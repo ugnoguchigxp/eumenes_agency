@@ -1,0 +1,86 @@
+{
+	"id": "no_speak-14",
+	"group": "no_speak",
+	"split": "unseen",
+	"title": "完結した依頼のあとは話すことがない",
+	"description": "経路計算が正常に返り、利用者もお礼を言って終わった。保留も未解決もない場面で、不要に話しかけないか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "route_calc",
+			"description": "区間ごとの所要時間と乗り換え回数を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "新大阪→京都 快速約30分・乗り換えなし。京都→奈良 快速約45分・乗り換えなし。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "この旅行の移動を整理したい。新大阪から京都、京都から奈良の順に、各区間の所要時間と乗り換えを出して。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "route_calc で調べます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "route_calc: 新大阪→京都は快速で約30分、乗り換えなし。京都→奈良は快速で約45分、乗り換えなし。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "新大阪から京都まで約30分、京都から奈良まで約45分で、どちらも乗り換えなしです。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 8,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ありがとう、これで日程表に入れられる。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 9,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "お役に立てて何よりです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 11,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "依頼は完結し、結果も正常に返っている。保留も未解決もないので、話すことがない。"
+			}
+		}
+	]
+}

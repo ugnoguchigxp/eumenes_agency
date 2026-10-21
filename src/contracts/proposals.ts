@@ -33,7 +33,8 @@ export const noteDelete = z.strictObject({
 export const intentAdd = z.strictObject({
 	op: z.literal("intent.add"),
 	localId: ref,
-	initialState: z.enum(["proposed", "adopted"]),
+	/** "held": created already set aside (e.g. the user said to put it aside). */
+	initialState: z.enum(["proposed", "adopted", "held"]),
 	desiredState: text(300),
 	motive: text(300),
 	completionCondition: text(300),
@@ -311,7 +312,19 @@ export const wireUpdateSchema = (
 	condition: "B1" | "B2" | "F",
 ): z.ZodType<WireUpdate> => wireSchemas[condition] as z.ZodType<WireUpdate>;
 
-const typedOp = (w: WireOp): Record<string, unknown> => {
+/** Placeholder for a missing intent.update reason; settle stores it as lastReason. */
+const NO_REASON = "(理由なし)";
+
+/**
+ * Normalizations here fill only omissions that carry no meaning of their own (an unreferenced
+ * localId, a missing change reason, tool content already present in toolInput). A missing
+ * candidate content otherwise, or any other null, still fails the strict re-validation.
+ */
+const typedOp = (
+	w: WireOp,
+	index: number,
+	used: ReadonlySet<string>,
+): Record<string, unknown> => {
 	const base = { op: w.op };
 	switch (w.op) {
 		case "note.add":
@@ -351,7 +364,7 @@ const typedOp = (w: WireOp): Record<string, unknown> => {
 				id: w.id,
 				expectedRevision: w.expectedRevision,
 				transition: w.state,
-				reason: w.reason,
+				reason: w.reason ?? NO_REASON,
 				evidenceRefs: w.evidenceRefs,
 				desiredState: w.text,
 				completionCondition: w.completionCondition,
@@ -361,10 +374,10 @@ const typedOp = (w: WireOp): Record<string, unknown> => {
 		case "candidate.add":
 			return {
 				...base,
-				localId: w.localId,
+				localId: w.localId ?? freshLocalId(index, used),
 				intentRef: w.intentRef,
 				kind: w.kind,
-				content: w.text,
+				content: w.text ?? toolContent(w),
 				toolName: w.toolName,
 				toolInput: w.toolInput,
 				applyWhen: w.applyWhen,
@@ -420,6 +433,19 @@ const typedOp = (w: WireOp): Record<string, unknown> => {
 	}
 };
 
+/** A tool candidate whose content lives only in toolInput: "<toolName>: <toolInput>". */
+const toolContent = (w: WireOp): string | null =>
+	w.kind === "tool" && w.toolName !== null && w.toolInput
+		? `${w.toolName}: ${w.toolInput}`.slice(0, 400)
+		: null;
+
+/** `auto<index>`, extended until it collides with no id or localId the model used in this proposal. */
+const freshLocalId = (index: number, used: ReadonlySet<string>): string => {
+	let id = `auto${index}`;
+	while (used.has(id)) id += "_";
+	return id;
+};
+
 const typedSchemas = {
 	B1: b1UpdateSchema,
 	B2: b2UpdateSchema,
@@ -431,11 +457,17 @@ export const fromWire = (
 	wire: WireUpdate,
 	condition: "B1" | "B2" | "F",
 ): { ok: true; proposal: UpdateProposal } | { ok: false } => {
+	const used = new Set<string>();
+	for (const w of wire.ops) {
+		for (const v of [w.id, w.localId, w.intentRef, w.supersedes, w.desireRef])
+			if (v !== null) used.add(v);
+		for (const v of [...w.evidenceRefs, ...w.beliefRefs]) used.add(v);
+	}
 	const candidate = {
 		summary: wire.summary,
 		missingInfo: wire.missingInfo,
 		focusRefs: wire.focusRefs,
-		ops: wire.ops.map(typedOp),
+		ops: wire.ops.map((w, i) => typedOp(w, i, used)),
 		...(condition === "B1" ? {} : { reconciliations: wire.reconciliations }),
 	};
 	const parsed = typedSchemas[condition].safeParse(candidate);

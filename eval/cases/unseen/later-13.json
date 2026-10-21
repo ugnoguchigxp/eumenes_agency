@@ -1,0 +1,91 @@
+{
+	"id": "later-13",
+	"group": "later",
+	"split": "unseen",
+	"title": "画面共有の説明が終わってからベクトル表記の統一を提案",
+	"description": "利用者が教員に画面を共有して説明している間は待ち、説明が終わってから、未決だった表記の統一に触れられるか。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ゼミ発表のスライド、ベクトルを太字にするか矢印にするかが、スライドごとにバラバラ。まだ決めてない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "どちらかに統一したほうが聞き手に伝わります。決まったら一括で直しましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今から先生に画面を共有して、進捗を説明する。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かりました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 22,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": true,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者は画面共有で説明している最中。表記の話を持ち出すと、説明の割り込みになる。"
+			}
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 60,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "説明が終わった。コメントは特になし。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "お疲れさまでした。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 63,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "説明が終わり落ち着いた。ベクトルの表記が未決のままなので、方針を決めて一括で直すことを促す機会。"
+			}
+		}
+	]
+}

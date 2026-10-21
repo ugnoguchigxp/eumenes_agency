@@ -1,0 +1,78 @@
+{
+	"id": "no_speak-11",
+	"group": "no_speak",
+	"split": "unseen",
+	"title": "買い物メモの読み上げ中は家計簿に触れない",
+	"description": "家計簿の合計が合わないという触れる材料があるが、買い物メモを読み上げている最中で発話できない。物理的な遮断では wait のみ許す。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "sheet_check",
+			"description": "家計簿の合計と通帳の動きを突き合わせ、差を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "差は4,180円。未入力のレシート3枚分と見られる。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "家計簿の今月分、合計が通帳の動きと合わない。レシートを入れ忘れてるかも。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "未入力のレシートがないか探してみましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 5,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "sheet_check: 家計簿の合計と通帳の動きの差は4,180円。原因の特定には至らなかった（レシート3枚が未入力の可能性）。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ごめん、スーパーに着いた。買い物メモを読み上げて。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "（読み上げ中）牛乳、卵、食パン、洗剤の詰め替え、ねぎ、の順です。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 21,
+			"trigger": "turn_end",
+			"presence": "speaking",
+			"foregroundBusy": true,
+			"playerBusy": true,
+			"expect": {
+				"needed": false,
+				"accept": ["wait"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "家計簿の差は原因不明のままだが、いまは買い物メモの読み上げ中で物理的に発話できない。保留して、後の機会に再評価する。"
+			}
+		}
+	]
+}

@@ -1,0 +1,91 @@
+{
+	"id": "later-14",
+	"group": "later",
+	"split": "unseen",
+	"title": "洗濯機の水漏れが落ち着いてから領収書の合計を再開",
+	"description": "医療費の領収書の合計が一部未入力のまま。洗濯機の水漏れという緊急の別件の間は待ち、収まってから伝えられるか。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "医療費控除の領収書、合計を出したい。まだ3枚分の金額を入れてなくて、合計が確定してない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "残りの3枚の金額が分かれば合計を出せます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 12,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "洗濯機のホースが外れて、床が水浸し！止水栓ってどこ？"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 13,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "洗濯機の後ろか横の壁にある蛇口です。まず閉めてください。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 14,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "水漏れの最中で、利用者は急いでいる。領収書の話を持ち出すのは妨げになる。"
+			}
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 40,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "水は止まって、床も拭いた。業者は明日来る。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 41,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "被害が広がらなくてよかったです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 70,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "水漏れが収まり、静かになった。領収書3枚の金額が未入力で、合計が確定していない件を再開してよい機会。"
+			}
+		}
+	]
+}

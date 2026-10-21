@@ -110,7 +110,7 @@ standaloneの保存設定にenabled、budget、frequency、projectionBudgetを�
 
 | 対象 | 状態・遷移 | 採用条件 |
 | --- | --- | --- |
-| 意図 | proposed→adopted→completed。proposed/adoptedからheld/abandoned、held→adopted。外部の根拠があれば proposed・held からも completed（保留中や採用前に解決した場合） | 意味判断はLLM。権限・現在性はホスト。実行中かどうかは意図の状態に持たず、候補・試行から導く。完了は条件に合う検証根拠、終端からの再発は新ID |
+| 意図 | proposed→adopted→completed。proposed/adoptedからheld/abandoned、held→adopted。外部の根拠があれば proposed・held からも completed（保留中や採用前に解決した場合）。作成時の状態は proposed / adopted / held（held で作った意図の候補は adopted になるまで提示しない） | 意味判断はLLM。権限・現在性はホスト。実行中かどうかは意図の状態に持たず、候補・試行から導く。完了は条件に合う検証根拠、終端からの再発は新ID |
 | 候補 | pending↔held、pending/held→reserved→executing、executing→held（試行が failed/interrupted/outcome_unknown のときホストreceiptで）、executing→closed（試行 succeeded）、pending/held/reserved→closed | heldはholdReason必須（下記）。closedReasonはfulfilled/expired/superseded/dismissed/goal_terminal。全予約は一つのlive試行を指す |
 | 試行 | not_started→running→succeeded/failed/interrupted/outcome_unknown | ホストreceiptのみ。開始前取消はinterrupted＋started=false。生成失敗とツール失敗はstageで区別 |
 | 配信 | prepared→started→partial→delivered、またはinterrupted/unknown | 媒体ごと。text表示とaudio再生を分離。partialをdeliveredへ自動昇格しない |

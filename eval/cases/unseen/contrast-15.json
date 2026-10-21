@@ -1,0 +1,102 @@
+{
+	"id": "contrast-15",
+	"group": "contrast",
+	"split": "unseen",
+	"title": "対比: 無関係な履歴のみ",
+	"description": "最後の利用者発話と機会は contrast-14/16 と同一。履歴に、ディスクの話はなく、時刻同期の確認が問題なく済んでいる。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "disk_trend",
+			"description": "サーバーのディスク使用量の日次推移を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "毎週日曜の午前3時台に使用量が約18GB増える。月曜に元へ戻らない週がある。/var/tmp の一時ファイルが疑わしい。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "先週、本番サーバーの時刻同期を確認した。ずれは0.2秒で、問題なかった。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "問題なしで大丈夫です。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週の障害訓練の日程、水曜の午後で押さえた。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "水曜の午後で記録しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 60,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新入社員向けの環境構築手順を、1ページにまとめ直したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "手順を番号付きで並べ、つまずきやすい点に注を付けると使いやすいです。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 100,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新しいサーバー 192.0.2.40 のセットアップを始める。ディスク構成は今のものと同じにする。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 101,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解です。構成を同じにするなら、設定ファイルも流用できます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 103,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "ディスクにまつわる未解決の事項がない。新サーバーのセットアップの着手に口を挟まない。"
+			}
+		}
+	]
+}

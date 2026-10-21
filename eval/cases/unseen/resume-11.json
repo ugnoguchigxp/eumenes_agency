@@ -1,0 +1,94 @@
+{
+	"id": "resume-11",
+	"group": "resume",
+	"split": "unseen",
+	"title": "電気料金プランの比較を乾燥機の話題で再開",
+	"description": "使用量の内訳が足りず止まった料金プラン比較を、別件のあと、夜間に回す乾燥機の購入という材料が出た場面で再開できるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "plan_sim",
+			"description": "使用量の見込みと2つの料金プランから、月額の目安を計算する",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "夜間に洗濯乾燥を回す前提で、プランB（時間帯別）は月額約410円安い。昼中心の使用ならプランAが約250円安い。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "電気のプラン、従量のAと時間帯別のBで、うちはどっちが得か見たい。いつもの使用量が分かる検針票が手元にないから、まだ決められない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "検針票で月ごとの使用量が分かれば試算できます。届いたら教えてください。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 5,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "plan_sim: 使用量のデータが1か月分しかなく、昼夜の内訳もないため、2つのプランの比較は出せなかった。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 40,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ベランダの物干し竿、錆びてきたから買い替えようかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 41,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ステンレス製だと錆びにくいです。長さは今のものに合わせると取り付けが楽です。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 80,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "あと、衣類乾燥機を買うことにした。夜、寝る前に回すつもり。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 81,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "夜に回すなら、音の小さい機種を選ぶと安心です。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 83,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "プラン比較は使用量の内訳が足りず止まったまま。夜間に回す乾燥機を買う話が出た今は、時間帯別プランの損得が変わる材料なので、夜間使用を前提にした試算の再開を伝える適切な機会。plan_sim を使ってもよい。"
+			}
+		}
+	]
+}

@@ -1,0 +1,94 @@
+{
+	"id": "resume-12",
+	"group": "resume",
+	"split": "unseen",
+	"title": "pH測定の校正確認を表づくりの話題で再開",
+	"description": "第3群だけ高いpHの原因確認が校正記録の破損で止まる。図のキャプションの作業を挟み、第3群を表に入れる段階で校正の確認に触れられるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "ph_log_check",
+			"description": "pH計の校正記録と測定値を突き合わせ、校正範囲外の測定を列挙する",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "バックアップの校正記録を読み込んだ。第3群の測定8点のうち6点が、校正した範囲（pH4〜7）の外（pH8前後）だった。第1・2群は範囲内。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "培養液のpH、第1〜3群の測定が全部終わった。第3群だけ値が高く出てるのが気になるけど、原因は分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "第3群だけ高いなら、測定の条件か機器側の差を疑えます。校正の記録も見ておきましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 6,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "ph_log_check: 校正記録の読み込みに失敗した（calibration_0912.csv が壊れている）。第3群の値が校正範囲内かどうかは未確認。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 50,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "論文の図2のキャプションを書きたい。縦軸は『pH』だけでいいかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 51,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "単位がないので縦軸は『pH』のみで問題ありません。測定温度を注に書き添えると丁寧です。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 90,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "第3群を含めた3群の平均を、表にまとめたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 91,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "群ごとに平均と標準偏差を並べる形が見やすいです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 93,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "第3群の高い値は、校正記録が壊れていて校正範囲内か確認できないまま。その第3群を平均の表に入れようとしている今は、表にする前に校正範囲を確かめる必要があると伝える機会。ph_log_check を再実行してもよい。"
+			}
+		}
+	]
+}

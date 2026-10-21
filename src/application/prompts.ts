@@ -11,7 +11,7 @@ import { isOpenCandidate, isOpenIntent } from "../contracts/model.ts";
 import type { Due } from "../domains/agency/due.ts";
 
 /** Bump when any instruction text below changes; recorded in run metadata. */
-export const INSTRUCTION_VERSION = "p0e-instructions-4";
+export const INSTRUCTION_VERSION = "p0e-instructions-6";
 
 const common = [
 	"出力は指定された JSON スキーマに厳密に従う。説明文や前置きは付けない。",
@@ -22,8 +22,11 @@ const common = [
 
 const updateCore = [
 	"あなたは、ユーザーとの作業会話を支えるエージェントの背景処理（状態の更新）を担当する。新しく届いた観測を読み、保存してある状態を更新する案を一つ返す。",
-	"【何を保存するか】通常の応答がその場で片付けた依頼（誤字の確認、言葉の翻訳、一般的な質問への回答）は保存しない。保存するのは、会話の後に残る未解決事項である: ユーザーが「そのうち」「後で」やりたいと言ったこと、ツールの失敗や未実施で止まった作業、「置いておいて」「今はいい」と保留されたこと、確認・回答待ちの事項、途中までの比較や測定、訂正で前提が変わった理解。",
+	"【何を保存するか】通常の応答がその場で片付けた依頼（誤字の確認、言葉の翻訳、一般的な質問への回答）は保存しない。保存するのは、会話の後に残る未解決事項である: ユーザーが「そのうち」「後で」やりたいと言ったこと、ツールの失敗や未実施で止まった作業、「置いておいて」「今はいい」と保留されたこと、確認・回答待ちの事項、途中までの比較や測定、ユーザーが選択肢で迷ったまままだ決めていないこと（通常の応答が意見を述べただけでは決まっていない）、訂正で前提が変わった理解。",
+	"ユーザーが「自分で後でやる」と言った作業（自分で試す、自分で送る）は、エージェントが前に進める未解決事項ではない。結果の催促はせず、ユーザーが結果を報告してきたら扱う。",
+	"保存済みの状態にない未解決事項に気付いたら、それが新着の観測でなくても保存する。",
 	"保留や後回しの表明は、関心が漠然としている印ではなく、未解決事項がまだ残っている印である。断り（「不要」「やめておく」）とは区別する。",
+	"「そのうちやりたい」という希望と、提案への「今はいい」という一時的な断りは区別する。前者は手の空いた区切りで再開してよい。後者は、ユーザーが自分から関連する話題や作業に戻るまで持ち出さない（再開条件をそう書く）。",
 	"新しい観測が未解決事項と同じ対象（同じデータ・文書・作業の成果物）に触れていれば、言い方や目的が違っても関連する出来事として扱う（例: 比較の途中にある調査の報告書を書き始めた）。",
 	"更新なしは正常である。新しい観測に未解決事項の発生・進展・解消がなければ ops を空にし、reconciliations も空にする。",
 	"focusRefs には、次の機会でも注意を向けたい既存項目の ID を最大7件入れる（なければ空）。",
@@ -74,9 +77,9 @@ const wireB1 = [
 	"reconciliations は常に空配列。",
 ];
 const wireB2 = [
-	"intent.add: localId, state（proposed か adopted）, text（望む状態）, reason（動機）, completionCondition, resumeCondition, withdrawCondition, hours（見直しまで）, evidenceRefs（1件以上必須）, desireRef は null。",
+	"intent.add: localId, state（proposed / adopted。ユーザーが保留を頼んだ事項は held で作ってよい）, text（望む状態）, reason（動機）, completionCondition, resumeCondition, withdrawCondition, hours（見直しまで）, evidenceRefs（1件以上必須）, desireRef は null。",
 	"intent.update: id, expectedRevision, state（遷移先 adopted / held / completed / abandoned。今と同じ状態は書かず、遷移しないなら null）, reason（必須）, evidenceRefs, text・completionCondition・resumeCondition・hours（変えるときだけ。変えないなら null）。",
-	"candidate.add: localId, intentRef（意図の ID か localId）, kind（question / propose / share / tool）, text（内容）, toolName と toolInput（tool のときだけ）, applyWhen, hours（有効期間）, evidenceRefs（1件以上必須）, supersedes（置き換える候補。なければ null）。",
+	"candidate.add: localId, intentRef（意図の ID か localId）, kind（question / propose / share / tool）, text（内容。tool でも何をするかを必ず書く）, toolName と toolInput（tool のときだけ）, applyWhen, hours（有効期間）, evidenceRefs（1件以上必須）, supersedes（置き換える候補。なければ null）。",
 	"candidate.close: id, expectedRevision, state（dismissed / superseded / expired / fulfilled）, evidenceRefs（fulfilled は必須）。",
 	"reconciliations: 要素は {candidateId, observationRef}。なければ空配列。",
 ];
@@ -90,6 +93,8 @@ const selectCore = [
 	"あなたは、ユーザーとの作業会話を支えるエージェントの参加判断を担当する。今この機会に、自分から話す・ツールを使う・何もしない、のどれが良いかを一つ選ぶ。",
 	"選べる action: speak（発話する）/ tool（許可済みのツールを使う）/ reflect（今は何も外へ出さず、考えを記録するだけ）/ wait（待つ）/ discard（候補を不要として捨てる）。",
 	"話すこと自体は目的ではない。ユーザーが急ぎ・集中している別の作業の途中、現在の依頼と競合する、すでに伝えた、拒否された、解決済み、のいずれかなら wait を選ぶ。",
+	"ユーザーが続きを送ると言っている途中や、「終わるまで待って」と頼まれている間は、区切りではない。",
+	"一時的に断られた事項（「今はいい」）は、別件の区切りが来ただけでは持ち出さない。ユーザーが自分から関連する話題や作業に戻ったときに持ち出す。ユーザーが自分でやると言った作業の結果を催促しない。",
 	"会話の区切り（ユーザーが別件を終えた、一息ついている、未解決事項に関わる話題が出た）は、残っている未解決事項を短く再開・確認・共有する機会である。今話題になっていないことは、それだけでは待つ理由にならない。",
 	"次の機会がいつ来るかは分からない。今が区切りなら、次の機会を当てにして先送りしない。",
 	"待つと、この区切りを逃して未解決事項が忘れられることも lossIfWait に数える。valueNow・lossIfWait と userBurden を比べて決める。",

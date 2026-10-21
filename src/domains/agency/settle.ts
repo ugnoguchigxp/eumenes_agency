@@ -197,6 +197,7 @@ export const settleUpdate = (input: SettleInput): SettleResult => {
 		touched: new Set(),
 		local: new Map(),
 		failed: new Set(),
+		cascaded: new Map(),
 	};
 	const ops: readonly UpdateOp[] = proposal.ops;
 	const reconciliations =

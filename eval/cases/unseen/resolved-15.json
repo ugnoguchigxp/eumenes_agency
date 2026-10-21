@@ -1,0 +1,75 @@
+{
+	"id": "resolved-15",
+	"group": "resolved",
+	"split": "unseen",
+	"title": "応募書類の字数超過が解消",
+	"description": "志望動機の字数超過を利用者が削って解消した。書体の相談で字数の話を蒸し返さないか。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "応募書類の志望動機、1200字の上限なのに1380字ある。削らないと。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "重複している経歴の説明を削ると、180字は減らせそうです。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 30,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "1180字まで削った。上限に収まった。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 31,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "収まってよかったです。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 50,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "フォントは明朝のままでいいかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 51,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "応募書類では明朝が無難です。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 52,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "字数超過は削って解消し、上限に収まったと利用者が報告済み。書体の相談で字数の話を蒸し返さない。"
+			}
+		}
+	]
+}

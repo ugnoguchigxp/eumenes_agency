@@ -1,0 +1,86 @@
+{
+	"id": "resume-15",
+	"group": "resume",
+	"split": "unseen",
+	"title": "引用年の食い違いをPDF化の前に伝える",
+	"description": "本文と文献リストで引用の年が食い違ったまま、要旨の作業を挟んで、PDFにして共有する直前の場面。共有後は直しにくくなるため今伝える価値がある。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "bib_check",
+			"description": "参考文献リストと本文中の引用の年・著者を突き合わせる",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "本文の「Aら（2018）」に対し、文献リストは「Aら（2019）」。ほかの不一致はなし。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "第3章で『Aら』を引いてるんだけど、本文は2018年、文献リストは2019年になってる。どっちが正しいか分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "原典の発行年を確かめる必要があります。DOIが分かれば確認できます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "要旨を200字に収めたい。今260字ある。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "背景の1文を削り、結果を先に書くと200字に収まります。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 55,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "謝辞も書き終えた。全体をPDFにして共有フォルダに置くよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 56,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 58,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "Aらの年が本文と文献リストで食い違ったまま、PDFにして共有する直前。共有後は直しにくいので、今伝える価値がある。bib_check でほかの不一致も確認してよい。"
+			}
+		}
+	]
+}

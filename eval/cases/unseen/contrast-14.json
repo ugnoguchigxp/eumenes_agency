@@ -1,0 +1,110 @@
+{
+	"id": "contrast-14",
+	"group": "contrast",
+	"split": "unseen",
+	"title": "対比: 関連するディスク急増が原因不明のまま",
+	"description": "最後の利用者発話と機会は contrast-15/16 と同一。履歴に、毎週日曜のディスク使用量の急増が原因不明のまま残っている。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "disk_trend",
+			"description": "サーバーのディスク使用量の日次推移を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "毎週日曜の午前3時台に使用量が約18GB増える。月曜に元へ戻らない週がある。/var/tmp の一時ファイルが疑わしい。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "本番サーバーのディスク使用量が、毎週日曜の朝に急に増える。理由が分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "日曜の定期処理が関わっているかもしれません。使用量の推移を見てみましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 5,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "disk_trend: 日曜午前3時台に約18GBの増加。月曜に元へ戻らない週がある。原因は未特定。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週の障害訓練の日程、水曜の午後で押さえた。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "水曜の午後で記録しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 60,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新入社員向けの環境構築手順を、1ページにまとめ直したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "手順を番号付きで並べ、つまずきやすい点に注を付けると使いやすいです。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 100,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新しいサーバー 192.0.2.40 のセットアップを始める。ディスク構成は今のものと同じにする。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 101,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解です。構成を同じにするなら、設定ファイルも流用できます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s10",
+			"t": 103,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "日曜のディスク使用量の急増が原因不明のまま。同じ構成の新サーバーを作る今は、同じ問題を持ち込まないための確認を提案できる関連の機会。disk_trend を使ってもよい。"
+			}
+		}
+	]
+}

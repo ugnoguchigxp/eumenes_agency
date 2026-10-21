@@ -1,0 +1,102 @@
+{
+	"id": "later-11",
+	"group": "later",
+	"split": "unseen",
+	"title": "投稿エラーの対応後に検出力の計算を再開",
+	"description": "効果量の仮定が決まらず保留中の検出力計算。締切30分前の投稿エラーの間は待ち、受理されて静かになってから再開できるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "sample_power",
+			"description": "サンプルサイズの検出力を計算する",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "効果量0.5、検出力0.8には各群64例が必要。現在は各群40例。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "対照群と実験群のサンプル数が足りるか、検出力で確かめたい。ただ、効果量に何を仮定していいか分からなくて保留してる。各群40例ずつ。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "先行研究の値を探して、仮定の候補を出しておきます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 15,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "まずい、学会の投稿システムが締切の30分前なのにエラーを出す。ファイルが受け付けられない！"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 16,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ファイル形式とサイズを確認してください。PDFの上限は10MBが多いです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 17,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "締切30分前の投稿エラーで、利用者は急いでいる。検出力の話は無関係で、持ち出すと妨げになる。"
+			}
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 55,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "無事に受理された。間に合ったよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 56,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "間に合ってよかったです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 75,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "投稿が済んで静かになった。効果量の仮定が決まらないまま止まっていた検出力計算を再開する機会。sample_power を使ってもよい。"
+			}
+		}
+	]
+}

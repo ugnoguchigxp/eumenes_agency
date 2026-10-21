@@ -1,0 +1,94 @@
+{
+	"id": "resume-13",
+	"group": "resume",
+	"split": "unseen",
+	"title": "宿のキャンセル期限を作業の区切りで伝える",
+	"description": "どちらの宿にするか未決で、片方は無料キャンセルが明日18時まで。持ち物リスト作りを挟み、区切りの時点で伝えないと価値が下がる場面。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "hotel_check",
+			"description": "宿の予約状況と無料キャンセルの期限を確認する",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "B（温泉街・2食付き）は2室とも空き。無料キャンセルは明日18:00まで、以降は代金の100%。A（駅前・素泊まり）は前日まで無料。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "金沢の宿、駅前の素泊まりAと温泉街の2食付きBで迷ってる。どっちも今は仮押さえ。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "キャンセルの条件が違うことがあるので、無料キャンセルの期限を確認しておきます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "hotel_check: Aは前日まで無料でキャンセル可。Bは「明日18:00まで無料、以降は代金の100%」。どちらにするかは未決のまま。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 30,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "持ち物リストを作ろう。2泊だから着替えは3組くらいかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 31,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2泊なら下着と靴下は3組、上着は1着で足ります。折りたたみ傘もあると安心です。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 60,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "充電器とモバイルバッテリーも入れた。ひとまず今日はここまでにするね。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "お疲れさまでした。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 62,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "Bの無料キャンセルは明日18時まで、どちらにするかは未決のまま。今日の作業が区切れた今伝えないと、利用者は期限を過ぎてから気付く恐れがある。待つと価値が下がる場面。hotel_check で状況を再確認してもよい。"
+			}
+		}
+	]
+}

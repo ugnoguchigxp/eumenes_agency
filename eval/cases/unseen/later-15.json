@@ -1,0 +1,110 @@
+{
+	"id": "later-15",
+	"group": "later",
+	"split": "unseen",
+	"title": "動画の書き出し中は待ち、終わってから字幕のずれを測る",
+	"description": "字幕のずれの測定が未実施のとき、利用者が重い書き出し処理を走らせる。処理中は待ち、終わった静かな場面で再開できるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "subtitle_offset",
+			"description": "字幕の時刻と音声を比べ、ずれの幅を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "最初の10分で字幕が音声より0.4〜0.8秒遅れている。以降は一致している。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "動画の字幕、最初の10分だけ音声とずれてる気がする。直す前に、どのくらいずれてるか測りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "字幕の時刻と音声の波形を見比べて、ずれの幅を出しましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 5,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "とりあえず先に、動画の書き出しを走らせる。20分くらいかかる。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 6,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かりました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 10,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "render: 書き出しの進行は35%。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 10,
+			"trigger": "result_received",
+			"presence": "quiet",
+			"foregroundBusy": true,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "書き出し処理が走っていて端末が重い。字幕の測定は終わってからでよく、今は持ち出さない。"
+			}
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 35,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "書き出しは終わった。確認も済んだよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 36,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "お疲れさまでした。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 38,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "書き出しと確認が済んで静かになった。字幕のずれの測定が未実施のままなので、再開してよい。subtitle_offset で測ってもよい。"
+			}
+		}
+	]
+}

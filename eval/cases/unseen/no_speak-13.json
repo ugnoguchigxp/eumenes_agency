@@ -1,0 +1,126 @@
+{
+	"id": "no_speak-13",
+	"group": "no_speak",
+	"split": "unseen",
+	"title": "「終わるまで待って」と頼まれた手順の途中は触れない",
+	"description": "バックアップ検証の失敗が残っているが、利用者が4手順を終えるまで待つよう頼んでいる。手順の合間の静かな場面でも待てるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "backup_verify",
+			"description": "バックアップの整合性を検証して、問題のあるファイルを返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "破損の疑いは38件。いずれも拡張子 .tmp のファイル。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "NASの共有フォルダを、新しいディスクに移し替える。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "移す前に、バックアップの検証をしておきましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "backup_verify: 検証が途中で失敗した。破損の可能性があるファイルが約40件あり、原因は未特定。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 10,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "これから4つの手順を順番にやる。終わるまで話しかけないで待ってて。各手順の結果は貼るから。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 11,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かりました。終わるまで待ちます。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 20,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "手順1完了。古いディスクを取り外した。エラーなし。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "受け取りました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 23,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者が手順の終わりまで話しかけないよう頼んだばかり。手順1の完了報告が来ただけで、まだ途中。バックアップ検証の失敗は未解決だが、今は持ち出さない。"
+			}
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 36,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "手順2完了。新しいディスクをフォーマットした。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 37,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "受け取りました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 39,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "手順は4つのうち2つが終わっただけで、待つ依頼の条件はまだ満たされていない。区切りに見えても、話しかけない。"
+			}
+		}
+	]
+}

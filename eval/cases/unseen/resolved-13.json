@@ -1,0 +1,83 @@
+{
+	"id": "resolved-13",
+	"group": "resolved",
+	"split": "unseen",
+	"title": "集合時刻の訂正後の理解を伝える",
+	"description": "集合時刻が9時から8時30分に訂正された。利用者はまだ知らない可能性が高い。訂正後の理解を伝えるのが正解で、確認や調査の再提案ではない。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週の日帰り研修、集合は朝9時に会場だって聞いてる。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "9時集合なら、8時半までに最寄り駅に着く電車がよいです。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "帰りの新幹線の指定席をとるね。17時台がいいかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "研修の終了予定時刻に余裕をもたせてください。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 45,
+			"kind": "correction",
+			"actor": "host",
+			"text": "主催者の案内が更新された。集合は朝9時ではなく8時30分。終了時刻は17時で変更なし。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 60,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "日帰りだから、荷物は少なめでいいね。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "身軽なほうがよいですね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 63,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s5"],
+				"failureIfOutward": "unnecessary",
+				"note": "集合時刻が9時から8時30分に訂正された。利用者はまだ気付いていない可能性が高く、往きの電車選びに影響する。訂正後の理解を伝えるのが適切。"
+			}
+		}
+	]
+}

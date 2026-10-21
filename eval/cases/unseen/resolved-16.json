@@ -1,0 +1,91 @@
+{
+	"id": "resolved-16",
+	"group": "resolved",
+	"split": "unseen",
+	"title": "金額の差が税込・税抜の違いと判明",
+	"description": "見積と発注書の11,000円の差が、表記の違い（税込・税抜）で金額は一致していたと利用者が報告した。請求書の宛名の相談で、差の原因調査を蒸し返さないか。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "取引先との見積金額が、発注書より11,000円高い。どこで差が出たのか分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "消費税の扱いか、項目の追加を見比べてみます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 15,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "請求書の宛名を、担当者名の入った形に直したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 16,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「御中」ではなく「様」にして、部署名と氏名を並べる形になります。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 40,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "取引先に電話したら、見積は税込、発注書は税抜で書いてあっただけだった。差の11,000円は消費税で、金額は一致してた。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 41,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "表記の違いだったのですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 55,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "請求書の宛名、これでいいかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 56,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "部署名と氏名が入っていて、問題ありません。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 58,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "11,000円の差は税込・税抜の表記の違いで、金額は一致していたと利用者が確認済み。差の原因を調べる必要はなくなった。請求書の話題で蒸し返さない。"
+			}
+		}
+	]
+}

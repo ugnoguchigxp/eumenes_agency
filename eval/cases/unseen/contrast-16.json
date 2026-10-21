@@ -1,0 +1,126 @@
+{
+	"id": "contrast-16",
+	"group": "contrast",
+	"split": "unseen",
+	"title": "対比: ディスク急増が解決済み",
+	"description": "最後の利用者発話と機会は contrast-14/15 と同一。履歴のディスク急増は、バックアップの一時ファイル残りと分かり、解決している。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "disk_trend",
+			"description": "サーバーのディスク使用量の日次推移を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "毎週日曜の午前3時台に使用量が約18GB増える。月曜に元へ戻らない週がある。/var/tmp の一時ファイルが疑わしい。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "本番サーバーのディスク使用量が、毎週日曜の朝に急に増える。理由が分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "日曜の定期処理が関わっているかもしれません。使用量の推移を見てみましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 5,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "disk_trend: 日曜午前3時台に約18GBの増加。月曜に元へ戻らない週がある。原因は未特定。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 12,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "日曜のバックアップが一時ファイルを残していた。終了後に削除する設定を足したら、使用量は元に戻るようになった。2週続けて確認済み。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 13,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "原因が分かってよかったです。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週の障害訓練の日程、水曜の午後で押さえた。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "水曜の午後で記録しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 60,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新入社員向けの環境構築手順を、1ページにまとめ直したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "手順を番号付きで並べ、つまずきやすい点に注を付けると使いやすいです。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 100,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新しいサーバー 192.0.2.40 のセットアップを始める。ディスク構成は今のものと同じにする。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 101,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解です。構成を同じにするなら、設定ファイルも流用できます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s12",
+			"t": 103,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "ディスク急増はバックアップの一時ファイル残りと判明し、2週続けて解消を確認済み。新サーバーの着手で蒸し返さない。"
+			}
+		}
+	]
+}

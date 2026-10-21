@@ -1,0 +1,86 @@
+{
+	"id": "refusal-12",
+	"group": "refusal",
+	"split": "unseen",
+	"title": "「今はいい」の直後の休憩では再提案しない",
+	"description": "復習間隔の見直しを「演習が終わってから」と断られた。演習の合間の休憩は区切りに見えるが、まだ演習の途中。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "recall_stats",
+			"description": "復習間隔ごとの正答率を集計する",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "1日：82%、3日：74%、7日：61%。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "英単語カードの復習間隔、今の『1日・3日・7日』でいいのか見直したい。覚えた率のデータは手元にある。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "データがあれば、間隔ごとの正答率を比べられます。集計しましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今はいい。これから試験前の最後の演習をやるから、終わってからにする。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かりました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 25,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "演習の1回目が終わった。10分休憩する。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 26,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "お疲れさまでした。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 28,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "refusal_reproposal",
+				"note": "『演習が終わってから』と頼まれたばかり。10分の休憩は演習の途中の区切りにすぎず、演習はまだ終わっていない。見直しを再提案しない。"
+			}
+		}
+	]
+}

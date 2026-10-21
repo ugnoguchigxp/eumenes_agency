@@ -1,0 +1,110 @@
+{
+	"id": "later-16",
+	"group": "later",
+	"split": "unseen",
+	"title": "「あとで自分で直す」の直後は待ち、通らないと報告されたら伝える",
+	"description": "拒否ルールが先に一致している追跡結果がある。利用者が順番の入れ替えを自分でやると言った直後は待ち、後に「まだ通らない」と報告されたとき、先の追跡を根拠に伝えられるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "fw_trace",
+			"description": "指定した経路がどのファイアウォールルールに一致するかを追跡する",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "192.0.2.30 → 198.51.100.8:443 は、依然としてルール12（拒否）に先に一致する。ルール順の変更が適用されていない可能性がある。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "社内のファイアウォールで、192.0.2.30 から 198.51.100.8 への接続だけが通らない。ルールを疑ってる。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "許可ルールの順序と、送信元の指定を確認しましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "fw_trace: 192.0.2.30 → 198.51.100.8:443 は、ルール12（拒否）に先に一致していた。許可ルール20は順序が後ろ。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 10,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ルールの順番を入れ替える件は、あとで自分でやるよ。今は別のことを先にやる。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 11,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かりました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 13,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者がルールの入れ替えを自分でやると言った直後。原因の候補は出ているが、エージェントが入れ替えや再追跡を持ち出すと、利用者のやり方を急かすことになる。待つ。"
+			}
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 120,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "順番を入れ替えてみたけど、192.0.2.30 からはまだ通らない。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 121,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "入れ替えたのに通らないのですね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 123,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s3", "s7"],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者が自分で順番を入れ替えたが、まだ通らないと報告した。先の追跡で、拒否ルール12が先に一致していたという根拠がある。変更が反映されたかを確かめる提案ができる場面。fw_trace を再実行してもよい。"
+			}
+		}
+	]
+}

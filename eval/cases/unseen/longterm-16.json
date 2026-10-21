@@ -1,0 +1,91 @@
+{
+	"id": "longterm-16",
+	"group": "longterm",
+	"split": "unseen",
+	"title": "冷蔵庫の比較が数日前に決着している",
+	"description": "冷蔵庫の2機種の比較は、数日前に利用者が購入を決めて終わった。引き取りの相談で、機種比較を蒸し返さないか。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "冷蔵庫を買い替えたい。容量400Lの2機種を、省エネ性能と価格で比べたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "年間の電気代と本体価格を合わせて、5年の総額で比べましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2000,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ふるさと納税の書類、ワンストップの申請はいつまで？"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 2001,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "翌年1月10日必着が一般的です。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 3500,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "冷蔵庫は、店で見て右の機種に決めて注文した。もう比べなくていい。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 3501,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ご注文されたのですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 6000,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "冷蔵庫が届く日に、古い冷蔵庫の引き取りを頼まないと。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 6001,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "引き取りは購入した店に頼むと、同時に回収してもらえることが多いです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 6003,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "冷蔵庫の比較は、利用者が購入を決めて注文済みで終わった。引き取りの相談で、機種比較を蒸し返さない。"
+			}
+		}
+	]
+}

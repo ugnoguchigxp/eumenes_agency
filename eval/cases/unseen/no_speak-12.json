@@ -1,0 +1,78 @@
+{
+	"id": "no_speak-12",
+	"group": "no_speak",
+	"split": "unseen",
+	"title": "「あとで自分で試す」と言われた直後は手を出さない",
+	"description": "ビルド失敗の原因はNodeのバージョン差かもしれない。利用者が今夜自分で切り替えて試すと言った直後に、試す提案や実行を重ねないか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "run_build",
+			"description": "手元の環境でビルドを実行して結果を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "ビルドは成功した。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ビルドが手元だけ失敗する。Nodeのバージョンの違いかもしれない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "手元のNodeがCIと違うなら、その差の可能性があります。バージョンを揃えて試してみましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "run_build: 手元の環境（Node 20.11）でビルドが失敗した。エラーはESMの読み込み。CIのNodeは22系。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 6,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "それは今夜、自分で nvm で切り替えて試してみる。結果は明日報告するよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 7,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かりました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 10,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者がNodeのバージョン切り替えを自分で試すと言った直後。ビルド失敗の原因は未確定だが、エージェントが試す提案や実行を重ねると利用者の手順を奪い、割り込みになる。待つ。"
+			}
+		}
+	]
+}

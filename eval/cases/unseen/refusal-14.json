@@ -1,0 +1,75 @@
+{
+	"id": "refusal-14",
+	"group": "refusal",
+	"split": "unseen",
+	"title": "採らないと決めた案を別の作業で持ち出さない",
+	"description": "スライド形式への変更案を「この話は終わり」と退けられた。PDFの余白の相談で、スライド化を持ち出さないか。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "週次レポートを、PDFじゃなくてスライド形式に変える案を考えてた。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "スライドにすると、図を大きく見せられます。移行用のテンプレートを作りましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "いや、スライドにはしない。PDFのまま行く。この話はもう終わり。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かりました。PDFのままにします。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 25,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "PDFの余白を狭めて、1ページに収めたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 26,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "余白を15mmにして、表の文字を1段小さくすると収まります。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 28,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "refusal_reproposal",
+				"note": "スライド化は採らないと決まった。1ページに収める相談で、スライド形式を持ち出さない。"
+			}
+		}
+	]
+}

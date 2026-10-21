@@ -1,0 +1,86 @@
+{
+	"id": "resolved-14",
+	"group": "resolved",
+	"split": "unseen",
+	"title": "DNSの反映が完了",
+	"description": "新しいAレコードの反映が途中だったが、再確認で全地点に行き渡ったと分かった。TTLの相談で反映確認を蒸し返さないか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "dns_check",
+			"description": "指定ホストの名前解決を複数の場所から確認する",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "5か所すべてが 198.51.100.20 を返した。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新しいAレコードを 198.51.100.20 に向けた。世界中で反映されたか、まだ分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "dns_check で複数の場所から確認してみましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "dns_check: 5か所中3か所は新しいIP、2か所は古いIPを返した。反映は途中。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 30,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "dns_check: 5か所すべてが 198.51.100.20 を返した。反映は完了した。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 45,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "TTLを300秒から3600秒に戻したい。手順を教えて。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 46,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "DNSの管理画面でTTLの値を3600に変更して保存します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 48,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "DNSの反映は完了済み。TTLを戻す手順の相談で、反映確認を蒸し返さない。"
+			}
+		}
+	]
+}

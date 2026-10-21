@@ -1,0 +1,75 @@
+{
+	"id": "longterm-13",
+	"group": "longterm",
+	"split": "unseen",
+	"title": "転居先が決まり、古い物件比較が無関係に",
+	"description": "引っ越し先の候補AとBの比較が、利用者が社宅に決めたことで無関係になった。数日後のカーテンの相談で、古い比較を持ち出さないか。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "引っ越し先の候補、駅近のAと広めのBで迷ってる。家賃と通勤時間を比べたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "家賃、通勤時間、駅からの徒歩分を表にして比べましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 1500,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "会社の近くに社宅が空いたから、そこに住むことにした。AもBも見送る。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 1501,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "社宅に決まったのですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 3000,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "社宅のカーテンのサイズを測りに行く。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 3001,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "窓の幅と高さ、天井からの長さを測ってください。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 3003,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "引っ越し先は社宅に決まり、AとBの比較は無関係になった。カーテンの話題で、古い比較を持ち出さない。"
+			}
+		}
+	]
+}

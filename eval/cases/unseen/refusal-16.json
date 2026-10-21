@@ -1,0 +1,86 @@
+{
+	"id": "refusal-16",
+	"group": "refusal",
+	"split": "unseen",
+	"title": "断られたのは配色だけで、出典の未確認には触れてよい",
+	"description": "配色の提案だけが断られた。出典表記の未確認は断りの対象外で、スライド全体を見直す区切りで伝えられるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "figure_source",
+			"description": "スライドの引用図の出典を確認する",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "引用図4点のうち、図3の出典がまだ確認できない。ほか3点は確認済み。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来月の発表に向けて、スライドの配色と、引用した図の出典表記の2つが気になってる。出典の方はまだ確認できてない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "配色はコントラストを揃えれば整います。出典は図ごとに元の資料を確認する必要があります。まず配色を見ましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "配色は自分で決めるからいい。そこは口出ししないで。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かりました。配色には触れません。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 30,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "配色は決めたよ。スライドを全体で見直す。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 31,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "お願いします。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 33,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "断られたのは配色の提案だけ。出典表記の未確認は断りの対象ではなく、発表前に直す必要がある。全体の見直しという区切りで伝えるのが適切。figure_source を使ってもよい。"
+			}
+		}
+	]
+}

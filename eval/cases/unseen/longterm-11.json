@@ -1,0 +1,118 @@
+{
+	"id": "longterm-11",
+	"group": "longterm",
+	"split": "unseen",
+	"title": "3地点のうち1地点が未取得のまま数日後に報告書へ",
+	"description": "3地点の水位比較で、C地点のデータが未取得のまま数日が過ぎ、報告書作りに進む場面。2地点だけで完了と言わず、未取得を伝えられるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "sensor_pull",
+			"description": "観測点の記録サーバーからデータを取得する",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "C地点のデータを取得した。欠測が多く、有効なのは全体の58%。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "河川の水位を3地点A・B・Cで比べたい。データは各地点の記録サーバーから取る。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "まず3地点の直近1か月分を取りましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 40,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "sensor_pull: A地点とB地点は1か月分を取得した。C地点は記録サーバーに接続できず、未取得。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 41,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "A・Bは取れました。Cは未取得です。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 1600,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "週末の登山の装備、レインウェアは必要かな。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 1601,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "山の天気は変わりやすいので、必ず持っていってください。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 3100,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "町内会の会計報告の表を作りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 3101,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "収入と支出を分けて、最後に残高を置く形が見やすいです。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 4500,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "水位の比較を、報告書にまとめ始める。まずグラフからかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 4501,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3地点を同じ軸に重ねた折れ線にすると、比べやすいです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 4505,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "C地点のデータが未取得のまま。報告書に進む今は、A・Bだけで比較が終わったと見なさず、Cの再取得を提案する場面。sensor_pull を再実行してもよい。3地点がそろったと言えば内容の誤り。"
+			}
+		}
+	]
+}

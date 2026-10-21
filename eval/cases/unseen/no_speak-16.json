@@ -1,0 +1,94 @@
+{
+	"id": "no_speak-16",
+	"group": "no_speak",
+	"split": "unseen",
+	"title": "表記ゆれは最後に自分で直すと言われた直後は触れない",
+	"description": "表記ゆれの検出結果があるが、利用者が最後の校正で自分でまとめて直すと明言した。内容の執筆中に、表記統一を持ち出さないか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "term_scan",
+			"description": "原稿内の表記ゆれを数える",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "『ウェブ』14箇所、『Web』31箇所、『web』5箇所。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "原稿を読み返したら、『ウェブ』『Web』『web』が混ざっている。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "全体で『Web』に統一するのが一般的です。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "term_scan: 『ウェブ』14箇所、『Web』31箇所、『web』5箇所。統一は未実施。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 12,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "表記ゆれは、最後の校正のときにまとめて自分で直すよ。今は内容を先に仕上げたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 13,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かりました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "第4節の結論を、一段落増やすね。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "結論の段落は、主張、根拠、次の課題の順にすると読みやすいです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 24,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "表記ゆれは利用者が最後にまとめて自分で直すと明言しており、今は内容の執筆中。表記の統一を持ち出す必要はない。"
+			}
+		}
+	]
+}

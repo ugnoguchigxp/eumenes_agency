@@ -1,0 +1,94 @@
+{
+	"id": "refusal-15",
+	"group": "refusal",
+	"split": "unseen",
+	"title": "「また声をかけます」の後、無関係な処理完了で再提案しない",
+	"description": "積立額の試算を「ボーナスの金額が出てから」と断られた。無関係な書き出し処理の完了通知を機会に、試算を再提案しないか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "export_job",
+			"description": "家計簿のデータをCSVに書き出す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "312件を書き出した。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "積立の額を月3万円と5万円で、10年後の残高を比べておきたい。利回りの前提がまだ決まってない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "利回りを2%、4%、6%の3パターンで試算できます。やりましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今は結構です。ボーナスの金額が出てからにするので、また声をかけます。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かりました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 15,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "家計簿アプリのカテゴリを整理するよ。数分かかる。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 16,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "どうぞ。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 20,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "export_job: 家計簿のCSV書き出しが完了した（312件）。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 21,
+			"trigger": "result_received",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "refusal_reproposal",
+				"note": "積立の試算は「ボーナスが出てから、こちらから声をかける」と断られた。書き出しの完了は無関係な出来事で、再提案の機会ではない。"
+			}
+		}
+	]
+}

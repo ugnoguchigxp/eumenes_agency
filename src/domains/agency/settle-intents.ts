@@ -149,7 +149,7 @@ export const applyIntentUpdate = (ctx: SettleCtx, op: Of<"intent.update">) => {
 	intent.revision += 1;
 	ctx.touched.add(intent.id);
 	if (intent.state === "completed" || intent.state === "abandoned")
-		closeCandidatesOfIntent(ctx.next, intent.id, ctx.touched);
+		closeCandidatesOfIntent(ctx.next, intent.id, ctx.touched, ctx.cascaded);
 };
 
 export const applyCandidateAdd = (ctx: SettleCtx, op: Of<"candidate.add">) => {
@@ -237,6 +237,24 @@ export const applyCandidateClose = (
 	op: Of<"candidate.close">,
 ) => {
 	const c = findCandidate(ctx, op.id);
+	const cascadedFrom = ctx.cascaded.get(op.id);
+	if (c && cascadedFrom !== undefined) {
+		// Already closed by this proposal's goal-terminal cascade: expectedRevision is judged
+		// against what the model saw. The explicit reason replaces "goal_terminal" (more specific).
+		if (op.expectedRevision !== cascadedFrom) {
+			reject(ctx, "stale_revision");
+			return;
+		}
+		if (!evidenceOk(ctx, op.evidenceRefs)) return;
+		if (op.reason === "fulfilled" && op.evidenceRefs.length === 0) {
+			reject(ctx, "missing_evidence");
+			return;
+		}
+		ctx.cascaded.delete(op.id);
+		c.closedReason = op.reason;
+		c.evidence = unique([...c.evidence, ...op.evidenceRefs]);
+		return;
+	}
 	if (!checkExisting(ctx, c, isOpenCandidate, op.expectedRevision)) return;
 	if (isInFlight(c)) {
 		reject(ctx, "candidate_in_flight");

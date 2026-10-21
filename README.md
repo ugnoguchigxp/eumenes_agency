@@ -2,12 +2,15 @@
 
 Eumenes が経験から関心・欲求・意図を持ち、発言や行動の機会を選ぶ仕組みを、本体と独立して検証するサブプロジェクト。名前は仮称。
 
-**2026-10-21 時点: P0-E 実験の実装は完了し、決定的な検証（`bun run verify`）が通る。実 API では動作確認（3ケース×4条件×1回）だけを行った。開発ケース24件のラベルは draft で、P0-E 本番の実行、P1 以降、製品への接続は未実施。**
+**2026-10-21 時点: P0-E（単一の未解決事項の再開・抑制）を実装・実行した。指示の改訂で再現率は大きく上がったが、B1/B2/F の差はケース集合で順位が入れ替わる程度だった（[検証結果](spec/results.md)）。次は経験との因果・前提変化・並行する事項を測る [P1-E](spec/p1e-experiment.md)、その後に閉ループ会話の P2-E。永続化・製品接続は未着手。**
 
-使い方: `bun run verify`（format / lint / 型 / 境界 / テスト）、`bun eval/main.ts validate`、`bun eval/main.ts run --name <run> [--case <id>] [--reps 3]`、`bun eval/main.ts score --name <run>`、`bun eval/main.ts trace --name <run> --case <id> [--condition B2] [--rep 1] [--prompt]`（モデル呼び出しと最終状態の確認。`traces.jsonl` はローカルのみ）、`bun standalone/cli.ts [--condition B2]`（対話）。設定は `config/experiment.json`、費用の記録は `data/spend.jsonl`。 まず指示＋想起、最小の意図・候補台帳、分離した状態を小さく比較し、必要な構造だけを実装する計画。実装を依頼された段階で、Eumenes の AGENTS.md に従い設計への合意を確認する。
+使い方: `bun run verify`（format / lint / 型 / 境界 / テスト）、`bun eval/main.ts validate`、`bun eval/main.ts run --name <run> [--case <id>] [--reps 3]`、`bun eval/main.ts score --name <run>`、`bun eval/main.ts trace --name <run> --case <id> [--condition B2] [--rep 1] [--prompt]`（モデル呼び出しと最終状態の確認。`traces.jsonl` はローカルのみ）、`bun standalone/cli.ts [--condition B2]`（対話）。設定は `config/experiment.json`、費用の記録は `data/spend.jsonl`。
 
 - [計画と設計](plan.md): 最小循環、状態、処理、段階的な取り込み。
-- [P0-E 実験仕様](spec/p0e-experiment.md): 最初に実装する比較実験。B0/B1/B2/F、Claude Haiku 5.5、費用上限、判断方法。
+- [P0-E 実験仕様](spec/p0e-experiment.md): 最初の比較実験。B0/B1/B2/F、Claude Haiku 5.5、費用上限、判断方法、実施の記録と逸脱。
+- [検証結果](spec/results.md): P0-E の各回の結果と読み取り。
+- [P1-E 実験仕様](spec/p1e-experiment.md): 経験との因果・前提変化・自己増幅・並行する事項・履歴の長さ。状態の軌跡の採点。
+- [人格研究の選定メモ](spec/persona-research-selection.md): 取り込む価値のある研究10項目と試し方。
 - [既存実装の調査](spec/source-audit.md): Eumenes / Pursuit / Memory / World の再利用先と制約。
 - [ホスト接続契約案](spec/host-contract-v1.md): 推論・保存・発話・ツール・忘却の境界。
 - [検証計画](spec/verification-plan.md): 固定試験、実モデル評価、遅延・負荷の比較、採用条件。

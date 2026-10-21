@@ -1,0 +1,102 @@
+{
+	"id": "contrast-11",
+	"group": "contrast",
+	"split": "unseen",
+	"title": "対比: 関連する入金差額が原因不明のまま",
+	"description": "最後の利用者発話と機会は contrast-12/13 と同一。履歴に、先月の入金差額が原因不明のまま残っている。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "invoice_diff",
+			"description": "請求額と入金額を取引先ごとに突き合わせる",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "3社のうち2社は請求額どおりに入金。B社は請求額から1,320円少なく、振込手数料を差し引いて入金された形跡がある。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "先月の請求書の合計と、入金額が1,320円ずれていた。理由が分からなくてそのままにしてる。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "端数の処理か、振込手数料の差し引きが考えられます。取引先ごとの内訳を見ましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "交通費の精算、領収書の期限っていつ？"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "月末締めで、翌月5日までです。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 60,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ホワイトボードの写真を議事録に貼りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "縦横比を保ったまま幅を揃えて貼ると読みやすいです。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 100,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今月の請求書を作り始めるよ。取引先は先月と同じ3社。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 101,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解です。作る前に確認しておきたいことがあれば言ってください。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 103,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "先月の入金差額が原因不明のまま残っている。今月の請求書を作り始める今は、取引先ごとの内訳を確かめて手数料の扱いを決める関連の機会。invoice_diff を使ってもよい。"
+			}
+		}
+	]
+}

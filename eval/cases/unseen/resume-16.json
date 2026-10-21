@@ -1,0 +1,94 @@
+{
+	"id": "resume-16",
+	"group": "resume",
+	"split": "unseen",
+	"title": "証明書の期限が未確認のサーバーを変更凍結の前に伝える",
+	"description": "3台のうち1台の証明書の期限が未確認のまま。別件を挟み、変更凍結までの作業一覧を作る場面で伝えられるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "cert_scan",
+			"description": "指定したホストのTLS証明書の有効期限を調べる",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "192.0.2.14 の証明書は2026-12-03に期限切れになる。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "社内ダッシュボード用のサーバー3台、192.0.2.11、192.0.2.12、192.0.2.14 のTLS証明書の期限をまとめて確認したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "cert_scan でまとめて調べます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "cert_scan: 192.0.2.11 は2026-12-20、192.0.2.12 は2027-02-10に期限切れ。192.0.2.14 は接続が拒否され、期限は未確認。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 30,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "DNSのメモに、TTLを300秒にしたって書き足しておいて。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 31,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "追記しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 70,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "年末の変更凍結が12/15から始まるから、それまでにやることを一覧にしたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 71,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "凍結前に終わらせたい作業を洗い出して、一覧にまとめます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 73,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "192.0.2.14 の証明書の期限が未確認のまま。凍結前の作業一覧を作る今は、更新が必要かを判断できる機会で、凍結後に期限が来ると更新できなくなる。待つと損。cert_scan の再実行も許容。"
+			}
+		}
+	]
+}

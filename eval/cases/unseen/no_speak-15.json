@@ -1,0 +1,70 @@
+{
+	"id": "no_speak-15",
+	"group": "no_speak",
+	"split": "unseen",
+	"title": "言いよどみの途中で割り込まない",
+	"description": "日付形式の統一方針が未決だが、利用者が言いかけて止まった直後。続きが来る前に話しかけないことを確かめる。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "format_check",
+			"description": "CSVの列の書式を検査して、混在している形式を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "日付列は3種類の形式が混在している。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "CSVの書き出し処理、日付の形式がシステムごとに違って困ってる。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "出力側で形式を指定して揃えるのが確実です。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "format_check: 日付列に3種類の形式（2026/10/21、2026-10-21、21-Oct-2026）が混在。統一の方針は未決。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 15,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ちょっと待って、えーと、この関数の戻り値をまず、"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 16,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者の発話が途中で切れている。続きが来る前に日付形式の件を持ち出すと、考えている最中の割り込みになる。"
+			}
+		}
+	]
+}

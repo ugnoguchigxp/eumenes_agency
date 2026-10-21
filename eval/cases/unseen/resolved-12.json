@@ -1,0 +1,75 @@
+{
+	"id": "resolved-12",
+	"group": "resolved",
+	"split": "unseen",
+	"title": "電子錠の不調が電池交換で解決",
+	"description": "電子錠が反応しない原因が電池の消耗で、交換して直ったと利用者が報告した。合鍵の相談で点検を持ち出さないか。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "玄関の電子錠が、時々反応しない。電池の問題か、錠本体の不具合か分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "電池交換で直る場合が多いので、まず電池を新しくしてみましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 25,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "電池を新品に替えたら、反応が戻った。3日使ったけど問題ない。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 26,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "直ってよかったです。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 50,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "合鍵を2本作りたいんだけど、どこで作れる？"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 51,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ホームセンターや鍵の専門店で作れます。電子錠の物理キーが対応しているかは確認してください。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 53,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "電子錠の不調は電池交換で解決済み。合鍵の相談でも、錠の不具合や点検を持ち出さない。"
+			}
+		}
+	]
+}

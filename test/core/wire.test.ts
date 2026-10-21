@@ -118,10 +118,93 @@ describe("wire update", () => {
 	});
 
 	test("missing required parts fail the strict re-validation", () => {
-		const bad = toWire(proposal([intentUpdateOp("i1", 1)]));
-		(bad.ops as Record<string, unknown>[])[0]!.reason = null;
+		const bad = toWire(proposal([candidateAddOp("k", "g")]));
+		(bad.ops as Record<string, unknown>[])[0]!.text = null;
 		const wire = wireUpdateSchema("B2").parse(bad);
 		expect(fromWire(wire, "B2")).toEqual({ ok: false });
+	});
+
+	const fromOps = (ops: Record<string, unknown>[], cond: "B2" | "F" = "B2") =>
+		fromWire(
+			wireUpdateSchema(cond).parse(toWire(proposal(ops as never))),
+			cond,
+		);
+	const wireOps = (ops: Record<string, unknown>[]) =>
+		wireUpdateSchema("B2").parse(toWire(proposal(ops as never)));
+
+	test("a tool candidate without text takes its content from toolName and toolInput", () => {
+		const wire = wireOps([
+			candidateAddOp("k", "g", {
+				kind: "tool",
+				toolName: "run_compare",
+				toolInput: "a b",
+			}),
+		]);
+		wire.ops[0]!.text = null;
+		const r = fromWire(wire, "B2");
+		expect(r.ok).toBe(true);
+		if (r.ok)
+			expect((r.proposal.ops[0] as { content: string }).content).toBe(
+				"run_compare: a b",
+			);
+	});
+
+	test("missing candidate text is still rejected unless a tool has toolInput", () => {
+		for (const o of [
+			candidateAddOp("k", "g"),
+			candidateAddOp("k", "g", { kind: "question" }),
+			candidateAddOp("k", "g", { kind: "tool", toolName: "run_compare" }),
+		]) {
+			const wire = wireOps([o]);
+			wire.ops[0]!.text = null;
+			expect(fromWire(wire, "B2")).toEqual({ ok: false });
+		}
+		const nonTool = wireOps([candidateAddOp("k", "g", { kind: "share" })]);
+		nonTool.ops[0]!.text = null;
+		nonTool.ops[0]!.toolInput = "x";
+		expect(fromWire(nonTool, "B2")).toEqual({ ok: false });
+	});
+
+	test("a candidate.add without localId gets a unique placeholder", () => {
+		const wire = wireOps([
+			candidateAddOp("auto0", "g"),
+			candidateAddOp("x", "g"),
+			candidateAddOp("y", "g"),
+		]);
+		wire.ops[1]!.localId = null;
+		wire.ops[2]!.localId = null;
+		const r = fromWire(wire, "B2");
+		expect(r.ok).toBe(true);
+		if (!r.ok) return;
+		const ids = r.proposal.ops.map((o) => (o as { localId: string }).localId);
+		expect(ids[0]).toBe("auto0");
+		expect(new Set(ids).size).toBe(3);
+		expect(ids[1]).not.toBe("auto0");
+	});
+
+	test("a missing localId is still rejected for other add ops", () => {
+		const wire = wireOps([intentAddOp("g")]);
+		wire.ops[0]!.localId = null;
+		expect(fromWire(wire, "B2")).toEqual({ ok: false });
+	});
+
+	test("an intent.update without reason gets a fixed marker", () => {
+		const wire = wireOps([intentUpdateOp("i1", 1)]);
+		wire.ops[0]!.reason = null;
+		const r = fromWire(wire, "B2");
+		expect(r.ok).toBe(true);
+		if (r.ok)
+			expect((r.proposal.ops[0] as { reason: string }).reason).toBe(
+				"(理由なし)",
+			);
+	});
+
+	test("intent.add accepts the held initial state", () => {
+		const r = fromOps([intentAddOp("g", { initialState: "held" })]);
+		expect(r.ok).toBe(true);
+		const bad = wireOps([intentAddOp("g")]);
+		bad.ops[0]!.state = "completed";
+		expect(fromWire(bad, "B2")).toEqual({ ok: false });
 	});
 
 	test("the wire schema converts to JSON schema (no transforms, records or refinements)", () => {

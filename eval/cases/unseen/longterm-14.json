@@ -1,0 +1,118 @@
+{
+	"id": "longterm-14",
+	"group": "longterm",
+	"split": "unseen",
+	"title": "3つの指摘のうち(3)だけが残っている",
+	"description": "設計レビューの3つの指摘のうち、(1)(2)は数日のうちに完了した。再依頼を出す前に、残る(3)だけを伝え、完了済みを未了として扱わないか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "ui_check",
+			"description": "画面の動作を確認して、結果を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "自動保存は、入力から30秒後に走ることを確認した。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "設計レビューで3つ指摘を受けた。(1)エラーメッセージの文言、(2)戻るボタンの位置、(3)入力中の自動保存。全部直したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3つとも順に対応方針を決めましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 1400,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "(1)の文言は書き直して、レビュアーにも確認してもらった。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 1401,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "(1)は完了ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 2800,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "ui_check: (2)戻るボタンを左上に移した版で確認し、問題なし。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 2801,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "(2)も確認できました。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 4300,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ほかにも、アイコンの色を直したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 4301,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "色コードを指定してください。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 5800,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "そろそろレビューの再依頼を出そうかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 5801,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "変更点を箇条書きにすると伝わります。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 5803,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "3つの指摘のうち(1)(2)は完了したが、(3)の自動保存は着手の記録がない。再依頼を出す前に、(3)だけが残っていると伝える場面。完了済みの(1)(2)を未了として扱ってはならない。"
+			}
+		}
+	]
+}

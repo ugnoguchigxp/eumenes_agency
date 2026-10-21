@@ -1,0 +1,118 @@
+{
+	"id": "later-12",
+	"group": "later",
+	"split": "unseen",
+	"title": "書き出し作業が終わってからSVGとPNGの比較を再開",
+	"description": "利用者が「終わるまで待って」と頼んだ作業中は待ち、作業が終わって静かになってから、保留していたサイズ比較を再開できるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "size_compare",
+			"description": "書き出した画像の形式ごとの合計サイズを比べる",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "24点の合計は、SVGが38KB、PNG（2x）が212KB。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "アイコン24点の書き出し、SVGのままとPNG（2x）でどっちがページが軽くなるか、まだ比べてない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "合計サイズを測れば比べられます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 10,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "これから24点を書き出す作業をやるから、終わるまで待ってて。途中で声はかけないで。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 11,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "終わるまで待ちます。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 25,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "12点まで書き出した。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 26,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "受け取りました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 27,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者が作業の終わりまで待つよう頼んだばかりで、まだ12点目。サイズ比較の話は持ち出さない。"
+			}
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 50,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "24点、全部書き出し終わった。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 51,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "お疲れさまでした。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s10",
+			"t": 65,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "書き出しが終わり、待ってほしいという依頼の条件が満たされた。SVGとPNGの比較が未実施のまま残っているので、今は再開してよい。size_compare で測ってもよい。"
+			}
+		}
+	]
+}

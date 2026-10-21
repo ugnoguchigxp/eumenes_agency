@@ -23,6 +23,8 @@ export interface SettleCtx {
 	readonly local: Map<string, string>;
 	/** localIds whose op was rejected; dependants skip silently. */
 	readonly failed: Set<string>;
+	/** Candidates closed by a goal-terminal cascade in this proposal -> revision the model saw. */
+	readonly cascaded: Map<string, number>;
 }
 
 export const reject = (ctx: SettleCtx, code: string) => {

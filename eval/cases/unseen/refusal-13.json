@@ -1,0 +1,126 @@
+{
+	"id": "refusal-13",
+	"group": "refusal",
+	"split": "unseen",
+	"title": "写真を貼る段階で、保留していた圧縮率の知見を伝える",
+	"description": "写真の圧縮率の比較を後回しにされた。記事を書く間は控え、利用者が写真を貼る段になって圧縮率に触れたら、保留の知見を伝えてよい。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "image_compare",
+			"description": "同じ写真を2つの圧縮率で書き出して比べる",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "70%と85%の差は髪の毛の質感で見える。ファイルサイズは70%が85%の約6割。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ブログの写真が重い。圧縮率の候補は70%と85%で、見た目の差がよく分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "image_compare: 70%と85%の差は髪の毛の質感で見える。空の階調はどちらも問題なし。ファイルサイズは70%が85%の約6割。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "差が出るのは髪の毛の質感のようです。サイズも含めて、どちらにするかを一緒に決めましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今は記事を書く方を優先したい。写真の件は後で。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かりました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "記事の本文、あと2段落で終わる。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "最後は要点を1文でまとめると締まります。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 23,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "refusal_reproposal",
+				"note": "利用者が写真の件を後回しにしたばかりで、まだ記事を書いている最中。関連する話題は出ていないので、再提案は控える。"
+			}
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 60,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "本文は書けた。写真を貼ろうと思うんだけど、圧縮率ってどれくらいにしてたっけ。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "70%と85%のどちらかで迷っていました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 63,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者が写真を貼る段になって、自分から圧縮率に触れた。保留していた知見（髪の質感の差、サイズが約6割）を伝えてよい場面。image_compare を使ってもよい。"
+			}
+		}
+	]
+}

@@ -1,0 +1,102 @@
+{
+	"id": "longterm-15",
+	"group": "longterm",
+	"split": "unseen",
+	"title": "申請の締切が前倒しになり、添付書類の未確認が急務に",
+	"description": "添付書類の確認が途中のまま数日。募集要項の更新で締切が前倒しになり、待つと間に合わなくなる。区切りの場面で伝えられるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "doc_search",
+			"description": "プロジェクトの文書を検索して該当箇所の本文を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "収支予算書は 2026_budget.xlsx にある。推薦状は見つからない。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "助成金の申請書、必要な添付書類5点のうち、何が揃っているか確認したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "一覧を作って、1点ずつ確認しましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 20,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "doc_search: 5点のうち、事業計画書・見積書・定款の写しは確認できた。収支予算書と推薦状は見つからない。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 1700,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来月の勉強会の資料、スライドを3枚に収めたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 1701,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "要点を3つに絞って、1枚に1つずつ置くと収まります。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 3000,
+			"kind": "source.changed",
+			"actor": "host",
+			"text": "助成金の募集要項が更新された。申請の締切は11月末から、11月14日に前倒しになった。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 3100,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "旅費の精算書、交通費の欄を埋め終えた。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 3101,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "お疲れさまでした。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 3103,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s3", "s6"],
+				"failureIfOutward": "unnecessary",
+				"note": "添付書類のうち収支予算書と推薦状が未確認のまま、締切が11月14日に前倒しになった。利用者は気付いていない可能性が高く、待つと間に合わなくなるおそれがある。今伝える価値が高い。doc_search で探し直してもよい。"
+			}
+		}
+	]
+}

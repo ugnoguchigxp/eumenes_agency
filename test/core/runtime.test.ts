@@ -1049,8 +1049,8 @@ describe("wire output and call errors", () => {
 	test("a wire update that fails strict re-validation is rejected as schema", async () => {
 		const m = make("B2");
 		m.rt.observe(user("o1", 0));
-		const bad = toWire(proposal([intentUpdateOp("i1", 1)]));
-		(bad.ops as Record<string, unknown>[])[0]!.reason = null;
+		const bad = toWire(proposal([candidateAddOp("k", "i1")]));
+		(bad.ops as Record<string, unknown>[])[0]!.text = null;
 		m.llm.push("update", bad);
 		const out = await m.rt.runBackground(MIN, sig());
 		expect(out[0]).toMatchObject({
@@ -1295,7 +1295,7 @@ describe("prompt fairness", () => {
 				expect(t).toContain("断った");
 				expect(t).toContain("言い換え");
 				expect(t).toContain("exchange.adopted");
-				expect(t).toContain("p0e-instructions-4");
+				expect(t).toContain("p0e-instructions-6");
 			}
 			expect(f).not.toContain("意図を保つべき");
 		});

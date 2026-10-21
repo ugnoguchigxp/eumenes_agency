@@ -1,0 +1,94 @@
+{
+	"id": "resume-14",
+	"group": "resume",
+	"split": "unseen",
+	"title": "ボタン色のコントラスト確認を次の画面に進む前に再開",
+	"description": "色コードの入力エラーで一度も計算されなかったコントラスト確認を、別の文言作業を挟んだあと、次の画面へ進む区切りで再開できるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "contrast_check",
+			"description": "文字色と背景色のコントラスト比を計算する",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "文字#FFFFFF／背景#4A90D9 のコントラスト比は3.4:1。通常サイズの文字の基準（4.5:1）に届かない。背景を#2F6FB8にすると5.1:1。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "登録ボタンの背景を#4A90D9、文字を白にしたい。見やすさの基準を満たしてるかは、まだ確かめてない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "コントラスト比を計算して、基準に届くか確認しましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "contrast_check: 色コードの形式が不正で計算できなかった（'#4A90D9 ' の末尾に空白が入っていた）。基準に届くかは未確認。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 25,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ヘッダの見出し、『はじめに』と『はじめましょう』のどっちが柔らかいかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 26,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "『はじめましょう』のほうが呼びかけの調子で、柔らかいです。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 50,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ボタンの文言は『登録する』に決めた。次はフォームの入力欄に進むよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 51,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解です。入力欄はラベルを上に置くと崩れにくいです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 53,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "ボタンの色の確認が、色コードの入力エラーで一度も実行されないまま。ボタンが仕上がり、次の部品へ進む区切りなので、確認の再開を伝える機会。contrast_check を空白を除いて再実行してもよい。"
+			}
+		}
+	]
+}

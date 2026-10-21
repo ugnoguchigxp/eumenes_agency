@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AgencyState, Limits } from "../../src/contracts/model.ts";
+import { presentableCandidates } from "../../src/domains/agency/lifecycle.ts";
 import { settleUpdate } from "../../src/domains/agency/settle.ts";
 import {
 	applyOrThrow,
@@ -288,6 +289,30 @@ describe("settle: reject codes", () => {
 		expect(back.kind).toBe("applied");
 	});
 
+	test("an intent can be created held; its candidates wait until it is adopted", () => {
+		const held = applyOrThrow(
+			emptyState(),
+			proposal([
+				intentAddOp("g", { initialState: "held" }),
+				candidateAddOp("k", "g"),
+			]),
+			[o1],
+		);
+		expect(held.intents[0]?.state).toBe("held");
+		expect(held.candidates).toHaveLength(1);
+		expect(presentableCandidates(held)).toEqual([]);
+		const back = applyOrThrow(
+			held,
+			proposal([
+				intentUpdateOp(held.intents[0]!.id, 1, { transition: "adopted" }),
+			]),
+			[o1],
+		);
+		expect(presentableCandidates(back).map((c) => c.id)).toEqual([
+			held.candidates[0]!.id,
+		]);
+	});
+
 	test("completion needs newer evidence from a non-agent actor", () => {
 		const s = base();
 		const complete = (refs: string[]) =>
@@ -346,6 +371,90 @@ describe("settle: reject codes", () => {
 		expect(c?.closedReason).toBe("goal_terminal");
 		expect(c?.revision).toBe(2);
 		expect(r.touched).toContain("c2");
+	});
+
+	test("explicit candidate.close after a terminal intent cascade is accepted (pre-proposal revisions)", () => {
+		const r = run(
+			base(),
+			proposal([
+				intentUpdateOp("i1", 1, { transition: "abandoned" }),
+				candidateCloseOp("c2", 1, { reason: "dismissed" }),
+			]),
+		);
+		if (r.kind !== "applied")
+			throw new Error(`expected applied: ${codesOf(r)}`);
+		const c = r.state.candidates[0];
+		expect(c?.state).toBe("closed");
+		expect(c?.closedReason).toBe("dismissed");
+		expect(c?.revision).toBe(2);
+		expect(r.state.intents[0]?.state).toBe("abandoned");
+	});
+
+	test("completed intent plus candidate.close fulfilled needs evidence and keeps the explicit reason", () => {
+		const ops = (evidenceRefs: string[]) => [
+			intentUpdateOp("i1", 1, {
+				transition: "completed",
+				evidenceRefs: ["o3"],
+			}),
+			candidateCloseOp("c2", 1, { reason: "fulfilled", evidenceRefs }),
+		];
+		expect(codesOf(run(base(), proposal(ops([]))))).toEqual([
+			"missing_evidence",
+		]);
+		const r = run(base(), proposal(ops(["o3"])));
+		if (r.kind !== "applied") throw new Error("expected applied");
+		expect(r.state.candidates[0]?.closedReason).toBe("fulfilled");
+		expect(r.state.candidates[0]?.evidence).toContain("o3");
+		expect(r.state.candidates[0]?.revision).toBe(2);
+	});
+
+	test("candidate.close before the terminal intent still works", () => {
+		const r = run(
+			base(),
+			proposal([
+				candidateCloseOp("c2", 1, { reason: "dismissed" }),
+				intentUpdateOp("i1", 1, { transition: "abandoned" }),
+			]),
+		);
+		if (r.kind !== "applied") throw new Error("expected applied");
+		expect(r.state.candidates[0]?.closedReason).toBe("dismissed");
+		expect(r.state.candidates[0]?.revision).toBe(2);
+	});
+
+	test("a cascaded candidate still rejects a revision that differs from the pre-proposal one", () => {
+		const r = run(
+			base(),
+			proposal([
+				intentUpdateOp("i1", 1, { transition: "abandoned" }),
+				candidateCloseOp("c2", 2),
+			]),
+		);
+		expect(codesOf(r)).toEqual(["stale_revision"]);
+		const r2 = run(
+			base(),
+			proposal([
+				intentUpdateOp("i1", 1, { transition: "abandoned" }),
+				candidateCloseOp("c2", 1),
+				candidateCloseOp("c2", 1),
+			]),
+		);
+		expect(codesOf(r2)).toEqual(["stale_revision"]);
+	});
+
+	test("an unrelated candidate is unaffected by another intent's cascade", () => {
+		const s0 = applyOrThrow(
+			base(),
+			proposal([intentAddOp("g2"), candidateAddOp("k2", "g2")]),
+			[o1],
+		);
+		const r = run(
+			s0,
+			proposal([
+				intentUpdateOp("i1", 1, { transition: "abandoned" }),
+				candidateCloseOp("c4", 7),
+			]),
+		);
+		expect(codesOf(r)).toEqual(["stale_revision"]);
 	});
 
 	test("review and expire hours are capped by limits", () => {

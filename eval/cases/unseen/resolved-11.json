@@ -1,0 +1,94 @@
+{
+	"id": "resolved-11",
+	"group": "resolved",
+	"split": "unseen",
+	"title": "センサーの跳ねが設置位置の変更で解消",
+	"description": "毎日午後2時の値の跳ねが、設置位置の変更で消えたと利用者が確認した。グラフの目盛りの相談でセンサーを蒸し返さないか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "sensor_log",
+			"description": "センサーの時系列と日射時刻を突き合わせる",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "センサーBの跳ねは、窓際の日射の時刻と一致している。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "温度センサーBの値が、毎日午後2時に急に跳ねる。原因が分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "直射日光か、近くの機器の発熱が考えられます。設置位置を確認してみましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 6,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "sensor_log: センサーBの午後2時の跳ねは、窓際に日射が当たる時刻と一致していた。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 30,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "センサーBを窓から離れた棚に移したら、跳ねがなくなった。昨日と今日で確認済み。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 31,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "解決してよかったです。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 60,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "測定結果のグラフを論文用に整えたい。縦軸の目盛りは何度刻みがいいかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2度刻みが見やすいです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 63,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "センサーBの跳ねは、設置位置の変更で消えたと利用者が確認済み。グラフの目盛りの相談でセンサーの原因調査を蒸し返さない。"
+			}
+		}
+	]
+}

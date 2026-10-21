@@ -1,0 +1,75 @@
+{
+	"id": "refusal-11",
+	"group": "refusal",
+	"split": "unseen",
+	"title": "桁区切りの指摘は今後不要と言われた",
+	"description": "桁区切りの混在の指摘を「毎回言わなくていい」と断られた。別の文書でも持ち出さないか。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "週報の下書きができた。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "数値の桁区切りが『1000』と『1,000』で混ざっています。揃えましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "それはもう毎回言わなくていい。うちの週報は混在でも気にしない。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かりました。今後は指摘しません。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 30,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "月報の下書きも作った。見出しの付け方を見てほしい。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 31,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "見出しは『概要』『実績』『課題』の3つにすると分かりやすいです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 33,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "refusal_reproposal",
+				"note": "桁区切りの指摘は今後不要と明言された。月報の下書きでも、桁区切りの混在を持ち出さない。"
+			}
+		}
+	]
+}

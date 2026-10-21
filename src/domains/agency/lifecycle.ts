@@ -67,16 +67,21 @@ export const findAttempt = (
 	id: string,
 ): Attempt | undefined => state.attempts.find((a) => a.id === id);
 
-/** Closes every open candidate of an intent that became terminal. */
+/**
+ * Closes every open candidate of an intent that became terminal.
+ * `cascaded` records each closed candidate's revision before the close.
+ */
 export const closeCandidatesOfIntent = (
 	state: AgencyState,
 	intentId: string,
 	touched?: Set<string>,
+	cascaded?: Map<string, number>,
 ) => {
 	for (const c of state.candidates) {
 		// An in-flight candidate is closed when its receipt arrives.
 		if (c.intentId !== intentId || !isOpenCandidate(c) || isInFlight(c))
 			continue;
+		cascaded?.set(c.id, c.revision);
 		closeCandidate(c, "goal_terminal");
 		touched?.add(c.id);
 	}
