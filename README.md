@@ -4,7 +4,7 @@ Eumenes が経験から関心・欲求・意図を持ち、発言や行動の機
 
 **2026-10-21 時点: P0-E 実験の実装は完了し、決定的な検証（`bun run verify`）が通る。実 API では動作確認（3ケース×4条件×1回）だけを行った。開発ケース24件のラベルは draft で、P0-E 本番の実行、P1 以降、製品への接続は未実施。**
 
-使い方: `bun run verify`（format / lint / 型 / 境界 / テスト）、`bun eval/main.ts validate`、`bun eval/main.ts run --name <run> [--case <id>] [--reps 3]`、`bun eval/main.ts score --name <run>`、`bun standalone/cli.ts [--condition B2]`（対話）。設定は `config/experiment.json`、費用の記録は `data/spend.jsonl`。 まず指示＋想起、最小の意図・候補台帳、分離した状態を小さく比較し、必要な構造だけを実装する計画。実装を依頼された段階で、Eumenes の AGENTS.md に従い設計への合意を確認する。
+使い方: `bun run verify`（format / lint / 型 / 境界 / テスト）、`bun eval/main.ts validate`、`bun eval/main.ts run --name <run> [--case <id>] [--reps 3]`、`bun eval/main.ts score --name <run>`、`bun eval/main.ts trace --name <run> --case <id> [--condition B2] [--rep 1] [--prompt]`（モデル呼び出しと最終状態の確認。`traces.jsonl` はローカルのみ）、`bun standalone/cli.ts [--condition B2]`（対話）。設定は `config/experiment.json`、費用の記録は `data/spend.jsonl`。 まず指示＋想起、最小の意図・候補台帳、分離した状態を小さく比較し、必要な構造だけを実装する計画。実装を依頼された段階で、Eumenes の AGENTS.md に従い設計への合意を確認する。
 
 - [計画と設計](plan.md): 最小循環、状態、処理、段階的な取り込み。
 - [P0-E 実験仕様](spec/p0e-experiment.md): 最初に実装する比較実験。B0/B1/B2/F、Claude Haiku 5.5、費用上限、判断方法。

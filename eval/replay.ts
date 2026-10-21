@@ -1,6 +1,10 @@
 /** Fake host: replays one Case through an AgencyRuntime and records a RunRecord. */
 import type { Case, OpportunityRecord, RunRecord } from "./contracts.ts";
-import type { Condition, ToolCapability } from "../src/contracts/model.ts";
+import type {
+	AgencyState,
+	Condition,
+	ToolCapability,
+} from "../src/contracts/model.ts";
 import { isOpenCandidate, isOpenIntent } from "../src/contracts/model.ts";
 import type {
 	ActionReceipt,
@@ -20,6 +24,8 @@ export interface ReplayOptions {
 	readonly timeoutMs?: number;
 	/** Pending observations that trigger a background run (budget.batchSize). Default 4. */
 	readonly batchSize?: number;
+	/** Called once with the runtime's final state (for trace recording). */
+	readonly onFinal?: (state: AgencyState) => void;
 }
 
 const isCallFailure = (code: string): boolean =>
@@ -236,6 +242,7 @@ export async function replayCase(
 				beliefs: state.beliefs.length,
 				desires: state.desires.length,
 			};
+			opts.onFinal?.(state);
 		} catch (e) {
 			error ??= errorMessage(e);
 		}

@@ -182,6 +182,7 @@ describe("settle: reject codes", () => {
 
 	test("illegal transitions", () => {
 		const s = base();
+		// proposed -> completed is allowed with external evidence (resolved before adoption)
 		expect(
 			codesOf(
 				run(
@@ -198,7 +199,7 @@ describe("settle: reject codes", () => {
 					]),
 				),
 			),
-		).toEqual(["illegal_transition"]);
+		).toEqual([]);
 		const held = applyOrThrow(
 			s,
 			proposal([intentUpdateOp("i1", 1, { transition: "abandoned" })]),
@@ -213,12 +214,64 @@ describe("settle: reject codes", () => {
 				),
 			),
 		).toEqual(["illegal_transition"]);
-		// adopted -> adopted
+		// held -> completed is allowed with external evidence (resolved while on hold)
+		const heldAgain = applyOrThrow(
+			s,
+			proposal([intentUpdateOp("i1", 1, { transition: "held" })]),
+			all,
+		);
 		expect(
 			codesOf(
-				run(s, proposal([intentUpdateOp("i1", 1, { transition: "adopted" })])),
+				run(
+					heldAgain,
+					proposal([
+						intentUpdateOp("i1", 2, {
+							transition: "completed",
+							evidenceRefs: ["o3"],
+						}),
+					]),
+				),
 			),
-		).toEqual(["illegal_transition"]);
+		).toEqual([]);
+	});
+
+	test("restating the current state is a no-op transition, not a rejection", () => {
+		const s = base();
+		const next = applyOrThrow(
+			s,
+			proposal([
+				intentUpdateOp("i1", 1, {
+					transition: "adopted",
+					desiredState: "changed",
+				}),
+			]),
+			all,
+		);
+		const i = next.intents.find((x) => x.id === "i1");
+		expect(i?.state).toBe("adopted");
+		expect(i?.desiredState).toBe("changed");
+		expect(i?.revision).toBe(2);
+		// same for a held intent
+		const held = applyOrThrow(
+			s,
+			proposal([intentUpdateOp("i1", 1, { transition: "held" })]),
+			all,
+		);
+		const again = applyOrThrow(
+			held,
+			proposal([intentUpdateOp("i1", 2, { transition: "held" })]),
+			all,
+		);
+		expect(again.intents.find((x) => x.id === "i1")?.state).toBe("held");
+		// the rest of a multi-op proposal survives
+		const r = run(
+			s,
+			proposal([
+				intentUpdateOp("i1", 1, { transition: "adopted" }),
+				candidateAddOp("k2", "i1"),
+			]),
+		);
+		expect(r.kind).toBe("applied");
 	});
 
 	test("held can resume to adopted", () => {

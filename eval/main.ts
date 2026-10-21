@@ -5,8 +5,10 @@
  *   bun eval/main.ts run --name <run> [--split dev] [--conditions B0,B1,B2,F] [--reps 3]
  *       [--case <id>] [--resume]
  *   bun eval/main.ts score --name <run>
+ *   bun eval/main.ts trace --name <run> --case <id> [--condition B2] [--rep 1] [--prompt]
  *
- * Results: eval/results/<name>/{runs.jsonl, summary.md}.
+ * Results: eval/results/<name>/{runs.jsonl, summary.md, traces.jsonl}.
+ * traces.jsonl (every model call + final state) is local only, not tracked.
  * `run` calls the real model and spends money; it stops at the spend limit or on
  * any safety observation.
  */
@@ -28,6 +30,7 @@ import {
 } from "./contracts.ts";
 import { isSpendLimit, replayCase } from "./replay.ts";
 import { latestRecords, summarize } from "./score.ts";
+import { createTraceRecorder, traceCommand } from "./trace.ts";
 import { conditions, type Condition } from "../src/contracts/model.ts";
 
 export const resultsRoot = resolve(import.meta.dir, "results");
@@ -265,6 +268,11 @@ async function runCommand(values: {
 	const budget = resolveBudget(settings);
 	assertResumeCompatible(existing, digest, INSTRUCTION_VERSION);
 	mkdirSync(dir, { recursive: true });
+	const recorder = createTraceRecorder(
+		llm,
+		join(dir, "traces.jsonl"),
+		values.name,
+	);
 
 	let n = 0;
 	let consecutiveIncomplete = 0;
@@ -276,6 +284,11 @@ async function runCommand(values: {
 			console.log(`stop: ${(error as Error).message}`);
 			return 3;
 		}
+		recorder.begin({
+			caseId: p.case.id,
+			condition: p.condition,
+			rep: p.rep,
+		});
 		const record = await replayCase(
 			p.case,
 			p.condition,
@@ -283,7 +296,7 @@ async function runCommand(values: {
 			(tools) =>
 				createAgencyRuntime({
 					condition: p.condition,
-					llm,
+					llm: recorder.llm,
 					tools,
 					budget,
 				}),
@@ -293,6 +306,7 @@ async function runCommand(values: {
 				instructionVersion: INSTRUCTION_VERSION,
 				spent: () => meter.spentUsd(),
 				batchSize: budget.batchSize,
+				onFinal: (state) => recorder.final(state),
 			},
 		);
 		appendFileSync(file, `${JSON.stringify(record)}\n`);
@@ -320,6 +334,9 @@ export async function main(argv: string[]): Promise<number> {
 			reps: { type: "string", default: "3" },
 			case: { type: "string" },
 			resume: { type: "boolean", default: false },
+			condition: { type: "string" },
+			rep: { type: "string" },
+			prompt: { type: "boolean", default: false },
 		},
 	});
 	const command = positionals[0];
@@ -329,6 +346,30 @@ export async function main(argv: string[]): Promise<number> {
 	}
 	if (command === "score") {
 		console.log(scoreCommand(runName(values.name)));
+		return 0;
+	}
+	if (command === "trace") {
+		if (!values.case) {
+			throw new Error(
+				"trace: --case <id> is required (usage: trace --name <run> --case <id> [--condition B2] [--rep 1] [--prompt])",
+			);
+		}
+		const rep = values.rep === undefined ? undefined : Number(values.rep);
+		if (rep !== undefined && (!Number.isInteger(rep) || rep < 1))
+			throw new Error("--rep must be an integer >= 1");
+		let condition: string | undefined;
+		if (values.condition !== undefined) {
+			const parsed = parseConditions(values.condition);
+			if (parsed.length !== 1) throw new Error("--condition takes one value");
+			condition = parsed[0];
+		}
+		console.log(
+			traceCommand(
+				join(resultsRoot, runName(values.name), "traces.jsonl"),
+				{ caseId: values.case, condition, rep },
+				{ prompt: values.prompt },
+			),
+		);
 		return 0;
 	}
 	if (command === "run") {
@@ -344,7 +385,7 @@ export async function main(argv: string[]): Promise<number> {
 			resume: values.resume,
 		});
 	}
-	console.error("usage: bun eval/main.ts <validate|run|score> [options]");
+	console.error("usage: bun eval/main.ts <validate|run|score|trace> [options]");
 	return 1;
 }
 

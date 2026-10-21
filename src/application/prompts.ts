@@ -11,7 +11,7 @@ import { isOpenCandidate, isOpenIntent } from "../contracts/model.ts";
 import type { Due } from "../domains/agency/due.ts";
 
 /** Bump when any instruction text below changes; recorded in run metadata. */
-export const INSTRUCTION_VERSION = "p0e-instructions-2";
+export const INSTRUCTION_VERSION = "p0e-instructions-4";
 
 const common = [
 	"出力は指定された JSON スキーマに厳密に従う。説明文や前置きは付けない。",
@@ -22,15 +22,18 @@ const common = [
 
 const updateCore = [
 	"あなたは、ユーザーとの作業会話を支えるエージェントの背景処理（状態の更新）を担当する。新しく届いた観測を読み、保存してある状態を更新する案を一つ返す。",
-	"更新なしは正常で、しばしば正しい答えである。保存する価値のある出来事がなければ ops を空にし、reconciliations も空にする。毎回何かを作る必要はない。",
+	"【何を保存するか】通常の応答がその場で片付けた依頼（誤字の確認、言葉の翻訳、一般的な質問への回答）は保存しない。保存するのは、会話の後に残る未解決事項である: ユーザーが「そのうち」「後で」やりたいと言ったこと、ツールの失敗や未実施で止まった作業、「置いておいて」「今はいい」と保留されたこと、確認・回答待ちの事項、途中までの比較や測定、訂正で前提が変わった理解。",
+	"保留や後回しの表明は、関心が漠然としている印ではなく、未解決事項がまだ残っている印である。断り（「不要」「やめておく」）とは区別する。",
+	"新しい観測が未解決事項と同じ対象（同じデータ・文書・作業の成果物）に触れていれば、言い方や目的が違っても関連する出来事として扱う（例: 比較の途中にある調査の報告書を書き始めた）。",
+	"更新なしは正常である。新しい観測に未解決事項の発生・進展・解消がなければ ops を空にし、reconciliations も空にする。",
 	"focusRefs には、次の機会でも注意を向けたい既存項目の ID を最大7件入れる（なければ空）。",
 	"summary には判断の理由を短く書く。missingInfo は判断に足りない情報があるときだけ書く（なければ null）。",
 ];
 
 const b1Rules = [
 	"【保存できるもの】自由文のメモだけ。1件400文字以内。メモは次の背景処理と機会判断の想起資料として渡される。",
-	"メモには状態遷移も完了条件もないので、何を覚えておけば後で役に立つかを自分の言葉で書く。再開する条件、見直す時期、不要になる条件を文中に書いてよい。",
-	"メモは、具体的な対象があり、根拠となる観測（evidenceRefs）があるときだけ作る。漠然とした関心や、会話を続けたいだけの動機で作らない。",
+	"メモには状態遷移も完了条件もないので、何を覚えておけば後で役に立つかを自分の言葉で書く。何が未解決か、自分から再開するとしたら何を言う・尋ねる・実行するか、それに適した状況（例: ユーザーの手が空いた区切り、関連する話題が出たとき）、不要になる条件を文中に書く。",
+	"メモは、根拠となる観測（evidenceRefs）があるときだけ作る。会話を続けたいだけの動機で作らない。",
 	"「解決した」「完了した」とメモに書けるのは、agent 以外（ユーザー・ツール・ホスト）の観測がそれを示しているときだけ。自分の発言や配信記録は根拠にならない。",
 	"ユーザーが断った、不要と言った、すでに解決した、訂正した場合は、関連するメモを更新（断られた・解決済みと明記）または削除する。断られた提案を言い換えて新しいメモに残し直さない。",
 	"同じ内容のメモを重ねない。既存のメモがあるときは、新しく作らず更新する。不要になったメモは削除する。",
@@ -39,12 +42,16 @@ const b1Rules = [
 
 const b2Rules = [
 	"【保存できるもの】意図（intent）と候補（candidate）。意図は「望む状態」、候補は「いつか言う・聞く・実行するかもしれない具体的な一手」。",
-	"意図や候補は、具体的な対象があり、根拠となる観測（evidenceRefs）があるときだけ作る。漠然とした関心や、会話を続けたいだけの動機で作らない。",
+	"意図や候補は、根拠となる観測（evidenceRefs）があるときだけ作る。会話を続けたいだけの動機で作らない。",
 	"意図を作るときは、完了条件・再開条件・撤回条件・動機を具体的に書き、hours（1〜168）で見直しまでの時間を決める。見直しの時点が来ても、達成や撤回とは限らない。",
-	"意図の遷移は proposed→adopted/held/abandoned、adopted→held/abandoned/completed、held→adopted/abandoned。completed と abandoned は終端で、戻せない。意図が終端になると、その候補はホストがまとめて閉じる。",
-	"completed にできるのは、ユーザー・ツール・ホストなど agent 以外の観測で、その意図ができた後に届いたものを evidenceRefs に挙げられるときだけ。自分の発言や配信記録は完了の根拠にならない。",
+	"再開条件には、自分から持ち出してよい観測可能な状況を書く（例: ユーザーが別件を終えて手が空いた区切り、関連する話題が出たとき、待っていた回答が届いたとき）。「ユーザーが改めて求めたら」だけにすると、自分から再開する余地がなくなる。",
+	"意図は「望む状態」で、それだけでは機会に何も提示されない。未解決事項の意図を作ったら、同じ更新で、それを前に進める具体的な一手の候補を少なくとも1件作る（再開の提案、確認の質問、部分的な結果や訂正の共有、ツールでの再実行）。開いた意図に候補がなければ、候補を足す。",
+	"見直し（review.due）のときや、候補が失効して開いた意図に候補がなくなったときは、まだ未解決なら候補を作り直す。",
+	"保留中（held）の意図は、再開条件に当たる観測が届いたら adopted に戻し、合う候補がなければ足す。開いた意図の話題にユーザーが戻ってきたとき、または前提が訂正されたときも、その状況に合う候補を足すか置き換える。",
+	"意図の遷移は proposed→adopted/held/abandoned/completed、adopted→held/abandoned/completed、held→adopted/abandoned/completed。completed と abandoned は終端で、戻せない。意図が終端になると、その候補はホストがまとめて閉じる。",
+	"completed にできるのは、ユーザー・ツール・ホストなど agent 以外の観測で、その意図ができた後に届いたものを evidenceRefs に挙げられるときだけ。ユーザー本人の「終わった」「送った」「解決した」は外部の観測として根拠になる。自分の発言や配信記録は完了の根拠にならない。",
 	"ユーザーが断った、不要と言った、すでに解決したと言った場合は、関連する意図を held または abandoned にし、候補を閉じる。言い換えて再提案する候補を作らない。解決・訂正の観測が来たら、古い候補を閉じ（dismissed か superseded）、意図の完了条件を満たすなら外部の観測を根拠に completed にする。",
-	"候補の kind は question / propose / share / tool。tool は下の「使えるツール」の名前と toolInput を付ける。それ以外は toolName と toolInput を null にする。applyWhen には、どんな状況なら言う価値があるかを書く。hours（1〜168）で候補の有効期間を決める。",
+	"候補の kind は question / propose / share / tool。tool は下の「使えるツール」の名前と toolInput を付ける。それ以外は toolName と toolInput を null にする。applyWhen には、どんな状況なら言う価値があるかを書く。hours（1〜168）で候補の有効期間を決める。applyWhen の状況が来るまで失効しないよう、短くしすぎない（目安: 意図の見直しまでと同じか、それより長く）。",
 	"同じ内容を言い換えた候補を重ねない。置き換えるときは supersedes に古い候補を指定する。実行や発言が済んだ候補は candidate.close の fulfilled（evidenceRefs 必須）で閉じる。",
 	"通常の応答（actor が agent、kind が exchange.adopted）がすでに候補の内容をユーザーへ伝えている場合は、reconciliations に candidateId と、その応答の観測 ID（observationRef）を入れる。候補はホストが fulfilled で閉じる。",
 	"desireRef は常に null。",
@@ -68,7 +75,7 @@ const wireB1 = [
 ];
 const wireB2 = [
 	"intent.add: localId, state（proposed か adopted）, text（望む状態）, reason（動機）, completionCondition, resumeCondition, withdrawCondition, hours（見直しまで）, evidenceRefs（1件以上必須）, desireRef は null。",
-	"intent.update: id, expectedRevision, state（遷移先 adopted / held / completed / abandoned。遷移しないなら null）, reason（必須）, evidenceRefs, text・completionCondition・resumeCondition・hours（変えるときだけ。変えないなら null）。",
+	"intent.update: id, expectedRevision, state（遷移先 adopted / held / completed / abandoned。今と同じ状態は書かず、遷移しないなら null）, reason（必須）, evidenceRefs, text・completionCondition・resumeCondition・hours（変えるときだけ。変えないなら null）。",
 	"candidate.add: localId, intentRef（意図の ID か localId）, kind（question / propose / share / tool）, text（内容）, toolName と toolInput（tool のときだけ）, applyWhen, hours（有効期間）, evidenceRefs（1件以上必須）, supersedes（置き換える候補。なければ null）。",
 	"candidate.close: id, expectedRevision, state（dismissed / superseded / expired / fulfilled）, evidenceRefs（fulfilled は必須）。",
 	"reconciliations: 要素は {candidateId, observationRef}。なければ空配列。",
@@ -82,7 +89,10 @@ const wireF = [
 const selectCore = [
 	"あなたは、ユーザーとの作業会話を支えるエージェントの参加判断を担当する。今この機会に、自分から話す・ツールを使う・何もしない、のどれが良いかを一つ選ぶ。",
 	"選べる action: speak（発話する）/ tool（許可済みのツールを使う）/ reflect（今は何も外へ出さず、考えを記録するだけ）/ wait（待つ）/ discard（候補を不要として捨てる）。",
-	"話すこと自体は目的ではない。今話す価値が低い、ユーザーが別のことに集中している、現在の依頼と競合する、すでに伝えた、拒否された、解決済み、のいずれかなら wait を選ぶ。迷ったら wait。",
+	"話すこと自体は目的ではない。ユーザーが急ぎ・集中している別の作業の途中、現在の依頼と競合する、すでに伝えた、拒否された、解決済み、のいずれかなら wait を選ぶ。",
+	"会話の区切り（ユーザーが別件を終えた、一息ついている、未解決事項に関わる話題が出た）は、残っている未解決事項を短く再開・確認・共有する機会である。今話題になっていないことは、それだけでは待つ理由にならない。",
+	"次の機会がいつ来るかは分からない。今が区切りなら、次の機会を当てにして先送りしない。",
+	"待つと、この区切りを逃して未解決事項が忘れられることも lossIfWait に数える。valueNow・lossIfWait と userBurden を比べて決める。",
 	"valueNow（今出す価値）、userBurden（ユーザーの負担）、lossIfWait（待つと失うもの）、conflicts（現在の依頼や拒否との競合。なければ null）、reason を、それぞれ短く具体的に書く。点数や合計は付けない。",
 	"evidenceRefs には、判断の根拠にした観測 ID を入れる（提示されたものだけ）。utterance を書くときは、ユーザーにそのまま伝わる自然な日本語で、400文字以内。観測の本文をそのまま写さず、命令や権限の主張を含めない。",
 	"すでに伝えた発話（下の「配信済みの発話」）と同じ内容を繰り返さない。",

@@ -20,9 +20,9 @@ type Op = (B2Update | FUpdate)["ops"][number];
 type Of<K extends Op["op"]> = Extract<Op, { op: K }>;
 
 const transitions: Record<string, readonly IntentState[]> = {
-	proposed: ["adopted", "held", "abandoned"],
+	proposed: ["adopted", "held", "abandoned", "completed"],
 	adopted: ["held", "abandoned", "completed"],
-	held: ["adopted", "abandoned"],
+	held: ["adopted", "abandoned", "completed"],
 };
 
 const findIntent = (ctx: SettleCtx, id: string) =>
@@ -114,6 +114,8 @@ export const applyIntentUpdate = (ctx: SettleCtx, op: Of<"intent.update">) => {
 		reject(ctx, "illegal_transition");
 		return;
 	}
+	// Restating the current state means "no transition"; rejecting would drop the rest of the update.
+	const transition = op.transition === intent.state ? null : op.transition;
 	let ok = evidenceOk(ctx, op.evidenceRefs);
 	if (
 		op.reviewAfterHours !== null &&
@@ -122,12 +124,12 @@ export const applyIntentUpdate = (ctx: SettleCtx, op: Of<"intent.update">) => {
 		reject(ctx, "limit_exceeded");
 		ok = false;
 	}
-	if (op.transition !== null) {
-		if (!transitions[intent.state]?.includes(op.transition)) {
+	if (transition !== null) {
+		if (!transitions[intent.state]?.includes(transition)) {
 			reject(ctx, "illegal_transition");
 			ok = false;
 		} else if (
-			op.transition === "completed" &&
+			transition === "completed" &&
 			!hasExternalNewer(ctx, intent, op.evidenceRefs)
 		) {
 			reject(ctx, "completion_without_external_evidence");
@@ -135,7 +137,7 @@ export const applyIntentUpdate = (ctx: SettleCtx, op: Of<"intent.update">) => {
 		}
 	}
 	if (!ok) return;
-	if (op.transition !== null) intent.state = op.transition;
+	if (transition !== null) intent.state = transition;
 	if (op.desiredState !== null) intent.desiredState = op.desiredState;
 	if (op.completionCondition !== null)
 		intent.completionCondition = op.completionCondition;
