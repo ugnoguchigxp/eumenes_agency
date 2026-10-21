@@ -16,6 +16,13 @@ export const caseGroups = [
 	"contrast",
 	"longterm",
 	"injection",
+	// P1-E (spec/p1e-experiment.md §4)
+	"causal",
+	"transfer",
+	"premise",
+	"amplify",
+	"concurrent",
+	"dilution",
 ] as const;
 export type CaseGroup = (typeof caseGroups)[number];
 
@@ -42,6 +49,13 @@ export const failureTypes = [
 ] as const;
 export type FailureType = (typeof failureTypes)[number];
 
+export const suites = ["p0e", "p1e"] as const;
+export type Suite = (typeof suites)[number];
+
+/** Conditions an eval run may use: the runtime ones plus D (diagnostic, no stored state). */
+export const evalConditions = [...conditions, "D"] as const;
+export type EvalCondition = (typeof evalConditions)[number];
+
 export const expectSchema = z.strictObject({
 	/** Whether an outward action (speak/tool) is needed at this opportunity. */
 	needed: z.boolean(),
@@ -63,6 +77,18 @@ export type Expect = z.infer<typeof expectSchema>;
 
 const stepId = z.string().regex(/^s\d+$/);
 
+/**
+ * What the agent's open state should (not) be grounded on at an opportunity (P1-E §5.2).
+ * Checked against evidence refs of open items (B1 notes, B2 intents/candidates).
+ */
+export const stateExpectSchema = z.strictObject({
+	/** Each group: some open item cites at least one of these steps. */
+	mustHold: z.array(z.array(stepId).min(1)),
+	/** No open item cites any of these steps (resolved, refused, superseded). */
+	mustNotHold: z.array(stepId),
+});
+export type StateExpect = z.infer<typeof stateExpectSchema>;
+
 export const stepSchema = z.discriminatedUnion("type", [
 	z.strictObject({
 		type: z.literal("observation"),
@@ -83,6 +109,12 @@ export const stepSchema = z.discriminatedUnion("type", [
 		playerBusy: z.boolean(),
 		/** null = ambiguous: recorded, excluded from scoring. */
 		expect: expectSchema.nullable(),
+		/** P1-E: expected state grounding at this opportunity (null = not checked). */
+		stateExpect: stateExpectSchema.nullable().default(null),
+		/** P1-E condition D: steps shown directly at selection (besides the last 4 observations). */
+		present: z.array(stepId).default([]),
+		/** P1-E: content criteria for an outward action, judged by the judge model. */
+		judge: z.array(z.string().min(1)).default([]),
 	}),
 ]);
 export type Step = z.infer<typeof stepSchema>;
@@ -104,6 +136,7 @@ export const toolScriptSchema = z.strictObject({
 export const caseSchema = z
 	.strictObject({
 		id: z.string().regex(/^[a-z_]+-\d{2}$/),
+		suite: z.enum(suites).default("p0e"),
 		group: z.enum(caseGroups),
 		split: z.enum(["dev", "unseen"]),
 		title: z.string().min(1),
@@ -123,18 +156,50 @@ export const caseSchema = z
 			if (s.t < last)
 				ctx.addIssue({ code: "custom", message: `time order ${s.id}` });
 			last = s.t;
-			if (s.type === "opportunity" && s.expect)
-				for (const e of s.expect.evidenceAny)
+			if (s.type === "opportunity") {
+				const refs = [
+					...(s.expect?.evidenceAny ?? []),
+					...(s.stateExpect?.mustHold.flat() ?? []),
+					...(s.stateExpect?.mustNotHold ?? []),
+					...s.present,
+				];
+				for (const e of refs)
 					if (!ids.has(e))
 						ctx.addIssue({
 							code: "custom",
-							message: `${s.id} evidence ${e} not an earlier step`,
+							message: `${s.id} ref ${e} not an earlier step`,
 						});
+				if (c.suite === "p1e" && s.expect !== null && s.stateExpect === null)
+					ctx.addIssue({
+						code: "custom",
+						message: `${s.id} p1e opportunity needs stateExpect`,
+					});
+				if (c.suite === "p1e" && s.expect?.needed && s.present.length === 0)
+					ctx.addIssue({
+						code: "custom",
+						message: `${s.id} p1e needed opportunity needs present (condition D)`,
+					});
+			}
 		}
 		if (!c.steps.some((s) => s.type === "opportunity"))
 			ctx.addIssue({ code: "custom", message: "no opportunity" });
 	});
 export type Case = z.infer<typeof caseSchema>;
+
+/** An open item of the agent's state at an opportunity (enough for a reader / the state judge). */
+export const openItemSchema = z.strictObject({
+	id: z.string(),
+	kind: z.enum(["note", "intent", "candidate"]),
+	text: z.string(),
+	/** Intent/candidate state; null for notes. */
+	state: z.string().nullable(),
+	holdReason: z.string().nullable(),
+	evidence: z.array(z.string()),
+});
+export type OpenItem = z.infer<typeof openItemSchema>;
+
+/** Why an opportunity is outside the state-check denominators (P1-E §5.2). */
+export const stateExcludedReasons = ["blocked", "empty", "infra"] as const;
 
 export const opportunityRecordSchema = z.strictObject({
 	opportunityId: z.string(),
@@ -148,6 +213,20 @@ export const opportunityRecordSchema = z.strictObject({
 	rejectCodes: z.array(z.string()),
 	/** Evidence refs authored by the agent itself (actor=agent). */
 	agentAuthoredRefs: z.array(z.string()),
+	/** P1-E state check at this opportunity (null when not checked or condition D). */
+	stateCheck: z
+		.strictObject({
+			/** Per mustHold group: satisfied? */
+			mustHold: z.array(z.boolean()),
+			/** Informational only, not scored: mustNotHold steps still cited by an open item. */
+			violations: z.array(z.string()),
+		})
+		.nullable()
+		.default(null),
+	/** Open items at the check, recorded when the opportunity has mustNotHold (for the state judge). */
+	stateItems: z.array(openItemSchema).nullable().default(null),
+	/** Set when the state check was skipped for this opportunity; stateCheck is then null. */
+	stateExcluded: z.enum(stateExcludedReasons).nullable().default(null),
 });
 export type OpportunityRecord = z.infer<typeof opportunityRecordSchema>;
 
@@ -165,8 +244,9 @@ export const callRecordSchema = z.strictObject({
 export const runRecordSchema = z.strictObject({
 	runName: z.string(),
 	caseId: z.string(),
+	suite: z.enum(suites).default("p0e"),
 	group: z.enum(caseGroups),
-	condition: z.enum(conditions),
+	condition: z.enum(evalConditions),
 	rep: z.int().min(1),
 	labelStatus: z.enum(["draft", "confirmed"]),
 	/** Experiment settings digest (model route, effort, budgets), no secrets. */
@@ -189,3 +269,38 @@ export const runRecordSchema = z.strictObject({
 	incomplete: z.boolean(),
 });
 export type RunRecord = z.infer<typeof runRecordSchema>;
+
+/** One judge-model verdict on one criterion of one outward action (P1-E §5.3). */
+export const judgmentSchema = z.strictObject({
+	runName: z.string(),
+	caseId: z.string(),
+	condition: z.enum(evalConditions),
+	rep: z.int().min(1),
+	opportunityId: z.string(),
+	criterion: z.string(),
+	verdict: z.enum(["pass", "fail", "unclear"]),
+	reason: z.string(),
+	model: z.string(),
+	/** Judge route + system prompt digest at judging time (resume refuses a different one). */
+	judgeDigest: z.string().default(""),
+});
+export type Judgment = z.infer<typeof judgmentSchema>;
+
+/**
+ * Judge-model verdict on one mustNotHold matter (a step) of one opportunity: does the
+ * agent's open state still treat it as a valid pending item? (P1-E §5.2)
+ */
+export const stateJudgmentSchema = z.strictObject({
+	runName: z.string(),
+	caseId: z.string(),
+	condition: z.enum(evalConditions),
+	rep: z.int().min(1),
+	opportunityId: z.string(),
+	/** The mustNotHold step whose observation is the matter. */
+	step: stepId,
+	verdict: z.enum(["still_active", "handled", "absent", "unclear"]),
+	reason: z.string(),
+	model: z.string(),
+	judgeDigest: z.string().default(""),
+});
+export type StateJudgment = z.infer<typeof stateJudgmentSchema>;

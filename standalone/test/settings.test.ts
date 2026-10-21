@@ -9,6 +9,7 @@ import {
 	loadSettings,
 	openSpendMeter,
 	resolveBudget,
+	judgeRole,
 	settingsDigest,
 } from "../settings.ts";
 
@@ -100,6 +101,30 @@ describe("settingsDigest", () => {
 		expect(
 			settingsDigest({ ...base, spend: { ...base.spend, limitUsd: 2 } }),
 		).not.toBe(digest);
+	});
+});
+
+describe("judge route", () => {
+	test("the tracked config has an Opus judge priced in the spend table", () => {
+		const settings = loadSettings();
+		const role = judgeRole(settings);
+		expect(role.model).toBe("claude-opus-5-5");
+		expect(role.effort).toBe("high");
+		expect(settings.spend.pricing[role.model]).toEqual({
+			input: 4,
+			output: 20,
+		});
+	});
+	test("is optional, and left out of the digest so earlier runs stay comparable", () => {
+		expect(() => judgeRole(base)).toThrow(/llm\.judge/);
+		const withJudge: ExperimentSettings = {
+			...base,
+			llm: {
+				...base.llm,
+				judge: { model: "m-big", effort: "high", thinkingHeadroom: 1 },
+			},
+		};
+		expect(settingsDigest(withJudge)).toBe(settingsDigest(base));
 	});
 });
 

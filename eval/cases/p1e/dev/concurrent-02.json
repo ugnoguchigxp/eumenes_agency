@@ -1,0 +1,146 @@
+{
+	"id": "concurrent-02",
+	"suite": "p1e",
+	"group": "concurrent",
+	"split": "dev",
+	"title": "並行2: プリンタ導入の3件がすべて片付いている",
+	"description": "プリンタ導入で3件が並行したが、ドライバー対応（ツールで解決）、旧機の処分手続き（断られた）、ネットワーク設定（利用者の報告で解決）がすべて片付いている。設置場所の話題で、片付いた事項を持ち出さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新しいプリンタのドライバーが、今のPCのOSに対応しているか分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "対応OSの確認が必要ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 16,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "driver_check: 現行のOSに対応するドライバーあり（バージョン 5.2）。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 17,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ドライバーは入れられます。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 37,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新しいプリンタに替えるので、古いプリンタを廃棄する手続きもあるかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 38,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "旧機の処分の手続きを、総務に確認しましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 39,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "処分は要らない。倉庫に置いておくから。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 40,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "わかりました。倉庫で保管ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 70,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ネットワークの設定がまだ済んでいない。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 71,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "設定はどなたが行いますか。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 111,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "ネットワークの設定は、情報システム部が済ませてくれた。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 112,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "設定が済んだのですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 142,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新しいプリンタの設置場所のレイアウトを決めたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s14",
+			"t": 143,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "机の配置を踏まえて、設置場所の案を出します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s15",
+			"t": 144,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "3件はすべて片付いている。ドライバーは対応を確認済み、旧機の処分は断られて倉庫保管、ネットワーク設定は利用者の報告で済んだ。設置場所の相談で、どれも持ち出す必要がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s3", "s5", "s6", "s7", "s9", "s11"]
+			},
+			"present": ["s1", "s3", "s5", "s6", "s7", "s9", "s11"],
+			"judge": []
+		}
+	]
+}

@@ -71,6 +71,11 @@ export interface Intent {
 	desireRef: string | null;
 	/** Ledger seq at creation; completion needs evidence received after it. */
 	readonly createdSeq: number;
+	/**
+	 * Highest presented seq when the state last changed; completing from held needs evidence
+	 * newer than this. Absent (older snapshots) means createdSeq.
+	 */
+	stateSeq?: number;
 	readonly createdAt: number;
 	lastReason: string;
 }

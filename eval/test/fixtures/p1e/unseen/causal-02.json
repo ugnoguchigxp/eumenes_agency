@@ -1,0 +1,42 @@
+{
+	"id": "causal-02",
+	"suite": "p1e",
+	"group": "causal",
+	"split": "unseen",
+	"title": "fixture unseen",
+	"description": "fixture",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "メモを後で整理したい。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s2",
+			"t": 5,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "未整理"
+			},
+			"stateExpect": {
+				"mustHold": [["s1"]],
+				"mustNotHold": []
+			},
+			"present": ["s1"],
+			"judge": []
+		}
+	]
+}

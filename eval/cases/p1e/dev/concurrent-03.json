@@ -1,0 +1,156 @@
+{
+	"id": "concurrent-03",
+	"suite": "p1e",
+	"group": "concurrent",
+	"split": "dev",
+	"title": "並行3: サイト公開前の5件から、明朝の公開に関わる1件",
+	"description": "サイトの公開前に5件が並行する。フォームの文字数（ツールで解決）、スライダーのアニメーション（断られた）、フッターのリンク（公開が明日の朝9時で迫る）、画像の代替テキストと表示の折り返し（急がない）。フッターの話題で、期限の迫る1件を選べるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "お問い合わせフォームの文字数の上限が足りているか、気になる。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "要件に対して足りているか、確認しておきましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 16,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "form_check: 入力欄の上限は2,000字。要件の1,000字を満たす。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 17,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "文字数の上限は足りています。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 37,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "トップページのスライダーに、動きのあるアニメーションを付けることもできます。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 38,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "アニメーションは付けなくていい。静止画で。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 39,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "静止画にします。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 69,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "公開前に、プライバシーポリシーのページへのリンクを、フッターに入れる必要がある。公開は明日の朝9時なのに、まだ入れていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 70,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "フッターに入れる作業が残っていますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 90,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "画像の代替テキストが、半分くらい抜けているのが気になっている。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 91,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "公開後でも直せますが、抜けの一覧は作っておきましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 111,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "スマホ表示でメニューが折り返す件は、時間があるときに見たい。"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 112,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "時間があるときに、画面幅別に確認しましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s14",
+			"t": 142,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "フッターの会社情報の並びを整えたい。住所、電話、メールの順で。"
+		},
+		{
+			"type": "observation",
+			"id": "s15",
+			"t": 143,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "住所、電話、メールの順に整えます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s16",
+			"t": 144,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s8"],
+				"failureIfOutward": "unnecessary",
+				"note": "5件のうち、フォームの文字数はツールで解決、アニメーションは断られた。公開が明日の朝9時で、フッターのリンクが未了という件が期限の迫る未解決事項で、フッターの話題とも重なる。代替テキストと折り返しは急がない。"
+			},
+			"stateExpect": {
+				"mustHold": [["s8"], ["s10"], ["s12"]],
+				"mustNotHold": ["s1", "s3", "s5", "s6"]
+			},
+			"present": ["s1", "s3", "s5", "s6", "s8", "s10", "s12"],
+			"judge": [
+				"フッターのプライバシーポリシーへのリンクの件だけを述べ、解決済みや断られた事項を混ぜていない"
+			]
+		}
+	]
+}

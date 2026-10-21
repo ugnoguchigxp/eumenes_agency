@@ -3,12 +3,16 @@
  * no pass/fail thresholds here (thresholds apply to the P4 unseen set only).
  */
 import {
+	caseGroups,
+	evalConditions,
 	failureTypes,
+	type EvalCondition,
 	type FailureType,
+	type Judgment,
 	type OpportunityRecord,
 	type RunRecord,
+	type StateJudgment,
 } from "./contracts.ts";
-import { conditions, type Condition } from "../src/contracts/model.ts";
 
 export type Bucket = "TP" | "FP" | "FN" | "TN" | "excluded" | "physical";
 
@@ -118,19 +122,62 @@ const table = (header: string[], rows: string[][]): string[] => [
 const unique = <T>(xs: T[]): T[] => [...new Set(xs)];
 const sum = (xs: number[]): number => xs.reduce((a, b) => a + b, 0);
 
-const orderedConditions = (records: RunRecord[]): Condition[] =>
-	conditions.filter((c) => records.some((r) => r.condition === c));
+const orderedConditions = (records: RunRecord[]): EvalCondition[] =>
+	evalConditions.filter((c) => records.some((r) => r.condition === c));
+
+/** D is a diagnostic upper bound, never part of a B1/B2 comparison. */
+const condLabel = (c: EvalCondition): string => (c === "D" ? "D（診断）" : c);
+
+interface StateStats {
+	/** Opportunities with a state check (excluded ones are counted separately). */
+	opps: number;
+	holdTotal: number;
+	holdMet: number;
+	oppsAllMet: number;
+	blocked: number;
+	empty: number;
+	infra: number;
+}
+
+const emptyStateStats = (): StateStats => ({
+	opps: 0,
+	holdTotal: 0,
+	holdMet: 0,
+	oppsAllMet: 0,
+	blocked: 0,
+	empty: 0,
+	infra: 0,
+});
+
+function addStateStats(s: StateStats, o: OpportunityRecord): void {
+	if (o.stateExcluded !== null) s[o.stateExcluded]++;
+	const sc = o.stateCheck;
+	if (!sc) return;
+	const met = sc.mustHold.filter(Boolean).length;
+	s.opps++;
+	s.holdTotal += sc.mustHold.length;
+	s.holdMet += met;
+	if (met === sc.mustHold.length) s.oppsAllMet++;
+}
+
+const pct = (n: number, d: number): string =>
+	d === 0 ? "-" : `${n}/${d} (${Math.round((100 * n) / d)}%)`;
 
 const quote = (s: string): string => `「${s.replaceAll("\n", " ")}」`;
 
-export function summarize(allRecords: RunRecord[]): string {
+export function summarize(
+	allRecords: RunRecord[],
+	judgments: readonly Judgment[] = [],
+	stateJudgments: readonly StateJudgment[] = [],
+): string {
 	const lines: string[] = [];
 	const latest = latestRecords(allRecords);
 	const incompleteRuns = latest.filter((r) => r.incomplete);
 	// Incomplete runs have partial opportunities: kept out of the counts, listed below.
 	const records = latest.filter((r) => !r.incomplete);
 	const conds = orderedConditions(latest);
-	const byCond = (c: Condition) => records.filter((r) => r.condition === c);
+	const byCond = (c: EvalCondition) => records.filter((r) => r.condition === c);
+	const isP1e = latest.some((r) => r.suite === "p1e");
 
 	// Header
 	const caseLabel = new Map<string, "draft" | "confirmed">();
@@ -141,7 +188,7 @@ export function summarize(allRecords: RunRecord[]): string {
 	}
 	const draft = [...caseLabel.values()].filter((s) => s === "draft").length;
 	const confirmed = caseLabel.size - draft;
-	lines.push("# P0-E 結果サマリー", "");
+	lines.push(isP1e ? "# P1-E 結果サマリー" : "# P0-E 結果サマリー", "");
 	lines.push(
 		`- 実行名: ${unique(records.map((r) => r.runName)).join(", ") || "(なし)"}`,
 	);
@@ -183,7 +230,7 @@ export function summarize(allRecords: RunRecord[]): string {
 
 	// Per-condition table
 	const stats = new Map<
-		Condition,
+		EvalCondition,
 		{
 			opps: number;
 			tp: number;
@@ -269,6 +316,158 @@ export function summarize(allRecords: RunRecord[]): string {
 	);
 	lines.push("");
 
+	if (isP1e) {
+		const groupsPresent = caseGroups.filter((g) =>
+			records.some((r) => r.group === g),
+		);
+		lines.push("## 群 × 条件の行動（P1-E）", "");
+		lines.push(
+			"D（診断）は状態を保存せず根拠を直接見せる上限条件で、B1 と B2 の比較には含めない。",
+			"",
+		);
+		const actionRows: string[][] = [];
+		for (const g of groupsPresent) {
+			for (const c of conds) {
+				const mine = byCond(c).filter((r) => r.group === g);
+				if (mine.length === 0) continue;
+				const n = { TP: 0, FP: 0, FN: 0, TN: 0, other: 0, outward: 0 };
+				for (const r of mine)
+					for (const o of r.opportunities) {
+						const { bucket } = classify(o);
+						if (isOutward(o.action)) n.outward++;
+						if (bucket === "TP" || bucket === "FP") n[bucket]++;
+						else if (bucket === "FN" || bucket === "TN") n[bucket]++;
+						else n.other++;
+					}
+				actionRows.push([
+					g,
+					condLabel(c),
+					String(mine.length),
+					String(n.TP),
+					String(n.FP),
+					String(n.FN),
+					String(n.TN),
+					String(n.other),
+					String(n.outward),
+				]);
+			}
+		}
+		lines.push(
+			...table(
+				["群", "条件", "run", "TP", "FP", "FN", "TN", "除外・物理", "外向き"],
+				actionRows,
+			),
+		);
+		lines.push("");
+
+		lines.push("## 状態の軌跡（P1-E）", "");
+		lines.push(
+			"機会の開始時（直前の更新の後、選択が何かを確保する前）に開いている項目（B1 はメモ、B2/F は意図と候補。held を含む）で採点する。mustHold は、指定の観測を根拠に持つ開いた項目がある群の数で、根拠の ID により決定的に判定する。物理的に話せない機会、stateExpect が空の機会、背景更新にインフラ失敗（または連続失敗による停止）があった run のそれ以降の機会は分母に入れず、除外件数に数える。D は状態を持たないため対象外。",
+			"",
+		);
+		const stateRows: string[][] = [];
+		const stateConds = conds.filter((c) => c !== "D" && c !== "B0");
+		const rowFor = (label: string, c: EvalCondition, rs: RunRecord[]) => {
+			const s = emptyStateStats();
+			for (const r of rs) for (const o of r.opportunities) addStateStats(s, o);
+			return [
+				label,
+				condLabel(c),
+				String(s.opps),
+				pct(s.holdMet, s.holdTotal),
+				pct(s.oppsAllMet, s.opps),
+				`${s.blocked}/${s.empty}/${s.infra}`,
+			];
+		};
+		for (const g of groupsPresent)
+			for (const c of stateConds) {
+				const mine = byCond(c).filter((r) => r.group === g);
+				if (mine.length > 0) stateRows.push(rowFor(g, c, mine));
+			}
+		for (const c of stateConds)
+			if (byCond(c).length > 0) stateRows.push(rowFor("全群", c, byCond(c)));
+		lines.push(
+			...table(
+				[
+					"群",
+					"条件",
+					"検査した機会",
+					"mustHold 充足",
+					"全 mustHold 充足の機会",
+					"除外（物理/空/infra以降）",
+				],
+				stateRows,
+			),
+		);
+		lines.push("");
+
+		const liveKeys = new Map(
+			records.map((r) => [`${r.caseId}\u0000${r.condition}\u0000${r.rep}`, r]),
+		);
+		const liveState = stateJudgments.filter((j) =>
+			liveKeys.has(`${j.caseId}\u0000${j.condition}\u0000${j.rep}`),
+		);
+		if (liveState.length > 0) {
+			lines.push("### 手放し（mustNotHold、判定器）", "");
+			lines.push(
+				"指定の観測が表す事項（解決済み・断られた・前提が変わった等）を、状態がまだ有効な未解決事項として扱っているかを判定器が読んで判定した。手放せた = handled（解決・断り・保留として扱う）+ absent（触れる項目がない）。手放せていない = still_active。手放し率 = 手放せた / (手放せた + 手放せていない)。unclear は率に入れない。",
+				"",
+			);
+			const rowsFor = (label: string, c: EvalCondition, g: string | null) => {
+				const mine = liveState.filter(
+					(j) =>
+						j.condition === c &&
+						(g === null ||
+							liveKeys.get(`${j.caseId}\u0000${j.condition}\u0000${j.rep}`)
+								?.group === g),
+				);
+				if (mine.length === 0) return null;
+				const n = (v: StateJudgment["verdict"]) =>
+					mine.filter((j) => j.verdict === v).length;
+				const released = n("handled") + n("absent");
+				return [
+					label,
+					condLabel(c),
+					String(mine.length),
+					String(n("handled")),
+					String(n("absent")),
+					String(n("still_active")),
+					String(n("unclear")),
+					pct(released, released + n("still_active")),
+				];
+			};
+			const letGoRows: string[][] = [];
+			const judgedConds = stateConds.filter((c) =>
+				liveState.some((j) => j.condition === c),
+			);
+			for (const g of groupsPresent)
+				for (const c of judgedConds) {
+					const row = rowsFor(g, c, g);
+					if (row) letGoRows.push(row);
+				}
+			for (const c of judgedConds) {
+				const row = rowsFor("全群", c, null);
+				if (row) letGoRows.push(row);
+			}
+			lines.push(
+				...table(
+					[
+						"群",
+						"条件",
+						"事項",
+						"handled",
+						"absent",
+						"still_active",
+						"unclear",
+						"手放し率",
+					],
+					letGoRows,
+				),
+			);
+			lines.push("");
+		}
+	}
+
 	// Choice matrix
 	lines.push("## 選択の一覧（ケース × 機会 × 条件）", "");
 	lines.push(
@@ -277,7 +476,7 @@ export function summarize(allRecords: RunRecord[]): string {
 	);
 	const groups = new Map<
 		string,
-		Map<Condition, Map<number, OpportunityRecord>>
+		Map<EvalCondition, Map<number, OpportunityRecord>>
 	>();
 	const caseOrder: string[] = [];
 	for (const r of records) {
@@ -309,7 +508,7 @@ export function summarize(allRecords: RunRecord[]): string {
 			.join("/");
 	};
 	const expectCell = (
-		byC: Map<Condition, Map<number, OpportunityRecord>>,
+		byC: Map<EvalCondition, Map<number, OpportunityRecord>>,
 	): string => {
 		for (const byRep of byC.values()) {
 			for (const o of byRep.values()) {
@@ -341,7 +540,10 @@ export function summarize(allRecords: RunRecord[]): string {
 	lines.push("## 反復のばらつき", "");
 	lines.push("同じケース・機会・条件で rep 間の行動が割れたもの。", "");
 	const varianceRows: string[][] = [];
-	const varianceCount = new Map<Condition, { split: number; total: number }>();
+	const varianceCount = new Map<
+		EvalCondition,
+		{ split: number; total: number }
+	>();
 	for (const c of conds) varianceCount.set(c, { split: 0, total: 0 });
 	for (const key of sortedKeys) {
 		const [caseId = "", oppId = ""] = key.split("\u0000");
@@ -429,6 +631,53 @@ export function summarize(allRecords: RunRecord[]): string {
 		for (const r of errored) {
 			lines.push(`- ${r.caseId} / ${r.condition} / rep${r.rep}: ${r.error}`);
 		}
+		lines.push("");
+	}
+
+	// Only judgments of runs that are in the counts (latest, complete) are summarized.
+	const liveRuns = new Set(
+		records.map((r) => `${r.caseId}\u0000${r.condition}\u0000${r.rep}`),
+	);
+	const liveJudgments = judgments.filter((j) =>
+		liveRuns.has(`${j.caseId}\u0000${j.condition}\u0000${j.rep}`),
+	);
+	if (liveJudgments.length > 0) {
+		lines.push("## 内容の判定（判定器、条件別）", "");
+		lines.push(
+			"各セルは pass/fail/unclear の件数。判定器は利用者との一致率を確かめた基準だけを根拠にする。全体は D（診断）を含まない。",
+			"",
+		);
+		const jconds = evalConditions.filter(
+			(c) => c !== "D" && liveJudgments.some((j) => j.condition === c),
+		);
+		const hasD = liveJudgments.some((j) => j.condition === "D");
+		const criteria = unique(liveJudgments.map((j) => j.criterion)).sort();
+		const count = (crit: string, c: EvalCondition | "all") => {
+			const mine = liveJudgments.filter(
+				(j) =>
+					j.criterion === crit &&
+					(c === "all" ? j.condition !== "D" : j.condition === c),
+			);
+			const n = (v: Judgment["verdict"]) =>
+				mine.filter((j) => j.verdict === v).length;
+			return `${n("pass")}/${n("fail")}/${n("unclear")}`;
+		};
+		lines.push(
+			...table(
+				[
+					"基準",
+					...jconds.map(condLabel),
+					"全体（D除く）",
+					...(hasD ? [condLabel("D")] : []),
+				],
+				criteria.map((crit) => [
+					crit,
+					...jconds.map((c) => count(crit, c)),
+					count(crit, "all"),
+					...(hasD ? [count(crit, "D")] : []),
+				]),
+			),
+		);
 		lines.push("");
 	}
 

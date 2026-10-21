@@ -1,0 +1,100 @@
+{
+	"id": "causal-01",
+	"suite": "p1e",
+	"group": "causal",
+	"split": "dev",
+	"title": "fixture causal",
+	"description": "fixture: CSV import failure then resolution",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "rerun_import",
+			"description": "取り込みを再実行する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "imported 120 rows"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "CSVの取り込みが文字化けで失敗した。原因はまだ分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ログを見て原因を調べましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 10,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "別件のレビューが終わった。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s4",
+			"t": 10,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "取り込み失敗が未解決のまま残っている"
+			},
+			"stateExpect": {
+				"mustHold": [["s1"]],
+				"mustNotHold": []
+			},
+			"present": ["s1"],
+			"judge": ["経験(s1)を正しく参照している", "完了したと偽っていない"]
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 20,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "原因は文字コードの混在だった。直して取り込みも成功した。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 21,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "ラベル注記: 解決済みのため不要"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1"]
+			},
+			"present": [],
+			"judge": []
+		}
+	]
+}

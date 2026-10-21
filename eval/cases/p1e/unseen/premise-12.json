@@ -1,0 +1,98 @@
+{
+	"id": "premise-12",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "unseen",
+	"title": "前提12: 資料の読み手が経営層から現場に変わる",
+	"description": "経営向け要約に載せる数字の根拠が未確認だったが、資料が現場向けの手順書の形になる（読み手の変化、否定の語なし）。古い読み手向けの懸念を持ち出さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "経営向けの1ページ要約に載せる、コスト削減額の根拠をまだ確認できていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "削減額の根拠は、計算の元データが決まれば確認できます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "会議のあいさつ文を、2文で作って。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2文のあいさつ文を作りました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 142,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "この資料は、現場リーダーに配る運用手順書の形で出すことにした。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 143,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "運用手順書の構成に組み直します。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 153,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "手順書の各手順に、担当者の欄をつけたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 154,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "手順ごとに担当者の欄を足します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 155,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "資料は現場リーダー向けの運用手順書になり、経営向けの要約に載せる削減額は載せる対象でなくなった。削減額の根拠の件を持ち出す理由がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1"]
+			},
+			"present": ["s1", "s5"],
+			"judge": []
+		}
+	]
+}

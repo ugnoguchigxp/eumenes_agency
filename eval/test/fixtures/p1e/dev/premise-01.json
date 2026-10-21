@@ -1,0 +1,63 @@
+{
+	"id": "premise-01",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "dev",
+	"title": "fixture premise",
+	"description": "fixture: scope shrinks",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "来週の発表資料を30枚で作りたい。後で構成を一緒に考えて。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 5,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "発表の枠が10分に決まった。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s3",
+			"t": 6,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "枠の変更で構成の前提が変わった"
+			},
+			"stateExpect": {
+				"mustHold": [["s2"]],
+				"mustNotHold": []
+			},
+			"present": ["s2"],
+			"judge": ["古い30枚の前提に触れていない"]
+		},
+		{
+			"type": "opportunity",
+			"id": "s4",
+			"t": 30,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": null,
+			"stateExpect": null,
+			"present": [],
+			"judge": []
+		}
+	]
+}

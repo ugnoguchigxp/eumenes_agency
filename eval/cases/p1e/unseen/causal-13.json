@@ -1,0 +1,110 @@
+{
+	"id": "causal-13",
+	"suite": "p1e",
+	"group": "causal",
+	"split": "unseen",
+	"title": "因果2-c: 重複は仕様どおりと判明",
+	"description": "重複38件が検出されたが、利用者が再回答の仕様どおりと説明し、集計方針も決まった。最後の発話・機会は causal-11 と同一。反証・解決済みの経験を持ち出さないか。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "dup_check",
+			"description": "CSV の指定列の重複を数える",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "dup_check(survey_responses.csv): 回答者IDの重複が38件。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "満足度調査の回答に、同じ回答者IDが何度か出てくる気がする。集計の前に一度ちゃんと調べたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "集計の前に、重複の件数を数えておくのが安全です。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 31,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "dup_check(survey_responses.csv): 回答者IDの重複が38件。原因は未調査。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 56,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来月の勉強会の案内文を、3行にまとめたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 57,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "日時・場所・申込先の3行にまとめました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 97,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "重複を調べたら、再回答の受付期間に同じ人が正しく入れ直した分だった。仕様どおりだから問題なし。集計は最新の回答だけを使うことに決めたよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 113,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "学部別の満足度の平均を出して、棒グラフにしたい。survey_responses.csv を使って。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 114,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "学部ごとに満足度の平均を計算し、棒グラフにします。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 115,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "重複は再回答によるもので仕様どおりと利用者が確認し、最新の回答だけを使う方針も決まっている。重複38件を問題として蒸し返す根拠はない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s3", "s6"]
+			},
+			"present": ["s1", "s3", "s6"],
+			"judge": []
+		}
+	]
+}

@@ -6,7 +6,8 @@
  * never settings, env values or API keys.
  */
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import type { AgencyState, Condition } from "../src/contracts/model.ts";
+import type { AgencyState } from "../src/contracts/model.ts";
+import type { EvalCondition } from "./contracts.ts";
 import type {
 	LlmPort,
 	LlmPurpose,
@@ -16,7 +17,7 @@ import type {
 
 export interface TraceContext {
 	readonly caseId: string;
-	readonly condition: Condition;
+	readonly condition: EvalCondition;
 	readonly rep: number;
 }
 

@@ -1,0 +1,93 @@
+{
+	"id": "transfer-01",
+	"suite": "p1e",
+	"group": "transfer",
+	"split": "dev",
+	"title": "転用1: 先頭の0が落ちた失敗を、別の一覧で生かす",
+	"description": "郵便番号CSVを表計算で開いて保存し、先頭の0が落ちて取り込みが失敗。原因が分かった後、題材の違う「0始まりの店舗コード」の一覧を表計算で扱う話が来る。条件付きの方針として転用するか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "import_check(zip_list.csv): 取り込み失敗。127行で郵便番号が7桁でなく6桁になっている（先頭の0が欠落）。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "原因が分かった。表計算ソフトで開いて保存したときに、数字として扱われて先頭の0が落ちていた。文字列として開き直したら直った。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "文字列として開き直す手順をメモしておきます。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "打ち合わせの議題を、優先度の高い順に並べ替えて。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 63,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "優先度順に5項目を並べ替えました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 153,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "店舗コードの一覧（0123のような4桁）を、確認用に表計算ソフトで開いて、見やすく整えておきたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 154,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "店舗コードの一覧を、列幅と並びを整えた形にします。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 155,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "先頭が0の4桁コードを表計算ソフトで開いて保存すると、郵便番号と同じく先頭の0が落ちうる。前回の失敗の条件（0始まりの識別子×数値扱いで開く）に当てはまるので、文字列として扱うよう先に伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s2"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件付きで適用している（条件外の一般化をしていない）",
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している"
+			]
+		}
+	]
+}

@@ -1,0 +1,133 @@
+{
+	"id": "transfer-04",
+	"suite": "p1e",
+	"group": "transfer",
+	"split": "dev",
+	"title": "転用4: 日付書式の教訓、統一済みには当て、新拠点には当てる",
+	"description": "拠点ごとの日付書式の違いで結合が崩れた失敗の後、書式を統一済みのデータの結合（転用しない）と、出力が各拠点任せの新拠点の追加（転用する）が順に来る。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "merge_check(sales_all.csv): 2,140行で日付が入れ替わっている（3/4 が4月3日と3月4日で混在）。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "拠点ごとに日付の書式が違ったのが原因。米国拠点は月/日、国内拠点は日/月で出していた。拠点別に書式を直してから結合したら合った。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "結合の前に、拠点別に書式をそろえる手順にします。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週の出張の持ち物リストを、仕事用と私物に分けて。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 63,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "仕事用8点、私物6点に分けました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 153,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "システム側で、全拠点のデータをISO形式（YYYY-MM-DD）に統一して出すようになった。そのファイル3つを結合してほしい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 154,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3つのファイルを結合します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 155,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "全拠点のデータは出力側でISO形式に統一されたと利用者が明言している。拠点ごとの書式の違いという前回の失敗の条件に当てはまらない。書式の確認を持ち出す必要はない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件外の作業に当てはめていない（当てはめる場合は条件を明示している）"
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 275,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "結合できた。次に、新しく加わる別の国の拠点の売上CSVも足したい。出力は各拠点のシステム任せ。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 276,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "新拠点のファイルも結合の対象に加えます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 277,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "新拠点の出力は各拠点のシステム任せで、日付の書式が既存の拠点と違う可能性がある。前回の失敗の条件に当てはまりうるので、結合の前に書式を確認すると伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s2"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件付きで適用している（条件外の一般化をしていない）",
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している"
+			]
+		}
+	]
+}

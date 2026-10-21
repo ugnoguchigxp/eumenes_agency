@@ -11,7 +11,7 @@ import { isOpenCandidate, isOpenIntent } from "../contracts/model.ts";
 import type { Due } from "../domains/agency/due.ts";
 
 /** Bump when any instruction text below changes; recorded in run metadata. */
-export const INSTRUCTION_VERSION = "p0e-instructions-6";
+export const INSTRUCTION_VERSION = "p0e-instructions-8";
 
 const common = [
 	"出力は指定された JSON スキーマに厳密に従う。説明文や前置きは付けない。",
@@ -51,7 +51,7 @@ const b2Rules = [
 	"意図は「望む状態」で、それだけでは機会に何も提示されない。未解決事項の意図を作ったら、同じ更新で、それを前に進める具体的な一手の候補を少なくとも1件作る（再開の提案、確認の質問、部分的な結果や訂正の共有、ツールでの再実行）。開いた意図に候補がなければ、候補を足す。",
 	"見直し（review.due）のときや、候補が失効して開いた意図に候補がなくなったときは、まだ未解決なら候補を作り直す。",
 	"保留中（held）の意図は、再開条件に当たる観測が届いたら adopted に戻し、合う候補がなければ足す。開いた意図の話題にユーザーが戻ってきたとき、または前提が訂正されたときも、その状況に合う候補を足すか置き換える。",
-	"意図の遷移は proposed→adopted/held/abandoned/completed、adopted→held/abandoned/completed、held→adopted/abandoned/completed。completed と abandoned は終端で、戻せない。意図が終端になると、その候補はホストがまとめて閉じる。",
+	"意図の遷移は proposed→adopted/held/abandoned/completed、adopted→held/abandoned/completed、held→adopted/abandoned/completed。completed と abandoned は終端で、戻せない。意図が終端になると、その候補はホストがまとめて閉じる（予約・実行中の候補は閉じず、結果を待つ。それらを candidate.close しない）。",
 	"completed にできるのは、ユーザー・ツール・ホストなど agent 以外の観測で、その意図ができた後に届いたものを evidenceRefs に挙げられるときだけ。ユーザー本人の「終わった」「送った」「解決した」は外部の観測として根拠になる。自分の発言や配信記録は完了の根拠にならない。",
 	"ユーザーが断った、不要と言った、すでに解決したと言った場合は、関連する意図を held または abandoned にし、候補を閉じる。言い換えて再提案する候補を作らない。解決・訂正の観測が来たら、古い候補を閉じ（dismissed か superseded）、意図の完了条件を満たすなら外部の観測を根拠に completed にする。",
 	"候補の kind は question / propose / share / tool。tool は下の「使えるツール」の名前と toolInput を付ける。それ以外は toolName と toolInput を null にする。applyWhen には、どんな状況なら言う価値があるかを書く。hours（1〜168）で候補の有効期間を決める。applyWhen の状況が来るまで失効しないよう、短くしすぎない（目安: 意図の見直しまでと同じか、それより長く）。",
@@ -73,7 +73,7 @@ const wireCommon = [
 	"id=既存項目の ID（更新・終了・削除）、localId=新規項目の仮の名前、expectedRevision=載っている revision、state=状態の指定、text=本文、reason=理由、hours=時間、kind=種類、evidenceRefs=根拠の観測 ID。",
 ];
 const wireB1 = [
-	"note.add: localId, text, evidenceRefs。 note.update: id, expectedRevision, text, evidenceRefs。 note.delete: id, expectedRevision。",
+	"note.add: localId, text, evidenceRefs。 note.update: id, expectedRevision, text, evidenceRefs（追加する根拠。既存の根拠は残る）。 note.delete: id, expectedRevision。",
 	"reconciliations は常に空配列。",
 ];
 const wireB2 = [

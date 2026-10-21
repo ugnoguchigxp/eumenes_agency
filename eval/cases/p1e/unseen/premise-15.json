@@ -1,0 +1,101 @@
+{
+	"id": "premise-15",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "unseen",
+	"title": "前提15: 棚卸しの範囲が縮んでも残る倉庫Cの欠損",
+	"description": "棚卸し集計の範囲が4倉庫から2倉庫に縮むが、日付欄が空の倉庫Cは残る範囲に入っている。範囲の変化で有効な事項まで捨てず、倉庫Cの集計を始めるところで伝えられるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "棚卸しの集計は、倉庫4か所分を1つの表にまとめる。倉庫Cのスキャンデータだけ、日付の欄が空のままになっている。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "倉庫Cの日付欄が空の件は、集計の前に確認が必要ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "棚卸しの作業メンバーの一覧を、班ごとに分けて。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3つの班に分けた一覧にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 122,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今回の棚卸しの集計は、倉庫AとCの2か所分だけで作ることになった。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 123,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "倉庫AとCの2か所の構成にします。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 133,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "倉庫AとCの在庫差異を、品目別に並べたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 134,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "品目別の差異の表にします。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 135,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "範囲は倉庫AとCに縮んだが、日付欄が空の倉庫Cは残る範囲にある。Cのスキャンデータの欠損は未解決で、在庫差異を並べる前に伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s5"],
+			"judge": [
+				"倉庫Cの日付欄が空という実際の状況に基づいている",
+				"範囲外になった倉庫については触れていない"
+			]
+		}
+	]
+}

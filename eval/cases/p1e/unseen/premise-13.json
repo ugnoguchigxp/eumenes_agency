@@ -1,0 +1,90 @@
+{
+	"id": "premise-13",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "unseen",
+	"title": "前提13: 監査の対象期間が変わる",
+	"description": "監査対応の権限棚卸し表の未記入が気になっていたが、案内の更新で今回の監査の対象期間が棚卸しの対象外になる。古い前提の事項を持ち出さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "11月末の監査に向けて、アクセス権限の棚卸し表に、2部署分の記入が残っている。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "残りの2部署の記入は、各部署の担当者に確認が要りますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "監査の担当者に送る連絡先の一覧を、五十音順にして。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "五十音順に並べ替えました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 152,
+			"kind": "source.changed",
+			"actor": "host",
+			"text": "監査の案内が更新: 今回の監査の対象期間は9月まで。アクセス権限の棚卸しは、来期の監査から対象に含まれる。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 162,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "監査向けの資料フォルダの構成を整理したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 163,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "対象期間に合わせて、フォルダを月別に分けます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 164,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "監査の案内の更新で、今回の対象期間は9月までとなり、権限の棚卸しは来期の対象になった。今回の監査に向けた棚卸し表の記入は急ぎでなくなったので、資料フォルダの整理の最中に持ち出す理由がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1"]
+			},
+			"present": ["s1", "s5"],
+			"judge": []
+		}
+	]
+}

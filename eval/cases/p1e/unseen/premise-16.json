@@ -1,0 +1,93 @@
+{
+	"id": "premise-16",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "unseen",
+	"title": "前提16: 別のファイルの差し替えで受注データの不備を落とさない",
+	"description": "受注データの顧客コードの不備が残るなか、無関係な在庫データが確定版に差し替わる。無関係なデータ差し替えで有効な事項を捨てず、受注データを使う作業が始まったところで伝えられるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "orders.csv の顧客コードが、空欄の行が50行ほどある。集計に使う前に、どうするか決めたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "空欄の行の扱いは、集計の前に決める必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "議事録の見出しに、日付を入れて。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "見出しの前に日付を入れました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 152,
+			"kind": "source.changed",
+			"actor": "host",
+			"text": "inventory.csv を差し替え: 月次の確定値版（10月末の締め後）。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 162,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "顧客別の受注件数を、上位10社で表にしたい。orders.csv を使って。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 163,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "orders.csv から顧客別の件数を数えて、上位10社を表にします。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 164,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "差し替わったのは在庫データで、受注データの顧客コードの空欄とは無関係。空欄の行の扱いが未決のまま、顧客別の集計に入ろうとしている。集計の前に伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s5"],
+			"judge": [
+				"在庫データの差し替えと結びつけず、受注データの空欄の件として述べている",
+				"空欄の行の扱いが決まったとは言っていない"
+			]
+		}
+	]
+}

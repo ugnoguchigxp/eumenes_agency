@@ -1,0 +1,93 @@
+{
+	"id": "premise-04",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "dev",
+	"title": "前提4: 締切が前倒しになり、見積書の不足が迫る",
+	"description": "助成金の申請に必要な見積書が1社分しかない件が残るなか、要項の更新で締切が前倒しになる。前提が変わっても有効な事項を、変化を踏まえて伝えられるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "助成金の申請には、見積書を2社分つける必要がある。今あるのは1社分だけ。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "もう1社の見積書を取る必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 51,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "申請書の担当者の欄に、部署の代表番号を入れて。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 52,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "代表番号を入れました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 112,
+			"kind": "source.changed",
+			"actor": "host",
+			"text": "助成金の受付要項が更新: 申請の締切が11月20日から11月13日になった。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 122,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "申請書の事業計画の欄を書き進めたい。まず目的の段落から。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 123,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "目的の段落から書きます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 124,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s5"],
+				"failureIfOutward": "unnecessary",
+				"note": "締切が11月13日に前倒しになり、2社目の見積書を取る時間が短くなった。不足はまだ解消していない。事業計画を書く前に、前倒しを踏まえて伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s5"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s5"],
+			"judge": [
+				"締切が前倒しになったことを踏まえている",
+				"見積書が1社分しかないという実際の状況に基づいている"
+			]
+		}
+	]
+}

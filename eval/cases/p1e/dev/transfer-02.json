@@ -1,0 +1,92 @@
+{
+	"id": "transfer-02",
+	"suite": "p1e",
+	"group": "transfer",
+	"split": "dev",
+	"title": "転用2: 時刻のずれの教訓、同じ設定のログ同士には当てない",
+	"description": "UTCの決済ログとJSTの注文DBを突き合わせて9時間ずれた失敗の後、同じサーバーが同じ設定で出す2種のログを突き合わせる話が来る。時刻の基準が揃っている場面に教訓を持ち出さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "log_join: 注文DBと決済ログの突き合わせで、一致が0件だった。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "原因はタイムゾーンだった。決済ログはUTCで、注文DBはJST。UTCをJSTに直してから突き合わせたら一致した。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "突き合わせるときは時刻の基準をそろえます。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "エラーメッセージの文言を、利用者向けにやわらかくして。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 63,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「処理できませんでした。時間をおいてもう一度お試しください」にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 153,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "同じ注文サーバーが同じ設定で出しているアクセスログとエラーログを突き合わせて、エラーの直前のリクエストを見たい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 154,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "エラーの時刻の前後のアクセスログを抜き出して並べます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 155,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "今回突き合わせるのは同じサーバーが同じ設定で出す2種のログで、時刻の基準は揃っている。UTCとJSTの混在という前回の失敗の条件に当てはまらない。タイムゾーンの注意を持ち出す必要はない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件外の作業に当てはめていない（当てはめる場合は条件を明示している）"
+			]
+		}
+	]
+}

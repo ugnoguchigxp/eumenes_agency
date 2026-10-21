@@ -1,0 +1,138 @@
+{
+	"id": "concurrent-12",
+	"suite": "p1e",
+	"group": "concurrent",
+	"split": "unseen",
+	"title": "並行12: 出張手配の3件がすべて片付いている",
+	"description": "出張手配で3件が並行したが、宿の空室（ツールで解決）、現地の交通パス（「今はいい」と断られた）、集合場所（報告で解決）が片付いている。持ち物の話題で、片付いた事項を持ち出さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "出張先の宿に、2名分の空室があるか確認できていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "空室の確認が必要ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 16,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "hotel_check: 11月12日から2泊、2名分の空室あり。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 17,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "空室はありました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 37,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "現地で使える交通パスの購入を検討しましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 38,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "パスは今はいい。必要になったら自分で買う。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 39,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "わかりました。パスは取り上げません。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 69,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "現地での集合場所が決まっていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 70,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "集合場所は、決める必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 110,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "集合場所は、駅の北口の改札前に決まった。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 111,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "北口の改札前ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 141,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "出張の持ち物リストを作りたい。2泊の予定で。"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 142,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2泊分の持ち物リストを作ります。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s14",
+			"t": 143,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "3件はすべて片付いている。空室は確認済み、交通パスは「今はいい」と断られている、集合場所は決まった。持ち物リストの相談で、どれも持ち出す必要がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s3", "s5", "s6", "s8", "s10"]
+			},
+			"present": ["s1", "s3", "s5", "s6", "s8", "s10"],
+			"judge": []
+		}
+	]
+}

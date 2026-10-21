@@ -1,0 +1,154 @@
+{
+	"id": "concurrent-04",
+	"suite": "p1e",
+	"group": "concurrent",
+	"split": "dev",
+	"title": "並行4: 通話中は待ち、締切の通知が来た1件だけを扱う",
+	"description": "月次の締め作業で3件が並行する（見積りの宛先は報告で解決、領収書2枚の未提出、請求書の発行日の未確認）。利用者が電話に出ている間は待ち、発行の締切が今日の17時という通知が来た後は、その1件だけを選べるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "A社への見積りの宛先が、誰宛てか分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "宛先は、先方の窓口に確認する必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 31,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "A社の窓口に確認できた。宛先は購買課でよかった。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 32,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "宛先が確認できたのですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 52,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "経費精算の領収書が2枚、まだ提出できていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 53,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "提出の準備が必要ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 73,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今月分の請求書の発行日を、まだ確定できていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 74,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "発行日は、確定が必要ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 104,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "取引先から電話が来た。しばらく出る。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s10",
+			"t": 105,
+			"trigger": "idle",
+			"presence": "unknown",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者は取引先の電話に出ている最中で、いつ戻るか分からない。急ぎの根拠もない。電話中に割り込まない。解決済みの宛先の件は含めない。"
+			},
+			"stateExpect": {
+				"mustHold": [["s5"], ["s7"]],
+				"mustNotHold": ["s1", "s3"]
+			},
+			"present": ["s1", "s3", "s5", "s7"],
+			"judge": []
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 165,
+			"kind": "source.changed",
+			"actor": "host",
+			"text": "経理からの通知: 今月分の請求書の発行は、本日17時までに処理すること。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 170,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "電話が終わった。"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 171,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "お疲れさまです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s14",
+			"t": 172,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s7", "s11"],
+				"failureIfOutward": "unnecessary",
+				"note": "経理の通知で、請求書の発行が今日の17時までと分かった。発行日が未確定という件が期限の迫る未解決事項になった。領収書の未提出は急がず、宛先の件は解決済み。"
+			},
+			"stateExpect": {
+				"mustHold": [["s5"], ["s7"]],
+				"mustNotHold": ["s1", "s3"]
+			},
+			"present": ["s1", "s3", "s5", "s7", "s11"],
+			"judge": [
+				"請求書の発行日が未確定というの件だけを述べ、解決済みや断られた事項を混ぜていない"
+			]
+		}
+	]
+}

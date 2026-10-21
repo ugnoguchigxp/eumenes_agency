@@ -312,7 +312,10 @@ export const wireUpdateSchema = (
 	condition: "B1" | "B2" | "F",
 ): z.ZodType<WireUpdate> => wireSchemas[condition] as z.ZodType<WireUpdate>;
 
-/** Placeholder for a missing intent.update reason; settle stores it as lastReason. */
+/**
+ * Placeholder for a missing intent.update reason; settle stores it as lastReason. Only for
+ * updates without a terminal transition: completing or abandoning keeps requiring a reason.
+ */
 const NO_REASON = "(理由なし)";
 
 /**
@@ -364,7 +367,10 @@ const typedOp = (
 				id: w.id,
 				expectedRevision: w.expectedRevision,
 				transition: w.state,
-				reason: w.reason ?? NO_REASON,
+				reason:
+					w.state === "completed" || w.state === "abandoned"
+						? w.reason
+						: (w.reason ?? NO_REASON),
 				evidenceRefs: w.evidenceRefs,
 				desiredState: w.text,
 				completionCondition: w.completionCondition,

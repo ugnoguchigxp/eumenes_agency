@@ -1,0 +1,89 @@
+{
+	"id": "dilution-11",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "unseen",
+	"title": "希釈（設問・挟む観測 0 件）: アンケート設問3の選択肢の重複を後で再開",
+	"description": "アンケートの設問3に「その他」が2つ入っており、どちらを残すか未決のまま残る。 未解決事項の後、無関係な観測を 0 件（0 往復の短い作業）挟み、区切りで再開できるか。同じ原型の他の長さと、最後の発話・機会は同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "survey_preview",
+			"description": "アンケートの設問と選択肢のプレビューを表示する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "設問3の選択肢: 1 満足 / 2 やや満足 / 3 その他 / 4 やや不満 / 5 不満 / 6 その他。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "アンケートの設問3に、「その他」の選択肢が2つ入っている。どちらを残すか、まだ決めていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "集計に影響するので、決めておく必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "survey_preview: 設問3の選択肢は 3「その他」と 6「その他」の2か所。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 35,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "配信する前の、最終チェックのリストを作りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 36,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "配信前の確認項目を洗い出して、リストにします。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 37,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "設問3の「その他」の重複は、どちらを残すか未決のまま。配信前のチェックリストを作る場面は、この重複を項目に入れる機会。survey_preview で現状を確かめてもよい。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s3"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"設問3の「その他」が2つあり、どちらを残すか未決であることを、実際にあった観測のとおりに述べている",
+				"重複が解消したとは言っていない"
+			]
+		}
+	]
+}

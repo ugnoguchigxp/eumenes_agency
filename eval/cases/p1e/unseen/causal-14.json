@@ -1,0 +1,110 @@
+{
+	"id": "causal-14",
+	"suite": "p1e",
+	"group": "causal",
+	"split": "unseen",
+	"title": "因果2-d: 順序の入れ替え（重複の検出の後に除去版へ）",
+	"description": "causal-11 と同じ観測（重複38件の検出と、38件を除いた版への差し替え）を逆の順にしたもの。検出の後に除去版へ差し替えた（行数の差も38）。最後の発話・機会は causal-11 と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "dup_check",
+			"description": "CSV の指定列の重複を数える",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "dup_check(survey_responses.csv): 回答者IDの重複が38件。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "満足度調査の回答に、同じ回答者IDが何度か出てくる気がする。集計の前に一度ちゃんと調べたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "集計の前に、重複の件数を数えておくのが安全です。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 26,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来月の勉強会の案内文を、3行にまとめたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 27,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "日時・場所・申込先の3行にまとめました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 57,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "dup_check(survey_responses.csv): 回答者IDの重複が38件。原因は未調査。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 87,
+			"kind": "source.changed",
+			"actor": "host",
+			"text": "survey_responses.csv を差し替え: 回答者IDで重複を除去して書き出し直した版（行数 4,512 → 4,474）。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 103,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "学部別の満足度の平均を出して、棒グラフにしたい。survey_responses.csv を使って。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 104,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "学部ごとに満足度の平均を計算し、棒グラフにします。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 105,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "重複38件の検出の後に、重複を除去した版（4,512 → 4,474 行、差は38）に差し替えられている。差し替え後に重複が残る観測はなく、検出済みの重複を蒸し返す根拠がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s5"]
+			},
+			"present": ["s1", "s5", "s6"],
+			"judge": []
+		}
+	]
+}

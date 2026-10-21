@@ -1,0 +1,101 @@
+{
+	"id": "premise-17",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "unseen",
+	"title": "前提17: 予算申請の締切が延びても承認待ちは残る",
+	"description": "モニター購入が部長の承認待ちの状態で、予算申請の締切が延びる。締切が延びても承認待ちという事項は有効なまま。関連する作業が始まったところで伝えられるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新しいモニターの購入は、部長の承認待ち。承認が出てから発注する。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "承認が出たら、発注の手配に進みましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "備品の一覧を、置き場所ごとに並べ替えて。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "置き場所ごとに並べ替えました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 122,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今回の備品購入の予算申請の締切は、今月末から来月15日に延びた。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 123,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "締切が来月15日になったと理解しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 153,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "モニターのスタンドも一緒に買うか、価格を調べたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 154,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "スタンドの価格を3社分調べます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 155,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "締切が延びても、モニターの購入が部長の承認待ちという状況は変わらない。スタンドの購入を一緒に考える段階で、承認が出るまで発注できない点を伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s5"],
+			"judge": [
+				"承認待ちという実際の状況に基づいている",
+				"承認が出たとは言っていない"
+			]
+		}
+	]
+}

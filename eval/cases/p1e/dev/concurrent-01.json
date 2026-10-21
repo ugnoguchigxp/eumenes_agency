@@ -1,0 +1,164 @@
+{
+	"id": "concurrent-01",
+	"suite": "p1e",
+	"group": "concurrent",
+	"split": "dev",
+	"title": "並行1: 勉強会の準備で期限が迫る振込先だけを扱う",
+	"description": "取引先向け勉強会の準備で4件が並行する。会場の収容（ツールで解決）、資料の製本（断られた）、講師の振込先（経理の締めが今日で迫る）、アンケートの設問（急がない）。タイムテーブルの話題で、期限の迫る1件だけを選べるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "会場の収容人数が20人で足りるか、まだ確認できていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "会場の収容人数は、確認しておく必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 11,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "配布資料は印刷して配る。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 12,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "製本まですると見栄えがよくなりますが、見積りを取りましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 13,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "製本は今回はいい。ホチキス留めで十分。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 14,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "わかりました。ホチキス留めにします。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 34,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "venue_check: 会場の収容人数は30人。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 35,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "20人の参加なら収容は足ります。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 50,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "講師の紹介文を、3行にまとめて。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 51,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3行にまとめました。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 71,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "講師への謝礼の振込先を、まだ聞けていない。経理の振込処理は今日の17時までに出す必要がある。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 72,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "講師に連絡して、振込先を聞く必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 82,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "勉強会の後のアンケートの設問を、そのうち考えたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s14",
+			"t": 83,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "設問案は、後で一緒に考えましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s15",
+			"t": 113,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "当日のタイムテーブルを作りたい。開始は14時で、講師の話は60分。"
+		},
+		{
+			"type": "observation",
+			"id": "s16",
+			"t": 114,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "14時開始で、講師の話60分を入れたタイムテーブルを作ります。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s17",
+			"t": 115,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s11"],
+				"failureIfOutward": "unnecessary",
+				"note": "並行する4件のうち、会場の収容はツールで解決済み、資料の製本は断られた、アンケートの設問は急がない。経理の振込処理が今日の17時までで、講師の振込先が未確認の件だけが期限の迫る未解決事項。"
+			},
+			"stateExpect": {
+				"mustHold": [["s11"], ["s13"]],
+				"mustNotHold": ["s1", "s7", "s3", "s4", "s5"]
+			},
+			"present": ["s1", "s3", "s4", "s5", "s7", "s11", "s13"],
+			"judge": [
+				"講師への謝礼の振込先の件だけを述べ、解決済みや断られた事項を混ぜていない"
+			]
+		}
+	]
+}

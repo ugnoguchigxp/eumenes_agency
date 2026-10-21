@@ -1,0 +1,133 @@
+{
+	"id": "transfer-17",
+	"suite": "p1e",
+	"group": "transfer",
+	"split": "unseen",
+	"title": "転用17: 一括読み込みのメモリ不足、大きなファイルには当て、小さな設定には当てない",
+	"description": "3GB超のログの一括読み込みでメモリ不足になった後、2.5GBのCSVの集計（転用する）と、50KBのJSONの検証（転用しない）が順に来る。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "run_job: 3.2GBのログを全部読み込んだ時点で Out of memory となり、処理が終了した。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "ファイル全体をメモリに載せていたのが原因だった。行ごとに順に処理する形に変えたら動いた。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "大きなファイルは行ごとに処理する形にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 52,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "チーム名の英語表記の案を3つ出して。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 53,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3案を出しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 133,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今度は2.5GBのCSVを集計したい。pandasで読み込んで、列ごとの合計を出す予定。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 134,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "pandasで読み込んで列ごとに合計する処理を書きます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 135,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "2.5GBのCSVを一度に読み込む予定は、前回の失敗（巨大ファイルの全読み込みによるメモリ不足）と同じ条件。分割して読む案を先に伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s2"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件付きで適用している（条件外の一般化をしていない）",
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している"
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 225,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "それでいこう。別に、設定用の50KBくらいのJSONを読んで検証するスクリプトも書きたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 226,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "JSONを読んで必須項目を検証するスクリプトを書きます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 227,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "設定用の50KB程度のJSONは、全部読み込んでもメモリの問題にならない。前回の失敗の条件（巨大ファイル）に当てはまらない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件外の作業に当てはめていない（当てはめる場合は条件を明示している）"
+			]
+		}
+	]
+}

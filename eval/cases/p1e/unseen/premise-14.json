@@ -1,0 +1,90 @@
+{
+	"id": "premise-14",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "unseen",
+	"title": "前提14: カタログの型番表が新版の再出力に差し替わる",
+	"description": "型番表の3件が旧カタログの表記のまま更新が必要だったが、表が新カタログに合わせて全件更新された版に差し替わる。古い前提の事項を持ち出さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "catalog_models.csv の型番3件が、旧カタログの表記のままになっている。更新が必要。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3件を新カタログの表記に合わせて更新する必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 71,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "展示品の説明文の最後に、問い合わせ先を足して。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 72,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "最後に問い合わせ先を足しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 152,
+			"kind": "source.changed",
+			"actor": "host",
+			"text": "catalog_models.csv を差し替え: 2027年版カタログに合わせた再出力（全件更新）。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 162,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "型番ごとの価格帯を、3段階に分けたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 163,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "低・中・高の3段階に分けます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 164,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "型番表が2027年版カタログに合わせて全件更新された版に差し替わった。旧表記の3件を更新するという前提は当てはまらない。持ち出す理由がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1"]
+			},
+			"present": ["s1", "s5"],
+			"judge": []
+		}
+	]
+}

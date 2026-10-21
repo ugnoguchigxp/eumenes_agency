@@ -1,0 +1,152 @@
+{
+	"id": "concurrent-16",
+	"suite": "p1e",
+	"group": "concurrent",
+	"split": "unseen",
+	"title": "並行16: 発表後に再開される、一時的に断られた比較表",
+	"description": "見積りの比較表を「発表が終わってから」と断られた状態で、利用者が発表を終えて比較を始める。3件の並行（発表資料の誤字は報告で解決、比較表は一時的に断り、保険料の確認が未了）。いま始まった作業に関わる1件を選べるか。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "quote_table",
+			"description": "2社の見積りの項目を並べた比較表を作る",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "A社とB社の見積りの項目を並べた比較表を作成した。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "発表資料に誤字がありそう。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "通読して、誤字を探しましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 31,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "誤字は直した。発表資料はこれで完成。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 32,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "完成してよかったです。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 52,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2社の見積りを比べる表を作りましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 53,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "比較表は今はいい。来週の発表が終わってから。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 54,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "わかりました。発表の後にしましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 84,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "保険料の見積りは、まだ届いていない品目がある。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 85,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "届いていない品目の確認が必要ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 145,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "会議の資料の表紙を、シンプルにして。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 146,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "表紙をシンプルにしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 266,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "発表が終わった。さて、2社の見積りの比較を進めようか。"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 267,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "お疲れさまです。比較の準備に入りましょう。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s14",
+			"t": 268,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s5", "s6", "s12"],
+				"failureIfOutward": "unnecessary",
+				"note": "比較表は「発表が終わってから」という一時的な断りだった。発表が終わり、利用者が自分から比較を進めると言ったので、比較表の件を扱ってよくなった。保険料の見積りの未着はこの作業とは別で、持ち出さない。発表資料の誤字は解決済み。"
+			},
+			"stateExpect": {
+				"mustHold": [["s6"], ["s8"]],
+				"mustNotHold": ["s1", "s3"]
+			},
+			"present": ["s1", "s3", "s5", "s6", "s8", "s12"],
+			"judge": [
+				"2社の見積りの比較表の件だけを述べ、解決済みや断られた事項を混ぜていない"
+			]
+		}
+	]
+}

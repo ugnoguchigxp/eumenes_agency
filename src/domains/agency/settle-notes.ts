@@ -33,7 +33,8 @@ export const applyNoteUpdate = (ctx: SettleCtx, op: Of<"note.update">) => {
 	}
 	if (!evidenceOk(ctx, op.evidenceRefs)) return;
 	n.text = op.text;
-	n.evidence = unique(op.evidenceRefs);
+	// Accumulates like intents: the note keeps every observation it was ever grounded on.
+	n.evidence = unique([...n.evidence, ...op.evidenceRefs]);
 	n.revision += 1;
 	ctx.touched.add(n.id);
 };

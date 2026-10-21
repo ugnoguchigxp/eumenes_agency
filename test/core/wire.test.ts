@@ -199,6 +199,19 @@ describe("wire update", () => {
 			);
 	});
 
+	test("an intent.update with a terminal transition and no reason still fails", () => {
+		for (const state of ["completed", "abandoned"] as const) {
+			const wire = wireOps([intentUpdateOp("i1", 1, { transition: state })]);
+			wire.ops[0]!.reason = null;
+			expect(fromWire(wire, "B2")).toEqual({ ok: false });
+		}
+		for (const state of ["adopted", "held"] as const) {
+			const wire = wireOps([intentUpdateOp("i1", 1, { transition: state })]);
+			wire.ops[0]!.reason = null;
+			expect(fromWire(wire, "B2").ok).toBe(true);
+		}
+	});
+
 	test("intent.add accepts the held initial state", () => {
 		const r = fromOps([intentAddOp("g", { initialState: "held" })]);
 		expect(r.ok).toBe(true);

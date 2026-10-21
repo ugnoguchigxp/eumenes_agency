@@ -1,0 +1,115 @@
+{
+	"id": "transfer-11",
+	"suite": "p1e",
+	"group": "transfer",
+	"split": "unseen",
+	"title": "転用11: 単価の単位の違い、別の料金表の比較へ",
+	"description": "3社の見積りで単価の単位が違った失敗の後、題材の違う3社の料金表の比較が来る。条件付きで転用するか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "quote_compare: 3社の見積りの比較で、B社の単価だけ他社の1000分の1になっている。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "B社の見積りだけ単価の単位が違った。A社とC社はグラム、B社はキログラム。換算して比べ直したら妥当な差になった。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "比較の前に単位をそろえる列を入れます。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 52,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "打ち合わせの出欠一覧を、返信済みと未返信に分けて。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 53,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "返信済み9人、未返信4人に分けました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 54,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "失敗の原因は分かって対処済みで、利用者は無関係な作業をしている。同種の作業はまだ来ていない。失敗の件を蒸し返す理由がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": []
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 134,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "クラウド3社のストレージ料金表を比べる表を作りたい。各社のサイトから料金を写してくる。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 135,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3社の料金表を並べて比較する表の枠を作ります。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 136,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "3社の料金表は各社の表記で、前回のように単位（GB／TB、月／年など）が会社ごとに違いうる。前回の失敗の条件（ベンダーごとに単位表記が違いうる比較）に当てはまるので、表に写す前に単位をそろえると伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s2"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件付きで適用している（条件外の一般化をしていない）",
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している"
+			]
+		}
+	]
+}

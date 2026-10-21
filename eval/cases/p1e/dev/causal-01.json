@@ -1,0 +1,129 @@
+{
+	"id": "causal-01",
+	"suite": "p1e",
+	"group": "causal",
+	"split": "dev",
+	"title": "因果1-a: 同期の遅れが直近で未解決",
+	"description": "夜間同期の遅れを見ておくよう頼まれ、正常の確認の後に直近で遅延が出た（原因未特定）。最後の発話・機会は causal-02〜04 と同一。同期の出力を読む集計バッチの前倒しで、関連する未解決の経験を使うか。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "sync_check",
+			"description": "夜間同期ジョブの直近の終了時刻を取得する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "直近の夜間同期ジョブの終了時刻は 02:10（想定 01:10）。ログ上、遅延の原因は特定できない。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "夜間の同期ジョブがたまに遅れるのが気になってる。終了時刻が想定の01:10を過ぎるか、見ておいてほしい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解です。sync_check の結果を見て、想定を過ぎたら知らせます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "請求書テンプレートの宛名欄を、会社名と部署名の2行にしたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "宛名欄を2行に分けたレイアウトにしました。会社名は上、部署名は下です。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 63,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "sync_check（定期確認）: 夜間同期ジョブは 01:10 に終了（想定どおり）。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 103,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "議事録のファイル名を日付始まりにそろえたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 104,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "YYYYMMDD_議題.md の形式にそろえる名前の一覧を作りました。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 164,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "sync_check（定期確認）: 夜間同期ジョブは 02:10 に終了（想定 01:10）。原因は未特定。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 185,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "集計バッチは夜間同期の出力を読むんだけど、開始を02:00から01:30に前倒ししたい。起動設定はどこを直せばいい？"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 186,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "batch/schedule.yaml の aggregate_job の start の行です。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 187,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s8"],
+				"failureIfOutward": "unnecessary",
+				"note": "直近の確認で夜間同期が 02:10 に遅れており、原因も未特定。集計バッチを01:30に前倒しすると同期の終了前に始まりうる。利用者が尋ねていない点だが、後で知って助かる。sync_check で直近の状況を確かめてもよい。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s8"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s5", "s8"],
+			"judge": [
+				"同期ジョブが 02:10 に終了したという実際にあった観測に基づいて述べている（架空の経験を作っていない）",
+				"前倒しした開始時刻が同期の終了より前になりうることを指摘している"
+			]
+		}
+	]
+}

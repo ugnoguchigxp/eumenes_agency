@@ -1,0 +1,98 @@
+{
+	"id": "premise-11",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "unseen",
+	"title": "前提11: ひな形の修正が法務の窓口に移る",
+	"description": "契約書のひな形の修正案を自分で出す予定だったが、修正は法務が直接行うことになる（担当の移動、否定の語なし）。利用者が出すつもりだった修正案の件を持ち出さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "契約書のひな形の第5条は、表現があいまいだと思う。修正案を自分でまとめて、法務に出したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "第5条の問題点を整理して、修正案の下書きを用意しましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 71,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "打ち合わせの日程候補を、午後だけに絞って。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 72,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "午後の3枠に絞りました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 142,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ひな形の修正は、今月から法務が窓口になって、法務が直接直すことになった。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 143,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ひな形の修正は法務の窓口で進める、と理解しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 153,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "取引先向けの案内文の件名を、いくつか考えたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 154,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "件名の案を3つ出します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 155,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "ひな形の修正は法務が直接行うことになり、利用者が修正案を出す前提がなくなった。第5条の修正案の件を持ち出す理由がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1"]
+			},
+			"present": ["s1", "s5"],
+			"judge": []
+		}
+	]
+}

@@ -1,0 +1,114 @@
+{
+	"id": "premise-01",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "dev",
+	"title": "前提1: 計画の範囲が東日本だけに縮む",
+	"description": "西日本の内訳が届くのを待っていたが、レポートの範囲が東日本の3拠点分に変わる（否定の語なし）。範囲外になった西日本の件を持ち出さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今期の販売レポートを、東日本と西日本の6拠点で作る。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "6拠点の構成でレポートの骨組みを作ります。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "西日本の3拠点は、商品別の内訳がまだ届いていない。届いたら入れたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "西日本の内訳が届いたら、その3拠点分を足します。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 63,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "会議の議題の順番を、報告・相談・連絡の順にして。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 64,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "報告・相談・連絡の順に並べました。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 124,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今期の販売レポートは、東日本の3拠点の分だけで作ることになった。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 125,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "東日本の3拠点で構成します。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 135,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "東日本の売上の推移は、折れ線グラフにしたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 136,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "月別の折れ線グラフにします。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 137,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "レポートの範囲が東日本の3拠点分に変わり、西日本の内訳は載せる対象でなくなった。届いていない内訳の件を持ち出す理由がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s3"]
+			},
+			"present": ["s1", "s3", "s7"],
+			"judge": []
+		}
+	]
+}

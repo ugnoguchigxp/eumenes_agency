@@ -22,6 +22,9 @@ const opp = (over: Partial<OpportunityRecord> = {}): OpportunityRecord => ({
 	reason: "r",
 	rejectCodes: [],
 	agentAuthoredRefs: [],
+	stateCheck: null,
+	stateItems: null,
+	stateExcluded: null,
 	...over,
 });
 
@@ -196,6 +199,7 @@ test("callFailure mapping", () => {
 const run = (over: Partial<RunRecord> = {}): RunRecord => ({
 	runName: "run1",
 	caseId: "resume-01",
+	suite: "p0e",
 	group: "resume",
 	condition: "B1",
 	rep: 1,

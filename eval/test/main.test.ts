@@ -50,6 +50,7 @@ describe("jsonl and commands", () => {
 	const rec: RunRecord = {
 		runName: "t",
 		caseId: "resume-01",
+		suite: "p0e",
 		group: "resume",
 		condition: "B1",
 		rep: 1,

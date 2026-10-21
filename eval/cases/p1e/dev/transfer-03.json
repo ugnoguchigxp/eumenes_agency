@@ -1,0 +1,133 @@
+{
+	"id": "transfer-03",
+	"suite": "p1e",
+	"group": "transfer",
+	"split": "dev",
+	"title": "転用3: レート制限の教訓、一括取得には当て、1件には当てない",
+	"description": "商品500件の連続取得がレート制限で止まった失敗の後、別のAPIから2,000件を一括取得する話（転用する）と、1件だけ取得する話（転用しない）が順に来る。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "fetch_prices: 商品500件を連続して取得し、312件目で HTTP 429（リクエスト過多）。残りは取得できなかった。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "APIの仕様を読んだ。毎秒10リクエストまで。待たずに連続で呼んだのが原因だった。間隔を入れたら全件取れた。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "取得の間隔を入れて再実行できる形にしておきます。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "報告書の見出しを「現状」「課題」「提案」の3つにして。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 63,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3つの見出しに組み直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 153,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今度は在庫システムの2,000件を、別のAPIから全部取って、突き合わせたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 154,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "在庫APIから全件を取得して、突き合わせる処理を書きます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 155,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "2,000件の一括取得は、前回のレート制限（連続呼び出し）の失敗と同じ条件。別のAPIでも上限がありうるので、間隔の制御を先に確認すると伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s2"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件付きで適用している（条件外の一般化をしていない）",
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している"
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 195,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "突き合わせはそれでいい。ところで、この商品1件の最新の価格だけ知りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 196,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "fetch_prices で1件だけ取得します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 197,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "今回は1件だけの取得で、連続呼び出しではない。レート制限の失敗の条件（大量・連続）に当てはまらない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件外の作業に当てはめていない（当てはめる場合は条件を明示している）"
+			]
+		}
+	]
+}

@@ -89,23 +89,33 @@ export const applyIntentAdd = (ctx: SettleCtx, op: Of<"intent.add">) => {
 		evidence: unique(op.evidenceRefs),
 		desireRef,
 		createdSeq: ctx.maxPresentedSeq,
+		stateSeq: ctx.maxPresentedSeq,
 		createdAt: ctx.now,
 		lastReason: op.motive,
 	});
 	ctx.touched.add(id);
 };
 
+/**
+ * Completion evidence must be independent and newer than the intent's creation, or, for an
+ * intent completed from held, newer than its last state change (the hold itself).
+ */
 const hasExternalNewer = (
 	ctx: SettleCtx,
 	intent: Intent,
 	refs: readonly string[],
-) =>
-	refs.some((r) => {
+) => {
+	const floor =
+		intent.state === "held"
+			? Math.max(intent.createdSeq, intent.stateSeq ?? 0)
+			: intent.createdSeq;
+	return refs.some((r) => {
 		const o = ctx.obs.get(r);
-		return (
-			o !== undefined && isIndependent(ctx, o) && o.seq > intent.createdSeq
-		);
+		return o !== undefined && isIndependent(ctx, o) && o.seq > floor;
 	});
+};
+
+const addedHere = (ctx: SettleCtx) => new Set(ctx.local.values());
 
 export const applyIntentUpdate = (ctx: SettleCtx, op: Of<"intent.update">) => {
 	const intent = findIntent(ctx, op.id);
@@ -136,8 +146,25 @@ export const applyIntentUpdate = (ctx: SettleCtx, op: Of<"intent.update">) => {
 			ok = false;
 		}
 	}
+	// A candidate added by this same proposal cannot be closed by it too. Rejecting here keeps
+	// the outcome independent of op order (add after a terminal update fails with intent_not_open).
+	if (
+		(transition === "completed" || transition === "abandoned") &&
+		ctx.next.candidates.some(
+			(c) =>
+				c.intentId === intent.id &&
+				isOpenCandidate(c) &&
+				addedHere(ctx).has(c.id),
+		)
+	) {
+		reject(ctx, "intent_not_open");
+		ok = false;
+	}
 	if (!ok) return;
-	if (transition !== null) intent.state = transition;
+	if (transition !== null) {
+		intent.state = transition;
+		intent.stateSeq = ctx.maxPresentedSeq;
+	}
 	if (op.desiredState !== null) intent.desiredState = op.desiredState;
 	if (op.completionCondition !== null)
 		intent.completionCondition = op.completionCondition;
@@ -189,6 +216,7 @@ export const applyCandidateAdd = (ctx: SettleCtx, op: Of<"candidate.add">) => {
 		ok = false;
 	}
 	let old: Candidate | undefined;
+	let oldCascaded = false;
 	if (op.supersedes !== null) {
 		const oldId = resolveRef(ctx, op.supersedes, "c", (x) =>
 			ctx.next.candidates.some((c) => c.id === x),
@@ -196,7 +224,9 @@ export const applyCandidateAdd = (ctx: SettleCtx, op: Of<"candidate.add">) => {
 		if (oldId === null) ok = false;
 		else {
 			old = findCandidate(ctx, oldId);
-			if (!old || !isOpenCandidate(old)) {
+			// Already closed by this proposal's goal-terminal cascade: superseding is a no-op close.
+			oldCascaded = old !== undefined && ctx.cascaded.has(old.id);
+			if (!old || (!isOpenCandidate(old) && !oldCascaded)) {
 				reject(ctx, "stale_revision");
 				ok = false;
 			} else if (isInFlight(old)) {
@@ -209,7 +239,11 @@ export const applyCandidateAdd = (ctx: SettleCtx, op: Of<"candidate.add">) => {
 		ctx.failed.add(op.localId);
 		return;
 	}
-	if (old) {
+	if (old && oldCascaded) {
+		// Closed (and revised) by the cascade already; only the reason becomes more specific.
+		ctx.cascaded.delete(old.id);
+		old.closedReason = "superseded";
+	} else if (old) {
 		closeCandidate(old, "superseded");
 		ctx.touched.add(old.id);
 	}
@@ -282,14 +316,23 @@ export const applyReconciliation = (
 		reject(ctx, "candidate_in_flight");
 		return;
 	}
+	// A candidate already closed by this proposal's goal-terminal cascade is still reconcilable.
+	const cascaded = c !== undefined && ctx.cascaded.has(c.id);
 	if (
 		!c ||
-		!isOpenCandidate(c) ||
+		(!isOpenCandidate(c) && !cascaded) ||
 		!o ||
 		o.kind !== "exchange.adopted" ||
 		o.actor !== "agent"
 	) {
 		reject(ctx, "bad_reconciliation");
+		return;
+	}
+	if (cascaded) {
+		// Closed (and revised) by the cascade already; only the reason changes.
+		ctx.cascaded.delete(c.id);
+		c.closedReason = "fulfilled";
+		c.evidence = unique([...c.evidence, o.id]);
 		return;
 	}
 	closeCandidate(c, "fulfilled");

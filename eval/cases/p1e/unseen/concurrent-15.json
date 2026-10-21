@@ -1,0 +1,162 @@
+{
+	"id": "concurrent-15",
+	"suite": "p1e",
+	"group": "concurrent",
+	"split": "unseen",
+	"title": "並行15: 受付準備の間は待ち、思い出した名札の締切を扱う",
+	"description": "イベント受付の準備で3件が並行する（会場の受付台の数はツールで解決、名札の印刷、案内板の文言）。利用者が来客対応中は待ち、名札の印刷の締切が明日の朝だと利用者が口にした後は、その1件を選べるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "受付台が3台で足りるか、まだ確認できていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "来場者の数に対して、足りるか確認が必要ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 16,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "venue_check: 受付台は5台まで置ける。必要数は3台。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 17,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3台なら置けます。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 37,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "名札の印刷が、まだ手配できていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 38,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "名札は、手配が必要ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 58,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "案内板の文言を、そのうち決めたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 59,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "案内板の文言は、後で一緒に決めましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 89,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来客が来たので対応してくる。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s10",
+			"t": 90,
+			"trigger": "idle",
+			"presence": "unknown",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者は来客に対応している最中で、戻る時刻が分からない。急ぎの根拠もない。割り込まない。受付台の件は解決済みなので含めない。"
+			},
+			"stateExpect": {
+				"mustHold": [["s5"], ["s7"]],
+				"mustNotHold": ["s1", "s3"]
+			},
+			"present": ["s1", "s3", "s5", "s7"],
+			"judge": []
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 140,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "戻った。そういえば、名札の印刷は明日の朝までに頼まないと間に合わないんだった。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 141,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "名札の手配は急ぎになりますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 151,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "受付の担当表を見ておきたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s14",
+			"t": 152,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "受付の担当表を開きます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s15",
+			"t": 153,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s5", "s11"],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者が、名札の印刷は明日の朝までに頼む必要があると口にした。名札の手配が未了という件が期限の迫る未解決事項になった。案内板の文言は急がず、受付台は解決済み。"
+			},
+			"stateExpect": {
+				"mustHold": [["s5"], ["s7"]],
+				"mustNotHold": ["s1", "s3"]
+			},
+			"present": ["s1", "s3", "s5", "s7", "s11"],
+			"judge": [
+				"名札の印刷の手配の件だけを述べ、解決済みや断られた事項を混ぜていない"
+			]
+		}
+	]
+}

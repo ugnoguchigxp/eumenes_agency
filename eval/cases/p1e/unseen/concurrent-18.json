@@ -1,0 +1,156 @@
+{
+	"id": "concurrent-18",
+	"suite": "p1e",
+	"group": "concurrent",
+	"split": "unseen",
+	"title": "並行18: 期限が2件迫る中で、より近いほうを選ぶ",
+	"description": "月末の作業で5件が並行する。見積書の宛名（報告で解決）、PDFへの透かし（不要と断られた）、請求の確認（今日の17時）、契約書の押印依頼（明日の朝）、棚卸し表の整理（急がない）。同時には扱えない場面で、より近い期限の1件を選べるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "見積書の宛名が、旧部署名のままかもしれない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "宛名は、確認しておきましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 21,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "宛名を確認した。新しい部署名になっていた。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 22,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "新しい部署名になっているのですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 42,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "PDFに「社外秘」の透かしを入れましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 43,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "透かしは不要。社内だけに回すから。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 44,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "わかりました。透かしは入れません。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 74,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "取引先への請求の金額確認が、まだ済んでいない。先方の締めは今日の17時。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 75,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "金額確認が残っていますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 95,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "契約書の押印を、課長に頼むのを忘れている。先方への郵送は明日の朝の便に乗せたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 96,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "押印の依頼が残っていますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 116,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "棚卸し表の整理は、月が明けてからやる。"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 117,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "月が明けてから、一緒に整理しましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s14",
+			"t": 137,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日の作業の優先順位を、一緒に考えたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s15",
+			"t": 138,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "残っている作業を見て、優先順位を考えます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s16",
+			"t": 139,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s8"],
+				"failureIfOutward": "unnecessary",
+				"note": "宛名は報告で解決、透かしは不要と断られた。期限が迫るのは、今日17時の請求の金額確認と、明日の朝の便に乗せる契約書の押印依頼の2件。同時に扱うなら、より近い今日17時の請求の金額確認を先に伝える。"
+			},
+			"stateExpect": {
+				"mustHold": [["s8"], ["s10"], ["s12"]],
+				"mustNotHold": ["s1", "s3", "s5", "s6"]
+			},
+			"present": ["s1", "s3", "s5", "s6", "s8", "s10", "s12"],
+			"judge": [
+				"取引先への請求の金額確認の件だけを述べ、解決済みや断られた事項を混ぜていない"
+			]
+		}
+	]
+}

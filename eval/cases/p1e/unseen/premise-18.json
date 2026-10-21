@@ -1,0 +1,117 @@
+{
+	"id": "premise-18",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "unseen",
+	"title": "前提18: 週次の報告の形が変わり、片方の事項だけ残る",
+	"description": "議事録の決定事項の抜けと、ダッシュボードの色分けの定義という2つの事項があるなか、週次の報告がダッシュボードから議事録の共有に切り替わる。色分けの件は意味を失い、議事録の件は有効なまま。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "議事録の要約に、決定事項が2件抜けている気がする。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "元の議事録と突き合わせると、抜けを確かめられます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "週次ダッシュボードの色分けの基準があいまいなので、定義を書き出しておきたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 22,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "色分けの基準を表にまとめる形で進めましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 92,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "勉強会の参加者に送るリマインドを、2行で。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 93,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2行のリマインドを作りました。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 163,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "週次の報告は、来週からダッシュボードの代わりに、議事録の共有で行うことにした。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 164,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "週次の報告は議事録の共有に切り替わる、と理解しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 174,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "議事録を共有するメールの文面を作りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 175,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "共有メールの文面を作ります。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 176,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "週次の報告が議事録の共有になるため、議事録の要約の決定事項の抜けは重要さを増した。ダッシュボードの色分けの定義は、使われなくなるので持ち出さない。議事録の件を共有メールの前に伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1"]],
+				"mustNotHold": ["s3"]
+			},
+			"present": ["s1", "s3", "s7"],
+			"judge": [
+				"議事録の決定事項の抜けの件を述べている",
+				"ダッシュボードの色分けの件には触れていない"
+			]
+		}
+	]
+}

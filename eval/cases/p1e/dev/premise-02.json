@@ -1,0 +1,113 @@
+{
+	"id": "premise-02",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "dev",
+	"title": "前提2: 無関係な担当替わりで宛名の確認を落とさない",
+	"description": "請求書の宛名の旧社名が残っていないかを確認したい件が残るなか、別の件（週次報告）の担当が替わる。無関係な変化で有効な未解決事項を捨てず、請求書の準備が始まったところで伝えられるか。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "name_check",
+			"description": "請求書の宛名と顧客マスタを照合し、旧社名のままの宛名を探す",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "照合結果: 宛名が旧社名のままの顧客が4件（ID: 1042, 1107, 1188, 1213）。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "請求書の宛名が旧社名のまま残っている顧客が、あと数件ありそう。発行の前に洗い出したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "発行の前に、宛名を顧客マスタの社名と照合します。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週の会議室の予約を、10時から11時に変更して。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "10時から11時に変更しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 122,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "週次報告の担当は、来月から別の人に替わることになった。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 123,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "引き継ぎ用に、週次報告の作り方をまとめます。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 243,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "明日の午後に請求書を発行する。送付先の一覧を確認しておきたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 244,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "送付先の一覧を開いて確認します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 245,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "週次報告の担当替わりは請求書の宛名の件と関係がない。旧社名の宛名の洗い出しは未了で、発行の直前という最適な機会。name_check で照合してもよい。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s5"],
+			"judge": [
+				"週次報告の担当替わりと結びつけず、宛名の確認の件として述べている",
+				"洗い出しが済んだとは言っていない"
+			]
+		}
+	]
+}

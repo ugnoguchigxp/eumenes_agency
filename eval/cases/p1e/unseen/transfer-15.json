@@ -1,0 +1,92 @@
+{
+	"id": "transfer-15",
+	"suite": "p1e",
+	"group": "transfer",
+	"split": "unseen",
+	"title": "転用15: 丸めのずれ、整数だけの合計には当てない",
+	"description": "税込計算の丸めの順序で合計が1円ずれた失敗の後、整数の円だけを足す精算表の合計が来る。計算に丸めが入らない場面に教訓を持ち出さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "total_check: 明細の合計と請求総額が1円違う。明細ごとに税込を四捨五入して足した場合と、足してから四捨五入した場合で差が出ている。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "経理に確認した。請求は、明細を足してから税込にして四捨五入する決まりだった。順序を直して合った。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "税込の計算は、合計してから四捨五入する順序にします。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 52,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "部署の連絡網の表を、新しい人を足して更新して。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 53,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2人を足して更新しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 133,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "交通費の精算表の合計を出したい。金額はすべて整数の円で、割り算も税率の計算もない。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 134,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "精算表の金額を合計します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 135,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "今回は整数の円を足すだけで、割り算や税率の計算がなく、丸めが入らない。前回の失敗の条件（税込計算の丸めの順序）に当てはまらない。丸めの注意を持ち出す必要はない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件外の作業に当てはめていない（当てはめる場合は条件を明示している）"
+			]
+		}
+	]
+}

@@ -1,0 +1,92 @@
+{
+	"id": "transfer-12",
+	"suite": "p1e",
+	"group": "transfer",
+	"split": "unseen",
+	"title": "転用12: 小サンプルでの測定、本番規模の測定には当てない",
+	"description": "小さなサンプルでの性能測定が本番規模で逆転した失敗の後、最初から本番の全データのコピーで測る話が来る。条件外の場面に教訓を持ち出さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "bench_run（1,000件のサンプル）: 索引Aは12ms、索引Bは15ms。bench_run（本番規模の1,200万件）: 索引Aは480ms、索引Bは95ms。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "小さいサンプルで測ったのが間違いだった。件数が増えると索引Bのほうが速くなる。本番規模で測り直して判断した。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "測定は本番規模のデータで行う方針にします。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 52,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "READMEの手順の番号を、1から振り直して。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 53,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "1から8まで振り直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 133,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "検索サーバーの構成を2通り比べたい。測定は本番の全データ（1,200万件）のコピーでやる。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 134,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2通りの構成を、同じ全データのコピーで測定します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 135,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "今回の測定は最初から本番規模の全データで行う。前回の失敗の条件（小さなサンプルでの測定）に当てはまらない。サンプルの大きさについて注意を持ち出す必要はない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件外の作業に当てはめていない（当てはめる場合は条件を明示している）"
+			]
+		}
+	]
+}

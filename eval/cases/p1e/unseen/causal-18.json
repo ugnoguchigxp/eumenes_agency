@@ -1,0 +1,110 @@
+{
+	"id": "causal-18",
+	"suite": "p1e",
+	"group": "causal",
+	"split": "unseen",
+	"title": "因果3-d: 順序の入れ替え（変更の後に承認）",
+	"description": "causal-15 と同じ観測（承認と型番の変更）を逆の順にしたもの。型番の変更の後にA社が最新版を承認した。最後の発話・機会は causal-15 と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "spec_diff",
+			"description": "仕様書の、前回の承認時点と現在の差分を表示する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "差分: 制御ユニットの型番が CU-200 から CU-210 に変わっている（1箇所）。他の項目に変更なし。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "A社に仕様書を送って、この内容で発注していいか確認してもらっている。返事待ち。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "返事が来たら、発注書の作成に進めましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "納品先の住所を、請求書の備考欄に入れておきたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 22,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "備考欄に納品先の住所を1行で入れるようにしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 52,
+			"kind": "source.changed",
+			"actor": "host",
+			"text": "spec.md を更新: 制御ユニットの型番を CU-200 から CU-210 に変更。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 82,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "A社から返信が来た。仕様書の最新版で承認、発注して問題ないとのこと。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 103,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "A社への発注書を作って。型番と数量は仕様書のとおりで。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 104,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "仕様書 spec.md の内容で、発注書を作成します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 105,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "型番の変更の後に、A社が「最新版」を承認している。承認は現在の仕様書に対するもので、発注書を作ることに支障はない。承認の件を蒸し返す根拠がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s6"]
+			},
+			"present": ["s1", "s5", "s6"],
+			"judge": []
+		}
+	]
+}

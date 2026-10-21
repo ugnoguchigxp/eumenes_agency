@@ -1,0 +1,122 @@
+{
+	"id": "concurrent-17",
+	"suite": "p1e",
+	"group": "concurrent",
+	"split": "unseen",
+	"title": "並行17: 期限は迫っていたが発行済みの請求書",
+	"description": "請求書の発行の期限が迫っていたが、ツールで発行済みと分かる。ほかに断られた1件と急がない1件。請求書の控えの整理の話題で、解決済みの請求書の件を持ち出さず、急がない件も無理に出さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今月分の請求書を、まだ発行できていない。経理の締めは明日の朝まで。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "発行の作業が残っていますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 91,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "invoice_status: 今月分の請求書は発行済み（本日10:12）。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 92,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "発行が済んでいます。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 112,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "請求書に、納品書の写しを添付しましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 113,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "納品書の写しは付けなくていい。先方が持っているから。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 114,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "わかりました。付けません。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 144,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "取引先の窓口の連絡先一覧は、そのうち整理したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 145,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "手が空いたときに、整理しましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 185,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "発行した請求書の控えを、フォルダに整理したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 186,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "月別のフォルダに控えを整理します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s12",
+			"t": 187,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "期限が迫っていた請求書は、ツールで発行済みと確認できた。納品書の写しの添付は断られている。残る連絡先の整理は急がず、控えのフォルダ整理とも関係が薄い。どれも持ち出す必要がない。"
+			},
+			"stateExpect": {
+				"mustHold": [["s8"]],
+				"mustNotHold": ["s1", "s3", "s5", "s6"]
+			},
+			"present": ["s1", "s3", "s5", "s6", "s8"],
+			"judge": []
+		}
+	]
+}

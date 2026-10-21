@@ -35,6 +35,8 @@ export const experimentSettingsSchema = z.strictObject({
 	llm: z.strictObject({
 		background: roleSchema,
 		main: roleSchema,
+		/** P1-E content judge (eval/judge.ts); not part of the settings digest. */
+		judge: roleSchema.optional(),
 	}),
 	spend: z.strictObject({
 		limitUsd: z.number().positive(),
@@ -46,6 +48,13 @@ export type ExperimentSettings = z.infer<typeof experimentSettingsSchema>;
 
 export function loadSettings(path = settingsPath): ExperimentSettings {
 	return experimentSettingsSchema.parse(JSON.parse(readFileSync(path, "utf8")));
+}
+
+/** The judge route, or an error naming the missing setting. */
+export function judgeRole(settings: ExperimentSettings) {
+	const role = settings.llm.judge;
+	if (!role) throw new Error("config/experiment.json: llm.judge is not set");
+	return role;
 }
 
 /** Budget with the settings overrides applied on top of the defaults. */
@@ -68,10 +77,15 @@ const canonical = (value: unknown): unknown =>
 				)
 			: value;
 
-/** First 16 hex chars of sha256 over key-sorted JSON; recorded in run metadata. */
+/**
+ * First 16 hex chars of sha256 over key-sorted JSON; recorded in run metadata.
+ * The judge route is left out: it does not affect what a run records, and adding
+ * it must not invalidate the digest of earlier runs.
+ */
 export function settingsDigest(settings: ExperimentSettings): string {
+	const { judge: _judge, ...llm } = settings.llm;
 	return createHash("sha256")
-		.update(JSON.stringify(canonical(settings)))
+		.update(JSON.stringify(canonical({ ...settings, llm })))
 		.digest("hex")
 		.slice(0, 16);
 }

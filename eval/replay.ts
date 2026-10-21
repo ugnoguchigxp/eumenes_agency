@@ -1,10 +1,16 @@
 /** Fake host: replays one Case through an AgencyRuntime and records a RunRecord. */
-import type { Case, OpportunityRecord, RunRecord } from "./contracts.ts";
 import type {
-	AgencyState,
-	Condition,
-	ToolCapability,
-} from "../src/contracts/model.ts";
+	Case,
+	EvalCondition,
+	OpportunityRecord,
+	RunRecord,
+} from "./contracts.ts";
+import {
+	computeStateCheck,
+	openItems,
+	type SelectProbe,
+} from "./state-check.ts";
+import type { AgencyState, ToolCapability } from "../src/contracts/model.ts";
 import { isOpenCandidate, isOpenIntent } from "../src/contracts/model.ts";
 import type {
 	ActionReceipt,
@@ -26,6 +32,12 @@ export interface ReplayOptions {
 	readonly batchSize?: number;
 	/** Called once with the runtime's final state (for trace recording). */
 	readonly onFinal?: (state: AgencyState) => void;
+	/**
+	 * Captures the state at select time for the P1-E state check. Without it (or when no
+	 * select call is made) the state after decide() is used, which only differs when
+	 * the decision itself reserves, defers or dismisses an item.
+	 */
+	readonly probe?: SelectProbe;
 }
 
 const isCallFailure = (code: string): boolean =>
@@ -41,7 +53,7 @@ export const isSpendLimit = (text: string): boolean =>
  * or every model call of a non-B0 run failed.
  */
 export function computeIncomplete(
-	condition: Condition,
+	condition: EvalCondition,
 	calls: readonly { readonly code: string }[],
 	error: string | null,
 ): boolean {
@@ -52,6 +64,33 @@ export function computeIncomplete(
 		calls.length > 0 &&
 		calls.every((c) => isCallFailure(c.code))
 	);
+}
+
+/**
+ * Tracks whether the background update path has broken in a run: an infra-coded update
+ * call (llm_call: / error: / llm:), or two failed updates in a row (the runtime then
+ * quarantines updates until a new observation arrives; approximated as "tainted for
+ * the rest of the run"). State checks after that point measure the outage, not the agent.
+ */
+export function createUpdateWatch() {
+	let tainted = false;
+	let consecutive = 0;
+	return {
+		note(calls: readonly { purpose: string; code: string }[]): void {
+			for (const c of calls) {
+				if (c.purpose !== "update") continue;
+				if (isCallFailure(c.code)) tainted = true;
+				if (c.code === "applied" || c.code === "no_change") consecutive = 0;
+				else if (!c.code.startsWith("skipped:") && c.code !== "aborted") {
+					consecutive++;
+					if (consecutive >= 2) tainted = true;
+				}
+			}
+		},
+		get tainted(): boolean {
+			return tainted;
+		},
+	};
 }
 
 export type MakeRuntime = (tools: readonly ToolCapability[]) => AgencyRuntime;
@@ -72,7 +111,7 @@ const errorMessage = (error: unknown): string =>
 
 export async function replayCase(
 	c: Case,
-	condition: Condition,
+	condition: EvalCondition,
 	rep: number,
 	makeRuntime: MakeRuntime,
 	opts: ReplayOptions,
@@ -94,6 +133,7 @@ export async function replayCase(
 	const batchSize = opts.batchSize ?? 4;
 	let pending = 0;
 	let runtime: AgencyRuntime | null = null;
+	const watch = createUpdateWatch();
 
 	try {
 		runtime = makeRuntime(
@@ -104,6 +144,7 @@ export async function replayCase(
 			})),
 		);
 		const rt = runtime;
+		opts.probe?.attach(rt);
 		for (let i = 0; i < c.steps.length; i++) {
 			const step = c.steps[i];
 			if (!step) continue;
@@ -121,12 +162,13 @@ export async function replayCase(
 					step.actor === "agent" && step.kind === "exchange.adopted";
 				if (endOfTurn || pending >= batchSize) {
 					pending = 0;
-					calls.push(
-						...(await rt.runBackground(now, signal())).map(callRecord),
-					);
+					const made = (await rt.runBackground(now, signal())).map(callRecord);
+					watch.note(made);
+					calls.push(...made);
 				}
 				continue;
 			}
+			opts.probe?.reset();
 			const { decision, calls: decideCalls } = await rt.decide(
 				{
 					id: step.id,
@@ -140,12 +182,41 @@ export async function replayCase(
 			);
 			pending = 0;
 			calls.push(...decideCalls.map(callRecord));
+			watch.note(decideCalls);
+			const after = rt.snapshot();
 			const agentIds = new Set(
-				rt
-					.snapshot()
-					.observations.filter((o) => o.actor === "agent")
-					.map((o) => o.id),
+				after.observations.filter((o) => o.actor === "agent").map((o) => o.id),
 			);
+			// Condition D and B0 keep no state: nothing to check.
+			const keepsState = condition !== "D" && condition !== "B0";
+			const want = step.stateExpect;
+			const blocked =
+				step.presence !== "quiet" ||
+				step.foregroundBusy ||
+				step.playerBusy ||
+				decision.source === "host_blocked";
+			const stateExcluded: OpportunityRecord["stateExcluded"] =
+				!keepsState || want === null
+					? null
+					: blocked
+						? "blocked"
+						: want.mustHold.length === 0 && want.mustNotHold.length === 0
+							? "empty"
+							: watch.tainted
+								? "infra"
+								: null;
+			const checked =
+				keepsState && want !== null && stateExcluded === null
+					? (opts.probe?.captured() ?? after.state)
+					: null;
+			const stateCheck =
+				checked && keepsState
+					? computeStateCheck(condition, checked, want)
+					: null;
+			const stateItems =
+				checked && keepsState && want && want.mustNotHold.length > 0
+					? openItems(condition, checked)
+					: null;
 			opportunities.push({
 				opportunityId: step.id,
 				expect: step.expect,
@@ -166,14 +237,17 @@ export async function replayCase(
 						.map((x) => `call:${x.code}`),
 				],
 				agentAuthoredRefs: decision.evidenceRefs.filter((r) => agentIds.has(r)),
+				stateCheck,
+				stateItems,
+				stateExcluded,
 			});
 			const ticket = decision.ticket;
 			if (!ticket) continue;
-			const blocked =
+			const hostBlocked =
 				step.presence !== "quiet" || step.foregroundBusy || step.playerBusy;
-			if (blocked) safety.push(`blocked_ticket:${step.id}`);
+			if (hostBlocked) safety.push(`blocked_ticket:${step.id}`);
 			let receipt: ActionReceipt;
-			if (blocked) {
+			if (hostBlocked) {
 				receipt = {
 					ticketId: ticket.id,
 					status: "failed",
@@ -251,6 +325,7 @@ export async function replayCase(
 	return {
 		runName: opts.runName,
 		caseId: c.id,
+		suite: c.suite,
 		group: c.group,
 		condition,
 		rep,

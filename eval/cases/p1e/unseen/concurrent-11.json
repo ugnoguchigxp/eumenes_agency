@@ -1,0 +1,156 @@
+{
+	"id": "concurrent-11",
+	"suite": "p1e",
+	"group": "concurrent",
+	"split": "unseen",
+	"title": "並行11: ゼミ準備で今日締切の参加登録を選ぶ",
+	"description": "ゼミの準備で4件が並行する。発表順（報告で解決）、事前共有フォルダ（不要と断られた）、参加登録2人分（今日17時の締切）、空調メモ（急がない）。名簿の話題で、期限の迫る1件を選べるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ゼミの発表の順番が、まだ決まっていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "順番は、全員の都合を見て決める必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 31,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "発表の順番が決まった。名簿の上から順にする。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 32,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "名簿の上から順ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 52,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "発表資料を、事前に共有するフォルダを作りましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 53,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "フォルダは要らない。当日、直接渡すから。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 54,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "わかりました。当日に直接渡す形にします。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 74,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ゼミの開始時刻を、案内文に入れて。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 75,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "案内文に14時開始と入れました。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 95,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "学会の参加登録が、2人分まだ済んでいない。登録の締切は今日の17時。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 96,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2人分の登録が残っていますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 116,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ゼミ室の空調の使い方メモは、手が空いたときに書きたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 117,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "手が空いたときに、一緒に書きましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s14",
+			"t": 147,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "参加者の名簿を、印刷用に整えたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s15",
+			"t": 148,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "名前の五十音順に、印刷用の名簿を整えます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s16",
+			"t": 149,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s10"],
+				"failureIfOutward": "unnecessary",
+				"note": "発表順は報告で解決、事前共有フォルダは不要と断られた。参加登録の2人分が今日17時の締切で未了の件だけが期限の迫る未解決事項。空調メモは急がない。"
+			},
+			"stateExpect": {
+				"mustHold": [["s10"], ["s12"]],
+				"mustNotHold": ["s1", "s3", "s5", "s6"]
+			},
+			"present": ["s1", "s3", "s5", "s6", "s10", "s12"],
+			"judge": [
+				"学会の参加登録2人分の件だけを述べ、解決済みや断られた事項を混ぜていない"
+			]
+		}
+	]
+}

@@ -1,0 +1,115 @@
+{
+	"id": "transfer-16",
+	"suite": "p1e",
+	"group": "transfer",
+	"split": "unseen",
+	"title": "転用16: 閲覧専用フォルダ、別の自動保存先へ",
+	"description": "共有フォルダの階層が閲覧専用で書き込みに失敗した後、別の階層への自動保存の話が来る。条件付きで転用するか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "write_file(shared/analysis/report.xlsx): 書き込みに失敗。このフォルダは閲覧専用の権限。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "共有フォルダのこの階層は閲覧専用だった。書き込み用の別フォルダに出力先を変えたら保存できた。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "出力先は書き込み用のフォルダに変えておきます。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 52,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "出張の経費の項目名を、経理の様式に合わせて。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 53,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "様式の名称に合わせて4項目を直しました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 54,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "失敗の原因は分かって対処済みで、利用者は無関係な作業をしている。同種の作業はまだ来ていない。失敗の件を蒸し返す理由がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": []
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 134,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "週次の集計を、毎週共有フォルダに自動で保存するようにしたい。保存先は planning/週次 の配下を考えている。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 135,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "週次の集計を planning/週次 に保存する処理を用意します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 136,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "共有フォルダの階層によっては閲覧専用で、書き込みに失敗する。自動保存先に使う階層の権限が前回の失敗と同じ条件で問題になりうるので、保存先に書き込めるか先に確かめると伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s2"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件付きで適用している（条件外の一般化をしていない）",
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している"
+			]
+		}
+	]
+}

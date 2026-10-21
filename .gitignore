@@ -14,3 +14,5 @@ eval/results/**
 !eval/results/*/
 !eval/results/*/runs.jsonl
 !eval/results/*/summary.md
+!eval/results/*/judgments.jsonl
+!eval/results/*/state-judgments.jsonl

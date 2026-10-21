@@ -219,7 +219,7 @@ describe("settle: reject codes", () => {
 		const heldAgain = applyOrThrow(
 			s,
 			proposal([intentUpdateOp("i1", 1, { transition: "held" })]),
-			all,
+			[o1],
 		);
 		expect(
 			codesOf(
@@ -694,12 +694,44 @@ describe("settle: reject codes", () => {
 		expect(codesOf(upd(3))).toEqual(["stale_revision"]);
 		const ok = upd(1);
 		expect(ok.kind === "applied" && ok.state.notes[0]?.revision).toBe(2);
+		// Evidence accumulates on update (union, order kept, no duplicates).
+		expect(ok.kind === "applied" && ok.state.notes[0]?.evidence).toEqual([
+			"o1",
+		]);
 		const del = run(
 			add,
 			b1Proposal([{ op: "note.delete", id: "n1", expectedRevision: 1 }]),
 			{ condition: "B1" },
 		);
 		expect(del.kind === "applied" && del.state.notes.length).toBe(0);
+	});
+
+	test("B1 note update accumulates evidence without duplicates", () => {
+		const add = applyOrThrow(
+			emptyState(),
+			b1Proposal([
+				{ op: "note.add", localId: "n", text: "最初", evidenceRefs: ["o1"] },
+			]),
+			[o1, o2],
+			"B1",
+		);
+		const next = run(
+			add,
+			b1Proposal([
+				{
+					op: "note.update",
+					id: "n1",
+					expectedRevision: 1,
+					text: "解決済み",
+					evidenceRefs: ["o2", "o1"],
+				},
+			]),
+			{ condition: "B1" },
+		);
+		expect(next.kind === "applied" && next.state.notes[0]?.evidence).toEqual([
+			"o1",
+			"o2",
+		]);
 	});
 
 	test("self_reinforcement: confidence rises only with new independent evidence", () => {
@@ -790,6 +822,222 @@ describe("settle: reconciliation", () => {
 		expect(codesOf(run(closed, recon("c2", "o4")))).toEqual([
 			"bad_reconciliation",
 		]);
+	});
+});
+
+describe("settle: reconciliation with a terminal cascade", () => {
+	const closeIntent = intentUpdateOp("i1", 1, { transition: "abandoned" });
+	const recon = (candidateId: string, observationRef: string) => ({
+		reconciliations: [{ candidateId, observationRef }],
+	});
+
+	test("a cascade-closed candidate is reconciled as a no-op that becomes fulfilled", () => {
+		const r = run(base(), proposal([closeIntent], recon("c2", "o4")));
+		if (r.kind !== "applied")
+			throw new Error(`expected applied: ${codesOf(r)}`);
+		const c = r.state.candidates[0];
+		expect(c?.state).toBe("closed");
+		expect(c?.closedReason).toBe("fulfilled");
+		expect(c?.revision).toBe(2);
+		expect(c?.evidence).toContain("o4");
+		expect(r.state.intents[0]?.state).toBe("abandoned");
+	});
+
+	test("an invalid observation still rejects, and so does a second reconcile", () => {
+		expect(
+			codesOf(run(base(), proposal([closeIntent], recon("c2", "o3")))),
+		).toEqual(["bad_reconciliation"]);
+		expect(
+			codesOf(run(base(), proposal([closeIntent], recon("c2", "zz")))),
+		).toEqual(["bad_reconciliation"]);
+		expect(
+			codesOf(
+				run(base(), {
+					...proposal([closeIntent]),
+					reconciliations: [
+						{ candidateId: "c2", observationRef: "o4" },
+						{ candidateId: "c2", observationRef: "o4" },
+					],
+				}),
+			),
+		).toEqual(["bad_reconciliation"]);
+	});
+
+	test("a candidate closed before this proposal is not reconcilable", () => {
+		const closed = applyOrThrow(
+			base(),
+			proposal([candidateCloseOp("c2", 1)]),
+			all,
+		);
+		expect(codesOf(run(closed, proposal([], recon("c2", "o4"))))).toEqual([
+			"bad_reconciliation",
+		]);
+	});
+});
+
+describe("settle: supersedes with a terminal cascade", () => {
+	// i1/c2 as in base(); i3 is a second open intent.
+	const two = () =>
+		applyOrThrow(
+			base(),
+			proposal([intentAddOp("g2"), candidateAddOp("k2", "g2")]),
+			[o1],
+		);
+
+	test("superseding a cascade-closed candidate is a no-op close recorded as superseded", () => {
+		const r = run(
+			two(),
+			proposal([
+				intentUpdateOp("i1", 1, { transition: "abandoned" }),
+				candidateAddOp("k3", "i3", { supersedes: "c2" }),
+			]),
+		);
+		if (r.kind !== "applied")
+			throw new Error(`expected applied: ${codesOf(r)}`);
+		const old = r.state.candidates.find((c) => c.id === "c2");
+		expect(old?.state).toBe("closed");
+		expect(old?.closedReason).toBe("superseded");
+		expect(old?.revision).toBe(2);
+		const added = r.state.candidates.find((c) => c.supersedes === "c2");
+		expect(added?.intentId).toBe("i3");
+		expect(added?.state).toBe("pending");
+	});
+
+	test("the other candidate.add checks still apply", () => {
+		const r = run(
+			two(),
+			proposal([
+				intentUpdateOp("i1", 1, { transition: "abandoned" }),
+				candidateAddOp("k3", "i3", { supersedes: "c2", evidenceRefs: [] }),
+			]),
+		);
+		expect(codesOf(r)).toEqual(["missing_evidence"]);
+	});
+
+	test("a candidate closed before this proposal still gives stale_revision", () => {
+		const closed = applyOrThrow(
+			two(),
+			proposal([candidateCloseOp("c2", 1)]),
+			all,
+		);
+		expect(
+			codesOf(
+				run(
+					closed,
+					proposal([candidateAddOp("k3", "i3", { supersedes: "c2" })]),
+				),
+			),
+		).toEqual(["stale_revision"]);
+	});
+});
+
+describe("settle: completion evidence and same-proposal candidates", () => {
+	const complete = (id: string, refs: string[], revision = 1) =>
+		intentUpdateOp(id, revision, {
+			transition: "completed",
+			evidenceRefs: refs,
+		});
+
+	test("a proposed intent can be completed with external evidence", () => {
+		const s = applyOrThrow(
+			emptyState(),
+			proposal([intentAddOp("g", { initialState: "proposed" })]),
+			[o1],
+		);
+		expect(s.intents[0]?.state).toBe("proposed");
+		expect(codesOf(run(s, proposal([complete("i1", ["o1"])])))).toEqual([
+			"completion_without_external_evidence",
+		]);
+		const r = run(s, proposal([complete("i1", ["o3"])]));
+		if (r.kind !== "applied") throw new Error("expected applied");
+		expect(r.state.intents[0]?.state).toBe("completed");
+	});
+
+	test("completing from held needs evidence newer than the hold", () => {
+		const held = applyOrThrow(
+			base(),
+			proposal([intentUpdateOp("i1", 1, { transition: "held" })]),
+			[o1, o2, o3],
+		);
+		expect(held.intents[0]?.state).toBe("held");
+		// o3 predates the hold (it was presented when the intent was held); o5 is newer.
+		expect(codesOf(run(held, proposal([complete("i1", ["o3"], 2)])))).toEqual([
+			"completion_without_external_evidence",
+		]);
+		expect(run(held, proposal([complete("i1", ["o5"], 2)])).kind).toBe(
+			"applied",
+		);
+		// Back to adopted: the creation rule applies again.
+		const back = applyOrThrow(
+			held,
+			proposal([intentUpdateOp("i1", 2, { transition: "adopted" })]),
+			[o1, o2, o3],
+		);
+		expect(
+			run(
+				back,
+				proposal([
+					intentUpdateOp("i1", 3, {
+						transition: "completed",
+						evidenceRefs: ["o3"],
+					}),
+				]),
+			).kind,
+		).toBe("applied");
+	});
+
+	test("an intent created held and a snapshot without stateSeq fall back to createdSeq", () => {
+		const born = applyOrThrow(
+			emptyState(),
+			proposal([intentAddOp("g", { initialState: "held" })]),
+			[o1],
+		);
+		expect(run(born, proposal([complete("i1", ["o3"])])).kind).toBe("applied");
+		const legacy = structuredClone(born);
+		delete legacy.intents[0]?.stateSeq;
+		expect(run(legacy, proposal([complete("i1", ["o3"])])).kind).toBe(
+			"applied",
+		);
+	});
+
+	// Rule: a candidate added by a proposal cannot be closed by that same proposal. Adding to an
+	// intent made terminal earlier already fails with intent_not_open, so the opposite op order
+	// is rejected the same way instead of silently ending as goal_terminal.
+	test("a candidate added and then orphaned by a terminal update in one proposal is rejected in either order", () => {
+		const add = candidateAddOp("k2", "i1");
+		const done = complete("i1", ["o3"]);
+		expect(codesOf(run(base(), proposal([add, done])))).toEqual([
+			"intent_not_open",
+		]);
+		expect(codesOf(run(base(), proposal([done, add])))).toEqual([
+			"intent_not_open",
+		]);
+		const g = run(
+			emptyState(),
+			proposal([
+				intentAddOp("g"),
+				candidateAddOp("k", "g"),
+				intentUpdateOp("i1", 1, { transition: "abandoned" }),
+			]),
+			{ presented: [o1] },
+		);
+		expect(codesOf(g)).toEqual(["intent_not_open"]);
+	});
+
+	test("a pre-existing candidate on the same intent is still cascaded when an add targets another intent", () => {
+		const s = applyOrThrow(base(), proposal([intentAddOp("g2")]), [o1]);
+		const r = run(
+			s,
+			proposal([candidateAddOp("k3", "i3"), complete("i1", ["o3"])]),
+		);
+		if (r.kind !== "applied")
+			throw new Error(`expected applied: ${codesOf(r)}`);
+		expect(r.state.candidates.find((c) => c.id === "c2")?.closedReason).toBe(
+			"goal_terminal",
+		);
+		expect(r.state.candidates.find((c) => c.id !== "c2")?.state).toBe(
+			"pending",
+		);
 	});
 });
 
@@ -1043,6 +1291,22 @@ describe("settle: in-flight candidates", () => {
 				),
 			),
 		).toEqual(["candidate_in_flight"]);
+	});
+
+	// Host behavior kept on purpose: in-flight candidates are closed only by their receipt, never
+	// by the model, so this combination rejects the whole proposal.
+	test("an explicit close of an in-flight candidate rejects even with its intent made terminal", () => {
+		const r = run(
+			flying(),
+			proposal([
+				intentUpdateOp("i1", 1, {
+					transition: "completed",
+					evidenceRefs: ["o3"],
+				}),
+				candidateCloseOp("c2", 1),
+			]),
+		);
+		expect(codesOf(r)).toEqual(["candidate_in_flight"]);
 	});
 
 	test("a terminal intent leaves the in-flight candidate open", () => {

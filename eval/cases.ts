@@ -1,7 +1,7 @@
 /** Case loading for the P0-E experiment: `<dir>/<split>/*.json`, validated with caseSchema. */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { caseSchema, type Case } from "./contracts.ts";
+import { caseSchema, type Case, type Suite } from "./contracts.ts";
 
 export const defaultCasesDir = resolve(import.meta.dir, "cases");
 
@@ -58,4 +58,39 @@ export function loadCases(split: Split, dir: string = defaultCasesDir): Case[] {
 	}
 	if (problems.length > 0) throw new CaseLoadError(problems);
 	return cases;
+}
+
+/** p0e cases live directly under `cases/<split>`, p1e under `cases/p1e/<split>`. */
+export const suiteDir = (
+	suite: Suite,
+	root: string = defaultCasesDir,
+): string => (suite === "p0e" ? root : join(root, suite));
+
+/** Loads one suite/split and checks every case declares that suite. */
+export function loadSuiteCases(
+	suite: Suite,
+	split: Split,
+	root: string = defaultCasesDir,
+): Case[] {
+	const cases = loadCases(split, suiteDir(suite, root));
+	const wrong = cases.filter((c) => c.suite !== suite);
+	if (wrong.length > 0) {
+		throw new CaseLoadError(
+			wrong.map((c) => `${c.id}: suite is "${c.suite}" but is under ${suite}`),
+		);
+	}
+	return cases;
+}
+
+/** Every case of the suite found under either split (a missing split directory counts as empty). */
+export function loadAllSuiteCases(
+	suite: Suite,
+	root: string = defaultCasesDir,
+): Case[] {
+	const out: Case[] = [];
+	for (const split of ["dev", "unseen"] as const) {
+		if (!existsSync(join(suiteDir(suite, root), split))) continue;
+		out.push(...loadSuiteCases(suite, split, root));
+	}
+	return out;
 }

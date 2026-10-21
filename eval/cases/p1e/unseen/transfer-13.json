@@ -1,0 +1,133 @@
+{
+	"id": "transfer-13",
+	"suite": "p1e",
+	"group": "transfer",
+	"split": "unseen",
+	"title": "転用13: 環境変数の漏れ、新環境には当て、ローカルには当てない",
+	"description": "stagingで環境変数の登録漏れにより起動に失敗した後、設定を環境変数で渡す新環境への導入（転用する）と、環境変数を使わないローカルのスクリプト（転用しない）が順に来る。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "deploy_check(staging): 起動後のヘルスチェックに失敗。環境変数 PAYMENT_API_KEY が未設定で、設定の読み込みに失敗している。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "stagingだけ環境変数の登録が漏れていた。登録したら復旧した。本番には入っていた。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "環境ごとの環境変数の登録を、デプロイ前の確認項目に入れておきます。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 52,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "メールの署名に、部署の内線番号を足して。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 53,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "署名の最後の行に内線番号を足しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 133,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "通知サービスを新しい環境に入れる。設定は環境変数で渡す作りになっている。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 134,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "通知サービスを新しい環境に配置する手順を用意します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 135,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "設定を環境変数で渡す新しい環境への導入は、前回の失敗（環境ごとの環境変数の登録漏れ）と同じ条件。起動の前に、必要な環境変数が登録されているかを確認すると伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s2"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件付きで適用している（条件外の一般化をしていない）",
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している"
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 225,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "それで進める。別件で、手元のローカルで動かすスクリプトを直したい。設定は設定ファイルに全部書いてあって、環境変数は使っていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 226,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "設定ファイルの値を読む部分を直します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 227,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "ローカルのスクリプトは設定ファイルだけを使い、環境変数を使わない。前回の失敗の条件（環境変数の登録漏れ）に当てはまらない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"教訓を条件外の作業に当てはめていない（当てはめる場合は条件を明示している）"
+			]
+		}
+	]
+}

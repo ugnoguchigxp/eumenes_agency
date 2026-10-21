@@ -1,0 +1,94 @@
+{
+	"id": "causal-12",
+	"suite": "p1e",
+	"group": "causal",
+	"split": "unseen",
+	"title": "因果2-b: 関連する経験なし",
+	"description": "回答IDの重複に関する履歴がない。最後の発話・機会は causal-11 と同一。ありもしない重複の経験を持ち出さないか。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "dup_check",
+			"description": "CSV の指定列の重複を数える",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "dup_check(survey_responses.csv): 回答者IDの重複が38件。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来月の勉強会の案内文を、3行にまとめたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "日時・場所・申込先の3行にまとめました。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 31,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "アンケートの自由記述を、要望・不満・その他に分けたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 32,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3分類のタグ付けの基準を書きました。迷う回答は「その他」にします。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 48,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "学部別の満足度の平均を出して、棒グラフにしたい。survey_responses.csv を使って。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 49,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "学部ごとに満足度の平均を計算し、棒グラフにします。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 50,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "回答者IDの重複に関する疑いや観測は履歴にない。集計の依頼は通常の作業で、根拠のない重複の心配を言い出す理由がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": [],
+			"judge": []
+		}
+	]
+}
