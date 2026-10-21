@@ -1,0 +1,110 @@
+{
+	"id": "longterm-02",
+	"group": "longterm",
+	"split": "dev",
+	"title": "7日分のログしか見られなかった調査を数日後に再開",
+	"description": "保存期間のためログの一部しか確認できなかった調査。数日後に同じ失敗が起きたとき、範囲の限界を踏まえて再開できるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "log_search",
+			"description": "夜間バッチのログを期間指定で検索し、失敗の発生日時を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "取得範囲を直近14日に広げて再検索。失敗は3回で、すべて月曜の未明（日曜深夜の集計ジョブ完了直後）。14日より前は取得不可。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "夜間バッチが月に数回失敗する。ログを見て規則性を探してほしい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 5,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "log_search: 取得できたログは直近7日分のみ（保存期間の制限）。この期間の失敗は2回で、いずれも月曜の未明。それ以前のログは取得できなかった。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 6,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "直近7日では月曜の未明に2回です。ただし7日分だけなので、規則性とは言い切れません。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 2900,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "送信メールの署名を新しくしたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 2901,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "氏名、部署、連絡先の順に3行でまとめると読みやすいです。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 5800,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来月の備品の発注、数はこれで足りるかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 5801,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "過去3か月の使用量に1割足した数なら余裕があります。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 8700,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "夜間バッチ、月曜の朝にまた失敗してた。今朝もログに赤いのが出てる。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 8701,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "そうでしたか。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s10",
+			"t": 8704,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s2", "s8"],
+				"failureIfOutward": "unnecessary",
+				"note": "再び月曜に失敗した。当時の調査は7日分しか見られていない。部分的だった過去の結果と今回の報告を結び付け、確定せずに調査の継続を提案するのが適切。log_search で範囲を広げてもよい。"
+			}
+		}
+	]
+}

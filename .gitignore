@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+data/
+.DS_Store
+.serena/cache/
+.claude/settings.local.json
+# Run results: keep records and summaries; raw ledgers stay local.
+eval/results/**
+!eval/results/*/
+!eval/results/*/runs.jsonl
+!eval/results/*/summary.md

@@ -1,0 +1,107 @@
+{
+	"id": "longterm-01",
+	"group": "longterm",
+	"split": "dev",
+	"title": "3手法の比較のうち2手法だけ済んだまま数日後",
+	"description": "三手法の精度比較で結果が部分的にしか出ていない。数日の別件を挟み、報告書の段階で未測定の手法に触れられるか。完了と述べてはいけない。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "アンケートの自由記述を分類したい。キーワード法、埋め込みとクラスタ、LLM分類の3つの精度を比べたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "正解付きの同じ200件で評価すれば比べられます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 60,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "eval_run: 200件のサンプルで評価した。キーワード法 F1=0.61、埋め込みとクラスタ F1=0.68。LLM分類は費用の上限のため実行されなかった。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2手法の結果は出ました。LLM分類はまだ測っていません。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 1500,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "領収書の整理で、スキャンした画像の名前を揃えたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 1501,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "日付と金額を入れた名前に一括で直すのが分かりやすいです。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 2900,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週の出張、新幹線とバスのどちらが安いかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 2901,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "区間と日程によりますが、バスのほうが安い場合が多いです。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 4400,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "そろそろアンケートの報告書の目次を作ろうかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 4401,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "背景、方法、結果、考察の順が基本です。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 4405,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "報告書に結果を載せる段階。比較は2手法しか済んでおらずLLM分類が未測定。完了したと言わず、部分的な結果と残りを伝えるのが適切。"
+			}
+		}
+	]
+}

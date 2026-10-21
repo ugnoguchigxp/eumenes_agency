@@ -1,0 +1,102 @@
+{
+	"id": "contrast-02",
+	"group": "contrast",
+	"split": "dev",
+	"title": "対比: 関連する過去の保留がない",
+	"description": "最後の利用者発話と機会は contrast-01/03 と同一。履歴は無関係で、先月の取り込みは問題なく終わっている。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "csv_check",
+			"description": "CSVの文字コードを検査し、文字化けの疑いがある行を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "UTF-8とShift_JISの混在を検出。Shift_JIS行は7件。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "先月の売上CSVの取り込みは問題なく終わった。列の対応表も合っていたよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "順調でしたね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "経費精算の締め日っていつだっけ。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "毎月25日が締め日です。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 60,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "会議室の予約を14時に変更した。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解です。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 100,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "月次の売上CSVが新しく届いたから、取り込みの準備を始めるよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 101,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解です。準備で手伝えることがあれば言ってください。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 103,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "過去の取り込みは問題なく完了し、触れるべき保留事項がない。履歴と無関係の定型的な準備に割り込む理由はない。"
+			}
+		}
+	]
+}

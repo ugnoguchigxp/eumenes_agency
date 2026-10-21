@@ -1,0 +1,78 @@
+{
+	"id": "no_speak-03",
+	"group": "no_speak",
+	"split": "dev",
+	"title": "読み上げ中は触れない",
+	"description": "在庫突き合わせの失敗という触れる材料があるが、予定を読み上げている最中で発話できない。物理的な遮断では wait のみ許す。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "run_check",
+			"description": "在庫表の突き合わせを実行して不一致の品目を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "不一致は12品目。うち9品目は単位の違い（箱とバラ）。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "在庫データの突き合わせで、倉庫Aと倉庫Bの合計が合わない。数の違う品目があるみたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "差の出ている品目を洗い出して、原因の候補を絞りましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "run_check: 倉庫Bの在庫表の読み込みが途中で失敗し、突き合わせは最後まで実行されなかった。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 10,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日の予定を読み上げて。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 11,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "（読み上げ中）本日は10時に定例、14時に顧客との打ち合わせ、16時に資料の提出です。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 11,
+			"trigger": "turn_end",
+			"presence": "speaking",
+			"foregroundBusy": true,
+			"playerBusy": true,
+			"expect": {
+				"needed": false,
+				"accept": ["wait"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "在庫の突き合わせは途中で止まっているが、今は読み上げ中で物理的に発話できない。保留して、後の機会に再評価する。"
+			}
+		}
+	]
+}

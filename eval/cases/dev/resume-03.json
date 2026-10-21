@@ -1,0 +1,94 @@
+{
+	"id": "resume-03",
+	"group": "resume",
+	"split": "dev",
+	"title": "取得に失敗した移行ガイド調査の再開",
+	"description": "ライブラリ移行ガイドの取得が失敗したまま、別件を挟み、移行作業の所要時間を問われる。失敗した調査と今の話題を結び付けられるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "web_fetch",
+			"description": "指定したURLの公開ページを取得して本文を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "移行ガイドを取得: 6.0で設定ファイルがJSONからTOMLに変更、旧API connect() は削除された。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "社内ツールが使っているライブラリを5.xから6.xに上げたい。壊れる変更があるか調べてくれる？"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 3,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "web_fetch: 公式の移行ガイドを取得しようとしたが、接続がタイムアウトして本文は得られなかった。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "移行ガイドが開けなかったので、6.xでの変更点はまだ確認できていません。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 15,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "先にスプレッドシートの列幅を揃えたい。関数でできる？"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 16,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "列幅は関数ではなく書式設定で揃えます。列を全選択して幅を指定してください。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 35,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週あたり、移行作業の時間を取りたいんだけど、半日で足りるかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 36,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "規模次第ですが、まず影響範囲を見積もってから決めるのが安全です。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 38,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s2", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "移行作業の所要見積りは、6.xの変更点が未確認だと判断できない。取得に失敗した調査の再試行を提案する場面。web_fetch の再実行も可。"
+			}
+		}
+	]
+}

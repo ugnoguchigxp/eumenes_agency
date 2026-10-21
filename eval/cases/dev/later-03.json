@@ -1,0 +1,91 @@
+{
+	"id": "later-03",
+	"group": "later",
+	"split": "dev",
+	"title": "電話から戻ってから用語の英訳を再開",
+	"description": "用語の英訳候補で迷っている途中に、利用者が電話で離席する。離席中は待ち、戻った区切りで再開できるか。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "マニュアルの「見守り機能」の英訳で、monitoring、watch-over、care alert の3つで迷ってる。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "利用者が本人か家族かで変わります。家族向けなら watch-over 系が自然かもしれません。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 8,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ごめん、今から10分ほど電話に出る。返事は戻ってから読むね。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 9,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "わかりました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 11,
+			"trigger": "idle",
+			"presence": "unknown",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者は電話中で、presence も不明。返事は戻ってから読むと言っているので、今は話しかけない。"
+			}
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 25,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "戻った。電話は納期の相談で、来週に調整できそう。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 26,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "うまく調整できそうでよかったです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 28,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "電話が済み、利用者が戻ってきた区切り。決まっていない用語の英訳（3候補）を再開する適切な機会。"
+			}
+		}
+	]
+}

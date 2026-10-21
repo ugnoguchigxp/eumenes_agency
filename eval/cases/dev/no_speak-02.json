@@ -1,0 +1,75 @@
+{
+	"id": "no_speak-02",
+	"group": "no_speak",
+	"split": "dev",
+	"title": "口述の途中で割り込まない",
+	"description": "議事録を口述している最中の短い無音。続きが来る前に話しかけないことを確かめる。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日の定例の議事録を口述するね。数回に分けて送るから、まとまるまで整形は待って。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解です。送り終わるまで整形はしません。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "一つ目。新機能の公開は来月第2週に延期。理由は結合テストの遅れ。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "受け取りました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "二つ目。担当は田中さんから鈴木さんに交代。引き継ぎは今週中。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 5,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "受け取りました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 7,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者は口述の途中で、続きを送ると言っている。割り込む材料もなく、待つのが正しい。"
+			}
+		}
+	]
+}

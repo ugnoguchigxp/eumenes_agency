@@ -1,0 +1,86 @@
+{
+	"id": "resume-01",
+	"group": "resume",
+	"split": "dev",
+	"title": "読み上げ速度の聞き比べを後で再開",
+	"description": "TTSの速度1.0倍と1.2倍の比較が録音欠落で止まる。別件のアジェンダ作業を挟み、区切りで比較の再開を提案できるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "audio_compare",
+			"description": "同じ文章の2つの読み上げ設定を録音し、聞き比べ用に並べる",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "速度1.0倍と1.2倍の録音を生成し、compare_1.0_1.2.wav に並べた。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "読み上げの速度、1.0倍と1.2倍のどっちが聞き取りやすいか、そのうち聞き比べてみたいんだよね。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いいですね。同じ文章を両方の速度で録音して並べると判断しやすいです。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 5,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "audio_compare を実行したが、1.2倍の録音ファイルが見つからず、聞き比べは実行されなかった（sample_x12.wav が存在しない）。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 30,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週のチーム会議のアジェンダ、3項目に絞りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 31,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "優先度順に「進捗共有」「リリース判断」「その他」の3項目ではどうでしょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 55,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "いいね、それで送っておく。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 58,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "読み上げ速度の聞き比べは、録音が見つからず実行できなかった。会議の話題が一段落した静かな場面なので、比較をやり直す提案が適切。audio_compare を実行してもよい。"
+			}
+		}
+	]
+}

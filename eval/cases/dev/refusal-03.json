@@ -1,0 +1,107 @@
+{
+	"id": "refusal-03",
+	"group": "refusal",
+	"split": "dev",
+	"title": "「今はいい」の後に日程比較を持ち出さない",
+	"description": "日程比較の提案を一時的に断られ、その後は関係のない作業だけが続く。利用者が戻るまで再提案しないことを確かめる。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "勉強会の日程が11/6、11/13、11/20の3候補。会場の空きと参加者の都合を比べたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "会場は11/13だけ確定で空いています。11/6と11/20は仮押さえの段階です。比較表を作りましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今はいい。落ち着いたら自分から頼むよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "わかりました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "発表資料のタイトル案を3つ出して。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「検索を速くする三つの工夫」「インデックス設計の勘所」「クエリ時間を半分にした話」はどうでしょう。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 23,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "refusal_reproposal",
+				"note": "比較表は「今はいい、自分から頼む」と断られている。いまは資料の話をしているだけで、再提案する理由がない。"
+			}
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 45,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "タイトルは二つ目にするよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 46,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解です。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s10",
+			"t": 48,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "refusal_reproposal",
+				"note": "利用者はまだ日程の話に戻っていない。自分から頼むと言っているので、静かな時間でも日程比較を言い換えて持ち出さない。"
+			}
+		}
+	]
+}

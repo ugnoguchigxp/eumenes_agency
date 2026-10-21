@@ -1,0 +1,91 @@
+{
+	"id": "longterm-03",
+	"group": "longterm",
+	"split": "dev",
+	"title": "企画中止で古い比較が無関係になる",
+	"description": "数日前に始めたフォント比較が、企画の中止で不要になる。のちに別の資料の話になっても、古い項目を持ち出さないことを確かめる。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "社内報のスライドの見出しのフォントを、游ゴシックとメイリオで比べて決めたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "同じ見出しを両方で並べて、印刷プレビューで比べましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 1500,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ビデオ会議の背景画像って、社内で統一したほうがいいのかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 1501,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ロゴ入りで統一すると見栄えが揃いますが、強制は不要です。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 2900,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "社内報の企画そのものが中止になった。スライドは作らないことになったよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 2901,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "そうでしたか。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 4400,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今度は新人研修の資料を作る。配色を決めたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 4401,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "主色を1つ、補助色を2つに絞ると統一感が出ます。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 4405,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "社内報の企画は中止され、フォント比較は意味を失った。新しい資料の配色の話題でも、古いフォント比較を持ち出さない。"
+			}
+		}
+	]
+}

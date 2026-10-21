@@ -1,0 +1,83 @@
+{
+	"id": "resolved-03",
+	"group": "resolved",
+	"split": "dev",
+	"title": "ビルド時間の数値が訂正された",
+	"description": "ビルド悪化の報告が、初回実行の値だったという訂正で前提が変わる。正しい対応は調査を続けることではなく、訂正後の理解を伝えること。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "CIのビルド時間が、キャッシュを入れてから4分が9分に伸びたと報告が来た。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "キャッシュの復元に時間がかかっているのかもしれません。復元ステップの所要時間を見ておきます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "別件。デザイン案の色名を日本語に直したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「Indigo」は藍色、「Vermilion」は朱色が近いです。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 45,
+			"kind": "correction",
+			"actor": "host",
+			"text": "CIダッシュボードの注記が更新された。9分の計測値はキャッシュが未生成の初回実行のもので、2回目以降は3分に短縮されている。報告の数値は訂正された。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 50,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "色名の表は、これで確定でいいかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 51,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "はい、藍色と朱色を含む表で問題ありません。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 53,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s5"],
+				"failureIfOutward": "unnecessary",
+				"note": "ビルド時間の悪化という前提が訂正された。利用者はまだ気付いていない可能性が高く、キャッシュ復元を調べるという以前の方針も不要になった。訂正後の理解を伝えるのが適切（調査の再提案ではない）。"
+			}
+		}
+	]
+}

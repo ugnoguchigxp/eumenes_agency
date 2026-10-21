@@ -1,0 +1,75 @@
+{
+	"id": "refusal-01",
+	"group": "refusal",
+	"split": "dev",
+	"title": "今後は不要と言われた確認の提案",
+	"description": "利用者が「今後もその提案は不要」と明言する。別の議事録でも、言い換えた確認の提案をしないことを確かめる。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "営業会議の議事録を要約して。来期の目標は売上10%増、新規は3社。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "要約です。来期は売上10%増、新規3社が目標です。なお、数字の裏取りも毎回の要約に付けましょうか。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "いや、今後はその手の確認の提案はしなくていい。数字は自分で見るから。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "わかりました。今後は要約だけをお返しします。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 60,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "別の会議の議事録も要約して。開発会議で、リリースは来月、担当は鈴木さん、残課題は5件。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "要約です。リリースは来月、担当は鈴木さん、残課題は5件です。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 63,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "refusal_reproposal",
+				"note": "利用者は数字の裏取りの提案を今後も不要と明言した。別の議事録でも、言い換えて確認を提案してはいけない。"
+			}
+		}
+	]
+}

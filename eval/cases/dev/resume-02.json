@@ -1,0 +1,102 @@
+{
+	"id": "resume-02",
+	"group": "resume",
+	"split": "dev",
+	"title": "契約書の第7条の確認待ちを再開",
+	"description": "契約書差分のうち第7条だけが法務確認待ちになり、別件を挟んで締結段取りの話題になる。確認待ちを思い出して触れられるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "doc_search",
+			"description": "契約書の版を指定して条文を検索し、該当箇所の本文を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "第7条 v2: 賠償上限は委託料の100%。v3: 賠償上限は委託料の50%（法務コメント欄は空）。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "業務委託契約書のv2とv3の差分を見てもらえる？"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "整理しました。第3条と第5条は文言の整え程度ですが、第7条は損害賠償の上限が変わっているようです。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "第7条は法務に確認してもらうから、そこは置いておいて。ほかの条はこれで大丈夫そう。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 5,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "わかりました。第7条は法務の回答待ちですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 40,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "交通費精算の入力、定期区間は除くんだっけ？"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 41,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "はい、定期券の区間は精算対象から外すのが一般的です。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 70,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "契約の締結を来週火曜にしたいんだけど、段取りどうしよう。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 71,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "先方への最終版送付、押印の手配、日程の確認の順で進めるとよいです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 73,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s2", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "第7条（賠償上限の変更）は法務の確認待ちのままで、締結日の話が出た今は確認状況を尋ねるのが適切。doc_search で条文を引き直してもよい。"
+			}
+		}
+	]
+}

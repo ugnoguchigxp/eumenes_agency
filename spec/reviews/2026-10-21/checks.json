@@ -1,0 +1,136 @@
+{
+  "reviewed_at": "2026-10-21",
+  "scope": "Documentation verification only; no application or model execution.",
+  "automated": {
+    "status": "pass",
+    "markdown_files": 7,
+    "local_links_checked": 22,
+    "baseline_sha256_files_checked": 5,
+    "evidence_references": "valid",
+    "score_consistency": "both withheld, coverage 0%",
+    "problems": [],
+    "comparison_arm_ids": [
+      "B0",
+      "B1",
+      "B2",
+      "F"
+    ],
+    "additional_test_ids": [
+      "T1",
+      "T2",
+      "T3",
+      "T4",
+      "T5",
+      "T6",
+      "T7",
+      "T8"
+    ]
+  },
+  "manual": [
+    {
+      "check": "Primary-source applicability and version boundaries",
+      "status": "reviewed",
+      "detail": "12 primary sources recorded with inspected scope and limits; unpinned reference code identified separately."
+    },
+    {
+      "check": "Cross-document lifecycle and phase consistency",
+      "status": "reviewed",
+      "detail": "Candidate/attempt/delivery separated; B0/B1/B2/F comparison arms distinguished from T1-T8 tests; P0-E/P1/P3/P4 dependency order aligned."
+    },
+    {
+      "check": "Tabletop main path",
+      "status": "reviewed",
+      "detail": "Observation -> scoped prepared input -> no_change or grounded proposal -> transactional adoption -> opportunity -> reservation -> host effect -> receipt -> next evaluation. No runtime claim."
+    },
+    {
+      "check": "Tabletop exceptions",
+      "status": "reviewed",
+      "detail": "Correction before dispatch, unknown tool outcome, normal reply delivered first, scope/authority change, forgetting, restart, and backpressure traced across documents."
+    },
+    {
+      "check": "LLM-native and scope diff review",
+      "status": "reviewed",
+      "detail": "Semantic interpretation stays with LLM. Added code responsibilities are contracts, bounds, state, provenance and execution controls. No keyword-specific product branches or adjacent-product modifications."
+    }
+  ],
+  "not_run": [
+    {
+      "check": "build/unit/SQLite integration/live model/voice E2E",
+      "reason": "No implementation in this project; user authorized design review and document fixes."
+    },
+    {
+      "check": "Adjacent product-wide tests",
+      "reason": "Outside review scope; adjacent sources only inspected read-only."
+    }
+  ],
+  "limitations": [
+    "Same reviewer performed the countercheck; no independent validation.",
+    "No implementation success, model performance, user acceptance or product readiness established."
+  ],
+  "tool_process": {
+    "initial_instructions": 1,
+    "context_compile": 1,
+    "compile_eval": 1,
+    "context_run_id": "00000000-0000-0000-18e0-6a1efe0f86e8",
+    "compile_evaluation_id": "00000000-0000-0000-18e0-6b0e92712479"
+  },
+  "document_diff": [
+    {
+      "file": "README.md",
+      "added": 3,
+      "removed": 1
+    },
+    {
+      "file": "plan.md",
+      "added": 52,
+      "removed": 12
+    },
+    {
+      "file": "spec/host-contract-v1.md",
+      "added": 46,
+      "removed": 4
+    },
+    {
+      "file": "spec/research-basis.md",
+      "added": 48,
+      "removed": 0
+    },
+    {
+      "file": "spec/review-2026-10-21.md",
+      "added": 61,
+      "removed": 0
+    },
+    {
+      "file": "spec/source-audit.md",
+      "added": 17,
+      "removed": 1
+    },
+    {
+      "file": "spec/verification-plan.md",
+      "added": 72,
+      "removed": 2
+    }
+  ],
+  "final_document_sha256": {
+    "README.md": "53ab9989fc401fdbc15cc80409364fba1a46c45bf8add9a144a25621ded9d823",
+    "plan.md": "dc35d15627bcdcd9bfa4c10d04428717265237e98e1fa020c08c7d76c3a18686",
+    "spec/host-contract-v1.md": "8de9f15ed578ebb092b8be78ed80795a249095b215a1189ce7e56a61bc591acc",
+    "spec/research-basis.md": "062807e33633c537efc1c515aac60fbd90c3f03ac4c2177c68f925934f9cb9c2",
+    "spec/review-2026-10-21.md": "86b49159f591ac3b434fcd3845c7c9e43fd3196626f02f403e9b65dc6693f6a9",
+    "spec/source-audit.md": "994875b343e43805a65604f95e190bc70541e3ef6f30151f0c929612df2dbf6f",
+    "spec/verification-plan.md": "17a19c14e6213cd4d2085a6f70ca69313f34e781eec5e596d0b7481d95276201"
+  },
+  "execution_environment": {
+    "python": "3.14.7",
+    "method": "Read-only document/link/hash checks in Python; score_review.py official validator; no dependency installation.",
+    "exit_status": 0
+  },
+  "verification_order": [
+    "partial: sources and modified contracts",
+    "integration: cross-document names, stages, references and scoring ledger",
+    "end-to-end: tabletop trace and complete document diff inspection (not runtime)"
+  ],
+  "verification_notes": [
+    "Final diff inspection found a two-row comparison-arm naming error introduced during test-ID renaming. Fixed the two rows and rechecked exact arm/test IDs, all links, fences, whitespace and snapshot hashes. No runtime test was performed."
+  ]
+}

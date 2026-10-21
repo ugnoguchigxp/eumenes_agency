@@ -1,0 +1,91 @@
+{
+	"id": "no_speak-01",
+	"group": "no_speak",
+	"split": "dev",
+	"title": "完結した依頼だけで保留なし",
+	"description": "スクリプトと英訳の依頼がいずれも完結し、保留中の事項がない。静かな時間に何も言わないことを確かめる。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ファイル名に日付を付け直すスクリプトを書いて。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "拡張子の前に日付を入れる短いスクリプトを書きました。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 6,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "動いた！ ありがとう。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 7,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "うまくいってよかったです。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "この一文を英訳して。「納品は月末までに完了する見込みです」"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "Delivery is expected to be completed by the end of the month."
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 23,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "うん、それで合ってそう。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 24,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "はい。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 27,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "保留中の事項は何もなく、依頼はすべて完結している。触れる材料がないので何もしないのが正しい。"
+			}
+		}
+	]
+}

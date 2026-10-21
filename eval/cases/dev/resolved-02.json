@@ -1,0 +1,91 @@
+{
+	"id": "resolved-02",
+	"group": "resolved",
+	"split": "dev",
+	"title": "顧客リストの重複が利用者の報告で解決",
+	"description": "重複の疑いが利用者自身の調査で解決する。その後に同じCSVへ列を足す話になっても、重複確認を蒸し返さない。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "顧客リストのCSVに、同じ顧客が二重に入っている気がする。あとで調べたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "顧客IDで重複を数えれば確認できます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 12,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "見積書のテンプレートに消費税の行を足したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 13,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "小計の下に税率別の行を設けると見やすいです。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 35,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "顧客リストの重複は自分で調べた。取り込みを二回走らせていたのが原因で、重複行を消したら件数も合った。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 36,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "件数が合ったなら安心です。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 55,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "顧客リストに「担当営業」の列を足したいんだけど、位置はどこがいいかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 56,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "顧客名の右隣にあると、一覧で見やすいです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 58,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "重複の件は原因が分かって削除まで済み、件数の一致も利用者が確認した。重複の再確認を提案する理由はない。"
+			}
+		}
+	]
+}

@@ -1,0 +1,102 @@
+{
+	"id": "later-01",
+	"group": "later",
+	"split": "dev",
+	"title": "障害対応が済んでからB案の測定を提案",
+	"description": "インデックス設定の比較が途中のとき、本番障害の対応が割り込む。障害中は待ち、復旧後の静かな場面で再開できるか。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "bench_run",
+			"description": "指定した設定でクエリ時間を計測して中央値を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "B案の中央値は38ms（A案は42ms）。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "検索のインデックス設定、A案とB案でクエリ時間を比べておきたい。まだ両方は測れてないけど。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "A案は測定済みで中央値42msでした。B案を測れば比較できます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 10,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "まずい、本番のAPIが500を返してる。今すぐ原因を見たい。ログの見方を教えて！"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 11,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "直近のエラーログをステータスコード別に絞り、最初に出た時刻を確認してください。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 12,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "本番障害の対応中で、利用者は急いでいる。インデックス比較の話を持ち出すと妨げになる。後で再評価する。"
+			}
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 40,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "デプロイ直後の設定ミスだった。戻したら復旧したよ。ふう。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 41,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "復旧してよかったです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 70,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "障害が収まり静かになった今は、中断されていたインデックス設定の比較（B案が未測定）を再開する適切な機会。bench_run で測ってもよい。"
+			}
+		}
+	]
+}

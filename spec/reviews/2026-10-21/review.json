@@ -1,0 +1,732 @@
+{
+  "rubric_version": "1.1.0",
+  "mode": "full",
+  "depth": "deep",
+  "technical_profile": "agent",
+  "assessment_kind": "current",
+  "target": {
+    "locator": "/Users/y.noguchi/Code/eumenes_agency",
+    "snapshot": "supplied documentation snapshot 2026-10-21; SHA-256 manifest and text preserved in before.zip",
+    "reviewed_at": "2026-10-21",
+    "stage": "design-only; implementation not started",
+    "scope": "Plan review and authorized documentation fixes only. All 5 initial documents reviewed. Adjacent code sampled read-only for integration assumptions. No model, build, SQLite or voice execution. Scoring of actual Technical Quality and Project Potential withheld; document findings are not runtime findings."
+  },
+  "evidence": [
+    {
+      "id": "DOC01",
+      "kind": "primary_doc",
+      "locator": "before.zip!/README.md @ sha256:31b578af99772700bed1299b835233eeeeec38e395c8cdb3827ff6a110ffdced",
+      "observed_at": "2026-10-21",
+      "observation": "Original design document; no implementation or evaluation result supplied. See design findings in spec/review-2026-10-21.md.",
+      "scope": "Full supplied document read; not an execution trace."
+    },
+    {
+      "id": "DOC02",
+      "kind": "primary_doc",
+      "locator": "before.zip!/plan.md @ sha256:5a93e5dcd31ad6e67e839eece685e42a39349b8b2b058b9b87d4da191e17eed0",
+      "observed_at": "2026-10-21",
+      "observation": "Original design document; no implementation or evaluation result supplied. See design findings in spec/review-2026-10-21.md.",
+      "scope": "Full supplied document read; not an execution trace."
+    },
+    {
+      "id": "DOC03",
+      "kind": "primary_doc",
+      "locator": "before.zip!/spec/host-contract-v1.md @ sha256:80da773a7f5f4971836bc561b707fe5829ded287748d267544c68b1f7a7136ad",
+      "observed_at": "2026-10-21",
+      "observation": "Original design document; no implementation or evaluation result supplied. See design findings in spec/review-2026-10-21.md.",
+      "scope": "Full supplied document read; not an execution trace."
+    },
+    {
+      "id": "DOC04",
+      "kind": "primary_doc",
+      "locator": "before.zip!/spec/source-audit.md @ sha256:fdf8ced66998728c8faf44d028753d42e12eb3bd8f8020bdc29debe6f67406ec",
+      "observed_at": "2026-10-21",
+      "observation": "Original design document; no implementation or evaluation result supplied. See design findings in spec/review-2026-10-21.md.",
+      "scope": "Full supplied document read; not an execution trace."
+    },
+    {
+      "id": "DOC05",
+      "kind": "primary_doc",
+      "locator": "before.zip!/spec/verification-plan.md @ sha256:e7e62d07cc4d2c754c42ff8485839c226a54cf25817a92bee9f55553fe72ef5d",
+      "observed_at": "2026-10-21",
+      "observation": "Original design document; no implementation or evaluation result supplied. See design findings in spec/review-2026-10-21.md.",
+      "scope": "Full supplied document read; not an execution trace."
+    },
+    {
+      "id": "SRC01",
+      "kind": "code",
+      "locator": "/Users/y.noguchi/Code/eumenes/api/domains/goals/contracts/index.ts :: goalStatuses and contract fields @ sha256:2feea80053fa8bebd9796d07afb1d8885ee21d896fba0a9ce1387e78220ab1ab",
+      "observed_at": "2026-10-21",
+      "observation": "Only proposed/adopted/withdrawn/completed; user-goal contract.",
+      "scope": "Local working-tree source read only, not deployed artifact or live verification."
+    },
+    {
+      "id": "SRC02",
+      "kind": "code",
+      "locator": "/Users/y.noguchi/Code/eumenes/api/domains/steward/contexts/curate-goals/instructions-text.context.toml :: whole instruction @ sha256:0177433d565f3aae5f2f297064129b34ff328047f1c41e42e7defeddc879b5d0",
+      "observed_at": "2026-10-21",
+      "observation": "User statements are goal evidence; inferred goals are proposals; empty goal update is allowed.",
+      "scope": "Local working-tree source read only, not deployed artifact or live verification."
+    },
+    {
+      "id": "SRC03",
+      "kind": "code",
+      "locator": "/Users/y.noguchi/Code/eumenes/api/domains/steward/service/unit-prepare.ts :: createPrepare/capture/prepareInTransaction @ sha256:6f275632cedbcb3661d32f546a0dae252009a9b39b76009e421d37f21478bed3",
+      "observed_at": "2026-10-21",
+      "observation": "Existing background capture, foreground deferral and prepared-state boundary.",
+      "scope": "Local working-tree source read only, not deployed artifact or live verification."
+    },
+    {
+      "id": "SRC04",
+      "kind": "code",
+      "locator": "/Users/y.noguchi/Code/eumenes/api/domains/steward/service/messages.ts :: buildMessages @ sha256:b34c4eed98a6a54400f31085f254c7bab8f10a728daf25fcfb51d9551ee73416",
+      "observed_at": "2026-10-21",
+      "observation": "System instructions/schema and serialized data are separated.",
+      "scope": "Local working-tree source read only, not deployed artifact or live verification."
+    },
+    {
+      "id": "SRC05",
+      "kind": "code",
+      "locator": "/Users/y.noguchi/Code/eumenes/api/domains/dialogue/contexts/system-prompt/conversation.context.toml :: text @ sha256:f87b4e97af42b8fe9cb12ded92748ee897d5d5e2b73752d5d854633bbdface02",
+      "observed_at": "2026-10-21",
+      "observation": "CURRENT_REQUEST is the current user instruction; references are data, not operations.",
+      "scope": "Local working-tree source read only, not deployed artifact or live verification."
+    },
+    {
+      "id": "SRC06",
+      "kind": "code",
+      "locator": "/Users/y.noguchi/Code/eumenes/api/domains/dialogue/service/system-prompt.ts :: buildSystemPrompt @ sha256:3f25688e008f014fe9635dbc93e95278ac501c0b042a95395eba229bef039fd4",
+      "observed_at": "2026-10-21",
+      "observation": "Host-selected persona and conversation instruction assembly.",
+      "scope": "Local working-tree source read only, not deployed artifact or live verification."
+    },
+    {
+      "id": "SRC07",
+      "kind": "code",
+      "locator": "/Users/y.noguchi/Code/eumenes/api/domains/tool-runtime/contracts/adapters.ts :: AdapterOrigin @ sha256:d10e64cbdecec5671efc7ee89ef27d56968ba982ca7742641bfe0bb37c1bcb0d",
+      "observed_at": "2026-10-21",
+      "observation": "Origins are task/conversation/ui/specialist; autonomous origin is absent in inspected type.",
+      "scope": "Local working-tree source read only, not deployed artifact or live verification."
+    },
+    {
+      "id": "SRC08",
+      "kind": "code",
+      "locator": "/Users/y.noguchi/Code/eumenes_memory/src/contracts/external.ts :: ExternalDependent/RegisterExternalDependentsResult @ sha256:c6d3c9bc1a069c16aeb684623d9e0251833d4509151ea879a5a141141a911c2c",
+      "observed_at": "2026-10-21",
+      "observation": "Dependencies are source/state_item; rejected and blocked are distinct results.",
+      "scope": "Local working-tree source read only, not deployed artifact or live verification."
+    },
+    {
+      "id": "SRC09",
+      "kind": "code",
+      "locator": "/Users/y.noguchi/Code/eumenes_memory/src/sqlite.ts :: exports @ sha256:d8bdd66ca26b82badf0c5b895111984c26f999ab4fbf142ee46a1e6b575f1fab",
+      "observed_at": "2026-10-21",
+      "observation": "Public change feed and external-dependent operations.",
+      "scope": "Local working-tree source read only, not deployed artifact or live verification."
+    },
+    {
+      "id": "SRC10",
+      "kind": "code",
+      "locator": "/Users/y.noguchi/Code/eumenes_world_model/src/sqlite.ts :: readWorldSnapshot/validateWorldUsage @ sha256:0465d73f65fcda730d783a39cdf574e1e35ed58afb2786692d3412fd3a592b49",
+      "observed_at": "2026-10-21",
+      "observation": "Borrowed DB public surface with schema compatibility gate.",
+      "scope": "Local working-tree source read only, not deployed artifact or live verification."
+    },
+    {
+      "id": "SRC11",
+      "kind": "code",
+      "locator": "/Users/y.noguchi/Code/eumenes/api/domains/settings/controller/index.ts :: registerSettings @ sha256:48909ab067c35af275d53b38d429df8b8a83a29d2e0be97953ad60a6c132e4a0",
+      "observed_at": "2026-10-21",
+      "observation": "Settings HTTP routes exist; this alone does not prove an independent model adapter exists.",
+      "scope": "Local working-tree source read only, not deployed artifact or live verification."
+    },
+    {
+      "id": "R01",
+      "kind": "primary_doc",
+      "locator": "https://arxiv.org/html/2501.00383v1",
+      "observed_at": "2026-10-21",
+      "observation": "Candidate formation and expression; text group-conversation evaluations and limitations.",
+      "scope": "Author/publisher primary source. Read scope and applicability limits are in spec/research-basis.md; not reproduced here."
+    },
+    {
+      "id": "R02",
+      "kind": "primary_doc",
+      "locator": "https://arxiv.org/abs/2304.03442v2",
+      "observed_at": "2026-10-21",
+      "observation": "Abstract: memory/reflection/planning in a 25-agent simulation; believability is the evaluated aim.",
+      "scope": "Author/publisher primary source. Read scope and applicability limits are in spec/research-basis.md; not reproduced here."
+    },
+    {
+      "id": "R03",
+      "kind": "primary_doc",
+      "locator": "https://arxiv.org/abs/2310.05418v1",
+      "observed_at": "2026-10-21",
+      "observation": "Abstract: simulated human needs/emotion/relationships; not proof that this project needs those states.",
+      "scope": "Author/publisher primary source. Read scope and applicability limits are in spec/research-basis.md; not reproduced here."
+    },
+    {
+      "id": "R04",
+      "kind": "primary_doc",
+      "locator": "https://stacymarsella.org/publications/pdf/EMA_Dynamics.pdf",
+      "observed_at": "2026-10-21",
+      "observation": "Abstract/introduction: appraisal of interpretations and reappraisal dynamics.",
+      "scope": "Author/publisher primary source. Read scope and applicability limits are in spec/research-basis.md; not reproduced here."
+    },
+    {
+      "id": "R05",
+      "kind": "primary_doc",
+      "locator": "https://cdn.aaai.org/ICMAS/1995/ICMAS95-042.pdf",
+      "observed_at": "2026-10-21",
+      "observation": "Dynamic Constraints and Abstract Architecture: intention commitment/termination; distinct data structures are not mandatory.",
+      "scope": "Author/publisher primary source. Read scope and applicability limits are in spec/research-basis.md; not reproduced here."
+    },
+    {
+      "id": "R06",
+      "kind": "primary_doc",
+      "locator": "https://www.microsoft.com/en-us/research/wp-content/uploads/2016/11/chi99horvitz.pdf",
+      "observed_at": "2026-10-21",
+      "observation": "Twelve mixed-initiative principles including uncertainty, attention, value and direct termination.",
+      "scope": "Author/publisher primary source. Read scope and applicability limits are in spec/research-basis.md; not reproduced here."
+    },
+    {
+      "id": "R07",
+      "kind": "primary_doc",
+      "locator": "https://arxiv.org/html/2410.12361v3",
+      "observed_at": "2026-10-21",
+      "observation": "Proactive assistance metrics; reward-model evaluation differs from actual human acceptance.",
+      "scope": "Author/publisher primary source. Read scope and applicability limits are in spec/research-basis.md; not reproduced here."
+    },
+    {
+      "id": "R08",
+      "kind": "primary_doc",
+      "locator": "https://arxiv.org/html/2602.04482v2",
+      "observed_at": "2026-10-21",
+      "observation": "Timing/content tasks, real-workflow context, automatic annotation and demographic/generalization limits.",
+      "scope": "Author/publisher primary source. Read scope and applicability limits are in spec/research-basis.md; not reproduced here."
+    },
+    {
+      "id": "R09",
+      "kind": "primary_doc",
+      "locator": "https://arxiv.org/html/2410.10813v2",
+      "observed_at": "2026-10-21",
+      "observation": "Five long-term memory abilities and separate QA/recall evaluation.",
+      "scope": "Author/publisher primary source. Read scope and applicability limits are in spec/research-basis.md; not reproduced here."
+    },
+    {
+      "id": "R10",
+      "kind": "primary_doc",
+      "locator": "https://arxiv.org/html/2303.11366v4",
+      "observed_at": "2026-10-21",
+      "observation": "Feedback-conditioned reflection; no general guarantee of success.",
+      "scope": "Author/publisher primary source. Read scope and applicability limits are in spec/research-basis.md; not reproduced here."
+    },
+    {
+      "id": "R11",
+      "kind": "primary_doc",
+      "locator": "https://arxiv.org/html/2310.01798v2",
+      "observed_at": "2026-10-21",
+      "observation": "Section 3: evaluated intrinsic self-correction can degrade accuracy without external labels.",
+      "scope": "Author/publisher primary source. Read scope and applicability limits are in spec/research-basis.md; not reproduced here."
+    },
+    {
+      "id": "R12",
+      "kind": "primary_doc",
+      "locator": "https://arxiv.org/html/2406.13352v3",
+      "observed_at": "2026-10-21",
+      "observation": "Tool-output injection evaluated separately from benign utility.",
+      "scope": "Author/publisher primary source. Read scope and applicability limits are in spec/research-basis.md; not reproduced here."
+    }
+  ],
+  "claims": [
+    {
+      "id": "D01",
+      "type": "Inference",
+      "statement": "The initial OFF/ON comparison cannot isolate value of explicit agency states over prompt-and-memory alternatives.",
+      "evidence_ids": [
+        "DOC05",
+        "R06",
+        "R07",
+        "R08"
+      ],
+      "limitations": "Design gap, not an observed outcome. B1/B2/F experiments remain unrun."
+    },
+    {
+      "id": "D02",
+      "type": "Inference",
+      "statement": "The plan does not establish a need for independently persisting every listed psychological concept.",
+      "evidence_ids": [
+        "DOC02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "limitations": "Concepts may become useful; minimal vs separated states must be compared."
+    },
+    {
+      "id": "D03",
+      "type": "Inference",
+      "statement": "Intention maintenance, reconsideration, withdrawal and explicit user controls need stronger contracts.",
+      "evidence_ids": [
+        "DOC02",
+        "R05",
+        "R06"
+      ],
+      "limitations": "Initial plan already includes held/abandoned and user priority; the finding is incomplete detail, not total absence."
+    },
+    {
+      "id": "D04",
+      "type": "Fact",
+      "statement": "Initial candidate status list mixes delivery states with execution lifecycle, while failed/unknown exist only in the separate execution ledger prose.",
+      "evidence_ids": [
+        "DOC02",
+        "DOC03"
+      ],
+      "limitations": "No runtime state machine exists to test; corrected contract is unimplemented."
+    },
+    {
+      "id": "D05",
+      "type": "Inference",
+      "statement": "Correction propagation and self-output feedback need explicit revalidation tests beyond the existing forgetting and origin safeguards.",
+      "evidence_ids": [
+        "DOC02",
+        "DOC03",
+        "R09",
+        "R10",
+        "R11"
+      ],
+      "limitations": "Original origin/forget safeguards preserved; no observed incorrect propagation."
+    },
+    {
+      "id": "D06",
+      "type": "Fact",
+      "statement": "At most 4 observations per batch and 6 calls per 10 minutes give at most 24 observations even before selection/retries/cancellations. Queue and state capacity behavior were unspecified.",
+      "evidence_ids": [
+        "DOC02",
+        "DOC03"
+      ],
+      "limitations": "An arithmetic upper bound, not measured throughput or projected actual demand."
+    },
+    {
+      "id": "D07",
+      "type": "Inference",
+      "statement": "Normal-response delivery reconciliation and host-origin generation require explicit integration because current conversation instructions are centered on CURRENT_REQUEST.",
+      "evidence_ids": [
+        "DOC02",
+        "DOC03",
+        "SRC05",
+        "SRC06",
+        "SRC07"
+      ],
+      "limitations": "No product integration attempted; this is a dependency to validate in P5."
+    },
+    {
+      "id": "D08",
+      "type": "Unknown",
+      "statement": "The callable standalone ModelPort acquisition/authentication/cancellation path is not yet established.",
+      "evidence_ids": [
+        "DOC02",
+        "SRC11"
+      ],
+      "limitations": "An internal backend capability is not proof of an exported standalone adapter. No credential or live API inspection performed."
+    }
+  ],
+  "findings": [],
+  "tracks": {
+    "technical": {
+      "dimensions": {
+        "architecture": {
+          "criteria": {
+            "boundaries": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "flow": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "fit": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "correctness": {
+          "criteria": {
+            "contracts": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "edge_cases": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "concurrency": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "security": {
+          "criteria": {
+            "access": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "input_secrets": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "abuse": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "reliability": {
+          "criteria": {
+            "failure": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "recovery": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "resilience": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "maintainability": {
+          "criteria": {
+            "clarity": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "change": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "debt": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "common_components": {
+          "criteria": {
+            "duplication": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "reuse": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "abstraction": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "testing": {
+          "criteria": {
+            "risk_coverage": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "quality": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "automation": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "supply_chain": {
+          "criteria": {
+            "dependencies": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "build_release": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "license": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "performance": {
+          "criteria": {
+            "budget": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "hot_path": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "measurement": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "operability": {
+          "criteria": {
+            "signals": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "lifecycle": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "interaction": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        }
+      }
+    },
+    "project": {
+      "dimensions": {
+        "problem": {
+          "criteria": {
+            "need": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "impact": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "validation": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "solution": {
+          "criteria": {
+            "mechanism": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "experience": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "outcomes": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "differentiation": {
+          "criteria": {
+            "alternatives": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "advantage": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "tradeoffs": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "novelty": {
+          "criteria": {
+            "prior_art": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "substance": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "verification": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "adoption": {
+          "criteria": {
+            "entry": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "reach": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "retention": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "defensibility": {
+          "criteria": {
+            "assets": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "substitution": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "incentives": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "execution": {
+          "criteria": {
+            "delivery": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "focus": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "feedback": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "timing": {
+          "criteria": {
+            "drivers": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "readiness": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "window": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "health": {
+          "criteria": {
+            "ownership": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "activity": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "governance": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        },
+        "expansion": {
+          "criteria": {
+            "adjacency": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "scalability": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            },
+            "path": {
+              "status": "unknown",
+              "value": null,
+              "unknown_reason": "Design-only review. Planned behavior and documentation improvements do not establish delivered implementation quality, real user outcomes, or the full criterion baseline."
+            }
+          }
+        }
+      }
+    }
+  },
+  "baseline_sha256": {
+    "README.md": "31b578af99772700bed1299b835233eeeeec38e395c8cdb3827ff6a110ffdced",
+    "plan.md": "5a93e5dcd31ad6e67e839eece685e42a39349b8b2b058b9b87d4da191e17eed0",
+    "spec/host-contract-v1.md": "80da773a7f5f4971836bc561b707fe5829ded287748d267544c68b1f7a7136ad",
+    "spec/source-audit.md": "fdf8ced66998728c8faf44d028753d42e12eb3bd8f8020bdc29debe6f67406ec",
+    "spec/verification-plan.md": "e7e62d07cc4d2c754c42ff8485839c226a54cf25817a92bee9f55553fe72ef5d"
+  },
+  "design_findings_locator": "../../review-2026-10-21.md; D01-D08 are documentation findings, not scored runtime findings"
+}

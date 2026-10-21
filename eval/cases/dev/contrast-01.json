@@ -1,0 +1,102 @@
+{
+	"id": "contrast-01",
+	"group": "contrast",
+	"split": "dev",
+	"title": "対比: 関連する過去の保留がある",
+	"description": "最後の利用者発話と機会は contrast-02/03 と同一。履歴に、文字化けの原因が分からないままの取り込み経験がある。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "csv_check",
+			"description": "CSVの文字コードを検査し、文字化けの疑いがある行を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "UTF-8とShift_JISの混在を検出。Shift_JIS行は7件。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "先月の売上CSVを取り込んだら、文字化けしている行が何件か出た。理由はまだ分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "文字コードが混在している可能性があります。特定の行に偏っているか見てみましょう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "経費精算の締め日っていつだっけ。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "毎月25日が締め日です。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 60,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "会議室の予約を14時に変更した。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解です。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 100,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "月次の売上CSVが新しく届いたから、取り込みの準備を始めるよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 101,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解です。準備で手伝えることがあれば言ってください。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 103,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "先月の取り込みで文字化けの原因が不明のまま残っている。新しいCSVの取り込み準備に入る今は、文字コードの確認を提案する関連の機会。csv_check を使ってもよい。"
+			}
+		}
+	]
+}

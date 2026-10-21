@@ -1,0 +1,94 @@
+{
+	"id": "resolved-01",
+	"group": "resolved",
+	"split": "dev",
+	"title": "録音ノイズが解消済み",
+	"description": "ツール結果で原因が判明し、利用者の報告で解消した。のちにマイク設定の話題が出ても、解決済みのノイズ調査を再提案しないことを確かめる。",
+	"labelStatus": "confirmed",
+	"tools": [
+		{
+			"name": "run_check",
+			"description": "録音の経路を切り替えて一定時間録音し、ノイズ回数を返す",
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "ハブ経由のみノイズ3回。直結は0回。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "録音にときどきプチッというノイズが入る。原因を探りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "機材か接続のどちらかが怪しいので、run_check で切り分けてみます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 6,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "run_check: USBハブ経由と直結で各10分録音した。ハブ経由のみノイズが3回、直結は0回。USBハブの電力不足が原因と判明した。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 14,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "ハブを電源付きのものに替えたら、ノイズは出なくなった。もう大丈夫。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 15,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "解決してよかったです。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 40,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "マイクの入力レベルって、どのくらいに合わせるのがいい？"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 41,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ピークが-12〜-6dBに収まる設定が扱いやすいです。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 43,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "ノイズは原因が特定され、利用者もハブ交換で解消を報告済み。再度の切り分けや確認の提案は不要。"
+			}
+		}
+	]
+}

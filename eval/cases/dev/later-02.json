@@ -1,0 +1,107 @@
+{
+	"id": "later-02",
+	"group": "later",
+	"split": "dev",
+	"title": "客先説明のあとにリリース日の比較を再開",
+	"description": "リリース日二案の比較中に、客先説明の誤字確認という緊急の依頼が入る。説明の前は待ち、終わって落ち着いたときに触れられるか。",
+	"labelStatus": "confirmed",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "リリース日を10月28日にするか11月4日にするか迷ってる。QAの日数が足りるかが分かれ目かな。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "28日案だとQAは3営業日、4日案だと6営業日です。足りるかは回帰テストの所要次第です。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 15,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "あと10分で客先への説明がある。スライドの誤字を探すのを手伝って！ 急ぎ！"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 16,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "貼ってください。すぐ確認します。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 17,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "客先説明の直前で急ぎの依頼中。リリース日の比較を持ち出すのは妨げになる。"
+			}
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 50,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "説明が終わった。無事に通ったよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 51,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "お疲れさまでした。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 70,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ちょっとコーヒーを飲んで一息ついてる。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 71,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ゆっくり休んでください。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s10",
+			"t": 74,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "客先説明が終わって一息ついた静かな場面。決まっていないリリース日の比較（QA日数）を再開する適切な機会。"
+			}
+		}
+	]
+}
