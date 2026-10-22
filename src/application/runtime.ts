@@ -359,9 +359,9 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				hostDecision(opp.id, "error", `select_failed:${r.outcome.code}`),
 			);
 		}
-		// Social / host-topics mode: a note may be cited by its id; read it as the note's evidence.
+		// B1: a note may be cited by its id; read it as the note's evidence (host-rules-4).
 		const p =
-			social || hostTopics
+			condition === "B1"
 				? {
 						...r.value,
 						evidenceRefs: [

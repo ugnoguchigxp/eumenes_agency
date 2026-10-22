@@ -78,7 +78,7 @@ export interface StandingInterest {
 export const RECENT_OBSERVATION_WINDOW = 30;
 
 /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
-export const HOST_RULES_VERSION = "host-rules-3";
+export const HOST_RULES_VERSION = "host-rules-4";
 
 /** One background model call (or a host decision not to make one). */
 export interface CallOutcome {

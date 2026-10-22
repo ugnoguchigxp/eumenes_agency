@@ -211,8 +211,16 @@ describe("hostTopics", () => {
 		});
 		expect(host.d.decision.action).toBe("speak");
 		expect(host.d.decision.evidenceRefs).toEqual(["o1"]);
+		// host-rules-4: the same holds without the mode (plain B1)
 		const plain = await run({ notes: [matterNote], select: cite });
-		expect(plain.d.decision.rejectCodes).toContain("unknown_ref");
+		expect(plain.d.decision.action).toBe("speak");
+		expect(plain.d.decision.evidenceRefs).toEqual(["o1"]);
+		// an id that is neither a note nor a presented observation is still rejected
+		const bogus = await run({
+			notes: [matterNote],
+			select: participation({ ...cite, evidenceRefs: ["n9"] }),
+		});
+		expect(bogus.d.decision.rejectCodes).toContain("unknown_ref");
 	});
 
 	test("gate: with no notes, select runs only if topics or interests exist", async () => {
