@@ -53,6 +53,13 @@ export interface RuntimeDeps {
 	 * evidence refs. Absent in eval.
 	 */
 	readonly standingInterests?: readonly StandingInterest[];
+	/**
+	 * Social conversation mode (B1 only, host-configured; absent in eval): update also keeps
+	 * "topic seed" notes (what the user likes or mentioned that is worth continuing), and
+	 * select treats a quiet lull in casual talk as a fitting time to start a short remark
+	 * from a topic seed or a standing interest.
+	 */
+	readonly socialTopics?: boolean;
 }
 
 export interface StandingInterest {

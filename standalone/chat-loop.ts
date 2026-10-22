@@ -5,7 +5,12 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { clearScreenDown, cursorTo, moveCursor } from "node:readline";
-import { type Condition, conditions } from "../src/contracts/index.ts";
+import {
+	type Condition,
+	conditions,
+	type Decision,
+	type Opportunity,
+} from "../src/contracts/index.ts";
 import { defaultInterestText, maxInterestChars } from "./persona.ts";
 
 // ---------------------------------------------------------------- arguments
@@ -14,7 +19,7 @@ import { defaultInterestText, maxInterestChars } from "./persona.ts";
 export const cliConditions = [...conditions, "B1a"] as const;
 export type CliCondition = (typeof cliConditions)[number];
 export const defaultCliCondition: CliCondition = "B1a";
-export const defaultIdleSec = 40;
+export const defaultIdleSec = 10;
 export const defaultMaxUnanswered = 1;
 
 export function resolveCondition(condition: CliCondition): {
@@ -41,6 +46,10 @@ export interface CliArgs {
 	readonly tts: boolean;
 	/** Persona interest texts (default: one; empty with --no-interest). */
 	readonly interests: readonly string[];
+	/** Social conversation mode (topic seeds, speak at a lull). Default on; B1/B1a only. */
+	readonly social: boolean;
+	/** Hide the one-line `[判断]` print of each background decision (the log keeps them). */
+	readonly quietWhy: boolean;
 }
 
 /** Upper bound for --idle-sec (one day) so interval doubling stays inside timer range. */
@@ -68,11 +77,11 @@ const nonNegative = (
 
 /** Spoken-style rules for the main reply (--tts). */
 export const ttsReplyStyle =
-	"音声で読み上げられるので、話し言葉で答えてください。ふつうは1〜3文、長くても100字程度にします。箇条書き、見出し、Markdown、記号の装飾、絵文字、URL、コードは使わないでください。括弧書きや「/」での併記も避けてください。数字や英字、略語は、読み上げて自然に聞こえる形で書いてください。質問は一度に一つまでにしてください。";
+	"音声で読み上げられるので、話し言葉で答えてください。ふつうは1〜3文、長くても100字程度にします。箇条書き、見出し、Markdown、記号の装飾、絵文字、URL、コードは使わないでください。括弧書きや「/」での併記も避けてください。数字や英字、略語は、読み上げて自然に聞こえる形で書いてください。質問は一度に一つまでにしてください。相手を「ユーザーさん」と呼ばないでください。";
 
 /** Same essence for proactive utterances (select instructions, --tts). */
 export const ttsUtteranceStyle =
-	"音声で読み上げられる。話し言葉で、1〜2文、長くても100字程度にする。箇条書き、見出し、Markdown、記号の装飾、絵文字、URL、コードは使わない。括弧書きや「/」での併記を避ける。数字や英字、略語は読み上げて自然な形にする。質問は一度に一つまで。";
+	"音声で読み上げられる。話し言葉で、1〜2文、長くても100字程度にする。箇条書き、見出し、Markdown、記号の装飾、絵文字、URL、コードは使わない。括弧書きや「/」での併記を避ける。数字や英字、略語は読み上げて自然な形にする。質問は一度に一つまで。相手を「ユーザーさん」「ユーザー」と呼ばない。呼びかけは省くか「あなた」を控えめに使う。";
 
 export function parseCliArgs(argv: readonly string[]): CliArgs {
 	let condition: CliCondition = defaultCliCondition;
@@ -81,6 +90,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 	let maxUnanswered = defaultMaxUnanswered;
 	let log: LogChoice = { kind: "default" };
 	let tts = true;
+	let social = true;
+	let quietWhy = false;
 	const interests: string[] = [];
 	let noInterest = false;
 	for (let i = 0; i < argv.length; i++) {
@@ -96,6 +107,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 			interests.push(value);
 		} else if (arg === "--tts") tts = true;
 		else if (arg === "--no-tts") tts = false;
+		else if (arg === "--social") social = true;
+		else if (arg === "--no-social") social = false;
+		else if (arg === "--quiet-why") quietWhy = true;
 		else if (arg === "--condition") {
 			const value = argv[++i];
 			const found = cliConditions.find((c) => c === value);
@@ -123,12 +137,45 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 		maxUnanswered,
 		log,
 		tts,
+		social,
+		quietWhy,
 		interests: noInterest
 			? []
 			: interests.length > 0
 				? interests
 				: [defaultInterestText],
 	};
+}
+
+// ---------------------------------------------------------------- decisions
+
+/** JSONL event for one decision of a background cycle (every action, accepted or not). */
+export function decisionEvent(
+	trigger: Opportunity["trigger"],
+	auto: boolean,
+	decision: Decision,
+): Record<string, unknown> {
+	return {
+		type: "decision",
+		trigger,
+		auto,
+		opportunityId: decision.opportunityId,
+		action: decision.action,
+		source: decision.source,
+		reason: decision.reason,
+		rejectCodes: decision.rejectCodes,
+		evidenceRefs: decision.evidenceRefs,
+	};
+}
+
+/** Dim-able one-line summary printed after a background decision. */
+export function decisionLine(decision: Decision): string {
+	const reason = decision.reason.replace(/\s+/g, " ").trim();
+	const rejected =
+		decision.rejectCodes.length > 0
+			? ` [reject: ${decision.rejectCodes.join(",")}]`
+			: "";
+	return `[判断] ${decision.action}(${decision.source}): ${reason}${rejected}`;
 }
 
 // ------------------------------------------------------------ conversation

@@ -3,11 +3,12 @@
  *   bun standalone/cli.ts [--condition B0|B1|B1a|B2|F] [--off]
  *                         [--idle-sec N] [--max-unanswered N] [--log PATH | --no-log]
  *                         [--tts | --no-tts] [--interest "<text>"]... | --no-interest]
+ *                         [--social | --no-social] [--quiet-why]
  *
  *   --condition B1a    runtime condition B1 with select always called (default)
  *   --off              start with the agency disabled
  *   --idle-sec N       the AI may speak after N seconds without a submitted line or AI
- *                      output (default 40; 0 disables; max 86400). A silent attempt is
+ *                      output (default 10; 0 disables; max 86400). A silent attempt is
  *                      retried at 2N, 4N, then stops until the next user input. Typing
  *                      does not count: only a submitted line (Enter) is user input.
  *   --max-unanswered N proactive utterances allowed in a row before waiting for the
@@ -18,6 +19,12 @@
  *                      My Melody). The agent may bring it up on its own at a lull, and
  *                      the main reply knows it as a character trait. B1/B1a only.
  *   --no-interest      no persona interest
+ *   --social / --no-social
+ *                      social conversation mode (default on; B1/B1a only, ignored for B2/F):
+ *                      the update keeps "topic seed" notes and the AI may start a short
+ *                      remark from a seed or an interest when the user is quiet at idle
+ *   --quiet-why        do not print the "[判断] action(source): reason" line after each
+ *                      background decision (every decision is still written to the log)
  *   --log PATH         JSONL conversation log (default data/chats/<ISO time>-<condition>.jsonl)
  *   --no-log           do not write a log
  * Commands: /idle  /state  /off  /on  /quit
@@ -41,6 +48,8 @@ import {
 	createConversation,
 	createIdlePlanner,
 	createIdleScheduler,
+	decisionEvent,
+	decisionLine,
 	defaultLogPath,
 	parseCliArgs,
 	printAbove,
@@ -108,6 +117,8 @@ async function main() {
 	const llm = createClaudeLlm(settings.llm.background, meter);
 	const chat: ChatPort = createClaudeChat(settings.llm.main, meter);
 	const standingInterests = toStandingInterests(args.interests);
+	// Social mode only exists for B1 (B1a included); B2/F ignore it.
+	const social = args.social && condition === "B1";
 	const runtime = createAgencyRuntime({
 		condition,
 		llm,
@@ -116,6 +127,7 @@ async function main() {
 		...(selectWhenEmpty ? { selectWhenEmpty: true } : {}),
 		...(args.tts ? { utteranceStyle: ttsUtteranceStyle } : {}),
 		...(standingInterests.length > 0 ? { standingInterests } : {}),
+		...(social ? { socialTopics: true } : {}),
 	});
 	if (args.off) runtime.setEnabled(false);
 	if (!process.env.ANTHROPIC_API_KEY)
@@ -123,7 +135,7 @@ async function main() {
 	const digest = settingsDigest(settings);
 	console.log(
 		dim(
-			`condition ${args.condition}${args.off ? " (off)" : ""} / tts ${args.tts ? "on" : "off"} / interests ${standingInterests.length === 0 ? "none" : standingInterests.map((x) => x.text).join(" | ")} / main ${settings.llm.main.model} / background ${settings.llm.background.model} / settings ${digest}`,
+			`condition ${args.condition}${args.off ? " (off)" : ""} / tts ${args.tts ? "on" : "off"} / social ${social ? "on" : args.social ? "off (B1/B1a only)" : "off"} / interests ${standingInterests.length === 0 ? "none" : standingInterests.map((x) => x.text).join(" | ")} / main ${settings.llm.main.model} / background ${settings.llm.background.model} / settings ${digest}`,
 		),
 	);
 
@@ -144,6 +156,8 @@ async function main() {
 		selectWhenEmpty,
 		off: args.off,
 		tts: args.tts,
+		social,
+		quietWhy: args.quietWhy,
 		interests: standingInterests,
 		settingsDigest: digest,
 		mainModel: settings.llm.main.model,
@@ -276,6 +290,7 @@ async function main() {
 	const cycleBody = async (
 		trigger: Opportunity["trigger"],
 		update: boolean,
+		auto: boolean,
 		controller: AbortController,
 		mine: number,
 	): Promise<CycleOutcome> => {
@@ -300,9 +315,13 @@ async function main() {
 			},
 			controller.signal,
 		);
+		// Every decision is logged, also one that is superseded before it is delivered.
+		const superseded =
+			closed || mine !== generation || controller.signal.aborted;
+		record({ ...decisionEvent(trigger, auto, decision), superseded });
 		if (haltOnOutcomes(calls)) return "halted";
-		if (closed || mine !== generation || controller.signal.aborted)
-			return "aborted";
+		if (superseded) return "aborted";
+		if (!args.quietWhy) out(dim(`  ${decisionLine(decision)}`));
 		return decision.ticket && deliver(decision.ticket, trigger)
 			? "spoke"
 			: "silent";
@@ -312,6 +331,7 @@ async function main() {
 	const runCycle = async (
 		trigger: Opportunity["trigger"],
 		update: boolean,
+		auto: boolean,
 	): Promise<CycleOutcome> => {
 		if (closed || backgroundHalted) return "halted";
 		abortBackground();
@@ -322,7 +342,7 @@ async function main() {
 		planner.enter();
 		let outcome: CycleOutcome = "silent";
 		try {
-			outcome = await cycleBody(trigger, update, controller, mine);
+			outcome = await cycleBody(trigger, update, auto, controller, mine);
 		} catch (error) {
 			if (controller.signal.aborted) outcome = "aborted";
 			else
@@ -351,7 +371,7 @@ async function main() {
 		},
 		clearTimer: (handle) =>
 			clearTimeout(handle as ReturnType<typeof setTimeout>),
-		run: () => runCycle("idle", false),
+		run: () => runCycle("idle", false, true),
 		// Called after the planner has absorbed the outcome, so the status is the new one.
 		onCycle: (outcome) =>
 			record({ type: "idle_cycle", auto: true, outcome, ...planner.status() }),
@@ -415,7 +435,7 @@ async function main() {
 				});
 				printSpend();
 				// Another line is already waiting: it will supersede this cycle anyway.
-				if (queuedLines === 0) void runCycle("turn_end", true);
+				if (queuedLines === 0) void runCycle("turn_end", true, true);
 			} catch (error) {
 				conversation.rollbackUser();
 				if (!closed && !haltOnSpendLimit(error))
@@ -441,7 +461,7 @@ async function main() {
 		}
 		if (line === "/idle") {
 			generation++;
-			const outcome = await runCycle("idle", false);
+			const outcome = await runCycle("idle", false, false);
 			record({
 				type: "idle_cycle",
 				auto: false,

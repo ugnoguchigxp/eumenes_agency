@@ -66,6 +66,8 @@ const NO_DUE: Due = { reviewIntentIds: [], pressure: [] };
 
 export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const { condition, llm, tools } = deps;
+	// Social conversation mode applies to B1 only; otherwise every prompt stays as before.
+	const social = condition === "B1" && deps.socialTopics === true;
 	const wireSchema = wireUpdateSchema(condition === "B0" ? "B2" : condition);
 	const limits = deps.limits ?? defaultLimits;
 	const cfg = deps.budget ?? defaultBudget;
@@ -158,7 +160,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			{
 				purpose: "update",
 				at,
-				system: systemPrompt("update", condition),
+				system: systemPrompt("update", condition, social ? { social } : {}),
 				prompt: updatePrompt({
 					condition,
 					now: at,
@@ -311,6 +313,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				system: systemPrompt("select", condition, {
 					utteranceStyle: deps.utteranceStyle,
 					interests: interests.length > 0,
+					...(social ? { social } : {}),
 				}),
 				prompt: selectPrompt({
 					condition,
@@ -325,6 +328,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					tools,
 					limits,
 					minutesSinceUserInput: minutesSinceUserInput(opp.at),
+					...(social ? { social } : {}),
 				}),
 				schema: participationSchema,
 				maxOutputTokens: cfg.selectMaxOutputTokens,
@@ -338,7 +342,20 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				hostDecision(opp.id, "error", `select_failed:${r.outcome.code}`),
 			);
 		}
-		const p = r.value;
+		// Social mode: a topic seed is often cited by its note id; read it as the note's evidence.
+		const p = social
+			? {
+					...r.value,
+					evidenceRefs: [
+						...new Set(
+							r.value.evidenceRefs.flatMap(
+								(ref) =>
+									state.notes.find((n) => n.id === ref)?.evidence ?? [ref],
+							),
+						),
+					],
+				}
+			: r.value;
 		if (epoch !== startEpoch) {
 			// New input / speech start arrived while the model was thinking.
 			calls.push(

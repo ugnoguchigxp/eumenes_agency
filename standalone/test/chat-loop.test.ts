@@ -8,6 +8,9 @@ import {
 	createConversation,
 	createIdlePlanner,
 	createIdleScheduler,
+	decisionEvent,
+	decisionLine,
+	defaultIdleSec,
 	defaultLogPath,
 	maxIdleSec,
 	maxTimerMs,
@@ -25,14 +28,16 @@ import {
 } from "../persona.ts";
 
 describe("parseCliArgs / resolveCondition", () => {
-	test("defaults: B1a, idle 40s, one unanswered, default log", () => {
+	test("defaults: B1a, idle 10s, one unanswered, default log, social on", () => {
 		expect(parseCliArgs([])).toEqual({
 			condition: "B1a",
 			off: false,
-			idleSec: 40,
+			idleSec: 10,
 			maxUnanswered: 1,
 			log: { kind: "default" },
 			tts: true,
+			social: true,
+			quietWhy: false,
 			interests: [defaultInterestText],
 		});
 	});
@@ -57,6 +62,16 @@ describe("parseCliArgs / resolveCondition", () => {
 			log: { kind: "path", path: "x.jsonl" },
 		});
 		expect(parseCliArgs(["--no-log"]).log).toEqual({ kind: "none" });
+	});
+
+	test("--social / --no-social (default on, last one wins); --quiet-why", () => {
+		expect(parseCliArgs([]).social).toBe(true);
+		expect(parseCliArgs(["--social"]).social).toBe(true);
+		expect(parseCliArgs(["--no-social"]).social).toBe(false);
+		expect(parseCliArgs(["--no-social", "--social"]).social).toBe(true);
+		expect(parseCliArgs(["--social", "--no-social"]).social).toBe(false);
+		expect(parseCliArgs([]).quietWhy).toBe(false);
+		expect(parseCliArgs(["--quiet-why"]).quietWhy).toBe(true);
 	});
 
 	test("--tts / --no-tts (default on, last one wins)", () => {
@@ -176,6 +191,21 @@ describe("createIdlePlanner", () => {
 		p.userTurn(10 * sec);
 		expect(p.delayMs(10 * sec)).toBe(40 * sec);
 		expect(p.delayMs(50 * sec)).toBe(0);
+	});
+
+	test("default idle is 10s and backs off 10 -> 20 -> 40 then waits for the user", () => {
+		expect(defaultIdleSec).toBe(10);
+		const p = make(defaultIdleSec);
+		expect(p.delayMs(0)).toBe(10 * sec);
+		p.idleSilent(10 * sec);
+		expect(p.delayMs(10 * sec)).toBe(20 * sec);
+		p.idleSilent(30 * sec);
+		expect(p.delayMs(30 * sec)).toBe(40 * sec);
+		p.idleSilent(70 * sec);
+		expect(p.delayMs(70 * sec)).toBeNull();
+		expect(p.blockedBy()).toBe("exhausted");
+		p.userTurn(80 * sec);
+		expect(p.delayMs(80 * sec)).toBe(10 * sec);
 	});
 
 	test("idleSec 0 disables", () => {
@@ -463,6 +493,66 @@ describe("chat log", () => {
 		log.write({ type: "a" });
 		log.write({ type: "b" });
 		expect(errors).toEqual(["disk"]);
+	});
+});
+
+describe("decision visibility", () => {
+	const decision = {
+		opportunityId: "o3",
+		action: "wait" as const,
+		source: "llm" as const,
+		candidateId: null,
+		utterance: null,
+		toolName: null,
+		toolInput: null,
+		evidenceRefs: ["o1", "interest:i1"],
+		reason: "雑談中で\n話題がまだ合わない。",
+		ticket: null,
+		rejectCodes: ["unknown_ref"],
+	};
+
+	test("event carries action, source, reason, rejectCodes and evidenceRefs", () => {
+		expect(decisionEvent("idle", true, decision)).toEqual({
+			type: "decision",
+			trigger: "idle",
+			auto: true,
+			opportunityId: "o3",
+			action: "wait",
+			source: "llm",
+			reason: "雑談中で\n話題がまだ合わない。",
+			rejectCodes: ["unknown_ref"],
+			evidenceRefs: ["o1", "interest:i1"],
+		});
+	});
+
+	test("every decision (turn_end / idle, auto / manual) is written to the JSONL", () => {
+		const dir = mkdtempSync(join(tmpdir(), "chat-decision-"));
+		const path = join(dir, "d.jsonl");
+		const log = createChatLog(path, () => 5);
+		for (const [trigger, auto] of [
+			["turn_end", true],
+			["idle", true],
+			["idle", false],
+		] as const)
+			log.write(decisionEvent(trigger, auto, decision));
+		const rows = readFileSync(path, "utf8")
+			.trim()
+			.split("\n")
+			.map((l) => JSON.parse(l));
+		expect(rows.map((r) => [r.type, r.trigger, r.auto, r.action])).toEqual([
+			["decision", "turn_end", true, "wait"],
+			["decision", "idle", true, "wait"],
+			["decision", "idle", false, "wait"],
+		]);
+		expect(rows[0].rejectCodes).toEqual(["unknown_ref"]);
+		expect(rows[0].evidenceRefs).toEqual(["o1", "interest:i1"]);
+	});
+
+	test("the printed line is one line: action(source): reason", () => {
+		const line = decisionLine({ ...decision, rejectCodes: [] });
+		expect(line).toBe("[判断] wait(llm): 雑談中で 話題がまだ合わない。");
+		expect(line).not.toContain("\n");
+		expect(decisionLine(decision)).toContain("[reject: unknown_ref]");
 	});
 });
 

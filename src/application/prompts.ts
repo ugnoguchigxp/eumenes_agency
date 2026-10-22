@@ -127,6 +127,26 @@ const selectInterest = [
 	"直近の「配信済みの発話」で同じ話題に触れているなら繰り返さない。ユーザーが作業の最中のとき、断った直後や話題を変えた直後は持ち出さない。未解決事項があれば、そちらを優先する。",
 ];
 
+/** Added to the B1 update rules only in social conversation mode. */
+const b1Social = [
+	"【話題の種】（社交会話モード）未解決事項に加えて、会話を自然に続けられる「話題の種」のメモを最大5件まで持ってよい。これは上の「会話を続けたいだけの動機で作らない」の例外だが、根拠の観測（evidenceRefs）は必須。メモ全体の件数の制限は守る。",
+	"話題の種にしてよいのは、ユーザーが好きだと言ったもの、最近話してくれた身近な話題、会話に出た気になる事実。メモには、何についてか＋あとで自然に言う・尋ねることを一緒に書く（例: 「【話題】ユーザーはクロミが好き。どこが好きか聞いてみたい」）。未解決事項のメモと区別できるよう、本文の先頭に必ず「【話題】」を付ける。",
+	"話題の種が古くなった、すでに話した（通常の応答や配信済みの発話で触れた）、ユーザーが話題を変えた・嫌がった場合は、更新または削除して入れ替える。5件を超えるときは古いものから消す。断られた話題は種にしない。",
+	"個人情報は必要最小限にとどめる。住所、勤務先、健康、家族、金銭など機微な情報は、話題の種として保存しない。",
+];
+
+/** Added to the B1 select rules only in social conversation mode. */
+const selectSocial = [
+	"【雑談の間】（社交会話モード）trigger が idle は、ユーザーが一定時間入力していない静かな間を表す。雑談の最中にこの機会が来たら、メモの「【話題】」（話題の種）か自分の関心から、短い一言か問いかけを始めることには価値があり、自然である。直前に自分が応答していても、ユーザーの返事がないまま間が空いたなら、話題を足してよい。この場合は wait より speak を選ぶ。上の「話すこと自体は目的ではない」「価値が低いなら wait」よりこの規則を優先する。",
+	"ユーザーが話した内容につなげられるなら、つなげる（例: ユーザーの好きなキャラクターと、自分の好きなキャラクターの話）。講義にせず、短い一言か質問を一つだけにする。「配信済みの発話」と直近の観測にすでに出ている内容は繰り返さない。同じ話題の種を続けて使わない。",
+	"次は変わらない: ユーザーが作業に集中している・忙しそうなときは割り込まない。ユーザー自身の作業や未実施のタスクを催促しない。断られた・解決済みの事項は持ち出さない。未解決事項が残っているなら、そちらを優先する。",
+	"trigger が turn_end（自分が応答した直後）のときは、この規則を使わず、これまでどおり控えめに判断する。",
+	"この規則で speak するときの evidenceRefs には、使った話題の種のメモに「根拠」として示された観測 ID、または自分の関心を使うなら `interest:<id>` を入れる。メモ自体の id は観測 ID ではないので入れない。",
+];
+
+const idleSocialClosing =
+	"この機会に何をするかを JSON で一つだけ返す。価値が低い、またはユーザーの邪魔になるなら wait。ただし雑談の最中の静かな間（trigger が idle）で、話題の種か自分の関心から短い一言を始められるなら、迷っても speak を選ぶ。";
+
 const lines = (xs: readonly string[]) => xs.map((x) => `- ${x}`).join("\n");
 
 export interface SelectOptions {
@@ -134,11 +154,16 @@ export interface SelectOptions {
 	readonly utteranceStyle?: string | undefined;
 	/** Standing interests are presented (B1 only): adds the interest rules. */
 	readonly interests?: boolean | undefined;
+	/**
+	 * Social conversation mode (B1 only): adds the topic-seed rules to the update prompt and the
+	 * lull rules to the select prompt. Absent / false: both prompts are byte-identical.
+	 */
+	readonly social?: boolean | undefined;
 }
 
 /**
  * One system prompt per (purpose x condition). B0 never calls the model.
- * `options` only affect the select prompt; absent (or blank / false), the prompt is
+ * `options` (utteranceStyle, interests, social); absent (or blank / false), the prompt is
  * byte-identical to the one without them.
  */
 export const systemPrompt = (
@@ -147,10 +172,11 @@ export const systemPrompt = (
 	options: SelectOptions = {},
 ): string => {
 	const head = `（指示版: ${INSTRUCTION_VERSION}）`;
+	const social = condition === "B1" && options.social === true;
 	if (purpose === "update") {
 		const rules =
 			condition === "B1"
-				? [...b1Rules, ...wireCommon, ...wireB1]
+				? [...b1Rules, ...(social ? b1Social : []), ...wireCommon, ...wireB1]
 				: condition === "F"
 					? [...b2Rules, ...fRules, ...wireCommon, ...wireB2, ...wireF]
 					: [...b2Rules, ...wireCommon, ...wireB2];
@@ -158,7 +184,11 @@ export const systemPrompt = (
 	}
 	const rules =
 		condition === "B1"
-			? [...selectB1, ...(options.interests ? selectInterest : [])]
+			? [
+					...selectB1,
+					...(options.interests ? selectInterest : []),
+					...(social ? selectSocial : []),
+				]
 			: selectB2;
 	const style = options.utteranceStyle?.trim();
 	const styleLine = style ? `\n${lines([`発話の配信形式: ${style}`])}` : "";
@@ -341,6 +371,8 @@ export interface SelectPromptInput {
 	readonly tools: readonly ToolCapability[];
 	readonly limits: Limits;
 	readonly minutesSinceUserInput: number | null;
+	/** Social conversation mode (B1 only): the closing line yields to a topic remark at idle. */
+	readonly social?: boolean;
 }
 
 /**
@@ -381,6 +413,8 @@ export const selectPrompt = (i: SelectPromptInput): string => {
 			: []),
 		`# 配信済みの発話（最近。繰り返さない）\n${renderDelivered(i.delivered)}`,
 		`# 使えるツール\n${renderTools(i.tools)}`,
-		"この機会に何をするかを JSON で一つだけ返す。価値が低い、または迷うなら wait。",
+		i.social === true && i.condition === "B1" && o.trigger === "idle"
+			? idleSocialClosing
+			: "この機会に何をするかを JSON で一つだけ返す。価値が低い、または迷うなら wait。",
 	].join("\n\n");
 };
