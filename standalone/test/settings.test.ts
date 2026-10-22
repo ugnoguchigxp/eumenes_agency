@@ -16,6 +16,7 @@ import {
 	judgeRole,
 	settingsDigest,
 } from "../settings.ts";
+import { SOCIAL_RULES_VERSION } from "../../src/application/prompts.ts";
 
 const dirs: string[] = [];
 const tempDir = () => {
@@ -117,7 +118,7 @@ describe("settingsDigest", () => {
 		).not.toBe(digest);
 	});
 
-	test("includes the host rules version, so a rule change blocks --resume", () => {
+	test("includes the host and social rules versions, so a rule change blocks --resume", () => {
 		// key-sorted JSON of the settings plus hostRules, hashed like settingsDigest does.
 		const expected = createHash("sha256")
 			.update(
@@ -125,6 +126,7 @@ describe("settingsDigest", () => {
 					JSON.stringify(HOST_RULES_VERSION) +
 					',"llm":{"background":{"effort":"low","model":"m-small","thinkingHeadroom":100},' +
 					'"main":{"effort":"medium","model":"m-small","thinkingHeadroom":200}},' +
+					`"socialRules":${JSON.stringify(SOCIAL_RULES_VERSION)},` +
 					`"spend":${JSON.stringify(sortedSpend())}}`,
 			)
 			.digest("hex")

@@ -69,9 +69,17 @@
 			"text": "洗濯物、干してきた。"
 		},
 		{
-			"type": "opportunity",
+			"type": "observation",
 			"id": "s5",
 			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "おつかれさま。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 5,
 			"trigger": "idle",
 			"presence": "quiet",
 			"foregroundBusy": false,

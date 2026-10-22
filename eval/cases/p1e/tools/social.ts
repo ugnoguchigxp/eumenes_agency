@@ -84,6 +84,7 @@ export const socialDev: CaseDef[] = [
 				],
 			}),
 			u("洗濯物、干してきた。", "c2"),
+			a("おつかれさま。"),
 			opp({
 				trig: "idle",
 				needed: true,

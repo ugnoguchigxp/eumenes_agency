@@ -8,6 +8,7 @@ import {
 	defaultBudget,
 	HOST_RULES_VERSION,
 } from "../src/contracts/index.ts";
+import { SOCIAL_RULES_VERSION } from "../src/application/prompts.ts";
 import type { UsageMeter } from "./claude.ts";
 
 const root = resolve(import.meta.dir, "..");
@@ -86,14 +87,20 @@ const canonical = (value: unknown): unknown =>
  * The judge route is left out: it does not affect what a run records, and adding
  * it must not invalidate the digest of earlier runs.
  * HOST_RULES_VERSION is included: a change in host validation/settlement rules changes what a
- * run records, so `--resume` must not mix runs across rule versions.
+ * run records, so `--resume` must not mix runs across rule versions. SOCIAL_RULES_VERSION
+ * (lull-talk wording, used by B1h) is included for the same reason.
  */
 export function settingsDigest(settings: ExperimentSettings): string {
 	const { judge: _judge, ...llm } = settings.llm;
 	return createHash("sha256")
 		.update(
 			JSON.stringify(
-				canonical({ ...settings, llm, hostRules: HOST_RULES_VERSION }),
+				canonical({
+					...settings,
+					llm,
+					hostRules: HOST_RULES_VERSION,
+					socialRules: SOCIAL_RULES_VERSION,
+				}),
 			),
 		)
 		.digest("hex")
