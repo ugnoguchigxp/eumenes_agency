@@ -1,0 +1,65 @@
+{
+	"id": "social-27",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "作業27: 部屋の掃除を始めた後の間",
+	"description": "利用者が部屋の掃除をすると言って取りかかった。間が空いても、記憶の話題や関心で話しかけずに待つか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "シナモロールが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "よし、今から部屋の掃除する。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いってらっしゃい。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s3",
+			"t": 2,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者は掃除に取りかかったばかり。間が空くのは作業中だからで、雑談で話しかけると邪魔になる。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1"],
+			"judge": [
+				"作業に取りかかった利用者を妨げる雑談になっていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーはラジオをよく聴く。"
+				}
+			]
+		}
+	]
+}

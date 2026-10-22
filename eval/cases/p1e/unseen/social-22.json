@@ -1,0 +1,116 @@
+{
+	"id": "social-22",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "雑談22: 新しい靴の雑談の後の間（記憶の話題が二つ）",
+	"description": "新しい靴の雑談の後に間が空く。記憶には野球観戦と、妹とよく電話する話題がある。返答の直後は待ち、間では短く話しかけるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新しいスニーカー履いてみた。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いいね、履き心地はどう？"
+		},
+		{
+			"type": "opportunity",
+			"id": "s3",
+			"t": 2,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "エージェントが問いを返したばかりで、利用者の答えを待つ場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"直前の会話、記憶にあるユーザーの話題、エージェント自身の関心のどれかにつながっている",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは野球観戦が好き。"
+				},
+				{
+					"id": "t2",
+					"text": "ユーザーは妹とよく電話する。"
+				}
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "軽くて歩きやすい。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "それは長く歩けそうだね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "雑談の後に間が空いた。急ぐ事項はない。靴の話の流れや記憶にある話題（野球観戦・妹）から、短く話しかける場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s4"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"直前の会話、記憶にあるユーザーの話題、エージェント自身の関心のどれかにつながっている",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは野球観戦が好き。"
+				},
+				{
+					"id": "t2",
+					"text": "ユーザーは妹とよく電話する。"
+				}
+			]
+		}
+	]
+}

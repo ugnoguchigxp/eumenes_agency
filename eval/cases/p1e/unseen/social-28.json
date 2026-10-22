@@ -1,0 +1,75 @@
+{
+	"id": "social-28",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "作業28: 資格の問題集を始めた後の間",
+	"description": "雑談の後、利用者が資格の問題集をやると言って始めた。間が空いても、記憶の話題で話しかけずに待つか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日は電車が空いてた。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "座れてよかったね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "さて、資格の問題集を20問やる。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "うん。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 4,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者は問題集に取りかかったばかり。間が空くのは集中しているからで、雑談で話しかけると邪魔になる。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"作業に取りかかった利用者を妨げる雑談になっていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーはキャンプが好き。"
+				}
+			]
+		}
+	]
+}

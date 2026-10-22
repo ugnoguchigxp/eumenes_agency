@@ -1,0 +1,91 @@
+{
+	"id": "social-26",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "雑談26: 明日の朝のゴミ出しが残ったままの間",
+	"description": "利用者は、明日の朝は粗大ゴミの回収日で、今夜のうちに玄関に出しておかないといけないと言った後、雑談に移った。間が空いたとき、その件を先に短く取り上げるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "明日の朝は粗大ゴミの回収日だから、今夜のうちに古い椅子を玄関に出しておかないと。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "忘れないようにね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 16,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "さっきコンビニで新作のアイス買った。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 17,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "何味？"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 18,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ほうじ茶味。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 19,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "おいしそう。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 20,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "雑談の間だが、今夜のうちに椅子を出す件が未解決のまま残っている。雑談を続けるより、その件を短く確かめるのが先。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3", "s5"],
+			"judge": [
+				"粗大ゴミ（古い椅子）を今夜のうちに出す件を取り上げ、済んだことにしていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは甘いものが好き。"
+				}
+			]
+		}
+	]
+}

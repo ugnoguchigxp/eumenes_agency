@@ -1,0 +1,76 @@
+{
+	"id": "social-24",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "雑談24: ラーメンの雑談の後の間（記憶の話題が会話とつながる）",
+	"description": "味噌ラーメンを食べてきた雑談の後に間が空く。記憶には北海道出身という話題がある。会話とつながる話題で短く話しかけるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "夜は味噌ラーメン食べてきた。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "寒い日にはいいね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "替え玉までしちゃった。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "しっかり食べたね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 4,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "雑談の後に間が空いた。急ぐ事項はない。味噌ラーメンの話と記憶にある話題（北海道出身）をつなげて、短く話しかける場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"直前の会話、記憶にあるユーザーの話題、エージェント自身の関心のどれかにつながっている",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは北海道出身。"
+				}
+			]
+		}
+	]
+}

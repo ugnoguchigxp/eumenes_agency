@@ -1,0 +1,114 @@
+{
+	"id": "social-21",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "雑談21: 週末の天気の雑談の後の間（記憶の話題と関心がある）",
+	"description": "週末の天気の雑談が続いた後に間が空く。記憶にはベランダでバジルを育てている話題があり、エージェントにはシナモロールが好きという関心がある。返答の直後は待ち、間では短く話しかけるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "シナモロールが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "週末は晴れるみたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "よかったね、出かけるにはちょうどいいね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s3",
+			"t": 2,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "エージェントが返したばかりで、利用者の次の発言を待つ場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"直前の会話、記憶にあるユーザーの話題、エージェント自身の関心のどれかにつながっている",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーはベランダでバジルを育てている。"
+				}
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "どこ行くかはまだ決めてない。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ゆっくり考えればいいよ。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "雑談の後に間が空いた。急ぐ事項はない。記憶にある話題（バジル）か自分の関心から、短く話しかける場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s4"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"直前の会話、記憶にあるユーザーの話題、エージェント自身の関心のどれかにつながっている",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーはベランダでバジルを育てている。"
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,67 @@
+{
+	"id": "social-30",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "断り30: 今日は何も考えたくないと言った後の間",
+	"description": "利用者は今日は何も考えたくないと言った。記憶の話題は資格試験の勉強だけ。間が空いても、その話を持ち出さずに待つか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日は何も考えたくない。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "そっか、ゆっくりしてね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "うん。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s4",
+			"t": 3,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者は何も考えたくないと言ったばかりで、記憶にある話題は試験勉強だけ。話しかけること自体が意向に反する。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"試験勉強の話を持ち出していない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは資格試験の勉強をしている。"
+				}
+			]
+		}
+	]
+}

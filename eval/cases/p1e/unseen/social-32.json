@@ -1,0 +1,83 @@
+{
+	"id": "social-32",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "直前32: バジルの様子を聞いた直後の間",
+	"description": "エージェントが記憶の話題（ベランダのバジル）で様子を聞き、利用者は「まあまあかな」とだけ答えた。記憶の話題はそれだけ。間が空いても、同じ話題を重ねずに待つか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "洗濯物、取り込んだ。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ありがとう、おつかれさま。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "delivery.observed",
+			"actor": "agent",
+			"text": "そういえば、ベランダのバジルは育ってる？"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "まあまあかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "そっか。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "記憶の話題で聞いたばかりで、利用者は短く答えただけ。同じ話題を重ねて聞くのはしつこく、ほかの話題もない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3", "s4"],
+			"judge": [
+				"直前に自分が出した話題（バジル）を繰り返していない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーはベランダでバジルを育てている。"
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,89 @@
+{
+	"id": "social-29",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "断り29: 引っ越しの話をまた今度と言った後の間",
+	"description": "エージェントが記憶の話題（引っ越し）で話しかけたところ、利用者はまた今度にしてと答えた。間が空いても、その話題も別の雑談も持ち出さずに待つか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "シナモロールが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ただいま。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "おかえり。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "delivery.observed",
+			"actor": "agent",
+			"text": "そういえば、引っ越し先は決まった？"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "その話は、また今度で。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者は話題を断ったばかり。断られた話題はもちろん、すぐに別の雑談で話しかけるのも押しつけになる。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3", "s4"],
+			"judge": [
+				"断られた話題（引っ越し）を持ち出していない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは来年の春に引っ越す予定。"
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,75 @@
+{
+	"id": "social-31",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "直前31: シナモロールの話をした直後の間",
+	"description": "エージェントが自分の関心（シナモロールのカフェ）の話をしたばかりで、利用者は「ふーん」とだけ返した。記憶の話題はない。間が空いても、同じ話を続けずに待つか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "シナモロールが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "お風呂から出た。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "さっぱりしたね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "delivery.observed",
+			"actor": "agent",
+			"text": "そういえば、シナモロールのカフェが期間限定で開くんだって。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ふーん。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 4,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "自分の関心の話をしたばかりで、利用者の反応は薄い。同じ話題を重ねるのはしつこく、ほかに出せる話題もない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3", "s4"],
+			"judge": [
+				"直前に自分が出した話題（シナモロールのカフェ）を繰り返していない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			]
+		}
+	]
+}
