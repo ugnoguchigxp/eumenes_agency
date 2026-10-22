@@ -80,3 +80,17 @@ Eumenes の現在の依存指定は `vendor/eumenes-memory/eumenes-memory-0.0.2-
 | `settings/controller/index.ts`、`inference/service/background-control.ts`への初回調査記録 | 設定読取とbackend内推論機構があることは確認対象。standalone向けの認証/推論port一式を動作確認したわけではない | 「backendからそのまま受け取れる」と断定せず、P0-E前に取得方法と取消到達先を確認する |
 
 本プロジェクトにGit管理情報はなかったため、初回5文書のhashと修正前本文を保存した。隣接の製品コード・設定・DBには書き込んでいない。外部調査は公開研究だけを検索し、会話データ・私有ソースを送信していない。
+
+## 2026-10-22 追加調査: コンテキストの蓄積と解放、想起
+
+agency をどこまで Eumenes の既存資源に任せられるかを、読み取りだけで調べた（パスは `../../eumenes/api/domains` 基準）。
+
+| 課題 | Eumenes にあるもの | agency への当てはめ |
+| --- | --- | --- |
+| 通常の応答の履歴の増大 | 予算つきの組立（`dialogue/service/context-compiler.ts`, `context-fit.ts`。記憶と履歴に min(128k, 窓/2)、最新2往復は固定、古い往復から落とす）。要約・圧縮・処分は背景の steward（`steward/service/steps/maintenance-steps.ts`）で、返事の経路に LLM 呼出しを足さない | Eumenes に任せる。この repo では履歴管理の比較をしない |
+| 窓から落ちた観測の想起 | 毎ターン自動の想起（`memory/service/turn-recall.ts`）。発話ごとの passage ベクトル（multilingual-e5-small、384次元、LARM の `larm.embedding.v1`）に、`prepare-recall` が LLM で作った query（200字以内）を内積で当てる。閾値 0.8、最上位から 0.05 以内 | 対象は会話の発話だけで、tool・外部の観測や agency の項目は入らない。curate-memory の前の発話はまだ検索できない |
+| 会話をまたぐ保存・忘却 | Memory パッケージの Records・State・変更フィード・忘却の連動（`eumenes_memory/src/sqlite.ts`）。検索の API はない | 台帳の永続化（計画 P1）の土台 |
+| 観測の受け取り | `conversation.changesInTransaction` の pull feed（World と同じ）。steward の口は1枠 | feed で受け取る |
+| 主会話への投影 | 汎用の差込口はない（`ContextSource` は閉じた union）。goals 層と同じく source・port・`withVolatile` の追加が要る | 本体を改修する段（P3/P5）で扱う |
+
+埋め込みの取得手順（`larm/service/playground-provider.ts`, `playground.ts`）は、catalog（`/v3/agent-profiles`）、接続の作成と準備待ち、claim（`larm-embedding-provider-v1`）、`/v1/embed`（`{texts, type, normalize:true, priority}`）、DELETE による解放の順で行う。設定は Eumenes と同じ `larm.baseUrl`・`larm.profile`、トークンは `LARM_API_TOKEN`。各呼出しで接続枠を1つ使い、5本目は待たされるため、並列の連打は Eumenes 本体の接続を待たせる。
