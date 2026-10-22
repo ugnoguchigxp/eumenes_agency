@@ -1,6 +1,11 @@
 # Eumenes 統合スパイク設計（案）
 
-2026-10-22。**設計のみ・未実装・利用者の合意待ち**。Eumenes は `../../eumenes/` を基準とし、`file:line` は 2026-10-22 時点の作業ツリー（未コミット変更 14 件あり。`api/domains/dialogue/service/conversation-generation.ts` は変更中なので触らない）を読んだもの。サーバー起動・API 呼出し・実機確認はしていない。Eumenes の `AGENTS.md:8` により、Eumenes 側の実装前に同等の設計書を `eumenes/spec/` に置いて合意を得る（手順 E0）。
+2026-10-22。**利用者の合意済み・実装開始**。Eumenes は `../../eumenes/` を基準とし、`file:line` は 2026-10-22 時点の作業ツリー（未コミット変更 14 件あり。`api/domains/dialogue/service/conversation-generation.ts` は変更中なので触らない）を読んだもの。サーバー起動・API 呼出し・実機確認はしていない。Eumenes の `AGENTS.md:8` により、Eumenes 側の実装前に同等の設計書を `eumenes/spec/` に置いて合意を得る（手順 E0）。
+決定済み（利用者、2026-10-22）:
+- 背景推論の route は設定 `agency.resourceId` で選べるようにする: 保存済みの cloud 資源（Claude Haiku を claude-agent-sdk 接続で）を指定すればそれを、未指定（null）なら LARM のローカル LLM を使う。利用者はローカル LLM も試す。LARM（約 60 tok/s）では select の出力（約 800 token）で自発発話が遅くなり、主会話・TTS と GPU を取り合う点は、試して log で測る。指定した cloud 資源が使えないときに黙って LARM へ落とすことはせず、agency を止めて理由を log に出す（§3 の方針どおり）。主会話の返答は従来どおり Eumenes の route。
+- 取込み（§6 の 2）と配信（§6 の 3）は推奨どおり（版付き tgz を vendor、runless の assistant message を直接 append）。
+- idle の既定は **20 秒**（backoff 20→40→80、無応答上限 1）。
+- **話題は Eumenes の記憶に蓄積する**: agency は【話題】メモ（socialTopics の種）を自分で作らず上書きもしない。host が Eumenes Memory（利用者の State の好み・事実、必要なら想起）から話題を選び、機会ごとに `Opportunity.topics`（`memory:<id>` で参照）として渡す（agency の `hostTopics` モード）。agency の状態は未解決事項のメモだけ。自発発言も Eumenes 側に残る形にする。
 
 ## 1. 目的と非目的
 

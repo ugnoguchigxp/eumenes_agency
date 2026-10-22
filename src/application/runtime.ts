@@ -1,6 +1,7 @@
 import type {
 	AgencyState,
 	Candidate,
+	HostTopic,
 	Observation,
 } from "../contracts/model.ts";
 import { defaultLimits, emptyState } from "../contracts/model.ts";
@@ -55,6 +56,7 @@ import {
 	selectEvidenceIds,
 	selectPrompt,
 	interestRef,
+	memoryRef,
 	systemPrompt,
 	updatePrompt,
 } from "./prompts.ts";
@@ -67,7 +69,10 @@ const NO_DUE: Due = { reviewIntentIds: [], pressure: [] };
 export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const { condition, llm, tools } = deps;
 	// Social conversation mode applies to B1 only; otherwise every prompt stays as before.
-	const social = condition === "B1" && deps.socialTopics === true;
+	// Host topics (topics kept by the host's own memory) take precedence over note-based seeds.
+	const hostTopics = condition === "B1" && deps.hostTopics === true;
+	const social =
+		condition === "B1" && deps.socialTopics === true && !hostTopics;
 	const wireSchema = wireUpdateSchema(condition === "B0" ? "B2" : condition);
 	const limits = deps.limits ?? defaultLimits;
 	const cfg = deps.budget ?? defaultBudget;
@@ -290,9 +295,18 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 						(x) => x.id !== "" && x.text.trim() !== "",
 					)
 				: [];
+		// Host topics (hostTopics mode, B1 only): seeds supplied by the host for this opportunity.
+		const topics: readonly HostTopic[] = hostTopics
+			? (opp.topics ?? []).filter((x) => x.id !== "" && x.text.trim() !== "")
+			: [];
 		// B1a (eval ablation): with no notes, still let select speak from the observations.
 		const selectEmpty = condition === "B1" && deps.selectWhenEmpty === true;
-		if (items === 0 && !selectEmpty && interests.length === 0)
+		if (
+			items === 0 &&
+			!selectEmpty &&
+			interests.length === 0 &&
+			topics.length === 0
+		)
 			return done(
 				hostDecision(opp.id, "host_no_candidates", "nothing to offer"),
 			);
@@ -314,6 +328,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					utteranceStyle: deps.utteranceStyle,
 					interests: interests.length > 0,
 					...(social ? { social } : {}),
+					...(hostTopics ? { hostTopics } : {}),
 				}),
 				prompt: selectPrompt({
 					condition,
@@ -325,10 +340,12 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					candidates: pool,
 					delivered: delivered(),
 					...(interests.length > 0 ? { interests } : {}),
+					...(topics.length > 0 ? { topics } : {}),
 					tools,
 					limits,
 					minutesSinceUserInput: minutesSinceUserInput(opp.at),
 					...(social ? { social } : {}),
+					...(hostTopics ? { hostTopics } : {}),
 				}),
 				schema: participationSchema,
 				maxOutputTokens: cfg.selectMaxOutputTokens,
@@ -342,20 +359,21 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				hostDecision(opp.id, "error", `select_failed:${r.outcome.code}`),
 			);
 		}
-		// Social mode: a topic seed is often cited by its note id; read it as the note's evidence.
-		const p = social
-			? {
-					...r.value,
-					evidenceRefs: [
-						...new Set(
-							r.value.evidenceRefs.flatMap(
-								(ref) =>
-									state.notes.find((n) => n.id === ref)?.evidence ?? [ref],
+		// Social / host-topics mode: a note may be cited by its id; read it as the note's evidence.
+		const p =
+			social || hostTopics
+				? {
+						...r.value,
+						evidenceRefs: [
+							...new Set(
+								r.value.evidenceRefs.flatMap(
+									(ref) =>
+										state.notes.find((n) => n.id === ref)?.evidence ?? [ref],
+								),
 							),
-						),
-					],
-				}
-			: r.value;
+						],
+					}
+				: r.value;
 		if (epoch !== startEpoch) {
 			// New input / speech start arrived while the model was thinking.
 			calls.push(
@@ -373,6 +391,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				...presented.map((o) => o.id),
 				...shownEvidence,
 				...interests.map((x) => interestRef(x.id)),
+				...topics.map((x) => memoryRef(x.id)),
 			]),
 			presentedCandidates: new Map(pool.map((c) => [c.id, c.revision])),
 			tools,

@@ -16,3 +16,4 @@ eval/results/**
 !eval/results/*/summary.md
 !eval/results/*/judgments.jsonl
 !eval/results/*/state-judgments.jsonl
+artifacts/

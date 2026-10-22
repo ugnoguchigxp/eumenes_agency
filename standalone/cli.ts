@@ -41,13 +41,16 @@ import {
 	type Opportunity,
 	type StandingInterest,
 } from "../src/contracts/index.ts";
-import { createAgencyRuntime } from "../src/index.ts";
 import {
 	type CycleOutcome,
-	createChatLog,
-	createConversation,
+	createAgencyRuntime,
 	createIdlePlanner,
 	createIdleScheduler,
+	ttsUtteranceStyle,
+} from "../src/index.ts";
+import {
+	createChatLog,
+	createConversation,
 	decisionEvent,
 	decisionLine,
 	defaultLogPath,
@@ -55,7 +58,6 @@ import {
 	printAbove,
 	resolveCondition,
 	ttsReplyStyle,
-	ttsUtteranceStyle,
 } from "./chat-loop.ts";
 import { createClaudeChat, createClaudeLlm } from "./claude.ts";
 import { personaPrompt, toStandingInterests } from "./persona.ts";

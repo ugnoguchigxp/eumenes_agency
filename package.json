@@ -17,7 +17,8 @@
 		"check:boundaries": "bun scripts/check-boundaries.ts",
 		"test": "bun test ./src ./test ./standalone ./eval",
 		"agency": "bun standalone/cli.ts",
-		"eval": "bun eval/main.ts"
+		"eval": "bun eval/main.ts",
+		"pack": "bun scripts/pack.ts"
 	},
 	"dependencies": {
 		"zod": "4.4.3"

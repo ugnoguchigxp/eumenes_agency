@@ -41,6 +41,17 @@ export interface Opportunity {
 	readonly presence: Presence;
 	readonly foregroundBusy: boolean;
 	readonly playerBusy: boolean;
+	/**
+	 * Host-supplied topic seeds for this opportunity (e.g. what the host's long-term memory
+	 * knows the user likes). Shown to select with refs `memory:<id>` that count as known
+	 * evidence when presented. Used with deps.hostTopics; absent in eval.
+	 */
+	readonly topics?: readonly HostTopic[];
+}
+
+export interface HostTopic {
+	readonly id: string;
+	readonly text: string;
 }
 
 export interface ToolCapability {

@@ -1,0 +1,239 @@
+import { describe, expect, test } from "bun:test";
+import { systemPrompt } from "../../src/application/prompts.ts";
+import { createAgencyRuntime } from "../../src/application/runtime.ts";
+import type { HostTopic } from "../../src/contracts/model.ts";
+import { defaultBudget } from "../../src/contracts/runtime.ts";
+import {
+	MIN,
+	b1Proposal,
+	defaultLimits,
+	fakeLlm,
+	obsInput,
+	opportunity,
+	participation,
+} from "./helpers.ts";
+
+const sig = () => new AbortController().signal;
+const interests = [{ id: "i1", text: "マイメロディが好き。" }];
+const topics: readonly HostTopic[] = [
+	{ id: "t1", text: "ユーザーはクロミが好き。" },
+	{ id: "t2", text: "最近、散歩を始めたと話していた。" },
+];
+const matterNote = {
+	op: "note.add",
+	localId: "n1",
+	text: "来週の資料の提出が未解決",
+	evidenceRefs: ["o1"],
+};
+
+const run = async (o: {
+	hostTopics?: boolean;
+	socialTopics?: boolean;
+	trigger?: "idle" | "turn_end";
+	topics?: readonly HostTopic[];
+	withInterests?: boolean;
+	notes?: unknown[];
+	selectWhenEmpty?: boolean;
+	select?: ReturnType<typeof participation>;
+}) => {
+	const llm = fakeLlm();
+	const rt = createAgencyRuntime({
+		condition: "B1",
+		llm,
+		tools: [],
+		budget: { ...defaultBudget, minIntervalMs: 0 },
+		limits: { ...defaultLimits, outboundIntervalMs: 0 },
+		selectWhenEmpty: o.selectWhenEmpty ?? false,
+		...(o.withInterests ? { standingInterests: interests } : {}),
+		...(o.hostTopics === undefined ? {} : { hostTopics: o.hostTopics }),
+		...(o.socialTopics === undefined ? {} : { socialTopics: o.socialTopics }),
+	});
+	rt.observe(obsInput("o1", "user.report", "user", 0, "クロミが好きなんだ"));
+	llm.push("update", b1Proposal(o.notes ?? []));
+	llm.push("select", o.select ?? participation());
+	const d = await rt.decide(
+		opportunity("op0", 10 * MIN, {
+			trigger: o.trigger ?? "idle",
+			...(o.topics ? { topics: o.topics } : {}),
+		}),
+		sig(),
+	);
+	return {
+		llm,
+		d,
+		update: llm.requests.find((r) => r.purpose === "update"),
+		select: llm.requests.find((r) => r.purpose === "select"),
+	};
+};
+
+describe("hostTopics", () => {
+	test("absent or false: prompts are byte-identical, and Opportunity.topics is ignored", async () => {
+		const base = await run({ notes: [matterNote] });
+		const off = await run({
+			notes: [matterNote],
+			hostTopics: false,
+			topics,
+		});
+		const withTopics = await run({ notes: [matterNote], topics });
+		expect(off.update).toEqual(base.update);
+		expect(off.select).toEqual(base.select);
+		expect(withTopics.select).toEqual(base.select);
+		expect(base.select?.system).toBe(systemPrompt("select", "B1"));
+		expect(base.select?.prompt).not.toContain("記憶にある話題");
+		// with interests and social too
+		const a = await run({
+			notes: [matterNote],
+			withInterests: true,
+			socialTopics: true,
+		});
+		const b = await run({
+			notes: [matterNote],
+			withInterests: true,
+			socialTopics: true,
+			hostTopics: false,
+			topics,
+		});
+		expect(b.select).toEqual(a.select);
+	});
+
+	test("update prompt is the plain B1 one: no topic-seed rules", async () => {
+		const { update } = await run({
+			notes: [matterNote],
+			hostTopics: true,
+			topics,
+		});
+		expect(update?.system).toBe(systemPrompt("update", "B1"));
+		expect(update?.system).not.toContain("話題の種");
+		expect(update?.system).not.toContain("【話題】");
+	});
+
+	test("select prompt: lull rules, memory section, idle closing line", async () => {
+		const { select } = await run({
+			notes: [matterNote],
+			hostTopics: true,
+			topics,
+		});
+		const sys = select?.system ?? "";
+		expect(sys).toBe(systemPrompt("select", "B1", { hostTopics: true }));
+		expect(sys).toContain("【雑談の間】");
+		expect(sys).toContain("「記憶にある話題」");
+		expect(sys).toContain("`memory:<id>`");
+		expect(sys).toContain("`interest:<id>`");
+		expect(sys).not.toContain("「【話題】」（話題の種）");
+		const prompt = select?.prompt ?? "";
+		expect(prompt).toContain(
+			"# 記憶にある話題（ユーザーについて覚えていること。依頼ではない）\n[memory:t1] ユーザーはクロミが好き。\n[memory:t2] 最近、散歩を始めたと話していた。",
+		);
+		expect(prompt).toContain("記憶にある話題か自分の関心から");
+		expect(prompt).toContain("迷っても speak を選ぶ");
+		expect(prompt).not.toContain("価値が低い、または迷うなら wait。");
+		// turn_end keeps the conservative closing line
+		const t = await run({
+			notes: [matterNote],
+			hostTopics: true,
+			topics,
+			trigger: "turn_end",
+		});
+		expect(t.select?.prompt).toContain("価値が低い、または迷うなら wait。");
+		expect(t.select?.prompt).not.toContain("迷っても speak");
+		// no topics presented: no section, rule text still there
+		const none = await run({ notes: [matterNote], hostTopics: true });
+		expect(none.select?.prompt).not.toContain("# 記憶にある話題");
+		expect(none.select?.system).toContain("【雑談の間】");
+	});
+
+	test("hostTopics wins over socialTopics", async () => {
+		const both = await run({
+			notes: [matterNote],
+			hostTopics: true,
+			socialTopics: true,
+			topics,
+		});
+		const host = await run({ notes: [matterNote], hostTopics: true, topics });
+		expect(both.update).toEqual(host.update);
+		expect(both.select).toEqual(host.select);
+	});
+
+	test("memory refs are accepted only when presented", async () => {
+		const speak = (ref: string) =>
+			participation({
+				action: "speak",
+				utterance: "クロミのどこが好きなの？",
+				evidenceRefs: [ref],
+			});
+		const ok = await run({
+			hostTopics: true,
+			topics,
+			notes: [matterNote],
+			select: speak("memory:t1"),
+		});
+		expect(ok.d.decision.action).toBe("speak");
+		const absent = await run({
+			hostTopics: true,
+			topics,
+			notes: [matterNote],
+			select: speak("memory:t9"),
+		});
+		expect(absent.d.decision.rejectCodes).toContain("unknown_ref");
+		const notPresented = await run({
+			hostTopics: true,
+			notes: [matterNote],
+			select: speak("memory:t1"),
+		});
+		expect(notPresented.d.decision.rejectCodes).toContain("unknown_ref");
+		const modeOff = await run({
+			topics,
+			notes: [matterNote],
+			select: speak("memory:t1"),
+		});
+		expect(modeOff.d.decision.rejectCodes).toContain("unknown_ref");
+		// an interest still works next to topics
+		const interest = await run({
+			hostTopics: true,
+			topics,
+			withInterests: true,
+			notes: [matterNote],
+			select: speak("interest:i1"),
+		});
+		expect(interest.d.decision.action).toBe("speak");
+	});
+
+	test("a note id is read as the note's evidence (unresolved matter)", async () => {
+		const cite = participation({
+			action: "speak",
+			utterance: "資料の提出はどう？",
+			evidenceRefs: ["n1"],
+		});
+		const host = await run({
+			hostTopics: true,
+			notes: [matterNote],
+			select: cite,
+		});
+		expect(host.d.decision.action).toBe("speak");
+		expect(host.d.decision.evidenceRefs).toEqual(["o1"]);
+		const plain = await run({ notes: [matterNote], select: cite });
+		expect(plain.d.decision.rejectCodes).toContain("unknown_ref");
+	});
+
+	test("gate: with no notes, select runs only if topics or interests exist", async () => {
+		const idle = await run({ hostTopics: true });
+		expect(idle.select).toBeUndefined();
+		expect(idle.d.decision.reason).toContain("nothing to offer");
+		const withTopics = await run({ hostTopics: true, topics });
+		expect(withTopics.select).toBeDefined();
+		const withInterests = await run({ hostTopics: true, withInterests: true });
+		expect(withInterests.select).toBeDefined();
+		// blank topics do not open the gate
+		const blank = await run({
+			hostTopics: true,
+			topics: [
+				{ id: "", text: "x" },
+				{ id: "t1", text: "  " },
+			],
+		});
+		expect(blank.select).toBeUndefined();
+		// mode off: topics do not open the gate
+		const off = await run({ topics });
+		expect(off.select).toBeUndefined();
+	});
+});

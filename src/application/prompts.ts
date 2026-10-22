@@ -2,6 +2,7 @@ import type {
 	AgencyState,
 	Candidate,
 	Condition,
+	HostTopic,
 	Limits,
 	Observation,
 	Opportunity,
@@ -144,8 +145,23 @@ const selectSocial = [
 	"この規則で speak するときの evidenceRefs には、使った話題の種のメモに「根拠」として示された観測 ID、または自分の関心を使うなら `interest:<id>` を入れる。メモ自体の id は観測 ID ではないので入れない。",
 ];
 
+/**
+ * Added to the B1 select rules only in host-topics mode: the same lull-talk rule as
+ * selectSocial, with the topics coming from the host's memory section instead of notes.
+ */
+const selectHostTopics = [
+	"【雑談の間】（社交会話モード）trigger が idle は、ユーザーが一定時間入力していない静かな間を表す。雑談の最中にこの機会が来たら、「記憶にある話題」（ユーザーについて覚えていること）か自分の関心から、短い一言か問いかけを始めることには価値があり、自然である。直前に自分が応答していても、ユーザーの返事がないまま間が空いたなら、話題を足してよい。この場合は wait より speak を選ぶ。上の「話すこと自体は目的ではない」「価値が低いなら wait」よりこの規則を優先する。",
+	"ユーザーが話した内容につなげられるなら、つなげる（例: ユーザーの好きなキャラクターと、自分の好きなキャラクターの話）。講義にせず、短い一言か質問を一つだけにする。「配信済みの発話」と直近の観測にすでに出ている内容は繰り返さない。同じ話題を続けて使わない。",
+	"次は変わらない: ユーザーが作業に集中している・忙しそうなときは割り込まない。ユーザー自身の作業や未実施のタスクを催促しない。断られた・解決済みの事項は持ち出さない。未解決事項が残っているなら、そちらを優先する。",
+	"trigger が turn_end（自分が応答した直後）のときは、この規則を使わず、これまでどおり控えめに判断する。",
+	"この規則で speak するときの evidenceRefs には、使った「記憶にある話題」の `memory:<id>`、または自分の関心を使うなら `interest:<id>` を入れる。",
+];
+
 const idleSocialClosing =
 	"この機会に何をするかを JSON で一つだけ返す。価値が低い、またはユーザーの邪魔になるなら wait。ただし雑談の最中の静かな間（trigger が idle）で、話題の種か自分の関心から短い一言を始められるなら、迷っても speak を選ぶ。";
+
+const idleHostTopicsClosing =
+	"この機会に何をするかを JSON で一つだけ返す。価値が低い、またはユーザーの邪魔になるなら wait。ただし雑談の最中の静かな間（trigger が idle）で、記憶にある話題か自分の関心から短い一言を始められるなら、迷っても speak を選ぶ。";
 
 const lines = (xs: readonly string[]) => xs.map((x) => `- ${x}`).join("\n");
 
@@ -159,6 +175,11 @@ export interface SelectOptions {
 	 * lull rules to the select prompt. Absent / false: both prompts are byte-identical.
 	 */
 	readonly social?: boolean | undefined;
+	/**
+	 * Host-topics mode (B1 only): the select prompt gets the lull rules with topics from the
+	 * host's memory section; the update prompt gets no topic-seed rules. Wins over `social`.
+	 */
+	readonly hostTopics?: boolean | undefined;
 }
 
 /**
@@ -172,7 +193,8 @@ export const systemPrompt = (
 	options: SelectOptions = {},
 ): string => {
 	const head = `（指示版: ${INSTRUCTION_VERSION}）`;
-	const social = condition === "B1" && options.social === true;
+	const host = condition === "B1" && options.hostTopics === true;
+	const social = condition === "B1" && options.social === true && !host;
 	if (purpose === "update") {
 		const rules =
 			condition === "B1"
@@ -187,7 +209,7 @@ export const systemPrompt = (
 			? [
 					...selectB1,
 					...(options.interests ? selectInterest : []),
-					...(social ? selectSocial : []),
+					...(host ? selectHostTopics : social ? selectSocial : []),
 				]
 			: selectB2;
 	const style = options.utteranceStyle?.trim();
@@ -373,6 +395,10 @@ export interface SelectPromptInput {
 	readonly minutesSinceUserInput: number | null;
 	/** Social conversation mode (B1 only): the closing line yields to a topic remark at idle. */
 	readonly social?: boolean;
+	/** Topics kept by the host (B1 only, hostTopics mode): shown with `memory:<id>` refs. */
+	readonly topics?: readonly HostTopic[];
+	/** Host-topics mode (B1 only): the closing line yields to a topic remark at idle. */
+	readonly hostTopics?: boolean;
 }
 
 /**
@@ -393,6 +419,12 @@ export const selectEvidenceIds = (
 /** Evidence ref for a presented standing interest. */
 export const interestRef = (id: string) => `interest:${id}`;
 
+/** Evidence ref for a presented host topic. */
+export const memoryRef = (id: string) => `memory:${id}`;
+
+const renderTopics = (xs: readonly HostTopic[]) =>
+	xs.map((x) => `[${memoryRef(x.id)}] ${x.text}`).join("\n");
+
 const renderInterests = (xs: readonly StandingInterest[]) =>
 	xs.map((x) => `[${interestRef(x.id)}] ${x.text}`).join("\n");
 
@@ -411,10 +443,17 @@ export const selectPrompt = (i: SelectPromptInput): string => {
 					`# あなた自身の関心（設定。ユーザーの依頼ではない）\n${renderInterests(i.interests)}`,
 				]
 			: []),
+		...(i.topics?.length
+			? [
+					`# 記憶にある話題（ユーザーについて覚えていること。依頼ではない）\n${renderTopics(i.topics)}`,
+				]
+			: []),
 		`# 配信済みの発話（最近。繰り返さない）\n${renderDelivered(i.delivered)}`,
 		`# 使えるツール\n${renderTools(i.tools)}`,
-		i.social === true && i.condition === "B1" && o.trigger === "idle"
-			? idleSocialClosing
-			: "この機会に何をするかを JSON で一つだけ返す。価値が低い、または迷うなら wait。",
+		i.condition === "B1" && o.trigger === "idle" && i.hostTopics === true
+			? idleHostTopicsClosing
+			: i.social === true && i.condition === "B1" && o.trigger === "idle"
+				? idleSocialClosing
+				: "この機会に何をするかを JSON で一つだけ返す。価値が低い、または迷うなら wait。",
 	].join("\n\n");
 };

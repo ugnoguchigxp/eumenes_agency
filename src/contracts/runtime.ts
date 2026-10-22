@@ -60,6 +60,13 @@ export interface RuntimeDeps {
 	 * from a topic seed or a standing interest.
 	 */
 	readonly socialTopics?: boolean;
+	/**
+	 * Social conversation with topics kept by the host (B1 only; absent in eval): select gets
+	 * the same lull-talk rule as socialTopics, using Opportunity.topics and standing
+	 * interests, but update does NOT create topic-seed notes (the host's memory accumulates
+	 * them). Takes precedence over socialTopics when both are set.
+	 */
+	readonly hostTopics?: boolean;
 }
 
 export interface StandingInterest {
