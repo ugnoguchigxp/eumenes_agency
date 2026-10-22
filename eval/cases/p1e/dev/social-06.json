@@ -1,0 +1,89 @@
+{
+	"id": "social-06",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "雑談6: 今夜が期限の出欠の返事が残ったままの間",
+	"description": "利用者は、友達の結婚式の出欠を今夜中に返事しなければならないと言った後、ゲームの雑談に移った。間が空いたとき、期限の近い返事の件を先に短く取り上げるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "マイメロディが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "友達の結婚式の出欠、今夜中に返事しないと。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "そっか、今夜までなんだね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 16,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "最近、寝る前にパズルゲームやってる。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 17,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ちょうどいい息抜きになりそうだね。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 18,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "つい長くやっちゃうけどね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 19,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "雑談の間だが、今夜が期限の結婚式の出欠の返事が未解決のまま残っている。ゲームや関心の話より、返事の件を短く確かめるのが先。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3", "s5"],
+			"judge": [
+				"結婚式の出欠の返事（今夜中）を取り上げ、済んだことにしていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーはゲームが好きで、最近はパズルゲームにはまっている。"
+				}
+			]
+		}
+	]
+}

@@ -24,6 +24,8 @@ export const caseGroups = [
 	"amplify",
 	"concurrent",
 	"dilution",
+	// Social lull experiment (spec/social-lull-experiment.md); run only with --group social.
+	"social",
 ] as const;
 export type CaseGroup = (typeof caseGroups)[number];
 
@@ -57,14 +59,25 @@ export type Suite = (typeof suites)[number];
  * Conditions an eval run may use: the runtime ones plus
  * - B1a (ablation): B1 with `selectWhenEmpty`, i.e. select is called even with 0 notes
  *   (removes the host_no_candidates gate; scored, state-checked and judged like B1),
+ * - B1h (social lull): B1a plus the host-topics mode (`hostTopics`), with the case's
+ *   `interests` as standing interests and each opportunity's `topics` as host topics,
  * - D (diagnostic, no stored state).
  */
-export const evalConditions = [...conditions, "B1a", "D"] as const;
+export const evalConditions = [...conditions, "B1a", "B1h", "D"] as const;
 export type EvalCondition = (typeof evalConditions)[number];
 
-/** The runtime condition an eval condition runs as (B1a runs as B1); null for D (own runtime). */
+/** The runtime condition an eval condition runs as (B1a/B1h run as B1); null for D (own runtime). */
 export const runtimeConditionOf = (c: EvalCondition): Condition | null =>
-	c === "D" ? null : c === "B1a" ? "B1" : c;
+	c === "D" ? null : c === "B1a" || c === "B1h" ? "B1" : c;
+
+/**
+ * A host-memory topic or a standing interest given by a social case. Shown only to B1h
+ * (as `memory:<id>` / `interest:<id>`) and to the judge as case facts.
+ */
+export const socialItemSchema = z.strictObject({
+	id: z.string().regex(/^[a-z][a-z0-9]{0,15}$/),
+	text: z.string().min(1),
+});
 
 export const expectSchema = z.strictObject({
 	/** Whether an outward action (speak/tool) is needed at this opportunity. */
@@ -136,6 +149,11 @@ export const stepSchema = z.discriminatedUnion("type", [
 		 * does not use it keeps its caseHash.
 		 */
 		judgeTool: z.array(z.string().min(1)).optional(),
+		/**
+		 * Social cases: what the host's memory offers as topics at this opportunity (B1h only).
+		 * Optional without a default, so other cases keep their caseHash.
+		 */
+		topics: z.array(socialItemSchema).optional(),
 	}),
 ]);
 export type Step = z.infer<typeof stepSchema>;
@@ -165,6 +183,8 @@ export const caseSchema = z
 		/** Draft labels need the user's confirmation before they count. */
 		labelStatus: z.enum(["draft", "confirmed"]),
 		tools: z.array(toolScriptSchema),
+		/** Social cases: the persona's standing interests (B1h only). Optional, no default. */
+		interests: z.array(socialItemSchema).optional(),
 		steps: z.array(stepSchema).min(2),
 	})
 	.superRefine((c, ctx) => {

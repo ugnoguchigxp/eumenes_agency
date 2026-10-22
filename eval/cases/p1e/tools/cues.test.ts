@@ -84,7 +84,8 @@ describe("generated P1-E cases", () => {
 		test(`${split}: every group passes the cue check`, () => {
 			const cases = loadCases(split, root);
 			const { reports, failed } = checkCues(cases);
-			expect(reports.length).toBe(6);
+			// dev also has the social group (no unseen social cases yet)
+			expect(reports.length).toBe(split === "dev" ? 7 : 6);
 			expect(failed.map((r) => `${r.key}: ${r.problems.join("; ")}`)).toEqual(
 				[],
 			);

@@ -181,6 +181,8 @@ export async function replayCase(
 					presence: step.presence,
 					foregroundBusy: step.foregroundBusy,
 					playerBusy: step.playerBusy,
+					// Social cases: host-memory topics (used by B1h only; ignored otherwise).
+					...(step.topics ? { topics: step.topics } : {}),
 				},
 				signal(),
 			);

@@ -1,0 +1,91 @@
+{
+	"id": "social-05",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "雑談5: 明朝が期限の返送が残ったままの間",
+	"description": "利用者は、明日の朝までに大家へ更新の書類を返送しなければならないと言った後、雑談に移った。間が空いたとき、記憶の話題（アニメ映画）より、期限の近い未解決事項を先に短く取り上げるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "そういえば、明日の朝までに大家さんに更新の書類を返送しないといけないんだった。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "忘れないようにしないとね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日、駅前に新しいパン屋が開いてた。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 22,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いいね、何か買った？"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 23,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "クロワッサン買った。おいしかった。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 24,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "よかったね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 25,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "雑談の間だが、明日の朝が期限の書類の返送が未解決のまま残っている。記憶の話題で雑談を続けるより、返送の件を短く確かめるのが先。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3", "s5"],
+			"judge": [
+				"大家さんへの更新書類の返送（明日の朝まで）を取り上げ、済んだことにしていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは映画が好きで、最近はアニメ映画をよく観る。"
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,81 @@
+{
+	"id": "social-07",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "作業1: 企画書を書き始めた後の間",
+	"description": "雑談の後、利用者が集中して企画書を書くと言って作業を始めた。間が空いても、記憶の話題や関心で話しかけずに待つか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "マイメロディが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "週末、久しぶりに料理したよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いいね、何を作ったの？"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "煮込みハンバーグ。……よし、そろそろ集中して企画書を書く。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解、がんばってね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 4,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者は集中して作業すると言ったばかり。間が空いても、それは作業に入ったからで、雑談で話しかけると邪魔になる。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"作業に集中するという利用者の表明を妨げる雑談になっていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは料理が好き。"
+				}
+			]
+		}
+	]
+}

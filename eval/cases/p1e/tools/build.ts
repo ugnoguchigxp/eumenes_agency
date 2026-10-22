@@ -22,6 +22,7 @@ import { concurrentDev, concurrentUnseen } from "./concurrent.ts";
 import { dilutionDev, dilutionUnseen } from "./dilution.ts";
 import { build, oppCounts, type CaseDef } from "./dsl.ts";
 import { premiseDev, premiseUnseen } from "./premise.ts";
+import { socialDev, socialUnseen } from "./social.ts";
 import { transferDev, transferUnseen } from "./transfer.ts";
 
 export const devDefs: CaseDef[] = [
@@ -31,6 +32,7 @@ export const devDefs: CaseDef[] = [
 	...amplifyDev,
 	...concurrentDev,
 	...dilutionDev,
+	...socialDev,
 ];
 export const unseenDefs: CaseDef[] = [
 	...causalUnseenA,
@@ -40,6 +42,7 @@ export const unseenDefs: CaseDef[] = [
 	...amplifyUnseen,
 	...concurrentUnseen,
 	...dilutionUnseen,
+	...socialUnseen,
 ];
 
 const root = resolve(import.meta.dir, "..");

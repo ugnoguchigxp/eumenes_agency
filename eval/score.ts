@@ -141,6 +141,7 @@ const conditionOrder: readonly EvalCondition[] = [
 	"B0",
 	"B1",
 	"B1a",
+	"B1h",
 	"B2",
 	"F",
 	"D",
@@ -156,7 +157,13 @@ const orderedConditions = (records: RunRecord[]): EvalCondition[] =>
 
 /** D is a diagnostic, never part of a B1/B2 comparison; B1a is the B1 gate ablation. */
 const condLabel = (c: EvalCondition): string =>
-	c === "D" ? "D（診断）" : c === "B1a" ? "B1a（B1+select常時）" : c;
+	c === "D"
+		? "D（診断）"
+		: c === "B1a"
+			? "B1a（B1+select常時）"
+			: c === "B1h"
+				? "B1h（B1a+雑談の間）"
+				: c;
 
 const caseCount = (rs: readonly RunRecord[]): number =>
 	new Set(rs.map((r) => r.caseId)).size;
@@ -513,7 +520,7 @@ export function summarize(
 		);
 		lines.push("## 群 × 条件の行動（P1-E）", "");
 		lines.push(
-			"D（診断）は状態を保存せず、ケースが指定する `present` と直近の観測（B1/B2 と同じ窓）を直接見せる条件で、B1 と B2 の比較には含めない。B1a は B1 と同じ指示・状態で、メモが 0 件でも select を呼ぶ（host_no_candidates の待ちを外した統制）。ケース数は独立な単位（原型）の数で、機会数・run 数（反復は疑似反復）ではない。",
+			"D（診断）は状態を保存せず、ケースが指定する `present` と直近の観測（B1/B2 と同じ窓）を直接見せる条件で、B1 と B2 の比較には含めない。B1a は B1 と同じ指示・状態で、メモが 0 件でも select を呼ぶ（host_no_candidates の待ちを外した統制）。B1h は B1a に雑談の間の規則（hostTopics）を足し、ケースの関心と機会ごとの話題を見せる。ケース数は独立な単位（原型）の数で、機会数・run 数（反復は疑似反復）ではない。",
 			"",
 		);
 		const actionRows: string[][] = [];

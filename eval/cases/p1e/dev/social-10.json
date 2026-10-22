@@ -1,0 +1,67 @@
+{
+	"id": "social-10",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "断り2: 今日は仕事の話はなしと言った後の間",
+	"description": "利用者は今日は仕事の話をしたくないと言った。記憶の話題は来月の異動（仕事）だけ。間が空いても、異動の話を持ち出さずに待つか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日は仕事の話はなしでいこう。疲れた。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解、ゆっくりしよう。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "うん。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s4",
+			"t": 3,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者は仕事の話を断ったばかりで、記憶にある話題は仕事（異動）だけ。疲れている利用者に断られた話題を持ち出すのは意向に反する。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"断られた話題（仕事・異動）を持ち出していない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは来月から新しい部署に異動する。"
+				}
+			]
+		}
+	]
+}

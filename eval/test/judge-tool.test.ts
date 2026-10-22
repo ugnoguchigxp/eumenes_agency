@@ -156,8 +156,30 @@ describe("pendingJudgeTasks by action kind", () => {
 });
 
 test("the judge fingerprint carries the bumped prompt version", () => {
-	expect(JUDGE_PROMPT_VERSION).toBe("judge-prompt-3");
-	expect(judgeFingerprint()).toContain("judge-prompt-3");
+	expect(JUDGE_PROMPT_VERSION).toBe("judge-prompt-4");
+	expect(judgeFingerprint()).toContain("judge-prompt-4");
+});
+
+test("social cases: interests and the opportunity's topics are judge facts", () => {
+	const base = dev().find((c) => c.id === "causal-01")!;
+	const c: Case = {
+		...base,
+		interests: [{ id: "i1", text: "マイメロディが好き" }],
+		steps: base.steps.map((s) =>
+			s.type === "opportunity" && s.id === "s4"
+				? { ...s, topics: [{ id: "t1", text: "ユーザーはクロミが好き" }] }
+				: s,
+		),
+	};
+	const facts = factsBefore(c, "s4");
+	expect(facts[0]).toContain("[interest:i1]");
+	expect(facts[0]).toContain("マイメロディが好き");
+	expect(facts[1]).toContain("[memory:t1]");
+	expect(facts[1]).toContain("クロミ");
+	// cases without them render as before
+	expect(factsBefore(base, "s4").some((f) => f.includes("interest:"))).toBe(
+		false,
+	);
 });
 
 test("the judge fingerprint includes the generic tool criterion", () => {

@@ -3,11 +3,14 @@
  * p0e cases are eval/cases/{dev,unseen}, p1e cases eval/cases/p1e/{dev,unseen}.
  *
  *   bun eval/main.ts validate [--suite p1e] [--split dev]
- *   bun eval/main.ts run --name <run> [--suite p1e] [--split dev] [--conditions B0,B1,B1a,B2,F,D] [--reps 3]
- *       [--case <id>] [--resume] [--budget-usd n] [--allow-unverified]
+ *   bun eval/main.ts run --name <run> [--suite p1e] [--split dev] [--conditions B0,B1,B1a,B1h,B2,F,D] [--reps 3]
+ *       [--group causal,...] [--case <id>] [--resume] [--budget-usd n] [--allow-unverified]
  *       (p0e default conditions: B0,B1,B2,F; p1e default: B1,B1a,B2,D.
  *        B1a = B1 with select called even when there are no notes (ablation of the
- *        host_no_candidates gate); D = diagnostic, no stored state)
+ *        host_no_candidates gate); B1h = B1a + social lull talk (hostTopics, the case's
+ *        interests and topics); D = diagnostic, no stored state.
+ *        p1e default groups: the six P1-E groups; the social group runs only when named,
+ *        e.g. --group social --conditions B1a,B1h,D)
  *   bun eval/main.ts score --name <run>
  *   bun eval/main.ts trace --name <run> --case <id> [--condition B2] [--rep 1] [--prompt]
  *   bun eval/main.ts judge --name <run> [--limit N] [--budget-usd n] [--allow-unverified]   (content + state judge; spends money)
@@ -286,6 +289,18 @@ export function parseRunsJsonl(
 	return records;
 }
 
+/** `--group a,b`: case groups to run; unknown names are an error. */
+export const parseGroups = (value: string): CaseGroup[] => {
+	const out: CaseGroup[] = [];
+	for (const raw of value.split(",")) {
+		const v = raw.trim();
+		if (!(caseGroups as readonly string[]).includes(v))
+			throw new Error(`unknown group: ${v}`);
+		if (!out.includes(v as CaseGroup)) out.push(v as CaseGroup);
+	}
+	return out;
+};
+
 export const parseConditions = (value: string): EvalCondition[] => {
 	const out: EvalCondition[] = [];
 	for (const raw of value.split(",")) {
@@ -337,10 +352,15 @@ const p1eGroups: readonly CaseGroup[] = [
 	"concurrent",
 	"dilution",
 ];
-const groupsOf = (suite: Suite): readonly CaseGroup[] =>
+/** P1-E case groups that a run includes only when named with --group. */
+const p1eExtraGroups: readonly CaseGroup[] = ["social"];
+/** Groups a run includes by default. */
+export const groupsOf = (suite: Suite): readonly CaseGroup[] =>
 	suite === "p1e"
 		? p1eGroups
-		: caseGroups.filter((g) => !p1eGroups.includes(g));
+		: caseGroups.filter(
+				(g) => !p1eGroups.includes(g) && !p1eExtraGroups.includes(g),
+			);
 
 export function validateCommand(
 	split: Split,
@@ -351,7 +371,9 @@ export function validateCommand(
 	const out: string[] = [
 		`${suite === "p0e" ? "" : `${suite} `}${split}: ${cases.length} cases`,
 	];
-	for (const g of groupsOf(suite)) {
+	for (const g of suite === "p1e"
+		? [...p1eGroups, ...p1eExtraGroups]
+		: groupsOf(suite)) {
 		const inGroup = cases.filter((c) => c.group === g);
 		const opps = inGroup.reduce(
 			(n, c) => n + c.steps.filter((s) => s.type === "opportunity").length,
@@ -669,6 +691,7 @@ async function runCommand(values: {
 	suite: Suite;
 	split: Split;
 	conditions: EvalCondition[];
+	groups: readonly CaseGroup[];
 	reps: number;
 	caseId: string | undefined;
 	resume: boolean;
@@ -689,6 +712,7 @@ async function runCommand(values: {
 	const done = doneKeys(existing);
 	let cases = loadSuiteCases(values.suite, values.split);
 	assertResumeCases(existing, cases, values.allowUnverified);
+	cases = cases.filter((c) => values.groups.includes(c.group));
 	if (values.caseId) cases = cases.filter((c) => c.id === values.caseId);
 	if (cases.length === 0) throw new Error("no cases selected");
 	const plan = skipDone(planRuns(cases, values.conditions, values.reps), done);
@@ -767,7 +791,16 @@ async function runCommand(values: {
 							tools,
 							budget,
 							// B1a: B1 without the host_no_candidates gate (ablation).
-							...(condition === "B1a" ? { selectWhenEmpty: true } : {}),
+							// B1h: B1a + social lull talk from the case's interests and topics.
+							...(condition === "B1a" || condition === "B1h"
+								? { selectWhenEmpty: true }
+								: {}),
+							...(condition === "B1h"
+								? {
+										hostTopics: true,
+										standingInterests: p.case.interests ?? [],
+									}
+								: {}),
 						}),
 			{
 				runName: values.name,
@@ -829,6 +862,7 @@ export async function main(argv: string[]): Promise<number> {
 			conditions: { type: "string" },
 			reps: { type: "string", default: "3" },
 			case: { type: "string" },
+			group: { type: "string" },
 			resume: { type: "boolean", default: false },
 			condition: { type: "string" },
 			rep: { type: "string" },
@@ -965,6 +999,10 @@ export async function main(argv: string[]): Promise<number> {
 			conditions: parseConditions(
 				values.conditions ?? defaultConditions(suite),
 			),
+			groups:
+				values.group === undefined
+					? groupsOf(suite)
+					: parseGroups(values.group),
 			reps,
 			caseId: values.case,
 			resume: values.resume,

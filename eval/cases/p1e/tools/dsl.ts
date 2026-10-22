@@ -57,6 +57,13 @@ export interface OppIn {
 	 * so that `present` is never empty and its size does not signal the label.
 	 */
 	pres?: string[];
+	/** Social cases: host-memory topics offered at this opportunity (shown to B1h only). */
+	topics?: { id: string; text: string }[];
+	/**
+	 * Social cases: needed although no step is the evidence (talk at a lull starts from a host
+	 * topic or an interest, cited as memory:/interest:), so `ev` stays empty (no evidence check).
+	 */
+	free?: boolean;
 	dt?: number;
 }
 export interface OppItem extends OppIn {
@@ -81,6 +88,8 @@ export interface CaseDef {
 	title: string;
 	description: string;
 	tools?: ToolDef[];
+	/** Social cases: the persona's standing interests (shown to B1h only). */
+	interests?: { id: string; text: string }[];
 	items: Item[];
 }
 
@@ -117,6 +126,9 @@ export const corr = (text: string, l?: string, dt?: number) =>
 /** Source change (source.changed/host). */
 export const src = (text: string, l?: string, dt?: number) =>
 	obs("source.changed", "host", text, l, dt);
+/** The agent's own earlier proactive utterance, delivered (delivery.observed/agent). */
+export const dl = (text: string, l?: string, dt?: number) =>
+	obs("delivery.observed", "agent", text, l, dt);
 export const gap = (n: number): GapItem => ({ k: "gap", n });
 export const opp = (o: OppIn): OppItem => ({ k: "opp", ...o });
 
@@ -179,8 +191,12 @@ export function build(def: CaseDef): Case {
 				...ev,
 			]),
 		].sort((x, y) => Number(x.slice(1)) - Number(y.slice(1)));
-		if (it.needed && ev.length === 0)
+		if (it.needed && ev.length === 0 && !it.free)
 			throw new Error(`${def.id}: ${id} needed without ev`);
+		if (it.free && (!it.needed || ev.length > 0))
+			throw new Error(
+				`${def.id}: ${id} free is for needed opportunities without ev`,
+			);
 		if (it.needed && present.length === 0)
 			throw new Error(`${def.id}: ${id} needed without present`);
 		if (!it.needed && ev.length > 0)
@@ -204,6 +220,7 @@ export function build(def: CaseDef): Case {
 			present,
 			judge: it.judge ?? [],
 			...(it.judgeTool ? { judgeTool: it.judgeTool } : {}),
+			...(it.topics ? { topics: it.topics } : {}),
 		});
 	}
 	const tools = (def.tools ?? []).map((tl) => ({
@@ -221,6 +238,7 @@ export function build(def: CaseDef): Case {
 		description: def.description,
 		labelStatus: "draft",
 		tools,
+		...(def.interests ? { interests: def.interests } : {}),
 		steps,
 	};
 	return caseSchema.parse(raw);
