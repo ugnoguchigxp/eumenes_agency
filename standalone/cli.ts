@@ -1,6 +1,18 @@
 /**
  * Interactive conversation with the agency runtime.
- *   bun standalone/cli.ts [--condition B0|B1|B2|F] [--off]
+ *   bun standalone/cli.ts [--condition B0|B1|B1a|B2|F] [--off]
+ *                         [--idle-sec N] [--max-unanswered N] [--log PATH | --no-log]
+ *
+ *   --condition B1a    runtime condition B1 with select always called (default)
+ *   --off              start with the agency disabled
+ *   --idle-sec N       the AI may speak after N seconds without a submitted line or AI
+ *                      output (default 40; 0 disables; max 86400). A silent attempt is
+ *                      retried at 2N, 4N, then stops until the next user input. Typing
+ *                      does not count: only a submitted line (Enter) is user input.
+ *   --max-unanswered N proactive utterances allowed in a row before waiting for the
+ *                      user (default 1)
+ *   --log PATH         JSONL conversation log (default data/chats/<ISO time>-<condition>.jsonl)
+ *   --no-log           do not write a log
  * Commands: /idle  /state  /off  /on  /quit
  */
 import { createInterface } from "node:readline";
@@ -9,14 +21,23 @@ import {
 	type AgencyRuntime,
 	type CallOutcome,
 	type ChatPort,
-	type Condition,
-	conditions,
 	isOpenCandidate,
 	isOpenIntent,
 	LlmCallError,
 	type Opportunity,
 } from "../src/contracts/index.ts";
 import { createAgencyRuntime } from "../src/index.ts";
+import {
+	type CycleOutcome,
+	createChatLog,
+	createConversation,
+	createIdlePlanner,
+	createIdleScheduler,
+	defaultLogPath,
+	parseCliArgs,
+	printAbove,
+	resolveCondition,
+} from "./chat-loop.ts";
 import { createClaudeChat, createClaudeLlm } from "./claude.ts";
 import {
 	loadSettings,
@@ -26,25 +47,6 @@ import {
 } from "./settings.ts";
 
 const dim = (text: string) => `\x1b[2m${text}\x1b[0m`;
-
-function parseArgs(argv: readonly string[]): {
-	condition: Condition;
-	off: boolean;
-} {
-	let condition: Condition = "B2";
-	let off = false;
-	for (let i = 0; i < argv.length; i++) {
-		const arg = argv[i];
-		if (arg === "--off") off = true;
-		else if (arg === "--condition") {
-			const value = argv[++i];
-			const found = conditions.find((c) => c === value);
-			if (!found) throw new Error(`usage: --condition ${conditions.join("|")}`);
-			condition = found;
-		} else throw new Error(`unknown_argument:${arg}`);
-	}
-	return { condition, off };
-}
 
 const baseSystem = [
 	"あなたは利用者と作業の相談をする会話相手です。簡潔に、日本語で答えてください。",
@@ -76,7 +78,8 @@ function describeState(runtime: AgencyRuntime): string {
 }
 
 async function main() {
-	const { condition, off } = parseArgs(process.argv.slice(2));
+	const args = parseCliArgs(process.argv.slice(2));
+	const { condition, selectWhenEmpty } = resolveCondition(args.condition);
 	const settings = loadSettings();
 	const meter = openSpendMeter(settings);
 	const llm = createClaudeLlm(settings.llm.background, meter);
@@ -86,27 +89,81 @@ async function main() {
 		llm,
 		tools: [],
 		budget: resolveBudget(settings),
+		...(selectWhenEmpty ? { selectWhenEmpty: true } : {}),
 	});
-	if (off) runtime.setEnabled(false);
+	if (args.off) runtime.setEnabled(false);
 	if (!process.env.ANTHROPIC_API_KEY)
 		console.warn("[warn] ANTHROPIC_API_KEY is not set");
+	const digest = settingsDigest(settings);
 	console.log(
 		dim(
-			`condition ${condition}${off ? " (off)" : ""} / main ${settings.llm.main.model} / background ${settings.llm.background.model} / settings ${settingsDigest(settings)}`,
+			`condition ${args.condition}${args.off ? " (off)" : ""} / main ${settings.llm.main.model} / background ${settings.llm.background.model} / settings ${digest}`,
 		),
 	);
 
-	const turns: { role: "user" | "assistant"; text: string }[] = [];
+	const logPath =
+		args.log.kind === "none"
+			? null
+			: args.log.kind === "path"
+				? args.log.path
+				: defaultLogPath(args.condition, new Date());
+	const log = createChatLog(logPath, Date.now, (message) =>
+		console.warn(`[warn] log write failed: ${message}`),
+	);
+	// Never log keys: only the condition, the settings digest and model ids.
+	log.write({
+		type: "session",
+		condition: args.condition,
+		runtimeCondition: condition,
+		selectWhenEmpty,
+		off: args.off,
+		settingsDigest: digest,
+		mainModel: settings.llm.main.model,
+		backgroundModel: settings.llm.background.model,
+		idleSec: args.idleSec,
+		maxUnanswered: args.maxUnanswered,
+	});
+	console.log(
+		dim(
+			`commands: /idle /state /off /on /quit | auto idle ${
+				args.idleSec > 0 && args.maxUnanswered > 0
+					? `${args.idleSec}s (retry ${args.idleSec * 2}s, ${args.idleSec * 4}s; max unanswered ${args.maxUnanswered})`
+					: "off"
+			} | log ${logPath ?? "off"}`,
+		),
+	);
+
+	const conversation = createConversation();
+	const planner = createIdlePlanner(
+		{ idleSec: args.idleSec, maxUnanswered: args.maxUnanswered },
+		Date.now(),
+	);
 	let counter = 0;
 	let opportunities = 0;
 	let generation = 0;
 	let background: AbortController | null = null;
 	let backgroundHalted = false;
+	let closed = false;
+	/** Lines read by readline but not handled yet (a pasted burst, input typed during a reply). */
+	let queuedLines = 0;
+	const chatAbort = new AbortController();
+	if (args.off) planner.setPaused(true, Date.now());
+
 	const rl = createInterface({ input: process.stdin, output: process.stdout });
 	rl.setPrompt("> ");
 
+	/** Print above the prompt and redraw whatever the user has typed so far. */
+	const out = (text: string) => {
+		if (closed) return;
+		printAbove(rl, process.stdout, text);
+	};
+	/** Nothing is logged once the session is closed. */
+	const record = (event: Record<string, unknown>) => {
+		if (!closed) log.write(event);
+	};
+	const say = (text: string) => out(`\n${text}`);
 	const printSpend = () =>
-		console.log(
+		out(
 			dim(
 				`  spend $${meter.spentUsd().toFixed(4)} / $${settings.spend.limitUsd}`,
 			),
@@ -117,8 +174,9 @@ async function main() {
 	};
 	const halt = (reason: string) => {
 		backgroundHalted = true;
+		planner.stop();
 		abortBackground();
-		console.log(`[停止] ${reason}`);
+		out(`[停止] ${reason}`);
 	};
 	/** The main reply failed on the spend limit (LlmCallError spend_limit). */
 	const haltOnSpendLimit = (error: unknown): boolean => {
@@ -138,26 +196,43 @@ async function main() {
 				call.code.startsWith("llm_call:") ||
 				call.code.startsWith("error:")
 			)
-				console.log(dim(`  [背景] ${call.purpose} ${call.code}`));
+				out(dim(`  [背景] ${call.purpose} ${call.code}`));
 		}
 		return halted;
 	};
-	const say = (text: string) => {
-		console.log(`\n${text}`);
-		rl.prompt(true);
-	};
 
-	const deliver = (ticket: ActionTicket) => {
+	/** Returns true when the AI actually said something. */
+	const deliver = (
+		ticket: ActionTicket,
+		trigger: Opportunity["trigger"],
+	): boolean => {
+		if (closed) return false;
 		if (ticket.action === "speak") {
-			say(`[自発] ${ticket.utterance ?? ""}`);
+			const text = ticket.utterance ?? "";
+			// The main model must know what it said, or the next reply contradicts it.
+			if (text !== "") conversation.addAssistant(text);
+			planner.proactiveSpoke(Date.now());
+			record({
+				type: "proactive",
+				trigger,
+				ticketId: ticket.id,
+				text,
+			});
+			say(`[自発] ${text}`);
 			runtime.recordResult({
 				ticketId: ticket.id,
 				status: "succeeded",
 				at: Date.now(),
-				resultText: ticket.utterance ?? "",
+				resultText: text,
 			});
-			return;
+			return true;
 		}
+		record({
+			type: "proactive_tool",
+			trigger,
+			ticketId: ticket.id,
+			toolName: ticket.toolName ?? null,
+		});
 		say(
 			`[自発:tool] ${ticket.toolName ?? "?"} ${ticket.toolInput ?? ""} (CLI のツールは fixture のみで実行しません)`,
 		);
@@ -167,119 +242,209 @@ async function main() {
 			at: Date.now(),
 			resultText: "no tool runtime in CLI",
 		});
+		return false;
+	};
+
+	const cycleBody = async (
+		trigger: Opportunity["trigger"],
+		update: boolean,
+		controller: AbortController,
+		mine: number,
+	): Promise<CycleOutcome> => {
+		if (update) {
+			const outcomes = await runtime.runBackground(
+				Date.now(),
+				controller.signal,
+			);
+			if (haltOnOutcomes(outcomes)) return "halted";
+		}
+		if (controller.signal.aborted) return "aborted";
+		// decide() itself interprets observations received before the opportunity, so an
+		// idle cycle needs no separate runBackground.
+		const { decision, calls } = await runtime.decide(
+			{
+				id: `o${++opportunities}`,
+				at: Date.now(),
+				trigger,
+				presence: "quiet",
+				foregroundBusy: false,
+				playerBusy: false,
+			},
+			controller.signal,
+		);
+		if (haltOnOutcomes(calls)) return "halted";
+		if (closed || mine !== generation || controller.signal.aborted)
+			return "aborted";
+		return decision.ticket && deliver(decision.ticket, trigger)
+			? "spoke"
+			: "silent";
 	};
 
 	/** Background update, then an opportunity. Superseded by any newer input. */
 	const runCycle = async (
 		trigger: Opportunity["trigger"],
 		update: boolean,
-	): Promise<void> => {
-		if (backgroundHalted) return;
+	): Promise<CycleOutcome> => {
+		if (closed || backgroundHalted) return "halted";
 		abortBackground();
 		const controller = new AbortController();
 		background = controller;
 		const mine = ++generation;
+		const spentBefore = meter.spentUsd();
+		planner.enter();
+		let outcome: CycleOutcome = "silent";
 		try {
-			if (update) {
-				const outcomes = await runtime.runBackground(
-					Date.now(),
-					controller.signal,
-				);
-				if (haltOnOutcomes(outcomes)) return;
-			}
-			if (controller.signal.aborted) return;
-			const { decision, calls } = await runtime.decide(
-				{
-					id: `o${++opportunities}`,
-					at: Date.now(),
-					trigger,
-					presence: "quiet",
-					foregroundBusy: false,
-					playerBusy: false,
-				},
-				controller.signal,
-			);
-			if (haltOnOutcomes(calls)) return;
-			if (mine !== generation || controller.signal.aborted) return;
-			if (decision.ticket) deliver(decision.ticket);
+			outcome = await cycleBody(trigger, update, controller, mine);
 		} catch (error) {
-			if (controller.signal.aborted) return;
-			console.log(
-				dim(
-					`  [背景エラー] ${error instanceof Error ? error.message : String(error)}`,
-				),
-			);
+			if (controller.signal.aborted) outcome = "aborted";
+			else
+				out(
+					dim(
+						`  [背景エラー] ${error instanceof Error ? error.message : String(error)}`,
+					),
+				);
 		} finally {
 			if (background === controller) background = null;
-			printSpend();
+			planner.leave(Date.now());
 		}
+		if (closed) return outcome;
+		if (outcome !== "aborted" && meter.spentUsd() !== spentBefore) printSpend();
+		scheduler.rearm();
+		return outcome;
 	};
+
+	const scheduler = createIdleScheduler({
+		planner,
+		now: Date.now,
+		setTimer: (fn, ms) => {
+			const handle = setTimeout(fn, ms);
+			handle.unref?.();
+			return handle;
+		},
+		clearTimer: (handle) =>
+			clearTimeout(handle as ReturnType<typeof setTimeout>),
+		run: () => runCycle("idle", false),
+		// Called after the planner has absorbed the outcome, so the status is the new one.
+		onCycle: (outcome) =>
+			record({ type: "idle_cycle", auto: true, outcome, ...planner.status() }),
+	});
+
+	// A submitted line supersedes any running background cycle immediately (even when it
+	// arrives in the same tick as a command, e.g. a paste). Commands do not interrupt it.
+	rl.on("line", (raw: string) => {
+		queuedLines++;
+		const line = raw.trim();
+		if (line !== "" && (!line.startsWith("/") || line === "/idle")) {
+			generation++;
+			abortBackground();
+		}
+	});
+	const shutdown = () => {
+		if (closed) return;
+		closed = true;
+		scheduler.dispose();
+		abortBackground();
+		chatAbort.abort();
+	};
+	// /quit, EOF and Ctrl-C all end in "close".
+	rl.on("close", shutdown);
 
 	const turn = async (text: string) => {
 		abortBackground();
 		generation++;
-		runtime.invalidate("input.changed", Date.now());
-		const n = ++counter;
-		runtime.observe({
-			id: `u${n}`,
-			kind: "exchange.adopted",
-			actor: "user",
-			occurredAt: Date.now(),
-			text,
-		});
-		turns.push({ role: "user", text });
+		planner.enter();
 		try {
-			const { text: reply } = await chat.reply(
-				mainSystem(runtime),
-				turns,
-				new AbortController().signal,
-			);
-			turns.push({ role: "assistant", text: reply });
-			console.log(reply);
+			runtime.invalidate("input.changed", Date.now());
+			planner.userTurn(Date.now());
+			scheduler.rearm();
+			const n = ++counter;
 			runtime.observe({
-				id: `r${n}`,
+				id: `u${n}`,
 				kind: "exchange.adopted",
-				actor: "agent",
+				actor: "user",
 				occurredAt: Date.now(),
-				text: reply,
+				text,
 			});
-			printSpend();
-			void runCycle("turn_end", true);
-		} catch (error) {
-			turns.pop();
-			if (!haltOnSpendLimit(error))
-				console.log(
-					`[エラー] ${error instanceof Error ? error.message : String(error)}`,
+			conversation.addUser(text);
+			record({ type: "user", text });
+			try {
+				const { text: reply } = await chat.reply(
+					mainSystem(runtime) + conversation.systemAddendum(),
+					conversation.messages(),
+					chatAbort.signal,
 				);
+				if (closed) return;
+				conversation.addAssistant(reply);
+				record({ type: "reply", text: reply });
+				out(reply);
+				runtime.observe({
+					id: `r${n}`,
+					kind: "exchange.adopted",
+					actor: "agent",
+					occurredAt: Date.now(),
+					text: reply,
+				});
+				printSpend();
+				// Another line is already waiting: it will supersede this cycle anyway.
+				if (queuedLines === 0) void runCycle("turn_end", true);
+			} catch (error) {
+				conversation.rollbackUser();
+				if (!closed && !haltOnSpendLimit(error))
+					out(
+						`[エラー] ${error instanceof Error ? error.message : String(error)}`,
+					);
+			}
+		} finally {
+			planner.leave(Date.now());
+			scheduler.rearm();
 		}
 	};
 
+	scheduler.rearm();
 	rl.prompt();
 	for await (const raw of rl) {
+		queuedLines = Math.max(0, queuedLines - 1);
 		const line = raw.trim();
 		if (line === "/quit") break;
 		if (line === "") {
-			rl.prompt();
+			rl.prompt(true);
 			continue;
 		}
 		if (line === "/idle") {
 			generation++;
-			await runCycle("idle", false);
-		} else if (line === "/state") console.log(describeState(runtime));
-		else if (line === "/off") {
+			const outcome = await runCycle("idle", false);
+			record({
+				type: "idle_cycle",
+				auto: false,
+				outcome,
+				...planner.status(),
+			});
+		} else if (line === "/state") {
+			const idle = planner.status();
+			console.log(
+				`${describeState(runtime)}\n  idle blockedBy=${idle.blockedBy ?? "-"} unanswered=${idle.unanswered} backoff=x${2 ** idle.level} next=${idle.nextIntervalSec}s`,
+			);
+		} else if (line === "/off") {
 			runtime.setEnabled(false);
+			planner.setPaused(true, Date.now());
 			abortBackground();
 			console.log(dim("  agency off"));
 		} else if (line === "/on") {
 			runtime.setEnabled(true);
+			planner.setPaused(false, Date.now());
+			scheduler.rearm();
 			console.log(dim("  agency on"));
 		} else if (line.startsWith("/")) console.log(`unknown command: ${line}`);
 		else await turn(line);
-		rl.prompt();
+		rl.prompt(true);
 	}
-	abortBackground();
+	shutdown();
 	rl.close();
-	printSpend();
+	console.log(
+		dim(
+			`  spend $${meter.spentUsd().toFixed(4)} / $${settings.spend.limitUsd}`,
+		),
+	);
 }
 
 await main();
