@@ -42,6 +42,22 @@ export interface RuntimeDeps {
 	 * instead of the host_no_candidates gate. Ignored for other conditions.
 	 */
 	readonly selectWhenEmpty?: boolean;
+	/**
+	 * Host delivery style for utterances (e.g. spoken via TTS), appended to the select
+	 * instructions. Absent in eval, so the evaluated prompts are unchanged.
+	 */
+	readonly utteranceStyle?: string;
+	/**
+	 * Host-configured standing interests of the agent's persona (e.g. a favourite
+	 * character). Shown to select with stable ids (`interest:<id>`) that count as known
+	 * evidence refs. Absent in eval.
+	 */
+	readonly standingInterests?: readonly StandingInterest[];
+}
+
+export interface StandingInterest {
+	readonly id: string;
+	readonly text: string;
 }
 
 /** Recent observations shown to update/select (and to eval condition D). */

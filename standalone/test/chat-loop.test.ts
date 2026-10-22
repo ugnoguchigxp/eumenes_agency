@@ -14,7 +14,15 @@ import {
 	parseCliArgs,
 	printAbove,
 	resolveCondition,
+	ttsReplyStyle,
+	ttsUtteranceStyle,
 } from "../chat-loop.ts";
+import {
+	defaultInterestText,
+	maxInterestChars,
+	personaPrompt,
+	toStandingInterests,
+} from "../persona.ts";
 
 describe("parseCliArgs / resolveCondition", () => {
 	test("defaults: B1a, idle 40s, one unanswered, default log", () => {
@@ -24,6 +32,8 @@ describe("parseCliArgs / resolveCondition", () => {
 			idleSec: 40,
 			maxUnanswered: 1,
 			log: { kind: "default" },
+			tts: true,
+			interests: [defaultInterestText],
 		});
 	});
 
@@ -47,6 +57,31 @@ describe("parseCliArgs / resolveCondition", () => {
 			log: { kind: "path", path: "x.jsonl" },
 		});
 		expect(parseCliArgs(["--no-log"]).log).toEqual({ kind: "none" });
+	});
+
+	test("--tts / --no-tts (default on, last one wins)", () => {
+		expect(parseCliArgs([]).tts).toBe(true);
+		expect(parseCliArgs(["--tts"]).tts).toBe(true);
+		expect(parseCliArgs(["--no-tts"]).tts).toBe(false);
+		expect(parseCliArgs(["--no-tts", "--tts"]).tts).toBe(true);
+		expect(parseCliArgs(["--tts", "--no-tts"]).tts).toBe(false);
+	});
+
+	test("--interest (repeatable) / --no-interest; default is the My Melody interest", () => {
+		expect(parseCliArgs([]).interests).toEqual([defaultInterestText]);
+		expect(defaultInterestText).toContain("マイメロディ");
+		expect(
+			parseCliArgs(["--interest", "猫が好き", "--interest", " 紅茶 "])
+				.interests,
+		).toEqual(["猫が好き", "紅茶"]);
+		expect(parseCliArgs(["--no-interest"]).interests).toEqual([]);
+		expect(() => parseCliArgs(["--interest"])).toThrow();
+		expect(() => parseCliArgs(["--interest", "--off"])).toThrow();
+		expect(() => parseCliArgs(["--interest", " "])).toThrow();
+		expect(() =>
+			parseCliArgs(["--interest", "あ".repeat(maxInterestChars + 1)]),
+		).toThrow();
+		expect(() => parseCliArgs(["--interest", "猫", "--no-interest"])).toThrow();
 	});
 
 	test("rejects bad input", () => {
@@ -471,5 +506,30 @@ describe("printAbove", () => {
 		printAbove(rl, stdout as never, "x");
 		expect(writes).toEqual(["x\n"]);
 		expect(calls).toHaveLength(1);
+	});
+});
+
+describe("tts styles", () => {
+	test("spoken-style rules are present", () => {
+		for (const style of [ttsReplyStyle, ttsUtteranceStyle]) {
+			expect(style).toContain("話し言葉");
+			expect(style).toContain("Markdown");
+			expect(style).toContain("URL");
+		}
+		expect(ttsUtteranceStyle).toContain("1〜2文");
+	});
+});
+
+describe("persona", () => {
+	test("interest ids are stable and the prompt is empty without interests", () => {
+		expect(toStandingInterests(["a", "b"])).toEqual([
+			{ id: "i1", text: "a" },
+			{ id: "i2", text: "b" },
+		]);
+		expect(personaPrompt([])).toBe("");
+		const prompt = personaPrompt([defaultInterestText]);
+		expect(prompt).toContain(defaultInterestText);
+		expect(prompt).toContain("聞かれたら");
+		expect(prompt).toContain("寄せたり");
 	});
 });

@@ -13,6 +13,7 @@ import {
 	defaultBudget,
 	RECENT_OBSERVATION_WINDOW,
 	type ActionTicket,
+	type StandingInterest,
 	type AgencyRuntime,
 	type CallOutcome,
 	type Decision,
@@ -53,6 +54,7 @@ import { buildProjection } from "./projection.ts";
 import {
 	selectEvidenceIds,
 	selectPrompt,
+	interestRef,
 	systemPrompt,
 	updatePrompt,
 } from "./prompts.ts";
@@ -278,9 +280,17 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		const pool: readonly Candidate[] =
 			condition === "B1" ? [] : presentableCandidates(state);
 		const items = condition === "B1" ? state.notes.length : pool.length;
+		// Standing interests are presented to B1 only: B2/F speak needs a candidate, so
+		// interest talk is unsupported there (ignored: no prompt, no gate, no known refs).
+		const interests: readonly StandingInterest[] =
+			condition === "B1"
+				? (deps.standingInterests ?? []).filter(
+						(x) => x.id !== "" && x.text.trim() !== "",
+					)
+				: [];
 		// B1a (eval ablation): with no notes, still let select speak from the observations.
 		const selectEmpty = condition === "B1" && deps.selectWhenEmpty === true;
-		if (items === 0 && !selectEmpty)
+		if (items === 0 && !selectEmpty && interests.length === 0)
 			return done(
 				hostDecision(opp.id, "host_no_candidates", "nothing to offer"),
 			);
@@ -298,7 +308,10 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			{
 				purpose: "select",
 				at: opp.at,
-				system: systemPrompt("select", condition),
+				system: systemPrompt("select", condition, {
+					utteranceStyle: deps.utteranceStyle,
+					interests: interests.length > 0,
+				}),
 				prompt: selectPrompt({
 					condition,
 					now: opp.at,
@@ -308,6 +321,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					state,
 					candidates: pool,
 					delivered: delivered(),
+					...(interests.length > 0 ? { interests } : {}),
 					tools,
 					limits,
 					minutesSinceUserInput: minutesSinceUserInput(opp.at),
@@ -341,6 +355,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			presentedObservations: new Set([
 				...presented.map((o) => o.id),
 				...shownEvidence,
+				...interests.map((x) => interestRef(x.id)),
 			]),
 			presentedCandidates: new Map(pool.map((c) => [c.id, c.revision])),
 			tools,

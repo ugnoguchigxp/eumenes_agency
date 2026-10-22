@@ -6,6 +6,7 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { clearScreenDown, cursorTo, moveCursor } from "node:readline";
 import { type Condition, conditions } from "../src/contracts/index.ts";
+import { defaultInterestText, maxInterestChars } from "./persona.ts";
 
 // ---------------------------------------------------------------- arguments
 
@@ -36,6 +37,10 @@ export interface CliArgs {
 	readonly idleSec: number;
 	readonly maxUnanswered: number;
 	readonly log: LogChoice;
+	/** Spoken-style (TTS) replies and proactive utterances. Default on. */
+	readonly tts: boolean;
+	/** Persona interest texts (default: one; empty with --no-interest). */
+	readonly interests: readonly string[];
 }
 
 /** Upper bound for --idle-sec (one day) so interval doubling stays inside timer range. */
@@ -61,15 +66,36 @@ const nonNegative = (
 	return value;
 };
 
+/** Spoken-style rules for the main reply (--tts). */
+export const ttsReplyStyle =
+	"音声で読み上げられるので、話し言葉で答えてください。ふつうは1〜3文、長くても100字程度にします。箇条書き、見出し、Markdown、記号の装飾、絵文字、URL、コードは使わないでください。括弧書きや「/」での併記も避けてください。数字や英字、略語は、読み上げて自然に聞こえる形で書いてください。質問は一度に一つまでにしてください。";
+
+/** Same essence for proactive utterances (select instructions, --tts). */
+export const ttsUtteranceStyle =
+	"音声で読み上げられる。話し言葉で、1〜2文、長くても100字程度にする。箇条書き、見出し、Markdown、記号の装飾、絵文字、URL、コードは使わない。括弧書きや「/」での併記を避ける。数字や英字、略語は読み上げて自然な形にする。質問は一度に一つまで。";
+
 export function parseCliArgs(argv: readonly string[]): CliArgs {
 	let condition: CliCondition = defaultCliCondition;
 	let off = false;
 	let idleSec = defaultIdleSec;
 	let maxUnanswered = defaultMaxUnanswered;
 	let log: LogChoice = { kind: "default" };
+	let tts = true;
+	const interests: string[] = [];
+	let noInterest = false;
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i];
 		if (arg === "--off") off = true;
+		else if (arg === "--no-interest") noInterest = true;
+		else if (arg === "--interest") {
+			const value = argv[++i]?.trim();
+			if (!value || value.startsWith("--") || value.length > maxInterestChars)
+				throw new Error(
+					`usage: --interest "<text>" (1-${maxInterestChars} chars, repeatable)`,
+				);
+			interests.push(value);
+		} else if (arg === "--tts") tts = true;
+		else if (arg === "--no-tts") tts = false;
 		else if (arg === "--condition") {
 			const value = argv[++i];
 			const found = cliConditions.find((c) => c === value);
@@ -88,7 +114,21 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 			log = { kind: "path", path };
 		} else throw new Error(`unknown_argument:${arg}`);
 	}
-	return { condition, off, idleSec, maxUnanswered, log };
+	if (noInterest && interests.length > 0)
+		throw new Error("usage: --interest and --no-interest are exclusive");
+	return {
+		condition,
+		off,
+		idleSec,
+		maxUnanswered,
+		log,
+		tts,
+		interests: noInterest
+			? []
+			: interests.length > 0
+				? interests
+				: [defaultInterestText],
+	};
 }
 
 // ------------------------------------------------------------ conversation

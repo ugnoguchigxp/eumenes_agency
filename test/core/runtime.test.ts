@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { INSTRUCTION_VERSION } from "../../src/application/prompts.ts";
+import {
+	INSTRUCTION_VERSION,
+	systemPrompt,
+} from "../../src/application/prompts.ts";
 import { createAgencyRuntime } from "../../src/application/runtime.ts";
 import {
 	LlmCallError,
@@ -856,6 +859,142 @@ describe("prompts", () => {
 		expect(select?.system).not.toBe(first?.system);
 		expect(select?.prompt).toContain("[c2 r1]");
 		expect(select?.prompt).toContain("trigger=turn_end");
+	});
+
+	test("utteranceStyle adds one line to the select system prompt only; absent is identical", async () => {
+		const style = "音声で読み上げる。1〜2文で話す。";
+		const run = async (c: Condition, utteranceStyle?: string) => {
+			const llm = fakeLlm();
+			const rt = createAgencyRuntime({
+				condition: c,
+				llm,
+				tools,
+				budget: { ...defaultBudget, minIntervalMs: 0 },
+				limits: { ...defaultLimits, outboundIntervalMs: 0 },
+				...(c === "B1" ? { selectWhenEmpty: true } : {}),
+				...(utteranceStyle === undefined ? {} : { utteranceStyle }),
+			});
+			if (c === "B1") {
+				rt.observe(user("o1", 0, "音声Aと音声Bの比較が未解決のまま"));
+				llm.push("update", b1Proposal());
+				llm.push("select", participation());
+				await rt.decide(opportunity("op0", 10 * MIN), sig());
+			} else await seed({ llm, rt });
+			return {
+				update: llm.requests.find((r) => r.purpose === "update")?.system ?? "",
+				select: llm.requests.find((r) => r.purpose === "select")?.system ?? "",
+			};
+		};
+		for (const c of ["B1", "B2", "F"] as const) {
+			const without = await run(c);
+			const withStyle = await run(c, style);
+			expect(without.select).toBe(systemPrompt("select", c));
+			expect(without.select).not.toContain(style);
+			expect(withStyle.select).toBe(
+				`${without.select}\n- 発話の配信形式: ${style}`,
+			);
+			expect(withStyle.update).toBe(without.update);
+		}
+	});
+
+	describe("standing interests", () => {
+		const interests = [{ id: "i1", text: "マイメロディが好き。" }];
+		const run = async (
+			c: Condition,
+			standingInterests?: readonly { id: string; text: string }[],
+			select: ReturnType<typeof participation> = participation(),
+			selectWhenEmpty = false,
+		) => {
+			const llm = fakeLlm();
+			const rt = createAgencyRuntime({
+				condition: c,
+				llm,
+				tools,
+				budget: { ...defaultBudget, minIntervalMs: 0 },
+				limits: { ...defaultLimits, outboundIntervalMs: 0 },
+				...(selectWhenEmpty ? { selectWhenEmpty } : {}),
+				...(standingInterests ? { standingInterests } : {}),
+			});
+			rt.observe(user("o1", 0, "ひと段落しました"));
+			llm.push("update", c === "B1" ? b1Proposal() : proposal());
+			llm.push("select", select);
+			const d = await rt.decide(opportunity("op0", 10 * MIN), sig());
+			return { llm, d };
+		};
+		const selectReq = (llm: ReturnType<typeof fakeLlm>) =>
+			llm.requests.find((r) => r.purpose === "select");
+		const speakInterest = (refs: string[]) =>
+			participation({
+				action: "speak",
+				utterance: "マイメロディ、好きなんです。",
+				evidenceRefs: refs,
+			});
+
+		test("without interests, the B1 gate blocks select as before", async () => {
+			const { llm, d } = await run("B1");
+			expect(d.decision.source).toBe("host_no_candidates");
+			expect(llm.count("select")).toBe(0);
+		});
+
+		test("with interests, B1 calls select and shows them with the rule", async () => {
+			const { llm, d } = await run("B1", interests);
+			expect(llm.count("select")).toBe(1);
+			expect(d.decision.source).toBe("llm");
+			const req = selectReq(llm);
+			expect(req?.prompt).toContain(
+				"# あなた自身の関心（設定。ユーザーの依頼ではない）\n[interest:i1] マイメロディが好き。",
+			);
+			expect(req?.system).toContain("【自分の関心】");
+		});
+
+		test("speaking about a presented interest is accepted", async () => {
+			const { d } = await run("B1", interests, speakInterest(["interest:i1"]));
+			expect(d.decision.action).toBe("speak");
+			expect(d.decision.ticket?.utterance).toBe("マイメロディ、好きなんです。");
+		});
+
+		test("an interest that was not presented is an unknown ref", async () => {
+			const bogus = await run("B1", interests, speakInterest(["interest:i9"]));
+			expect(bogus.d.decision.action).toBe("wait");
+			expect(bogus.d.decision.rejectCodes).toContain("unknown_ref");
+			// No interests configured: the gate stops before select, nothing is accepted.
+			const none = await run("B1", undefined, speakInterest(["interest:i1"]));
+			expect(none.d.decision.action).toBe("wait");
+		});
+
+		test("no interests (or empty) leaves the select prompts byte-identical", async () => {
+			const base = await run("B1", undefined, speakInterest(["o1"]), true);
+			const empty = await run("B1", [], speakInterest(["o1"]), true);
+			expect(selectReq(empty.llm)).toEqual(selectReq(base.llm));
+			expect(selectReq(base.llm)?.system).toBe(systemPrompt("select", "B1"));
+			expect(selectReq(base.llm)?.prompt).not.toContain("あなた自身の関心");
+			expect(base.d.decision.action).toBe("speak");
+		});
+
+		test("B2/F ignore interests: no prompt change, no gate change, no crash", async () => {
+			for (const c of ["B2", "F"] as const) {
+				const { llm, d } = await run(c, interests);
+				// no candidates: the host gate still applies
+				expect(d.decision.source).toBe("host_no_candidates");
+				expect(llm.count("select")).toBe(0);
+				expect(systemPrompt("select", c)).not.toContain("【自分の関心】");
+			}
+			// With a candidate, select runs without the section and the ref is not accepted.
+			const llm = fakeLlm();
+			const rt = createAgencyRuntime({
+				condition: "B2",
+				llm,
+				tools,
+				budget: { ...defaultBudget, minIntervalMs: 0 },
+				limits: { ...defaultLimits, outboundIntervalMs: 0 },
+				standingInterests: interests,
+			});
+			const m = { llm, rt };
+			await seed(m);
+			const req = llm.requests.find((r) => r.purpose === "select");
+			expect(req?.prompt).not.toContain("あなた自身の関心");
+			expect(req?.system).not.toContain("【自分の関心】");
+		});
 	});
 
 	test("prompt separates system by purpose and condition", async () => {
