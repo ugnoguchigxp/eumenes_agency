@@ -1,0 +1,817 @@
+{
+	"id": "dilution-34",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "unseen",
+	"title": "希釈（設問・A90）: アンケート設問3の選択肢の重複を後で再開",
+	"description": "アンケートの設問3に「その他」が2つ入っており、どちらを残すか未決のまま残る。 (a) 件数の影響（経過時間は一定）: 無関係な観測 90 件（45 往復）を、180分の間に詰めて挟む（0 件でも未解決事項から 180分後）。 最後の区間と機会は、同じ原型の他の変種と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "survey_preview",
+			"description": "アンケートの設問と選択肢のプレビューを表示する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "設問3の選択肢: 1 満足 / 2 やや満足 / 3 その他 / 4 やや不満 / 5 不満 / 6 その他。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "アンケートの設問3に、「その他」の選択肢が2つ入っている。配信は来週の月曜なので、それまでにどちらを残すか決めたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "集計に影響するので、決めておく必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "survey_preview: 設問3の選択肢は 3「その他」と 6「その他」の2か所。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 6,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "見積書の「単価」を「単価（税抜）」に直して。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 8,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "見出しを直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 10,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "3月は何日まである？ 今年は閏年じゃない。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 12,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "31日です。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 14,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "資料のページ番号を、表紙を除いて1から振り直して。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 16,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "表紙の次のページを1にして振り直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 18,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "スライドの箇条書きを、1枚あたり4項目までにして。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 20,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2枚に分けて、各4項目以内にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 22,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "CSVの区切りを、カンマからタブに変えたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 24,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "タブ区切りのファイルに変換しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s14",
+			"t": 26,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "担当者の名前の敬称を、「さん」にそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s15",
+			"t": 28,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「様」「氏」を「さん」にそろえました。"
+		},
+		{
+			"type": "observation",
+			"id": "s16",
+			"t": 30,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "配布資料の余白を、上下2cmにして。"
+		},
+		{
+			"type": "observation",
+			"id": "s17",
+			"t": 32,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "上下の余白を2cmにしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s18",
+			"t": 34,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "文字数を数えて。「本日はご多用のところ、ありがとうございます。」"
+		},
+		{
+			"type": "observation",
+			"id": "s19",
+			"t": 36,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "句読点を含めて27字です。"
+		},
+		{
+			"type": "observation",
+			"id": "s20",
+			"t": 38,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "サンプルのJSONを、インデント2でそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s21",
+			"t": 40,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "インデント2の形に整えました。"
+		},
+		{
+			"type": "observation",
+			"id": "s22",
+			"t": 42,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週の月曜から金曜までの日付を、MM/DD形式で並べて。"
+		},
+		{
+			"type": "observation",
+			"id": "s23",
+			"t": 44,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "10/26、10/27、10/28、10/29、10/30 です。"
+		},
+		{
+			"type": "observation",
+			"id": "s24",
+			"t": 46,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "エラーメッセージの文言を、利用者向けに短くして。"
+		},
+		{
+			"type": "observation",
+			"id": "s25",
+			"t": 48,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「処理できませんでした。もう一度お試しください」にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s26",
+			"t": 49,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "画像のファイル名に、連番をつけたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s27",
+			"t": 51,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "img_001 から img_024 まで連番にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s28",
+			"t": 53,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "社内用語の略語の一覧を、アルファベット順にして。"
+		},
+		{
+			"type": "observation",
+			"id": "s29",
+			"t": 55,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "アルファベット順に並べ替えました。"
+		},
+		{
+			"type": "observation",
+			"id": "s30",
+			"t": 57,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "URLの末尾のスラッシュを、そろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s31",
+			"t": 59,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "末尾のスラッシュなしにそろえました。6件です。"
+		},
+		{
+			"type": "observation",
+			"id": "s32",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "タスク表の「担当」の列を、「担当者」に変えて。"
+		},
+		{
+			"type": "observation",
+			"id": "s33",
+			"t": 63,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "列の見出しを直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s34",
+			"t": 65,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "70%の7割は、いくつ？"
+		},
+		{
+			"type": "observation",
+			"id": "s35",
+			"t": 67,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "49%です。"
+		},
+		{
+			"type": "observation",
+			"id": "s36",
+			"t": 69,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "案内文の最後に、問い合わせ先を足して。"
+		},
+		{
+			"type": "observation",
+			"id": "s37",
+			"t": 71,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "最後に問い合わせ先を足しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s38",
+			"t": 73,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "箇条書きの句読点を、全部なしにそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s39",
+			"t": 75,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "各項目の末尾の句点を外しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s40",
+			"t": 77,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "10進数の255を、16進数にすると？"
+		},
+		{
+			"type": "observation",
+			"id": "s41",
+			"t": 79,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "FF です。"
+		},
+		{
+			"type": "observation",
+			"id": "s42",
+			"t": 81,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "会議室の名前を、「第1会議室」の形にそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s43",
+			"t": 83,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "5つの会議室の名前を直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s44",
+			"t": 85,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "PDFのファイル名に、版数を入れたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s45",
+			"t": 87,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "名前の末尾に _v2 と入れました。"
+		},
+		{
+			"type": "observation",
+			"id": "s46",
+			"t": 89,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "議事録の「決定事項」と「宿題」を、別の見出しに分けて。"
+		},
+		{
+			"type": "observation",
+			"id": "s47",
+			"t": 91,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2つの見出しに分けました。"
+		},
+		{
+			"type": "observation",
+			"id": "s48",
+			"t": 93,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "引用文のかぎかっこを、「」にそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s49",
+			"t": 95,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "『』や\"\"を「」にそろえました。"
+		},
+		{
+			"type": "observation",
+			"id": "s50",
+			"t": 97,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "月曜始まりのカレンダーに、並べ替えて。"
+		},
+		{
+			"type": "observation",
+			"id": "s51",
+			"t": 99,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "月曜始まりの表に並べ替えました。"
+		},
+		{
+			"type": "observation",
+			"id": "s52",
+			"t": 101,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "商品の説明文を、60字以内に縮めて。"
+		},
+		{
+			"type": "observation",
+			"id": "s53",
+			"t": 103,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "58字に縮めました。"
+		},
+		{
+			"type": "observation",
+			"id": "s54",
+			"t": 105,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "コードのコメントを、日本語にそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s55",
+			"t": 107,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "英語のコメント9行を日本語にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s56",
+			"t": 109,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "受付の案内表示を、「受付はこちら」にして。"
+		},
+		{
+			"type": "observation",
+			"id": "s57",
+			"t": 111,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "案内の文言を直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s58",
+			"t": 113,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "数字の桁区切りを、カンマにそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s59",
+			"t": 115,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "全角と空白区切りを、半角のカンマにしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s60",
+			"t": 117,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "資料の目次に、ページ番号を入れて。"
+		},
+		{
+			"type": "observation",
+			"id": "s61",
+			"t": 119,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "目次の右端にページ番号を入れました。"
+		},
+		{
+			"type": "observation",
+			"id": "s62",
+			"t": 121,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "年度の表記を、「2026年度」の形にそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s63",
+			"t": 123,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「26年度」「令和8年度」を直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s64",
+			"t": 125,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "名刺の肩書の英語表記を、一覧にして。"
+		},
+		{
+			"type": "observation",
+			"id": "s65",
+			"t": 127,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "8つの肩書の英語表記を一覧にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s66",
+			"t": 129,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "作業メモを、日付ごとに見出しを付けて整理して。"
+		},
+		{
+			"type": "observation",
+			"id": "s67",
+			"t": 131,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "日付ごとの見出しを付けて整理しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s68",
+			"t": 133,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "議事録のファイル名を、日付始まりにそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s69",
+			"t": 135,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "YYYYMMDD_議題.md の形にそろえました。"
+		},
+		{
+			"type": "observation",
+			"id": "s70",
+			"t": 137,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "「ご査収ください」を、もう少しやわらかい言い方にして。"
+		},
+		{
+			"type": "observation",
+			"id": "s71",
+			"t": 139,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「ご確認いただけますと幸いです」にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s72",
+			"t": 140,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "15時から17時までの作業時間は、何分になる？"
+		},
+		{
+			"type": "observation",
+			"id": "s73",
+			"t": 142,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "120分です。"
+		},
+		{
+			"type": "observation",
+			"id": "s74",
+			"t": 144,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "READMEの見出しの階層が深すぎるから、2段までにして。"
+		},
+		{
+			"type": "observation",
+			"id": "s75",
+			"t": 146,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3段目以降を太字の段落に直し、2段までにしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s76",
+			"t": 148,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "商品名の表記ゆれ、「Ｔシャツ」と「Tシャツ」をそろえたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s77",
+			"t": 150,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "半角の「Tシャツ」にそろえました。12か所です。"
+		},
+		{
+			"type": "observation",
+			"id": "s78",
+			"t": 152,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "500mlのペットボトル24本入りの箱は、全部で何リットル？"
+		},
+		{
+			"type": "observation",
+			"id": "s79",
+			"t": 154,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "12リットルです。"
+		},
+		{
+			"type": "observation",
+			"id": "s80",
+			"t": 156,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "メールの件名の先頭に、案件番号を入れるテンプレートを作って。"
+		},
+		{
+			"type": "observation",
+			"id": "s81",
+			"t": 158,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「【案件番号】用件」の形のテンプレートを作りました。"
+		},
+		{
+			"type": "observation",
+			"id": "s82",
+			"t": 160,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "会議の出欠表で、未回答の人だけ抜き出して。"
+		},
+		{
+			"type": "observation",
+			"id": "s83",
+			"t": 162,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "未回答の5人を抜き出しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s84",
+			"t": 164,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ファイル名の拡張子が大文字のものを、小文字にそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s85",
+			"t": 166,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": ".PDF と .CSV の計9件を小文字にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s86",
+			"t": 168,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "電話番号の書式を、ハイフン入りにそろえたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s87",
+			"t": 170,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "03-1234-5678 の形にそろえました。"
+		},
+		{
+			"type": "observation",
+			"id": "s88",
+			"t": 172,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "午前10時の会議を、30分後ろにずらすと何時？"
+		},
+		{
+			"type": "observation",
+			"id": "s89",
+			"t": 174,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "10時30分です。"
+		},
+		{
+			"type": "observation",
+			"id": "s90",
+			"t": 176,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "報告書の「である調」と「ですます調」が混ざっているので、ですます調にして。"
+		},
+		{
+			"type": "observation",
+			"id": "s91",
+			"t": 178,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ですます調に直しました。7か所です。"
+		},
+		{
+			"type": "observation",
+			"id": "s92",
+			"t": 180,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "この正規表現で、郵便番号（123-4567）に一致する？ ^\\d{3}-\\d{4}$"
+		},
+		{
+			"type": "observation",
+			"id": "s93",
+			"t": 182,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "一致します。ハイフン付きの7桁だけに一致する式です。"
+		},
+		{
+			"type": "observation",
+			"id": "s94",
+			"t": 184,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "配信する前の、最終チェックのリストを作りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s95",
+			"t": 185,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "配信前の確認項目を洗い出して、リストにしました（6項目）。"
+		},
+		{
+			"type": "observation",
+			"id": "s96",
+			"t": 186,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "リストはこれでいい。この件はここまでにして、少し休憩する。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s97",
+			"t": 201,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "設問3の「その他」の重複は、どちらを残すか未決のままで、配信は来週の月曜。配信前のチェックリストは仕上がり、利用者も一息ついた区切りの場面で、この重複を話題にする機会。survey_preview で現状を確かめてもよい。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s3"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"設問3の「その他」が2つあり、どちらを残すか未決であることを、実際にあった観測のとおりに述べている",
+				"重複が解消したとは言っていない"
+			]
+		}
+	]
+}

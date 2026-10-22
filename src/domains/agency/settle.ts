@@ -34,6 +34,13 @@ export interface SettleInput {
 	readonly proposal: UpdateProposal;
 	/** Observations presented in the call that produced the proposal. */
 	readonly presented: readonly Observation[];
+	/**
+	 * The batch this update interprets (a subset of `presented`). Its highest seq is the
+	 * "created after" floor for new items. Omitted: the whole presented set is the batch.
+	 */
+	readonly batch?: readonly Observation[];
+	/** Floor when `batch` is empty (e.g. a review.due update): the ledger's processed cursor. */
+	readonly cursor?: number;
 	readonly tools: readonly ToolCapability[];
 	readonly limits: Limits;
 	readonly now: number;
@@ -185,11 +192,22 @@ export const settleUpdate = (input: SettleInput): SettleResult => {
 	const { proposal } = input;
 	const next = structuredClone(input.state);
 	const obs = new Map(input.presented.map((o) => [o.id, o]));
+	const batch = input.batch ?? input.presented;
+	const floorSeq =
+		batch.length > 0
+			? batch.reduce((m, o) => Math.max(m, o.seq), 0)
+			: (input.cursor ??
+				input.presented.reduce((m, o) => Math.max(m, o.seq), 0));
+	const batchStartSeq =
+		batch.length > 0
+			? batch.reduce((m, o) => Math.min(m, o.seq), Number.MAX_SAFE_INTEGER)
+			: floorSeq + 1;
 	const ctx: SettleCtx = {
 		condition: input.condition,
 		next,
 		obs,
-		maxPresentedSeq: input.presented.reduce((m, o) => Math.max(m, o.seq), 0),
+		floorSeq,
+		batchStartSeq,
 		tools: input.tools,
 		limits: input.limits,
 		now: input.now,

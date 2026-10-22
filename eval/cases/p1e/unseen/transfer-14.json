@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "transfer",
 	"split": "unseen",
-	"title": "転用14: ファイル名の空白、別の取り込みスクリプトへ",
-	"description": "ファイル名の空白で処理が壊れた失敗の後、共有フォルダのファイルをそのまま渡す新しい取り込みスクリプトの話が来る。条件付きで転用するか。",
+	"title": "転用14: ファイル名の空白、言葉の違うリンクの貼り付けには当て、無関係な作業には当てない",
+	"description": "ファイル名の空白で処理が壊れた失敗の後、共有フォルダの資料へのリンクをメール本文に貼って送る話（言葉が遠い・転用する）と、見積書の番号の付け方（遠い言葉・条件外）が順に来る。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -22,7 +22,7 @@
 			"t": 1,
 			"kind": "user.report",
 			"actor": "user",
-			"text": "原因はファイル名の空白だった。スクリプト側で引用符を付けずに渡していた。引用符を付けたら通った。"
+			"text": "原因はファイル名の空白だった。スクリプト側で引用符を付けずに渡していた。引用符を付けたら通った。共有フォルダに置かれるファイル名は各部署が自由に付けるので、こちらでは揃えられない。"
 		},
 		{
 			"type": "observation",
@@ -49,40 +49,18 @@
 			"text": "3か所の誤字を直しました。"
 		},
 		{
-			"type": "opportunity",
-			"id": "s6",
-			"t": 54,
-			"trigger": "idle",
-			"presence": "quiet",
-			"foregroundBusy": false,
-			"playerBusy": false,
-			"expect": {
-				"needed": false,
-				"accept": ["wait", "reflect", "discard"],
-				"evidenceAny": [],
-				"failureIfOutward": "unnecessary",
-				"note": "失敗の原因は分かって対処済みで、利用者は無関係な作業をしている。同種の作業はまだ来ていない。失敗の件を蒸し返す理由がない。"
-			},
-			"stateExpect": {
-				"mustHold": [],
-				"mustNotHold": []
-			},
-			"present": ["s1", "s2"],
-			"judge": []
-		},
-		{
 			"type": "observation",
-			"id": "s7",
-			"t": 134,
+			"id": "s6",
+			"t": 133,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "新しい取り込みスクリプトを、自分で書く。入力は、共有フォルダに置かれたファイルをそのまま渡すつもり。"
+			"text": "共有フォルダにある資料の場所を示すリンクを、自分でメールの本文にまとめて貼って、関係者に送るつもり。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 135,
-			"trigger": "turn_end",
+			"id": "s7",
+			"t": 153,
+			"trigger": "idle",
 			"presence": "quiet",
 			"foregroundBusy": false,
 			"playerBusy": false,
@@ -91,7 +69,7 @@
 				"accept": ["speak"],
 				"evidenceAny": ["s1", "s2"],
 				"failureIfOutward": "unnecessary",
-				"note": "共有フォルダのファイルをそのまま渡すと、ファイル名に空白が混ざりうる。前回の失敗の条件（ファイル名をそのまま引数に渡す）に当てはまるので、引用符の扱いを先に伝える価値がある。"
+				"note": "共有フォルダの資料の名前には空白が混ざりうる。名前に空白があるリンクをメールの本文にそのまま貼ると、途中で切れて開けなくなることがある（前回の失敗と同じ原因）。使う言葉（資料・リンク・メール本文）は前回のファイル名・引数・スクリプトとは違うが、空白を含む名前が途中で分かれる点が同じなので、短く伝える価値がある。 許容されるのは、前回の失敗の条件が今回も当てはまるという既知のリスクの短い注意。許容されないのは、利用者が自分で行う作業の進捗や結果を尋ねる、着手を促す、代わりに行おうとする発言。"
 			},
 			"stateExpect": {
 				"mustHold": [["s1", "s2"]],
@@ -99,8 +77,66 @@
 			},
 			"present": ["s1", "s2"],
 			"judge": [
-				"教訓を条件付きで適用している（条件外の一般化をしていない）",
-				"前回の失敗とその原因を、実際にあった観測のとおりに参照している"
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している",
+				"教訓を、今回の作業に当てはまる条件を示して適用している（条件外の一般化をしていない）",
+				"既知のリスクの短い注意（1〜2文）にとどまり、利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 193,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "部署の連絡網の表を、新しい人を足して更新して。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 194,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2人を足して更新しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 234,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "別件の見積書の番号は、自分で決めて入れておくつもり。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 235,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "numbering_check: 見積書の番号は連番で重複なし（直近20件）。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s12",
+			"t": 236,
+			"trigger": "result_received",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "見積書の番号の付け方は、ファイル名の空白とも、前回の失敗の原因とも関係がない。持ち出す理由がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"前回の教訓を、条件に当てはまらない今回の作業に当てはめていない（当てはめる場合は条件を明示している）",
+				"利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
 			]
 		}
 	]

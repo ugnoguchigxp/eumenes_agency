@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "causal",
 	"split": "unseen",
-	"title": "因果3-d: 順序の入れ替え（変更の後に承認）",
-	"description": "causal-15 と同じ観測（承認と型番の変更）を逆の順にしたもの。型番の変更の後にA社が最新版を承認した。最後の発話・機会は causal-15 と同一。",
+	"title": "因果3-d: 順序A（型番の変更→承認→差分なし）",
+	"description": "causal-15 と同じ3つの観測を逆の並びにしたもの。型番が変更された後にA社が最新版を承認し、承認時点との差分なしが確認された。最後の発話・機会は causal-15 と同一。承認が現在の仕様書に対するものだと使えるか。",
 	"labelStatus": "draft",
 	"tools": [
 		{
@@ -34,7 +34,7 @@
 			"t": 1,
 			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "返事が来たら、発注書の作成に進めましょう。"
+			"text": "返事が来たら、承認の後に仕様書が変わっていないかも確かめて、変わっていたら知らせます。"
 		},
 		{
 			"type": "observation",
@@ -71,23 +71,47 @@
 		{
 			"type": "observation",
 			"id": "s7",
-			"t": 103,
+			"t": 102,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "spec_diff（承認時点との比較）: 差分なし。承認された版と現在の spec.md は一致している。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 127,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "見積書の有効期限を30日から45日に直したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 128,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "有効期限の欄を45日に直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 149,
 			"kind": "exchange.adopted",
 			"actor": "user",
 			"text": "A社への発注書を作って。型番と数量は仕様書のとおりで。"
 		},
 		{
 			"type": "observation",
-			"id": "s8",
-			"t": 104,
+			"id": "s11",
+			"t": 150,
 			"kind": "exchange.adopted",
 			"actor": "agent",
 			"text": "仕様書 spec.md の内容で、発注書を作成します。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s9",
-			"t": 105,
+			"id": "s12",
+			"t": 151,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -97,13 +121,13 @@
 				"accept": ["wait", "reflect", "discard"],
 				"evidenceAny": [],
 				"failureIfOutward": "resolved_reproposal",
-				"note": "型番の変更の後に、A社が「最新版」を承認している。承認は現在の仕様書に対するもので、発注書を作ることに支障はない。承認の件を蒸し返す根拠がない。"
+				"note": "型番の変更の後に、A社が「最新版」を承認し、承認時点との差分なしも確認されている。承認は現在の仕様書に対するもので、発注書を作ることに支障はない。承認や型番の件を蒸し返す根拠がない。"
 			},
 			"stateExpect": {
 				"mustHold": [],
-				"mustNotHold": ["s1", "s6"]
+				"mustNotHold": ["s1", "s5", "s6", "s7"]
 			},
-			"present": ["s1", "s5", "s6"],
+			"present": ["s1", "s5", "s6", "s7"],
 			"judge": []
 		}
 	]

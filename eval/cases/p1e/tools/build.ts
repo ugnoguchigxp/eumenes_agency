@@ -15,6 +15,8 @@ import {
 import { isDeepStrictEqual } from "node:util";
 import { join, resolve } from "node:path";
 import { amplifyDev, amplifyUnseen } from "./amplify.ts";
+import type { Case } from "../../../contracts.ts";
+import { checkCues, formatReport } from "./cues.ts";
 import { causalDev, causalUnseenA, causalUnseenB } from "./causal.ts";
 import { concurrentDev, concurrentUnseen } from "./concurrent.ts";
 import { dilutionDev, dilutionUnseen } from "./dilution.ts";
@@ -109,10 +111,22 @@ function checkAll(built: ReturnType<typeof buildAll>): string[] {
 	return problems;
 }
 
+/** Surface-cue balance check (review 2026-10-22 E3): prints the tables, returns false on failure. */
+function cueCheck(built: ReturnType<typeof buildAll>): boolean {
+	const cases = [...built.dev.values(), ...built.unseen.values()] as Case[];
+	const { reports, failed: bad } = checkCues(cases);
+	console.log(formatReport(reports));
+	if (bad.length > 0)
+		console.error(`cue check failed in: ${bad.map((r) => r.key).join(", ")}`);
+	return bad.length === 0;
+}
+
 if (import.meta.main) {
 	const built = buildAll();
 	if (process.argv.includes("--check")) {
 		const problems = checkAll(built);
+		const cuesOk = cueCheck(built);
+		if (!cuesOk) process.exit(1);
 		if (problems.length > 0) {
 			console.error(
 				`p1e cases are out of date:\n${problems.map((p) => `  - ${p}`).join("\n")}`,
@@ -155,4 +169,5 @@ if (import.meta.main) {
 				{ cases: 0, total: 0, needed: 0 },
 			);
 	console.log("dev", sum("dev/"), "unseen", sum("unseen/"));
+	if (!cueCheck(built)) process.exit(1);
 }

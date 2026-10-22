@@ -1,0 +1,97 @@
+{
+	"id": "dilution-58",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "unseen",
+	"title": "希釈（面接日程・A0）: 候補者1名の返信待ちの面接日程を後で再開",
+	"description": "採用面接の日程調整で、候補者1名からの返信が来ないまま日程が未確定で残る。 (a) 件数の影響（経過時間は一定）: 無関係な観測 0 件（0 往復）を、180分の間に詰めて挟む（0 件でも未解決事項から 180分後）。 最後の区間と機会は、同じ原型の他の変種と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "mail_status",
+			"description": "送信した打診メールの返信状況を確認する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "候補者Bさん宛の日程の打診メール: 送信済み（3日前）、返信なし。ほかの候補者は日程が確定済み。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "採用面接の日程調整で、候補者のBさんからまだ返信が来ていない。面接は来週の水曜までに終えたいので、今週中に日程を確定したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "返信が来ないと、日程を確定できませんね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "mail_status: 候補者Bさん宛の日程の打診メール: 送信済み（3日前）、返信なし。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 184,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "面接官に送る、当日の流れの案内文を作りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 185,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "集合から終了までの流れを、案内文にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 186,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "案内文はこれでいい。次は、面接で聞く質問の一覧を、自分で見直すつもり。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 187,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "候補者Bさんから返信が来ないままで、面接の日程が未確定。面接は来週の水曜までに終えたい。当日の案内文は仕上がり、利用者が次の自分の作業を述べた区切りの場面で、Bさんの日程の件を話題にする機会。mail_status で返信状況を確かめてもよい。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s3"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"候補者Bさんからの返信がなく、面接の日程が未確定であることを、実際にあった観測のとおりに述べている",
+				"Bさんから返信が来た、または日程が確定したとは言っていない"
+			]
+		}
+	]
+}

@@ -1,0 +1,337 @@
+{
+	"id": "dilution-68",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "unseen",
+	"title": "希釈（API移行・A30）: 決済API v1の終了前に残る返金処理の移行を後で再開",
+	"description": "決済APIのv1が来月末で終了するのに、返金の処理だけv2への切り替えが未了のまま残る。 (a) 件数の影響（経過時間は一定）: 無関係な観測 30 件（15 往復）を、180分の間に詰めて挟む（0 件でも未解決事項から 180分後）。 最後の区間と機会は、同じ原型の他の変種と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "api_usage",
+			"description": "APIのバージョン別の呼び出し状況を確認する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "直近30日のv1の呼び出し: 返金のエンドポイントのみ142回。ほかはすべてv2。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "決済APIのv1が来月末で終了になる。うちはまだ、返金の処理だけv1のエンドポイントを使っている。終了の前に、v2への切り替えを済ませたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "返金の処理のv2への切り替えが残っていますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "api_usage: 直近30日のv1の呼び出しは、返金のエンドポイントだけで142回。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 10,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週の月曜から金曜までの日付を、MM/DD形式で並べて。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 16,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "10/26、10/27、10/28、10/29、10/30 です。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "エラーメッセージの文言を、利用者向けに短くして。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 27,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「処理できませんでした。もう一度お試しください」にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 33,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "画像のファイル名に、連番をつけたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 39,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "img_001 から img_024 まで連番にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 45,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "社内用語の略語の一覧を、アルファベット順にして。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 50,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "アルファベット順に並べ替えました。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 56,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "URLの末尾のスラッシュを、そろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "末尾のスラッシュなしにそろえました。6件です。"
+		},
+		{
+			"type": "observation",
+			"id": "s14",
+			"t": 68,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "タスク表の「担当」の列を、「担当者」に変えて。"
+		},
+		{
+			"type": "observation",
+			"id": "s15",
+			"t": 74,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "列の見出しを直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s16",
+			"t": 79,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "70%の7割は、いくつ？"
+		},
+		{
+			"type": "observation",
+			"id": "s17",
+			"t": 85,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "49%です。"
+		},
+		{
+			"type": "observation",
+			"id": "s18",
+			"t": 91,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "案内文の最後に、問い合わせ先を足して。"
+		},
+		{
+			"type": "observation",
+			"id": "s19",
+			"t": 97,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "最後に問い合わせ先を足しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s20",
+			"t": 103,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "箇条書きの句読点を、全部なしにそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s21",
+			"t": 109,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "各項目の末尾の句点を外しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s22",
+			"t": 114,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "10進数の255を、16進数にすると？"
+		},
+		{
+			"type": "observation",
+			"id": "s23",
+			"t": 120,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "FF です。"
+		},
+		{
+			"type": "observation",
+			"id": "s24",
+			"t": 126,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "会議室の名前を、「第1会議室」の形にそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s25",
+			"t": 132,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "5つの会議室の名前を直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s26",
+			"t": 138,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "PDFのファイル名に、版数を入れたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s27",
+			"t": 143,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "名前の末尾に _v2 と入れました。"
+		},
+		{
+			"type": "observation",
+			"id": "s28",
+			"t": 149,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "議事録の「決定事項」と「宿題」を、別の見出しに分けて。"
+		},
+		{
+			"type": "observation",
+			"id": "s29",
+			"t": 155,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2つの見出しに分けました。"
+		},
+		{
+			"type": "observation",
+			"id": "s30",
+			"t": 161,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "引用文のかぎかっこを、「」にそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s31",
+			"t": 167,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "『』や\"\"を「」にそろえました。"
+		},
+		{
+			"type": "observation",
+			"id": "s32",
+			"t": 172,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "月曜始まりのカレンダーに、並べ替えて。"
+		},
+		{
+			"type": "observation",
+			"id": "s33",
+			"t": 178,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "月曜始まりの表に並べ替えました。"
+		},
+		{
+			"type": "observation",
+			"id": "s34",
+			"t": 184,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "リリースノートの下書きを、箇条書きで作りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s35",
+			"t": 185,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "変更点を箇条書きにして、下書きにしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s36",
+			"t": 186,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "下書きはこれでいい。この件はここまでにして、少し休憩する。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s37",
+			"t": 201,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "返金の処理だけがまだv1を使っており、v1は来月末で終了する。リリースノートの下書きは仕上がり、利用者も一息ついた区切りの場面で、返金の処理の切り替えを話題にする機会。api_usage で呼び出し状況を確かめてもよい。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s3"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"決済APIのv1の終了前に、返金の処理がまだv1のままであることを、実際にあった観測のとおりに述べている",
+				"v2への切り替えが済んだとは言っていない"
+			]
+		}
+	]
+}

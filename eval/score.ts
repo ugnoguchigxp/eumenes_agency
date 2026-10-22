@@ -6,6 +6,7 @@ import {
 	caseGroups,
 	evalConditions,
 	failureTypes,
+	isEmptyStateJudgment,
 	type EvalCondition,
 	type FailureType,
 	type Judgment,
@@ -25,7 +26,18 @@ export function latestRecords(records: RunRecord[]): RunRecord[] {
 }
 
 const isInfraCode = (code: string): boolean =>
-	code.startsWith("llm_call:") || code.startsWith("error:");
+	code.startsWith("llm_call:") ||
+	code.startsWith("error:") ||
+	code === "aborted";
+
+/**
+ * A decision made by the host after a failed model call carries the underlying call code
+ * in its reason (`select_failed:<code>` / `update_failed:<code>`). An agent output failure
+ * (`llm:*` schema/parse/refusal/max_tokens, `rejected:*`) is the agent's own failure; any
+ * other source "error" (no recognizable code) is treated as infra.
+ */
+const isAgentOutputFailure = (record: OpportunityRecord): boolean =>
+	/_failed:(llm:|rejected)/.test(record.reason);
 
 export const isOutward = (action: string): boolean =>
 	action === "speak" || action === "tool";
@@ -34,9 +46,11 @@ export function classify(record: OpportunityRecord): {
 	bucket: Bucket;
 	failures: FailureType[];
 } {
-	// Infrastructure failure at this opportunity: not a judgment of the agent.
+	// Infrastructure failure at this opportunity: not a judgment of the agent. Agent output
+	// failures (llm:* / rejected:*) fall through and score as non-outward (TN or FN); their
+	// failure type is counted from the failed call in the failure table.
 	if (
-		record.source === "error" ||
+		(record.source === "error" && !isAgentOutputFailure(record)) ||
 		record.rejectCodes.some(
 			(c) => c.startsWith("call:") && isInfraCode(c.slice(5)),
 		)
@@ -122,15 +136,90 @@ const table = (header: string[], rows: string[][]): string[] => [
 const unique = <T>(xs: T[]): T[] => [...new Set(xs)];
 const sum = (xs: number[]): number => xs.reduce((a, b) => a + b, 0);
 
-const orderedConditions = (records: RunRecord[]): EvalCondition[] =>
-	evalConditions.filter((c) => records.some((r) => r.condition === c));
+/** Display order: the ablation B1a sits next to the B1 it ablates. */
+const conditionOrder: readonly EvalCondition[] = [
+	"B0",
+	"B1",
+	"B1a",
+	"B2",
+	"F",
+	"D",
+];
+if (
+	conditionOrder.length !== evalConditions.length ||
+	!evalConditions.every((c) => conditionOrder.includes(c))
+)
+	throw new Error("score.ts conditionOrder is out of sync with evalConditions");
 
-/** D is a diagnostic upper bound, never part of a B1/B2 comparison. */
-const condLabel = (c: EvalCondition): string => (c === "D" ? "D（診断）" : c);
+const orderedConditions = (records: RunRecord[]): EvalCondition[] =>
+	conditionOrder.filter((c) => records.some((r) => r.condition === c));
+
+/** D is a diagnostic, never part of a B1/B2 comparison; B1a is the B1 gate ablation. */
+const condLabel = (c: EvalCondition): string =>
+	c === "D" ? "D（診断）" : c === "B1a" ? "B1a（B1+select常時）" : c;
+
+const caseCount = (rs: readonly RunRecord[]): number =>
+	new Set(rs.map((r) => r.caseId)).size;
+
+/** Decision source classes of the host-gate breakdown. */
+const sourceClasses = [
+	"llm",
+	"host_no_candidates",
+	"host_stale",
+	"host_other",
+	"other",
+] as const;
+type SourceClass = (typeof sourceClasses)[number];
+
+const sourceClass = (source: string): SourceClass =>
+	source === "llm"
+		? "llm"
+		: source === "host_no_candidates"
+			? "host_no_candidates"
+			: source === "host_stale"
+				? "host_stale"
+				: source.startsWith("host_")
+					? "host_other"
+					: "other";
+
+/** Needed / not-needed labeled opportunities by where the decision came from. */
+function sourceCounts(
+	rs: readonly RunRecord[],
+): Record<"needed" | "notNeeded", Record<SourceClass, number>> {
+	const zero = (): Record<SourceClass, number> => ({
+		llm: 0,
+		host_no_candidates: 0,
+		host_stale: 0,
+		host_other: 0,
+		other: 0,
+	});
+	const out = { needed: zero(), notNeeded: zero() };
+	for (const r of rs)
+		for (const o of r.opportunities) {
+			if (!o.expect) continue;
+			out[o.expect.needed ? "needed" : "notNeeded"][sourceClass(o.source)]++;
+		}
+	return out;
+}
+
+const sourceRows = (prefix: string[], rs: readonly RunRecord[]): string[][] => {
+	const counts = sourceCounts(rs);
+	return (["needed", "notNeeded"] as const).map((k) => {
+		const c = counts[k];
+		return [
+			...prefix,
+			k === "needed" ? "要" : "不要",
+			String(sum(sourceClasses.map((x) => c[x]))),
+			...sourceClasses.map((x) => String(c[x])),
+		];
+	});
+};
 
 interface StateStats {
 	/** Opportunities with a state check (excluded ones are counted separately). */
 	opps: number;
+	/** Of those, the opportunities with at least one mustHold group (the mustHold denominator). */
+	holdOpps: number;
 	holdTotal: number;
 	holdMet: number;
 	oppsAllMet: number;
@@ -141,6 +230,7 @@ interface StateStats {
 
 const emptyStateStats = (): StateStats => ({
 	opps: 0,
+	holdOpps: 0,
 	holdTotal: 0,
 	holdMet: 0,
 	oppsAllMet: 0,
@@ -153,8 +243,11 @@ function addStateStats(s: StateStats, o: OpportunityRecord): void {
 	if (o.stateExcluded !== null) s[o.stateExcluded]++;
 	const sc = o.stateCheck;
 	if (!sc) return;
-	const met = sc.mustHold.filter(Boolean).length;
 	s.opps++;
+	// An empty mustHold is satisfied vacuously: it must not count as "all met".
+	if (sc.mustHold.length === 0) return;
+	const met = sc.mustHold.filter(Boolean).length;
+	s.holdOpps++;
 	s.holdTotal += sc.mustHold.length;
 	s.holdMet += met;
 	if (met === sc.mustHold.length) s.oppsAllMet++;
@@ -165,10 +258,52 @@ const pct = (n: number, d: number): string =>
 
 const quote = (s: string): string => `「${s.replaceAll("\n", " ")}」`;
 
+/** What the judge-agreement.md header records (digest of the judge compared, n pairs, kappa). */
+export interface AgreementInfo {
+	readonly digest: string;
+	readonly n: number;
+	readonly kappa: number | null;
+}
+
+/** Minimum compared pairs before the judge is called calibrated. */
+export const minCalibrationPairs = 20;
+
+const headerRe =
+	/<!--\s*judge-agreement\s+digest=(\S*)\s+n=(\d+)\s+kappa=(\S+)\s*-->/;
+
+/** The parseable first line of judge-agreement.md. */
+export const agreementHeader = (i: AgreementInfo): string =>
+	`<!-- judge-agreement digest=${i.digest === "" ? "none" : i.digest} n=${i.n} kappa=${i.kappa === null ? "-" : i.kappa.toFixed(3)} -->`;
+
+/** null when the text has no valid header (an old or hand-written file). */
+export function parseAgreementHeader(text: string): AgreementInfo | null {
+	const m = headerRe.exec(text);
+	if (!m) return null;
+	const kappa = m[3] === "-" ? null : Number(m[3]);
+	if (kappa !== null && !Number.isFinite(kappa)) return null;
+	return {
+		digest: m[1] === "none" ? "" : (m[1] ?? ""),
+		n: Number(m[2]),
+		kappa,
+	};
+}
+
+export interface SummarizeOptions {
+	/**
+	 * The header of judge-agreement.md (null/absent: no usable agreement file). The judge
+	 * counts as calibrated only when its digest equals the digest of the judgments and
+	 * n >= minCalibrationPairs.
+	 */
+	readonly judgeAgreement?: AgreementInfo | null;
+	/** Case-version warnings (records without caseHash, changed cases); shown in the header. */
+	readonly caseWarnings?: readonly string[];
+}
+
 export function summarize(
 	allRecords: RunRecord[],
 	judgments: readonly Judgment[] = [],
 	stateJudgments: readonly StateJudgment[] = [],
+	options: SummarizeOptions = {},
 ): string {
 	const lines: string[] = [];
 	const latest = latestRecords(allRecords);
@@ -201,7 +336,17 @@ export function summarize(
 	lines.push(
 		`- ケース数: ${caseLabel.size}（ラベル confirmed ${confirmed} / draft ${draft}）、run 数: ${records.length}（未完了 ${incompleteRuns.length} は集計から除外、再実行の旧記録は最新のみ採用）`,
 	);
-	lines.push(`- 合計費用: $${sum(latest.map((r) => r.usd)).toFixed(4)}`);
+	lines.push(
+		`- 合計費用（最新の記録のみ）: $${sum(latest.map((r) => r.usd)).toFixed(4)}`,
+	);
+	lines.push(
+		`- 合計費用（再実行・置き換えられた記録を含む実支出）: $${sum(allRecords.map((r) => r.usd)).toFixed(4)}（記録 ${allRecords.length} 件、うち置き換え ${allRecords.length - latest.length} 件）`,
+	);
+	for (const w of options.caseWarnings ?? [])
+		lines.push(
+			"",
+			`> **警告: ${w}。** run を混ぜた・ケースを編集した可能性があるので、件数を読む前に確かめる。`,
+		);
 	if (draft > 0) {
 		lines.push(
 			"",
@@ -268,7 +413,11 @@ export function summarize(
 				else if (bucket === "TN") s.tn++;
 				else if (bucket === "physical") s.physical++;
 				else s.excluded++;
-				failures.forEach(bump);
+				// An infra exclusion caused by a failed model call of the opportunity
+				// (rejectCodes "call:...") is counted once, from that call (callFailures
+				// below). Without such a call it is counted here.
+				const callCounted = o.rejectCodes.some((c) => c.startsWith("call:"));
+				failures.filter((f) => !(f === "infra" && callCounted)).forEach(bump);
 			}
 			callFailures(r.calls).forEach(bump);
 			if (r.error) bump("error");
@@ -302,7 +451,7 @@ export function summarize(
 	);
 	lines.push("", "### 失敗の型の件数", "");
 	lines.push(
-		"機会単位の型（unnecessary 等・self_evidence・wrong_content・missed）と呼出し単位の型（schema 等）を合算。run 全体の例外は error に含む。",
+		"機会単位の型（unnecessary 等・self_evidence・wrong_content・missed）と呼出し単位の型（schema 等）を合算。run 全体の例外は error に含む。infra は失敗した呼出しの数（機会の除外印とは二重に数えない）。",
 		"",
 	);
 	lines.push(
@@ -316,13 +465,34 @@ export function summarize(
 	);
 	lines.push("");
 
+	// Host gate visibility
+	lines.push("## 決定の出所（ホストの待ちと LLM の選択、要否別）", "");
+	lines.push(
+		"期待ラベルのある機会を、決定の出所で分けた件数。`llm` はモデルが選んだ決定、`host_no_candidates` は提示できる項目が 0 件で select を呼ばずに待った決定、`host_stale` は更新が失敗して未処理の観測が残る間（隔離中）に古い状態で選ばず待った決定、その他 host は host_blocked・host_budget・host_disabled、その他は rejected・error。host の待ちは通常の待ちと同じに採点される（要の機会では FN、不要では TN）ので、この表で LLM が判断した数と区別して読む。",
+		"",
+	);
+	const sourceHeader = [
+		"要否",
+		"機会",
+		...sourceClasses.map((x) =>
+			x === "host_other" ? "その他 host" : x === "other" ? "その他" : x,
+		),
+	];
+	lines.push(
+		...table(
+			["条件", ...sourceHeader],
+			conds.flatMap((c) => sourceRows([condLabel(c)], byCond(c))),
+		),
+	);
+	lines.push("");
+
 	if (isP1e) {
 		const groupsPresent = caseGroups.filter((g) =>
 			records.some((r) => r.group === g),
 		);
 		lines.push("## 群 × 条件の行動（P1-E）", "");
 		lines.push(
-			"D（診断）は状態を保存せず根拠を直接見せる上限条件で、B1 と B2 の比較には含めない。",
+			"D（診断）は状態を保存せず、ケースが指定する `present` と直近の観測（B1/B2 と同じ窓）を直接見せる条件で、B1 と B2 の比較には含めない。B1a は B1 と同じ指示・状態で、メモが 0 件でも select を呼ぶ（host_no_candidates の待ちを外した統制）。ケース数は独立な単位（原型）の数で、機会数・run 数（反復は疑似反復）ではない。",
 			"",
 		);
 		const actionRows: string[][] = [];
@@ -343,6 +513,7 @@ export function summarize(
 					g,
 					condLabel(c),
 					String(mine.length),
+					String(caseCount(mine)),
 					String(n.TP),
 					String(n.FP),
 					String(n.FN),
@@ -354,15 +525,44 @@ export function summarize(
 		}
 		lines.push(
 			...table(
-				["群", "条件", "run", "TP", "FP", "FN", "TN", "除外・物理", "外向き"],
+				[
+					"群",
+					"条件",
+					"run",
+					"ケース数",
+					"TP",
+					"FP",
+					"FN",
+					"TN",
+					"除外・物理",
+					"外向き",
+				],
 				actionRows,
+			),
+		);
+		lines.push("");
+
+		lines.push("### 決定の出所（群 × 条件 × 要否）", "");
+		lines.push(
+			...table(
+				["群", "条件", ...sourceHeader],
+				groupsPresent.flatMap((g) =>
+					conds.flatMap((c) => {
+						const mine = byCond(c).filter((r) => r.group === g);
+						return mine.length === 0 ? [] : sourceRows([g, condLabel(c)], mine);
+					}),
+				),
 			),
 		);
 		lines.push("");
 
 		lines.push("## 状態の軌跡（P1-E）", "");
 		lines.push(
-			"機会の開始時（直前の更新の後、選択が何かを確保する前）に開いている項目（B1 はメモ、B2/F は意図と候補。held を含む）で採点する。mustHold は、指定の観測を根拠に持つ開いた項目がある群の数で、根拠の ID により決定的に判定する。物理的に話せない機会、stateExpect が空の機会、背景更新にインフラ失敗（または連続失敗による停止）があった run のそれ以降の機会は分母に入れず、除外件数に数える。D は状態を持たないため対象外。",
+			"mustHold の列は、mustHold が1群以上ある機会だけを分母にする（空の mustHold は何も要求しないので「全充足」に数えない）。",
+			"",
+		);
+		lines.push(
+			"機会の開始時（直前の更新の後、選択が何かを確保する前）に開いている項目（B1 はメモ、B2/F は意図と候補。held を含む）で採点する。mustHold は、指定の観測を根拠に持つ開いた項目がある群の数で、根拠の ID により決定的に判定する。物理的に話せない機会、stateExpect が空の機会、背景更新にインフラ失敗（llm_call・error・aborted）があった run のそれ以降の機会は分母に入れず、除外件数に数える。エージェントの出力不良（schema・parse・refusal・max_tokens・rejected、その連続による更新の隔離を含む）は除外せず、分母に残す。D は状態を持たないため対象外。",
 			"",
 		);
 		const stateRows: string[][] = [];
@@ -373,9 +573,11 @@ export function summarize(
 			return [
 				label,
 				condLabel(c),
+				String(caseCount(rs)),
 				String(s.opps),
+				String(s.holdOpps),
 				pct(s.holdMet, s.holdTotal),
-				pct(s.oppsAllMet, s.opps),
+				pct(s.oppsAllMet, s.holdOpps),
 				`${s.blocked}/${s.empty}/${s.infra}`,
 			];
 		};
@@ -391,9 +593,11 @@ export function summarize(
 				[
 					"群",
 					"条件",
+					"ケース数",
 					"検査した機会",
-					"mustHold 充足",
-					"全 mustHold 充足の機会",
+					"うち mustHold あり（分母）",
+					"mustHold 充足（群数）",
+					"全 mustHold 充足（mustHold あり機会に対し）",
 					"除外（物理/空/infra以降）",
 				],
 				stateRows,
@@ -410,7 +614,7 @@ export function summarize(
 		if (liveState.length > 0) {
 			lines.push("### 手放し（mustNotHold、判定器）", "");
 			lines.push(
-				"指定の観測が表す事項（解決済み・断られた・前提が変わった等）を、状態がまだ有効な未解決事項として扱っているかを判定器が読んで判定した。手放せた = handled（解決・断り・保留として扱う）+ absent（触れる項目がない）。手放せていない = still_active。手放し率 = 手放せた / (手放せた + 手放せていない)。unclear は率に入れない。",
+				"指定の観測が表す事項（解決済み・断られた・前提が変わった等）を、状態がまだ有効な未解決事項として扱っているかを判定器が読んで判定した。handled = 項目はあるが解決・断り・保留として扱う。absent = 開いている項目はあるが、その事項に触れるものがない。still_active = 有効な未解決事項として扱っている。**項目なし（自動）** = 開いている項目が 0 件のため呼出しなしで absent とした件数で、何も保存しないほど増えるので、手放し率からは除き、別の列で示す。手放し率 = (handled + absent) / (handled + absent + still_active)。unclear と項目なし（自動）は率に入れない。判定器は未較正（下の内容の判定の注記を参照）。",
 				"",
 			);
 			const rowsFor = (label: string, c: EvalCondition, g: string | null) => {
@@ -423,17 +627,22 @@ export function summarize(
 				);
 				if (mine.length === 0) return null;
 				const n = (v: StateJudgment["verdict"]) =>
-					mine.filter((j) => j.verdict === v).length;
+					mine.filter((j) => j.verdict === v && !isEmptyStateJudgment(j))
+						.length;
+				const emptyState = mine.filter(isEmptyStateJudgment).length;
 				const released = n("handled") + n("absent");
+				const cases = new Set(mine.map((j) => j.caseId)).size;
 				return [
 					label,
 					condLabel(c),
+					String(cases),
 					String(mine.length),
 					String(n("handled")),
 					String(n("absent")),
 					String(n("still_active")),
 					String(n("unclear")),
 					pct(released, released + n("still_active")),
+					String(emptyState),
 				];
 			};
 			const letGoRows: string[][] = [];
@@ -454,12 +663,14 @@ export function summarize(
 					[
 						"群",
 						"条件",
-						"事項",
+						"ケース数",
+						"事項（全件）",
 						"handled",
-						"absent",
+						"absent（項目あり・該当なし）",
 						"still_active",
 						"unclear",
-						"手放し率",
+						"手放し率（項目なしを除く）",
+						"項目なし（自動）",
 					],
 					letGoRows,
 				),
@@ -643,8 +854,38 @@ export function summarize(
 	);
 	if (liveJudgments.length > 0) {
 		lines.push("## 内容の判定（判定器、条件別）", "");
+		const info = options.judgeAgreement ?? null;
+		const judgeDigests = unique(judgments.map((j) => j.judgeDigest));
+		const digestMatches =
+			info !== null &&
+			info.digest !== "" &&
+			judgeDigests.length === 1 &&
+			judgeDigests[0] === info.digest;
+		const enough = info !== null && info.n >= minCalibrationPairs;
+		const calibrated = digestMatches && enough;
+		const kappaText =
+			info === null
+				? ""
+				: `（一致ファイルの値: κ=${info.kappa === null ? "-" : info.kappa.toFixed(2)}、n=${info.n}）`;
+		if (calibrated) {
+			lines.push(
+				`> 判定器は較正済み${kappaText}: 一致ファイル judge-agreement.md の判定器 digest が judgments の digest と一致し、n が ${minCalibrationPairs} 以上。基準ごとの一致も確かめ、一致が低い基準は判定器に任せない。`,
+				"",
+			);
+		} else {
+			const why =
+				info === null
+					? "利用者との一致ファイル judge-agreement.md がない（または読み取れない）"
+					: !digestMatches
+						? "一致ファイルの判定器 digest が judgments の digest と一致しない（別の判定器・プロンプトで確かめた一致）"
+						: `一致ファイルの n が ${minCalibrationPairs} 未満`;
+			lines.push(
+				`> **判定器は未較正**: ${why}${kappaText}。以下の件数は判定器の出力であり、利用者の判定ではない。judge-export で fail/unclear を多めに抽出して利用者が判定し、judge-agreement で一致率・κ を確かめるまで、結論に使わない。`,
+				"",
+			);
+		}
 		lines.push(
-			"各セルは pass/fail/unclear の件数。判定器は利用者との一致率を確かめた基準だけを根拠にする。全体は D（診断）を含まない。",
+			"各セルは pass/fail/unclear の件数。全体は D（診断）を含まない。",
 			"",
 		);
 		const jconds = evalConditions.filter(

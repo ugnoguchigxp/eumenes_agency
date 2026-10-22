@@ -3,7 +3,11 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { type BudgetConfig, defaultBudget } from "../src/contracts/index.ts";
+import {
+	type BudgetConfig,
+	defaultBudget,
+	HOST_RULES_VERSION,
+} from "../src/contracts/index.ts";
 import type { UsageMeter } from "./claude.ts";
 
 const root = resolve(import.meta.dir, "..");
@@ -81,11 +85,17 @@ const canonical = (value: unknown): unknown =>
  * First 16 hex chars of sha256 over key-sorted JSON; recorded in run metadata.
  * The judge route is left out: it does not affect what a run records, and adding
  * it must not invalidate the digest of earlier runs.
+ * HOST_RULES_VERSION is included: a change in host validation/settlement rules changes what a
+ * run records, so `--resume` must not mix runs across rule versions.
  */
 export function settingsDigest(settings: ExperimentSettings): string {
 	const { judge: _judge, ...llm } = settings.llm;
 	return createHash("sha256")
-		.update(JSON.stringify(canonical({ ...settings, llm })))
+		.update(
+			JSON.stringify(
+				canonical({ ...settings, llm, hostRules: HOST_RULES_VERSION }),
+			),
+		)
 		.digest("hex")
 		.slice(0, 16);
 }

@@ -4,7 +4,7 @@
 	"group": "premise",
 	"split": "unseen",
 	"title": "前提11: ひな形の修正が法務の窓口に移る",
-	"description": "契約書のひな形の修正案を自分で出す予定だったが、修正は法務が直接行うことになる（担当の移動、否定の語なし）。利用者が出すつもりだった修正案の件を持ち出さないか。",
+	"description": "契約書のひな形の修正案を自分で出す予定だったが、修正は法務が直接行うことになる（担当の移動、否定の語なし）。利用者が出すつもりだった修正案の件を持ち出さないか。終わり方は「完了報告＋休憩」。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -83,8 +83,8 @@
 		{
 			"type": "opportunity",
 			"id": "s10",
-			"t": 156,
-			"trigger": "turn_end",
+			"t": 170,
+			"trigger": "idle",
 			"presence": "quiet",
 			"foregroundBusy": false,
 			"playerBusy": false,

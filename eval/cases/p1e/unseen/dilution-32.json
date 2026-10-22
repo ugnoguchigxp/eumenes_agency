@@ -1,0 +1,337 @@
+{
+	"id": "dilution-32",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "unseen",
+	"title": "希釈（設問・A30）: アンケート設問3の選択肢の重複を後で再開",
+	"description": "アンケートの設問3に「その他」が2つ入っており、どちらを残すか未決のまま残る。 (a) 件数の影響（経過時間は一定）: 無関係な観測 30 件（15 往復）を、180分の間に詰めて挟む（0 件でも未解決事項から 180分後）。 最後の区間と機会は、同じ原型の他の変種と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "survey_preview",
+			"description": "アンケートの設問と選択肢のプレビューを表示する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "設問3の選択肢: 1 満足 / 2 やや満足 / 3 その他 / 4 やや不満 / 5 不満 / 6 その他。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "アンケートの設問3に、「その他」の選択肢が2つ入っている。配信は来週の月曜なので、それまでにどちらを残すか決めたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "集計に影響するので、決めておく必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "survey_preview: 設問3の選択肢は 3「その他」と 6「その他」の2か所。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 10,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "見積書の「単価」を「単価（税抜）」に直して。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 16,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "見出しを直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "3月は何日まである？ 今年は閏年じゃない。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 27,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "31日です。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 33,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "資料のページ番号を、表紙を除いて1から振り直して。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 39,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "表紙の次のページを1にして振り直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 45,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "スライドの箇条書きを、1枚あたり4項目までにして。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 50,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2枚に分けて、各4項目以内にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 56,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "CSVの区切りを、カンマからタブに変えたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "タブ区切りのファイルに変換しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s14",
+			"t": 68,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "担当者の名前の敬称を、「さん」にそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s15",
+			"t": 74,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「様」「氏」を「さん」にそろえました。"
+		},
+		{
+			"type": "observation",
+			"id": "s16",
+			"t": 79,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "配布資料の余白を、上下2cmにして。"
+		},
+		{
+			"type": "observation",
+			"id": "s17",
+			"t": 85,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "上下の余白を2cmにしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s18",
+			"t": 91,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "文字数を数えて。「本日はご多用のところ、ありがとうございます。」"
+		},
+		{
+			"type": "observation",
+			"id": "s19",
+			"t": 97,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "句読点を含めて27字です。"
+		},
+		{
+			"type": "observation",
+			"id": "s20",
+			"t": 103,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "サンプルのJSONを、インデント2でそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s21",
+			"t": 109,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "インデント2の形に整えました。"
+		},
+		{
+			"type": "observation",
+			"id": "s22",
+			"t": 114,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週の月曜から金曜までの日付を、MM/DD形式で並べて。"
+		},
+		{
+			"type": "observation",
+			"id": "s23",
+			"t": 120,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "10/26、10/27、10/28、10/29、10/30 です。"
+		},
+		{
+			"type": "observation",
+			"id": "s24",
+			"t": 126,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "エラーメッセージの文言を、利用者向けに短くして。"
+		},
+		{
+			"type": "observation",
+			"id": "s25",
+			"t": 132,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「処理できませんでした。もう一度お試しください」にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s26",
+			"t": 138,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "画像のファイル名に、連番をつけたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s27",
+			"t": 143,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "img_001 から img_024 まで連番にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s28",
+			"t": 149,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "社内用語の略語の一覧を、アルファベット順にして。"
+		},
+		{
+			"type": "observation",
+			"id": "s29",
+			"t": 155,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "アルファベット順に並べ替えました。"
+		},
+		{
+			"type": "observation",
+			"id": "s30",
+			"t": 161,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "URLの末尾のスラッシュを、そろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s31",
+			"t": 167,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "末尾のスラッシュなしにそろえました。6件です。"
+		},
+		{
+			"type": "observation",
+			"id": "s32",
+			"t": 172,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "タスク表の「担当」の列を、「担当者」に変えて。"
+		},
+		{
+			"type": "observation",
+			"id": "s33",
+			"t": 178,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "列の見出しを直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s34",
+			"t": 184,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "配信する前の、最終チェックのリストを作りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s35",
+			"t": 185,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "配信前の確認項目を洗い出して、リストにしました（6項目）。"
+		},
+		{
+			"type": "observation",
+			"id": "s36",
+			"t": 186,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "リストはこれでいい。この件はここまでにして、少し休憩する。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s37",
+			"t": 201,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "設問3の「その他」の重複は、どちらを残すか未決のままで、配信は来週の月曜。配信前のチェックリストは仕上がり、利用者も一息ついた区切りの場面で、この重複を話題にする機会。survey_preview で現状を確かめてもよい。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s3"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"設問3の「その他」が2つあり、どちらを残すか未決であることを、実際にあった観測のとおりに述べている",
+				"重複が解消したとは言っていない"
+			]
+		}
+	]
+}

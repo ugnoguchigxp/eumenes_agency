@@ -11,6 +11,7 @@ import {
 } from "../contracts/proposals.ts";
 import {
 	defaultBudget,
+	RECENT_OBSERVATION_WINDOW,
 	type ActionTicket,
 	type AgencyRuntime,
 	type CallOutcome,
@@ -51,8 +52,7 @@ import {
 import { buildProjection } from "./projection.ts";
 import { selectPrompt, systemPrompt, updatePrompt } from "./prompts.ts";
 
-/** Recent observations shown on top of the batch; and the cap on extra pending ones. */
-const RECENT_OBSERVATIONS = 30;
+/** The cap on extra pending observations shown on top of the recent window. */
 const PENDING_CAP = 16;
 const DELIVERED_SHOWN = 5;
 const NO_DUE: Due = { reviewIntentIds: [], pressure: [] };
@@ -95,7 +95,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		pending: readonly Observation[],
 	): Observation[] => {
 		const m = new Map<number, Observation>();
-		for (const o of ledger.all().slice(-RECENT_OBSERVATIONS)) m.set(o.seq, o);
+		for (const o of ledger.all().slice(-RECENT_OBSERVATION_WINDOW))
+			m.set(o.seq, o);
 		for (const o of pending.slice(-PENDING_CAP)) m.set(o.seq, o);
 		for (const o of batch) m.set(o.seq, o);
 		return [...m.values()].sort((a, b) => a.seq - b.seq);
@@ -123,6 +124,16 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		failures += 1;
 		if (failures >= 2) quarantined = true;
 	};
+	// Transient provider errors say nothing about the batch, so they never count toward
+	// quarantine. The update still fails for that opportunity (decide returns without selecting)
+	// and is retried at the next one, bounded by the call budget. CallOutcome carries no
+	// `retryable` flag, so transient is decided from the code, mirroring LlmCallError's
+	// retryable mapping in standalone/claude.ts: `connection` (incl. timeouts), `api_429:*`,
+	// `api_5xx:*`. Non-retryable llm_call codes (auth, 400, spend_limit) will not fix themselves,
+	// so they count, like llm:* output errors, schema or settle rejections and unexpected errors.
+	const transientCall = /^llm_call:(connection$|api_(429|5\d\d):)/;
+	const countsTowardQuarantine = (code: string) =>
+		code !== "aborted" && !transientCall.test(code);
 
 	/** All outcomes of the update; the last one is the final result. */
 	const runUpdate = async (
@@ -159,7 +170,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			signal,
 		);
 		if (!r.ok) {
-			if (r.outcome.code !== "aborted") noteFailure();
+			if (countsTowardQuarantine(r.outcome.code)) noteFailure();
 			return [...r.prior, r.outcome];
 		}
 		const typed = fromWire(r.value, condition);
@@ -175,6 +186,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			state,
 			proposal: typed.proposal,
 			presented,
+			batch,
+			cursor: ledger.cursor(),
 			tools,
 			limits,
 			now: at,
@@ -245,10 +258,24 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				),
 			);
 
+		// Quarantined updates leave observations unprocessed. Never select or reserve on a state
+		// that has not seen them (it could re-propose what the user just declined).
+		const unprocessed = ledger.pending(upto).length;
+		if (quarantined && unprocessed > 0)
+			return done(
+				hostDecision(
+					opp.id,
+					"host_stale",
+					`state is stale: ${unprocessed} unprocessed observations (update quarantined)`,
+				),
+			);
+
 		const pool: readonly Candidate[] =
 			condition === "B1" ? [] : presentableCandidates(state);
 		const items = condition === "B1" ? state.notes.length : pool.length;
-		if (items === 0)
+		// B1a (eval ablation): with no notes, still let select speak from the observations.
+		const selectEmpty = condition === "B1" && deps.selectWhenEmpty === true;
+		if (items === 0 && !selectEmpty)
 			return done(
 				hostDecision(opp.id, "host_no_candidates", "nothing to offer"),
 			);

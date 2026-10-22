@@ -3,15 +3,25 @@
  * p0e cases are eval/cases/{dev,unseen}, p1e cases eval/cases/p1e/{dev,unseen}.
  *
  *   bun eval/main.ts validate [--suite p1e] [--split dev]
- *   bun eval/main.ts run --name <run> [--suite p1e] [--split dev] [--conditions B0,B1,B2,F] [--reps 3]
- *       [--case <id>] [--resume] [--budget-usd n]   (p1e default conditions: B1,B2,D)
+ *   bun eval/main.ts run --name <run> [--suite p1e] [--split dev] [--conditions B0,B1,B1a,B2,F,D] [--reps 3]
+ *       [--case <id>] [--resume] [--budget-usd n] [--allow-unverified]
+ *       (p0e default conditions: B0,B1,B2,F; p1e default: B1,B1a,B2,D.
+ *        B1a = B1 with select called even when there are no notes (ablation of the
+ *        host_no_candidates gate); D = diagnostic, no stored state)
  *   bun eval/main.ts score --name <run>
  *   bun eval/main.ts trace --name <run> --case <id> [--condition B2] [--rep 1] [--prompt]
- *   bun eval/main.ts judge --name <run> [--limit N] [--budget-usd n]   (content + state judge; spends money)
+ *   bun eval/main.ts judge --name <run> [--limit N] [--budget-usd n] [--allow-unverified]   (content + state judge; spends money)
  *   bun eval/main.ts label-export --suite p1e --split dev --n 12 --out <file.md> [--seed s]
- *   bun eval/main.ts agreement --sheet <file.md>
- *   bun eval/main.ts judge-export --name <run> --n 30 --out <file.md> [--seed s]
- *   bun eval/main.ts judge-agreement --sheet <file.md>
+ *   bun eval/main.ts agreement --sheet <file.md> [--allow-unverified]
+ *   bun eval/main.ts judge-export --name <run> --n 30 --out <file.md> [--seed s] [--allow-unverified]
+ *   bun eval/main.ts judge-agreement --sheet <file.md> [--allow-unverified]
+ *       (also writes results/<run>/judge-agreement.md with a parseable digest/n/kappa header)
+ *
+ * Case versions: records and label/judge keys carry a caseHash. --resume, judge,
+ * judge-export, agreement and judge-agreement refuse a changed case, and refuse records
+ * or keys without a hash unless --allow-unverified. `score` warns in the summary header.
+ * `run` halts after 2 consecutive incomplete (infra) runs and after 3 consecutive runs in
+ * which every call is an agent output failure (llm:*), both with exit code 3.
  *
  * Results: eval/results/<name>/{runs.jsonl, summary.md, judgments.jsonl, state-judgments.jsonl,
  * traces.jsonl}. runs.jsonl, summary.md and judgments.jsonl are tracked (.gitignore
@@ -32,6 +42,9 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import {
 	defaultCasesDir,
+	allowUnverifiedHint,
+	assertCaseVersions,
+	caseVersionIssues,
 	loadAllSuiteCases,
 	loadSuiteCases,
 	type Split,
@@ -40,6 +53,7 @@ import {
 	caseGroups,
 	evalConditions,
 	runRecordSchema,
+	runtimeConditionOf,
 	suites,
 	type Case,
 	type CaseGroup,
@@ -53,7 +67,7 @@ import {
 	appendJudgments,
 	assertDigestCompatible,
 	judgeDigest,
-	judgeSystemPrompt,
+	judgeFingerprint,
 	pendingJudgeTasks,
 	readJudgments,
 	runJudge,
@@ -80,7 +94,12 @@ import {
 	type LabelKey,
 } from "./label.ts";
 import { isSpendLimit, replayCase } from "./replay.ts";
-import { latestRecords, summarize } from "./score.ts";
+import {
+	agreementHeader,
+	latestRecords,
+	parseAgreementHeader,
+	summarize,
+} from "./score.ts";
 import { createSelectProbe } from "./state-check.ts";
 import { createTraceRecorder, traceCommand } from "./trace.ts";
 import type { LlmPort } from "../src/contracts/ports.ts";
@@ -161,17 +180,46 @@ export function assertResumeCompatible(
 	}
 }
 
+/** Resuming against edited cases would mix records of two versions of a case. */
+export function assertResumeCases(
+	records: readonly RunRecord[],
+	cases: readonly Case[],
+	allowUnverified = false,
+): void {
+	assertCaseVersions(records, cases, "cannot --resume", allowUnverified);
+}
+
 export const maxConsecutiveIncomplete = 2;
+export const maxConsecutiveOutputFailures = 3;
+
+/**
+ * A run whose every model call is an agent output failure (llm:* schema/parse/refusal/
+ * max_tokens). It is scored as decided (never made incomplete), but repeating it only
+ * spends money, so the run loop halts after maxConsecutiveOutputFailures in a row.
+ */
+export const allCallsOutputFailures = (record: RunRecord): boolean =>
+	record.condition !== "B0" &&
+	record.calls.length > 0 &&
+	record.calls.every((c) => c.code.startsWith("llm:"));
 
 /** Decides whether the run loop must stop after a record. exit: 2 safety, 3 limit/systematic. */
 export function evaluateStop(
 	record: RunRecord,
 	consecutiveIncomplete: number,
-): { consecutive: number; stop: { code: number; message: string } | null } {
+	consecutiveOutputFailures = 0,
+): {
+	consecutive: number;
+	outputFailures: number;
+	stop: { code: number; message: string } | null;
+} {
 	const consecutive = record.incomplete ? consecutiveIncomplete + 1 : 0;
+	const outputFailures = allCallsOutputFailures(record)
+		? consecutiveOutputFailures + 1
+		: 0;
 	if (record.safety.length > 0) {
 		return {
 			consecutive,
+			outputFailures,
 			stop: {
 				code: 2,
 				message: `safety observation: ${record.safety.join(", ")}`,
@@ -182,18 +230,33 @@ export function evaluateStop(
 		record.calls.some((c) => isSpendLimit(c.code)) ||
 		(record.error !== null && isSpendLimit(record.error))
 	) {
-		return { consecutive, stop: { code: 3, message: "spend limit reached" } };
+		return {
+			consecutive,
+			outputFailures,
+			stop: { code: 3, message: "spend limit reached" },
+		};
 	}
 	if (consecutive >= maxConsecutiveIncomplete) {
 		return {
 			consecutive,
+			outputFailures,
 			stop: {
 				code: 3,
 				message: `${consecutive} consecutive incomplete runs (systematic failure, e.g. API/auth/network); fix the cause and use --resume`,
 			},
 		};
 	}
-	return { consecutive, stop: null };
+	if (outputFailures >= maxConsecutiveOutputFailures) {
+		return {
+			consecutive,
+			outputFailures,
+			stop: {
+				code: 3,
+				message: `${outputFailures} consecutive runs in which every model call failed with an agent output failure (llm:schema/parse/refusal/max_tokens; scored as is, not an outage). Likely an instruction/schema problem: fix it and use --resume`,
+			},
+		};
+	}
+	return { consecutive, outputFailures, stop: null };
 }
 
 export function parseRunsJsonl(
@@ -250,9 +313,12 @@ export const parseSuite = (value: string): Suite => {
 	return value as Suite;
 };
 
-/** P1-E default: the conditions the spec compares (F is out), plus the D diagnostic. */
+/**
+ * P1-E default: the conditions the spec compares (F is out), the B1a ablation (B1 with
+ * select called even without notes) and the D diagnostic.
+ */
 export const defaultConditions = (suite: Suite): string =>
-	suite === "p1e" ? "B1,B2,D" : "B0,B1,B2,F";
+	suite === "p1e" ? "B1,B1a,B2,D" : "B0,B1,B2,F";
 
 const runName = (value: string | undefined): string => {
 	if (!value || !/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(value)) {
@@ -309,10 +375,57 @@ export function validateCommand(
 	return out.join("\n");
 }
 
+/** Written by judge-agreement next to the run (header line: digest, n, kappa). */
+export const judgeAgreementFile = "judge-agreement.md";
+
+/**
+ * Warning lines for the summary header: records without a caseHash, and records whose case
+ * changed (or no longer exists) since they were made. Never throws.
+ */
+export function caseVersionWarnings(
+	records: readonly RunRecord[],
+	casesRoot?: string,
+): string[] {
+	const latest = latestRecords([...records]);
+	const out: string[] = [];
+	const unhashed = latest.filter((r) => r.caseHash === undefined).length;
+	if (unhashed > 0)
+		out.push(
+			`${unhashed} 件の記録に caseHash がない（ケースの版を検証できない）`,
+		);
+	for (const suite of unique(latest.map((r) => r.suite))) {
+		const mine = latest.filter((r) => r.suite === suite);
+		let cases: Case[];
+		try {
+			cases = loadAllSuiteCases(suite, casesRoot);
+		} catch (error) {
+			out.push(
+				`${suite} のケースを読み込めず版を検証できない: ${(error as Error).message.split("\n").slice(0, 2).join(" ")}`,
+			);
+			continue;
+		}
+		const { issues } = caseVersionIssues(mine, cases);
+		if (issues.length > 0)
+			out.push(
+				`記録後にケースが変更されている: ${issues.map((i) => i.caseId).join(", ")}（記録時と現行のケースが違う）`,
+			);
+		const known = new Set(cases.map((c) => c.id));
+		const gone = unique(
+			mine.map((r) => r.caseId).filter((id) => !known.has(id)),
+		);
+		if (gone.length > 0)
+			out.push(`現行のケースにない id の記録: ${gone.join(", ")}`);
+	}
+	return out;
+}
+
+const unique = <T>(xs: T[]): T[] => [...new Set(xs)];
+
 export function scoreCommand(
 	name: string,
 	root = resultsRoot,
 	suite?: Suite,
+	casesRoot?: string,
 ): string {
 	const file = join(root, name, "runs.jsonl");
 	if (!existsSync(file)) throw new Error(`not found: ${file}`);
@@ -325,12 +438,19 @@ export function scoreCommand(
 			);
 	}
 	const out = join(root, name, "summary.md");
+	const agreementPath = join(root, name, judgeAgreementFile);
 	writeFileSync(
 		out,
 		summarize(
 			records,
 			readJudgments(join(root, name, "judgments.jsonl")),
 			readStateJudgments(join(root, name, "state-judgments.jsonl")),
+			{
+				judgeAgreement: existsSync(agreementPath)
+					? parseAgreementHeader(readFileSync(agreementPath, "utf8"))
+					: null,
+				caseWarnings: caseVersionWarnings(records, casesRoot),
+			},
 		),
 	);
 	return out;
@@ -364,17 +484,24 @@ export async function judgeCommand(
 		limit?: number;
 		root?: string;
 		casesRoot?: string;
+		allowUnverified?: boolean;
 	},
 ): Promise<string> {
 	const root = options.root ?? resultsRoot;
 	const records = readRecords(root, name);
 	const suite = suiteOfRecords(records);
 	const cases = loadAllSuiteCases(suite, options.casesRoot);
+	const { unverified } = assertCaseVersions(
+		records,
+		cases,
+		`cannot judge ${name}`,
+		options.allowUnverified ?? false,
+	);
 	const file = join(root, name, "judgments.jsonl");
 	const stateFile = join(root, name, "state-judgments.jsonl");
 	const existing = readJudgments(file);
 	const existingState = readStateJudgments(stateFile);
-	const digest = judgeDigest(options.role, judgeSystemPrompt);
+	const digest = judgeDigest(options.role, judgeFingerprint());
 	const sDigest = stateDigest(options.role);
 	assertDigestCompatible(existing, digest, file);
 	assertDigestCompatible(existingState, sDigest, stateFile);
@@ -388,6 +515,11 @@ export async function judgeCommand(
 		...(options.limit === undefined ? {} : { limit: options.limit }),
 	});
 	const lines = [
+		...(unverified > 0
+			? [
+					`note: --allow-unverified: ${unverified} records have no caseHash (made before hashing); their case version is not verified.`,
+				]
+			: []),
 		`judge ${name}: content ${tasks.length} pending actions, judged ${content.judged} (${content.rows} criteria), failed ${content.failed}, remaining ${content.remaining}${content.stoppedBy ? `, stopped: ${content.stoppedBy}` : ""}`,
 		...content.messages.map((m) => `  ${m}`),
 	];
@@ -438,13 +570,22 @@ export function labelExportCommand(options: {
 	return `wrote ${options.out} (${key.items.length} items) and ${keyPath(options.out)} (do not open the key before answering)`;
 }
 
-export function agreementCommand(sheet: string, casesRoot?: string): string {
+export function agreementCommand(
+	sheet: string,
+	casesRoot?: string,
+	allowUnverified = false,
+): string {
 	const key = JSON.parse(readFileSync(keyPath(sheet), "utf8")) as LabelKey;
 	if (key.kind !== "label")
 		throw new Error(`${keyPath(sheet)} is not a label key`);
 	const cases = loadSuiteCases(key.suite, key.split, casesRoot);
 	return formatLabelAgreement(
-		labelAgreement(parseLabelSheet(readFileSync(sheet, "utf8")), key, cases),
+		labelAgreement(
+			parseLabelSheet(readFileSync(sheet, "utf8")),
+			key,
+			cases,
+			allowUnverified,
+		),
 	);
 }
 
@@ -455,10 +596,17 @@ export function judgeExportCommand(options: {
 	seed?: string;
 	root?: string;
 	casesRoot?: string;
+	allowUnverified?: boolean;
 }): string {
 	const root = options.root ?? resultsRoot;
 	const records = readRecords(root, options.name);
 	const cases = loadAllSuiteCases(suiteOfRecords(records), options.casesRoot);
+	assertCaseVersions(
+		records,
+		cases,
+		`cannot export judge sheet of ${options.name}`,
+		options.allowUnverified ?? false,
+	);
 	const judgments = readJudgments(join(root, options.name, "judgments.jsonl"));
 	const actions = judgedActions(latestRecords(records), cases, judgments);
 	if (actions.length === 0)
@@ -474,13 +622,46 @@ export function judgeExportCommand(options: {
 	return `wrote ${options.out} (${key.items.length} items) and ${keyPath(options.out)} (holds the judge verdicts; do not open it before answering)`;
 }
 
-export function judgeAgreementCommand(sheet: string): string {
+export function judgeAgreementCommand(
+	sheet: string,
+	options: {
+		root?: string;
+		casesRoot?: string;
+		allowUnverified?: boolean;
+	} = {},
+): string {
+	const root = options.root ?? resultsRoot;
 	const key = JSON.parse(readFileSync(keyPath(sheet), "utf8")) as JudgeKey;
 	if (key.kind !== "judge")
 		throw new Error(`${keyPath(sheet)} is not a judge key`);
-	return formatJudgeAgreement(
-		judgeAgreement(parseJudgeSheet(readFileSync(sheet, "utf8")), key),
+	if (key.caseHashes !== undefined) {
+		const cases = loadAllSuiteCases(key.suite ?? "p1e", options.casesRoot);
+		assertCaseVersions(
+			Object.entries(key.caseHashes).map(([caseId, hash]) => ({
+				caseId,
+				caseHash: hash,
+			})),
+			cases,
+			"cannot compute judge agreement",
+		);
+	} else if (!options.allowUnverified) {
+		throw new Error(
+			`cannot compute judge agreement: the key has no caseHashes, so the case versions cannot be verified; ${allowUnverifiedHint}.`,
+		);
+	}
+	const result = judgeAgreement(
+		parseJudgeSheet(readFileSync(sheet, "utf8")),
+		key,
 	);
+	const text = formatJudgeAgreement(result);
+	const dir = join(root, key.run);
+	if (existsSync(dir)) {
+		writeFileSync(
+			join(dir, judgeAgreementFile),
+			`${agreementHeader({ digest: key.judgeDigest ?? "", n: result.compared, kappa: result.kappa })}\n# 判定器と利用者の一致（${key.run}）\n\n${text}\n`,
+		);
+	}
+	return text;
 }
 
 async function runCommand(values: {
@@ -492,6 +673,7 @@ async function runCommand(values: {
 	caseId: string | undefined;
 	resume: boolean;
 	budgetUsd: number | undefined;
+	allowUnverified: boolean;
 }): Promise<number> {
 	const dir = join(resultsRoot, values.name);
 	const file = join(dir, "runs.jsonl");
@@ -506,6 +688,7 @@ async function runCommand(values: {
 	}
 	const done = doneKeys(existing);
 	let cases = loadSuiteCases(values.suite, values.split);
+	assertResumeCases(existing, cases, values.allowUnverified);
 	if (values.caseId) cases = cases.filter((c) => c.id === values.caseId);
 	if (cases.length === 0) throw new Error("no cases selected");
 	const plan = skipDone(planRuns(cases, values.conditions, values.reps), done);
@@ -541,6 +724,7 @@ async function runCommand(values: {
 
 	let n = 0;
 	let consecutiveIncomplete = 0;
+	let consecutiveOutputFailures = 0;
 	for (const p of plan) {
 		n++;
 		try {
@@ -564,6 +748,7 @@ async function runCommand(values: {
 			rep: p.rep,
 		});
 		const condition = p.condition;
+		const runtimeCondition = runtimeConditionOf(condition);
 		const record = await replayCase(
 			p.case,
 			condition,
@@ -576,7 +761,14 @@ async function runCommand(values: {
 							present: presentMap(p.case),
 							budget,
 						})
-					: createAgencyRuntime({ condition, llm: probed, tools, budget }),
+					: createAgencyRuntime({
+							condition: runtimeCondition ?? "B1",
+							llm: probed,
+							tools,
+							budget,
+							// B1a: B1 without the host_no_candidates gate (ablation).
+							...(condition === "B1a" ? { selectWhenEmpty: true } : {}),
+						}),
 			{
 				runName: values.name,
 				settingsDigest: digest,
@@ -591,8 +783,13 @@ async function runCommand(values: {
 		console.log(
 			`[${n}/${plan.length}] ${p.case.id} ${p.condition} rep${p.rep} usd=${record.usd.toFixed(4)} total=${meter.spentUsd().toFixed(4)} opps=${record.opportunities.length} calls=${record.calls.length}${record.incomplete ? " INCOMPLETE" : ""}${record.error ? ` error=${record.error}` : ""}`,
 		);
-		const verdict = evaluateStop(record, consecutiveIncomplete);
+		const verdict = evaluateStop(
+			record,
+			consecutiveIncomplete,
+			consecutiveOutputFailures,
+		);
 		consecutiveIncomplete = verdict.consecutive;
+		consecutiveOutputFailures = verdict.outputFailures;
 		if (verdict.stop) {
 			console.log(`STOP: ${verdict.stop.message}`);
 			return verdict.stop.code;
@@ -642,6 +839,7 @@ export async function main(argv: string[]): Promise<number> {
 			sheet: { type: "string" },
 			seed: { type: "string" },
 			"budget-usd": { type: "string" },
+			"allow-unverified": { type: "boolean", default: false },
 		},
 	});
 	const command = positionals[0];
@@ -675,7 +873,13 @@ export async function main(argv: string[]): Promise<number> {
 		return 0;
 	}
 	if (command === "agreement") {
-		console.log(agreementCommand(required(values.sheet, "--sheet")));
+		console.log(
+			agreementCommand(
+				required(values.sheet, "--sheet"),
+				undefined,
+				values["allow-unverified"],
+			),
+		);
 		return 0;
 	}
 	if (command === "judge-export") {
@@ -685,12 +889,17 @@ export async function main(argv: string[]): Promise<number> {
 				n: positiveInt(values.n, "--n"),
 				out: required(values.out, "--out"),
 				...(values.seed === undefined ? {} : { seed: values.seed }),
+				allowUnverified: values["allow-unverified"],
 			}),
 		);
 		return 0;
 	}
 	if (command === "judge-agreement") {
-		console.log(judgeAgreementCommand(required(values.sheet, "--sheet")));
+		console.log(
+			judgeAgreementCommand(required(values.sheet, "--sheet"), {
+				allowUnverified: values["allow-unverified"],
+			}),
+		);
 		return 0;
 	}
 	if (command === "judge") {
@@ -716,6 +925,7 @@ export async function main(argv: string[]): Promise<number> {
 				llm,
 				role,
 				...(limit === undefined ? {} : { limit }),
+				allowUnverified: values["allow-unverified"],
 			}),
 		);
 		return 0;
@@ -759,6 +969,7 @@ export async function main(argv: string[]): Promise<number> {
 			caseId: values.case,
 			resume: values.resume,
 			budgetUsd: parseBudget(values["budget-usd"]),
+			allowUnverified: values["allow-unverified"],
 		});
 	}
 	console.error(

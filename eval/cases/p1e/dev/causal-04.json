@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "causal",
 	"split": "dev",
-	"title": "因果1-d: 順序の入れ替え（遅れの後に正常）",
-	"description": "causal-01 と同じ観測（正常の確認と遅延の確認）を逆の順にしたもの。最新の確認が正常（01:10 終了）。最後の発話・機会は causal-01 と同一。同じ出来事でも順序で結論が変わることを区別できるか。",
+	"title": "因果1-d: 順序B（原因判明と対処→正常→遅れ）",
+	"description": "causal-03 と同じ3つの観測を逆の並びにしたもの。原因が分かって対処され、正常に戻った後で、再び遅れた（原因は未特定）。最後の発話・機会は causal-01 と同一。同じ出来事でも順序で正しい行動が変わることを区別できるか。",
 	"labelStatus": "draft",
 	"tools": [
 		{
@@ -55,15 +55,15 @@
 		{
 			"type": "observation",
 			"id": "s5",
-			"t": 63,
-			"kind": "action.observed",
-			"actor": "tool",
-			"text": "sync_check（定期確認）: 夜間同期ジョブは 02:10 に終了（想定 01:10）。原因は未特定。"
+			"t": 93,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "同期が遅れた件の原因が分かった。バックアップが同期と重なっていた。バックアップを03:00に移したよ。"
 		},
 		{
 			"type": "observation",
 			"id": "s6",
-			"t": 103,
+			"t": 133,
 			"kind": "exchange.adopted",
 			"actor": "user",
 			"text": "議事録のファイル名を日付始まりにそろえたい。"
@@ -71,7 +71,7 @@
 		{
 			"type": "observation",
 			"id": "s7",
-			"t": 104,
+			"t": 134,
 			"kind": "exchange.adopted",
 			"actor": "agent",
 			"text": "YYYYMMDD_議題.md の形式にそろえる名前の一覧を作りました。"
@@ -79,7 +79,7 @@
 		{
 			"type": "observation",
 			"id": "s8",
-			"t": 164,
+			"t": 194,
 			"kind": "action.observed",
 			"actor": "tool",
 			"text": "sync_check（定期確認）: 夜間同期ジョブは 01:10 に終了（想定どおり）。"
@@ -87,40 +87,51 @@
 		{
 			"type": "observation",
 			"id": "s9",
-			"t": 185,
+			"t": 254,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "sync_check（定期確認）: 夜間同期ジョブは 02:10 に終了（想定 01:10）。原因は未特定。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 275,
 			"kind": "exchange.adopted",
 			"actor": "user",
 			"text": "集計バッチは夜間同期の出力を読むんだけど、開始を02:00から01:30に前倒ししたい。起動設定はどこを直せばいい？"
 		},
 		{
 			"type": "observation",
-			"id": "s10",
-			"t": 186,
+			"id": "s11",
+			"t": 276,
 			"kind": "exchange.adopted",
 			"actor": "agent",
 			"text": "batch/schedule.yaml の aggregate_job の start の行です。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s11",
-			"t": 187,
+			"id": "s12",
+			"t": 277,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
 			"playerBusy": false,
 			"expect": {
-				"needed": false,
-				"accept": ["wait", "reflect", "discard"],
-				"evidenceAny": [],
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s9"],
 				"failureIfOutward": "unnecessary",
-				"note": "一度遅れたが、最新の定期確認は 01:10 に終了（想定どおり）。01:30 の開始はその後で、最新の観測は前倒しと衝突しない。過去の一度の遅延を持ち出す根拠は弱い。見張りの依頼自体は継続している。"
+				"note": "バックアップを移す対処の後、一度は正常に戻ったが、直近の確認で再び 02:10 に遅れた。原因は未特定で、先の対処が効いていないか別の原因がある。集計バッチを01:30に前倒しすると同期の終了前に始まりうるので、伝える価値がある。同じ観測が causal-03 では順序が違うため、話す必要がない。"
 			},
 			"stateExpect": {
-				"mustHold": [["s1"]],
+				"mustHold": [["s1", "s9"]],
 				"mustNotHold": []
 			},
-			"present": ["s1", "s5", "s8"],
-			"judge": []
+			"present": ["s1", "s5", "s8", "s9"],
+			"judge": [
+				"同期ジョブが 02:10 に終了したという実際にあった観測に基づいて述べている",
+				"以前の対処の後に正常に戻った後で、再び遅れたという順序を正しく述べている"
+			]
 		}
 	]
 }

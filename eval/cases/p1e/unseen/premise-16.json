@@ -4,7 +4,7 @@
 	"group": "premise",
 	"split": "unseen",
 	"title": "前提16: 別のファイルの差し替えで受注データの不備を落とさない",
-	"description": "受注データの顧客コードの不備が残るなか、無関係な在庫データが確定版に差し替わる。無関係なデータ差し替えで有効な事項を捨てず、受注データを使う作業が始まったところで伝えられるか。",
+	"description": "受注データの顧客コードの不備が残るなか、無関係な在庫データが確定版に差し替わる。無関係なデータ差し替えで有効な事項を捨てず、受注データを使う作業が始まったところで伝えられるか。終わり方は「利用者の計画（依頼）の発話」。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -51,18 +51,18 @@
 		{
 			"type": "observation",
 			"id": "s6",
-			"t": 162,
+			"t": 153,
 			"kind": "exchange.adopted",
-			"actor": "user",
-			"text": "顧客別の受注件数を、上位10社で表にしたい。orders.csv を使って。"
+			"actor": "agent",
+			"text": "在庫データが確定値版に切り替わった、と理解しました。"
 		},
 		{
 			"type": "observation",
 			"id": "s7",
 			"t": 163,
 			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "orders.csv から顧客別の件数を数えて、上位10社を表にします。"
+			"actor": "user",
+			"text": "顧客別の受注件数を、上位10社で表にしたい。orders.csv を使って。"
 		},
 		{
 			"type": "opportunity",

@@ -4,7 +4,7 @@
 	"group": "premise",
 	"split": "unseen",
 	"title": "前提14: 型番の一覧が商品管理システムの出力に置き換わる",
-	"description": "catalog_models.csv の型番3件が旧カタログの表記のままで更新が必要だったが、型番の一覧は来月から商品管理システムの出力に置き換わる（対象の置き換え、否定の語なし）。更新するはずだった表がなくなる事項を持ち出さないか。",
+	"description": "catalog_models.csv の型番3件が旧カタログの表記のままで更新が必要だったが、型番の一覧は来月から商品管理システムの出力に置き換わる（対象の置き換え、否定の語なし）。更新するはずだった表がなくなる事項を持ち出さないか。終わり方は「ツール結果」。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -70,21 +70,21 @@
 			"t": 164,
 			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "低・中・高の3段階に分けました。"
+			"text": "低・中・高の3段階に分けます。"
 		},
 		{
 			"type": "observation",
 			"id": "s9",
 			"t": 165,
-			"kind": "exchange.adopted",
-			"actor": "user",
-			"text": "価格帯はこれでいい。この件はここまでにして、少し休憩する。"
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "price_band: 型番42件を3段階に分類した（低 12件、中 21件、高 9件）。"
 		},
 		{
 			"type": "opportunity",
 			"id": "s10",
 			"t": 166,
-			"trigger": "turn_end",
+			"trigger": "result_received",
 			"presence": "quiet",
 			"foregroundBusy": false,
 			"playerBusy": false,
@@ -93,7 +93,7 @@
 				"accept": ["wait", "reflect", "discard"],
 				"evidenceAny": [],
 				"failureIfOutward": "unnecessary",
-				"note": "型番の一覧は商品管理システムの出力に置き換わり、catalog_models.csv の3件を更新するという対象そのものがなくなる。更新が済んだわけではなく、更新する対象がなくなった。持ち出す理由がない。"
+				"note": "型番の一覧は商品管理システムの出力に置き換わり、catalog_models.csv の3件を更新するという対象そのものがなくなる。更新が済んだわけではなく、更新する対象がなくなった。価格帯の分類の結果が届いた場面でも、持ち出す理由がない。"
 			},
 			"stateExpect": {
 				"mustHold": [],

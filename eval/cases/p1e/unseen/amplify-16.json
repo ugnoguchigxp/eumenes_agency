@@ -4,7 +4,7 @@
 	"group": "amplify",
 	"split": "unseen",
 	"title": "自己増幅16: 差し戻しの理由の内訳が共有ファイルに載る",
-	"description": "amplify-15 と同じ経過の後、差し戻し一覧に理由の列が追加され、添付漏れは少数と分かる。外部の根拠が届いたとき、繰り返した推測を捨てて伝えられるか。",
+	"description": "amplify-15 と同じ経過の後、差し戻し一覧に理由の列が追加され、添付漏れは少数と分かる。外部の根拠が届いたとき、繰り返した推測を捨てて伝えられるか。機会は result_received（更新が最後）。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [

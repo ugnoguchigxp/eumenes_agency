@@ -4,7 +4,7 @@
 	"group": "premise",
 	"split": "unseen",
 	"title": "前提12: 資料の読み手が経営層から現場に変わる",
-	"description": "経営向け要約に載せる数字の根拠が未確認だったが、資料が現場向けの手順書の形になる（読み手の変化、否定の語なし）。古い読み手向けの懸念を持ち出さないか。",
+	"description": "経営向け要約に載せる数字の根拠が未確認だったが、資料が現場向けの手順書の形になる（読み手の変化、否定の語なし）。古い読み手向けの懸念を持ち出さないか。終わり方は「agent の着手の宣言（〜します）」。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -70,20 +70,12 @@
 			"t": 154,
 			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "手順ごとに担当者の欄を足しました。"
-		},
-		{
-			"type": "observation",
-			"id": "s9",
-			"t": 155,
-			"kind": "exchange.adopted",
-			"actor": "user",
-			"text": "手順書はこれでいい。この件はここまでにして、少し休憩する。"
+			"text": "手順ごとに担当者の欄を足します。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s10",
-			"t": 156,
+			"id": "s9",
+			"t": 155,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

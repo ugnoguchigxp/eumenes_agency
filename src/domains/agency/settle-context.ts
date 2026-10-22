@@ -13,7 +13,14 @@ export interface SettleCtx {
 	readonly next: AgencyState;
 	/** Observations presented to the model in this call. */
 	readonly obs: ReadonlyMap<string, Observation>;
-	readonly maxPresentedSeq: number;
+	/**
+	 * Highest seq of the batch being processed. Items created now get this as createdSeq/stateSeq,
+	 * so "newer than the item" means seq > floorSeq. Observations after the batch (later ones shown
+	 * only as context) do count as newer; observations in or before the batch never do.
+	 */
+	readonly floorSeq: number;
+	/** Lowest seq of the batch (floorSeq + 1 when the update has no batch). */
+	readonly batchStartSeq: number;
 	readonly tools: readonly ToolCapability[];
 	readonly limits: Limits;
 	readonly now: number;
@@ -61,6 +68,13 @@ export const isIndependent = (ctx: SettleCtx, o: Observation): boolean => {
 		ctx.next.attempts.some((x) => x.id === c)
 	);
 };
+
+/** At least one cited observation that arrived after `floor`. */
+export const hasNewerThan = (
+	ctx: SettleCtx,
+	refs: readonly string[],
+	floor: number,
+): boolean => refs.some((r) => (ctx.obs.get(r)?.seq ?? 0) > floor);
 
 export const assignLocal = (
 	ctx: SettleCtx,

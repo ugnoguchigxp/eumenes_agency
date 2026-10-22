@@ -1,0 +1,109 @@
+{
+	"id": "premise-06",
+	"suite": "p1e",
+	"group": "premise",
+	"split": "dev",
+	"title": "前提6: 連絡手段の切り替わりでも入館カードの申請は残る",
+	"description": "来月入社する人の入館カードの申請が1人分未提出のまま残るなか、無関係な全社の連絡手段の切り替えが知らされる。無関係な変化で有効な事項を捨てず、利用者が一息ついた区切りで伝えられるか。終わり方は「完了報告＋休憩」。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来月入社する人の入館カードの申請が、1人分まだ出せていない。入社日の前日までに出す必要がある。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "申請は入社日の前日が締切ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 61,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今週の当番表を、五十音順に並べ替えて。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "五十音順に並べ替えました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 132,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "全社の連絡の手段が、来月からチャットツールに切り替わることになった。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 133,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "連絡はチャットツールに切り替わる、と理解しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 143,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来月入社する人の歓迎会の店の候補を、駅から近い順に3つ挙げて。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 144,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "駅から近い3店を挙げました。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 145,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "候補はこれでいい。この件はここまでにして、少し休憩する。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s10",
+			"t": 160,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1"],
+				"failureIfOutward": "unnecessary",
+				"note": "連絡手段の切り替えは入館カードの申請と関係がない。1人分の申請は未提出のままで、入社日の前日という期限がある。歓迎会の店の相談が済んで利用者が一息ついた区切りで、伝える価値がある。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s5"],
+			"judge": [
+				"連絡手段の切り替えと結びつけず、入館カードの申請の件として述べている",
+				"申請が済んだとは言っていない"
+			]
+		}
+	]
+}

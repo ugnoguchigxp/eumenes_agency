@@ -117,17 +117,9 @@
 			"text": "発表が終わった。さて、2社の見積りの比較を進めようか。"
 		},
 		{
-			"type": "observation",
+			"type": "opportunity",
 			"id": "s13",
 			"t": 267,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "お疲れさまです。比較の準備に入りましょう。"
-		},
-		{
-			"type": "opportunity",
-			"id": "s14",
-			"t": 268,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

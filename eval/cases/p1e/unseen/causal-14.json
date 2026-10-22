@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "causal",
 	"split": "unseen",
-	"title": "因果2-d: 順序の入れ替え（重複の検出の後に除去版へ）",
-	"description": "causal-11 と同じ観測（重複38件の検出と、38件を除いた版への差し替え）を逆の順にしたもの。検出の後に除去版へ差し替えた（行数の差も38）。最後の発話・機会は causal-11 と同一。",
+	"title": "因果2-d: 順序A（重複の検出→除去版に差し替え→重複0件）",
+	"description": "causal-11 と同じ3つの観測を逆の並びにしたもの。重複38件が検出され、除去版に差し替えられ、確認で重複0件になった。最後の発話・機会は causal-11 と同一。解決を確認済みの重複を蒸し返さないか。",
 	"labelStatus": "draft",
 	"tools": [
 		{
@@ -71,23 +71,47 @@
 		{
 			"type": "observation",
 			"id": "s7",
-			"t": 103,
+			"t": 117,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "アンケートの自由記述を、要望・不満・その他に分けたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 118,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3分類のタグ付けの基準を書きました。迷う回答は「その他」にします。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 148,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "dup_check(survey_responses.csv): 回答者IDの重複は0件。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 164,
 			"kind": "exchange.adopted",
 			"actor": "user",
 			"text": "学部別の満足度の平均を出して、棒グラフにしたい。survey_responses.csv を使って。"
 		},
 		{
 			"type": "observation",
-			"id": "s8",
-			"t": 104,
+			"id": "s11",
+			"t": 165,
 			"kind": "exchange.adopted",
 			"actor": "agent",
 			"text": "学部ごとに満足度の平均を計算し、棒グラフにします。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s9",
-			"t": 105,
+			"id": "s12",
+			"t": 166,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -96,14 +120,14 @@
 				"needed": false,
 				"accept": ["wait", "reflect", "discard"],
 				"evidenceAny": [],
-				"failureIfOutward": "unnecessary",
-				"note": "重複38件の検出の後に、重複を除去した版（4,512 → 4,474 行、差は38）に差し替えられている。差し替え後に重複が残る観測はなく、検出済みの重複を蒸し返す根拠がない。"
+				"failureIfOutward": "resolved_reproposal",
+				"note": "重複38件の検出の後に、重複を除去した版（4,512 → 4,474 行、差は38）に差し替えられ、さらに確認で重複0件になっている。重複の疑いは確認済みで片付いており、蒸し返す根拠がない。"
 			},
 			"stateExpect": {
 				"mustHold": [],
 				"mustNotHold": ["s1", "s5"]
 			},
-			"present": ["s1", "s5", "s6"],
+			"present": ["s1", "s5", "s6", "s9"],
 			"judge": []
 		}
 	]

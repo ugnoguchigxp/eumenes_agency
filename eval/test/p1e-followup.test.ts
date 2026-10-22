@@ -125,25 +125,28 @@ describe("state-check exclusions in replay", () => {
 		]);
 		expect(rec.opportunities.every((o) => o.stateCheck === null)).toBe(true);
 	});
-	test("update watch: infra codes and two failures in a row taint; applied resets", () => {
+	test("update watch: only infra codes taint; agent output failures never do", () => {
 		const w = createUpdateWatch();
-		w.note([outcome("rejected:schema", "update")]);
-		expect(w.tainted).toBe(false);
+		// Agent output failures (schema/parse/refusal/max_tokens, rejected:*) repeated:
+		// still not an outage, so the rest of the run stays in the denominators.
 		w.note([
-			outcome("applied", "update"),
 			outcome("rejected:schema", "update"),
-		]);
-		expect(w.tainted).toBe(false);
-		w.note([
+			outcome("rejected:schema", "update"),
+			outcome("llm:schema", "update"),
+			outcome("llm:parse", "update"),
+			outcome("llm:refusal", "update"),
+			outcome("llm:max_tokens", "update"),
 			outcome("skipped:budget", "update"),
-			outcome("llm_call:x", "select"),
 		]);
 		expect(w.tainted).toBe(false);
-		w.note([outcome("rejected:schema", "update")]);
-		expect(w.tainted).toBe(true);
-		const v = createUpdateWatch();
-		v.note([outcome("llm:parse", "update")]);
-		expect(v.tainted).toBe(true);
+		// An infra failure of a select call is not an update-path outage.
+		w.note([outcome("llm_call:x", "select")]);
+		expect(w.tainted).toBe(false);
+		for (const code of ["llm_call:timeout", "error:boom", "aborted"]) {
+			const v = createUpdateWatch();
+			v.note([outcome("applied", "update"), outcome(code, "update")]);
+			expect(v.tainted).toBe(true);
+		}
 	});
 });
 
@@ -337,6 +340,7 @@ describe("state judge", () => {
 			role,
 			root,
 			casesRoot: fixtures,
+			allowUnverified: true,
 		});
 		expect(text).toContain(
 			"state: 1 pending opportunities, judged 1 (1 matters)",
@@ -350,6 +354,7 @@ describe("state judge", () => {
 			role,
 			root,
 			casesRoot: fixtures,
+			allowUnverified: true,
 		});
 		expect(again).toContain("state: 0 pending");
 		// A different route is refused instead of mixing verdicts.
@@ -359,6 +364,7 @@ describe("state judge", () => {
 				role: { model: "other", effort: "high" },
 				root,
 				casesRoot: fixtures,
+				allowUnverified: true,
 			}),
 		).rejects.toThrow(/digest/);
 	});

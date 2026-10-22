@@ -1,7 +1,9 @@
 /**
- * Condition D (P1-E §3, diagnostic upper bound): no stored state and no background
- * update. At each opportunity one select call sees the case's `present` steps plus
- * the last observations before it. It reuses the B1 select instructions, prompt
+ * Condition D (P1-E §3, diagnostic): no stored state and no background update.
+ * At each opportunity one select call sees the case's `present` steps plus the last
+ * RECENT_OBSERVATION_WINDOW observations before it, the same window B1/B2 get, so D
+ * differs from the ablation B1a only by `present` instead of stored notes (and by
+ * having no update step). It reuses the B1 select instructions, prompt
  * builder and participation validation, and the same ticket/receipt path, so its
  * actions score exactly like the other conditions.
  *
@@ -25,6 +27,7 @@ import { defaultLimits, emptyState } from "../src/contracts/model.ts";
 import type { LlmPort } from "../src/contracts/ports.ts";
 import { participationSchema } from "../src/contracts/proposals.ts";
 import {
+	RECENT_OBSERVATION_WINDOW,
 	defaultBudget,
 	type ActionTicket,
 	type AgencyRuntime,
@@ -40,8 +43,6 @@ import {
 import { applyReceipt } from "../src/domains/agency/results.ts";
 import { createLedger } from "../src/domains/experience/ledger.ts";
 
-/** Observations shown besides the case's `present` steps. */
-export const D_RECENT_OBSERVATIONS = 4;
 const DELIVERED_SHOWN = 5;
 
 /** opportunity id -> observation steps to show directly (observation steps only). */
@@ -63,7 +64,7 @@ export function presentMap(c: Case): Map<string, string[]> {
 export function selectDiagnosticObservations(
 	all: readonly Observation[],
 	presentIds: readonly string[],
-	recent: number = D_RECENT_OBSERVATIONS,
+	recent: number = RECENT_OBSERVATION_WINDOW,
 ): Observation[] {
 	const wanted = new Set(presentIds);
 	const picked = new Map<number, Observation>();

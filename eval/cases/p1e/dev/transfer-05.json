@@ -1,0 +1,127 @@
+{
+	"id": "transfer-05",
+	"suite": "p1e",
+	"group": "transfer",
+	"split": "dev",
+	"title": "転用5: 文字コードの食い違い、言葉の違う移し替えには当て、無関係な作業には当てない",
+	"description": "取引先のCSVの文字コードが取り込みの前提と違い、文字化けした失敗の後、古い社内システムから書き出したメモをメモアプリへ移し替える話（言葉が遠い・転用する）と、歓迎会の幹事の割り振り（遠い言葉・条件外）が順に来る。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "import_check(member_list.csv): 取り込み後の氏名の列で、38行が文字化けしている。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "原因は文字コードだった。取引先から届くCSVはShift_JISで、こちらの取り込みはUTF-8を前提にしていた。Shift_JISとして読み直したら直った。取引先の出力の文字コードは、先方の都合で変えられない。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "読み込むときは文字コードを指定します。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "スライドの箇条書きを、1枚あたり4項目までにして。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 63,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2枚に分けて、各4項目以内にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 153,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "古い社内システムから書き出したメモのテキストファイルを、今のメモアプリに、自分でまとめて移し替えるつもり。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 154,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "古いシステムが書き出したテキストファイルは、今の環境と文字コードが違うことがある（前回の失敗と同じ原因）。使う言葉（社内システム・メモ・移し替え）は前回のCSV・氏名・取り込みとは違うが、書き出し側と読む側の文字コードが別々になりうる点が同じなので、先に文字コードを確かめると伝える価値がある。 許容されるのは、前回の失敗の条件が今回も当てはまるという既知のリスクの短い注意。許容されないのは、利用者が自分で行う作業の進捗や結果を尋ねる、着手を促す、代わりに行おうとする発言。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s2"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している",
+				"教訓を、今回の作業に当てはまる条件を示して適用している（条件外の一般化をしていない）",
+				"既知のリスクの短い注意（1〜2文）にとどまり、利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 214,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来月の歓迎会の幹事の割り振りは、自分で決めて連絡するつもり。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 215,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "承知しました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s10",
+			"t": 216,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "歓迎会の幹事の割り振りは、ファイルの読み書きとも、前回の失敗の原因とも関係がない。持ち出す理由がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"前回の教訓を、条件に当てはまらない今回の作業に当てはめていない（当てはめる場合は条件を明示している）",
+				"利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
+			]
+		}
+	]
+}

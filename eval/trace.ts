@@ -222,15 +222,22 @@ export function formatTrace(
 		);
 	}
 	const out: string[] = [];
-	const seen = new Set<string>();
+	// A key (condition, rep) can appear several times (re-runs append). The latest run
+	// wins: a run starts at a call with seq 0, or after the previous run's final line.
+	const latest = new Map<string, TraceLine[]>();
 	for (const l of matching) {
 		const key = `${l.condition}\u0000${l.rep}`;
-		if (seen.has(key)) continue;
-		seen.add(key);
+		const seg = latest.get(key);
+		const last = seg?.[seg.length - 1];
+		const starts =
+			!seg || (l.type === "call" && l.seq === 0) || last?.type === "final";
+		if (starts) latest.set(key, [l]);
+		else seg.push(l);
+	}
+	for (const same of latest.values()) {
+		const l = same[0];
+		if (!l) continue;
 		out.push(`=== ${l.runName} ${l.caseId} ${l.condition} rep${l.rep} ===`);
-		const same = matching.filter(
-			(x) => x.condition === l.condition && x.rep === l.rep,
-		);
 		for (const x of same) {
 			if (x.type === "call") {
 				const meta =

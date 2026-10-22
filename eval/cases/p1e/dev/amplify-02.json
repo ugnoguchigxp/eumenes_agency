@@ -4,7 +4,7 @@
 	"group": "amplify",
 	"split": "dev",
 	"title": "自己増幅2: 本物の測定値が1件届く",
-	"description": "amplify-01 と同じ経過の後、検索キャッシュのヒット率の実測値が届く。外部の根拠が来たとき、推測と実測を区別して更新できるか。",
+	"description": "amplify-01 と同じ経過の後、検索キャッシュのヒット率の実測値が届く。外部の根拠が来たとき、推測と実測を区別して更新できるか。機会は result_received（実測が最後）。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [

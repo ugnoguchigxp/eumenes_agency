@@ -1,0 +1,110 @@
+{
+	"id": "dilution-05",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "dev",
+	"title": "希釈（証明書・K0）: ステージングの証明書の自動更新が失敗した件を後で再開",
+	"description": "ステージングの証明書の自動更新が失敗し、原因が未確認のまま残る。 対照（不要）: A0 と同じ構成（挟む 0 件・180分）だが、事項は挟む前に解決済み。 最後の区間と機会は、同じ原型の他の変種と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "cert_renew_check",
+			"description": "ステージング環境の証明書の有効期限と更新状態を確認する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "ステージングの証明書の有効期限は12日後。自動更新は未実施（直近の更新は失敗している）。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ステージング環境の証明書の自動更新が、昨夜失敗していた。有効期限が近いので、原因を突き止めて直したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "更新のログを見て、原因を確認する必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "cert_renew_log: 更新に失敗。認証用のDNSレコードの追加でタイムアウト（原因は不明）。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 24,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "証明書の件は片付いた。DNSの権限を直して再実行したら、更新に成功した。有効期限も延びている。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 25,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "更新できたのですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 205,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来月のメンテナンス窓で行う作業の一覧を作りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 206,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "メンテナンス窓で行う作業を洗い出して、一覧にしました（5項目）。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 207,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "一覧はこれでいい。この件はここまでにして、少し休憩する。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 222,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "ステージングの証明書の自動更新の失敗と、原因が未確認であることの件は、DNSの権限を直して再実行し、更新に成功した（利用者の報告）で解決済み。最後の区切りでも、解決済みの件を持ち出す理由がない（長い間に何があっても、この件は終わっている）。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s3", "s4"]
+			},
+			"present": ["s1", "s3", "s4"],
+			"judge": []
+		}
+	]
+}

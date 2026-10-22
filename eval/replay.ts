@@ -1,9 +1,11 @@
 /** Fake host: replays one Case through an AgencyRuntime and records a RunRecord. */
-import type {
-	Case,
-	EvalCondition,
-	OpportunityRecord,
-	RunRecord,
+import { caseHash } from "./cases.ts";
+import {
+	runtimeConditionOf,
+	type Case,
+	type EvalCondition,
+	type OpportunityRecord,
+	type RunRecord,
 } from "./contracts.ts";
 import {
 	computeStateCheck,
@@ -40,17 +42,22 @@ export interface ReplayOptions {
 	readonly probe?: SelectProbe;
 }
 
-const isCallFailure = (code: string): boolean =>
+/** Infra failure of a model call (API/connection/abort): not a judgment of the agent. */
+export const isInfraCallCode = (code: string): boolean =>
 	code.startsWith("llm_call:") ||
 	code.startsWith("error:") ||
-	code.startsWith("llm:");
+	code === "aborted";
 
 export const isSpendLimit = (text: string): boolean =>
 	text.toLowerCase().includes("spend_limit");
 
 /**
  * A run is incomplete when an exception stopped it, the spend limit was hit,
- * or every model call of a non-B0 run failed.
+ * or every model call of a non-B0 run failed for infra reasons (`llm_call:*`,
+ * `error:*`, aborted). Agent output failures (`llm:*` schema/parse/refusal/max_tokens,
+ * `rejected:*`) never make a run incomplete: they are the agent's own failures and stay
+ * in the counts (also the consecutive-incomplete halt in `run` therefore only fires on
+ * consecutive infra failures).
  */
 export function computeIncomplete(
 	condition: EvalCondition,
@@ -62,29 +69,26 @@ export function computeIncomplete(
 	return (
 		condition !== "B0" &&
 		calls.length > 0 &&
-		calls.every((c) => isCallFailure(c.code))
+		calls.every((c) => isInfraCallCode(c.code))
 	);
 }
 
 /**
- * Tracks whether the background update path has broken in a run: an infra-coded update
- * call (llm_call: / error: / llm:), or two failed updates in a row (the runtime then
- * quarantines updates until a new observation arrives; approximated as "tainted for
- * the rest of the run"). State checks after that point measure the outage, not the agent.
+ * Tracks whether the background update path hit an infra failure in a run
+ * (`llm_call:*`, `error:*`, aborted). State checks after that point measure the
+ * outage, not the agent, so the rest of the run is excluded from state scoring.
+ *
+ * Agent output failures (`llm:*` schema/parse/refusal/max_tokens and `rejected:*`,
+ * also when they repeat and the runtime quarantines updates) do NOT taint the run:
+ * they are the agent's own failures and stay in the denominators (a quarantined
+ * runtime waits as host_stale, which scores like any other wait).
  */
 export function createUpdateWatch() {
 	let tainted = false;
-	let consecutive = 0;
 	return {
 		note(calls: readonly { purpose: string; code: string }[]): void {
 			for (const c of calls) {
-				if (c.purpose !== "update") continue;
-				if (isCallFailure(c.code)) tainted = true;
-				if (c.code === "applied" || c.code === "no_change") consecutive = 0;
-				else if (!c.code.startsWith("skipped:") && c.code !== "aborted") {
-					consecutive++;
-					if (consecutive >= 2) tainted = true;
-				}
+				if (c.purpose === "update" && isInfraCallCode(c.code)) tainted = true;
 			}
 		},
 		get tainted(): boolean {
@@ -188,7 +192,8 @@ export async function replayCase(
 				after.observations.filter((o) => o.actor === "agent").map((o) => o.id),
 			);
 			// Condition D and B0 keep no state: nothing to check.
-			const keepsState = condition !== "D" && condition !== "B0";
+			const stateCondition = runtimeConditionOf(condition);
+			const keepsState = stateCondition !== null && stateCondition !== "B0";
 			const want = step.stateExpect;
 			const blocked =
 				step.presence !== "quiet" ||
@@ -210,12 +215,16 @@ export async function replayCase(
 					? (opts.probe?.captured() ?? after.state)
 					: null;
 			const stateCheck =
-				checked && keepsState
-					? computeStateCheck(condition, checked, want)
+				checked && stateCondition !== null && keepsState
+					? computeStateCheck(stateCondition, checked, want)
 					: null;
 			const stateItems =
-				checked && keepsState && want && want.mustNotHold.length > 0
-					? openItems(condition, checked)
+				checked &&
+				stateCondition !== null &&
+				keepsState &&
+				want &&
+				want.mustNotHold.length > 0
+					? openItems(stateCondition, checked)
 					: null;
 			opportunities.push({
 				opportunityId: step.id,
@@ -224,16 +233,14 @@ export async function replayCase(
 				source: decision.source,
 				utterance: decision.utterance,
 				toolName: decision.toolName,
+				toolInput: decision.toolInput,
 				evidenceRefs: [...decision.evidenceRefs],
 				reason: decision.reason,
 				// "call:<code>" marks infra failures of this opportunity's own model calls.
 				rejectCodes: [
 					...decision.rejectCodes,
 					...decideCalls
-						.filter(
-							(x) =>
-								x.code.startsWith("llm_call:") || x.code.startsWith("error:"),
-						)
+						.filter((x) => isInfraCallCode(x.code))
 						.map((x) => `call:${x.code}`),
 				],
 				agentAuthoredRefs: decision.evidenceRefs.filter((r) => agentIds.has(r)),
@@ -330,6 +337,7 @@ export async function replayCase(
 		condition,
 		rep,
 		labelStatus: c.labelStatus,
+		caseHash: caseHash(c),
 		settingsDigest: opts.settingsDigest,
 		instructionVersion: opts.instructionVersion,
 		opportunities,

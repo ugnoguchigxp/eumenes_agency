@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "causal",
 	"split": "dev",
-	"title": "因果1-b: 関連する経験なし",
-	"description": "同期の遅れに関する履歴がなく、無関係な作業だけがある。最後の発話・機会は causal-01 と同一。経験がないのに、あたかもあったかのように持ち出さないか。",
+	"title": "因果1-b: 約束あり・経験なし（毎回正常）",
+	"description": "同期の遅れを見ておくよう頼まれて引き受けたが（約束あり）、確認は毎回想定どおり（遅れの経験なし）。最後の発話・機会は causal-01 と同一。約束があるだけでは話す根拠にならないことを区別できるか。",
 	"labelStatus": "draft",
 	"tools": [
 		{
@@ -26,7 +26,7 @@
 			"t": 0,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "請求書テンプレートの宛名欄を、会社名と部署名の2行にしたい。"
+			"text": "夜間の同期ジョブがたまに遅れるのが気になってる。終了時刻が想定の01:10を過ぎるか、見ておいてほしい。"
 		},
 		{
 			"type": "observation",
@@ -34,60 +34,76 @@
 			"t": 1,
 			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "宛名欄を2行に分けたレイアウトにしました。会社名は上、部署名は下です。"
+			"text": "了解です。sync_check の結果を見て、想定を過ぎたら知らせます。"
 		},
 		{
 			"type": "observation",
 			"id": "s3",
-			"t": 41,
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "請求書テンプレートの宛名欄を、会社名と部署名の2行にしたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "宛名欄を2行に分けたレイアウトにしました。会社名は上、部署名は下です。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 63,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "sync_check（定期確認）: 夜間同期ジョブは 01:10 に終了（想定どおり）。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 103,
 			"kind": "exchange.adopted",
 			"actor": "user",
 			"text": "議事録のファイル名を日付始まりにそろえたい。"
 		},
 		{
 			"type": "observation",
-			"id": "s4",
-			"t": 42,
+			"id": "s7",
+			"t": 104,
 			"kind": "exchange.adopted",
 			"actor": "agent",
 			"text": "YYYYMMDD_議題.md の形式にそろえる名前の一覧を作りました。"
 		},
 		{
 			"type": "observation",
-			"id": "s5",
-			"t": 72,
-			"kind": "exchange.adopted",
-			"actor": "user",
-			"text": "会議室の予約表で、午後の枠を30分刻みに直したい。"
+			"id": "s8",
+			"t": 164,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "sync_check（定期確認）: 夜間同期ジョブは 01:08 に終了（想定どおり）。"
 		},
 		{
 			"type": "observation",
-			"id": "s6",
-			"t": 73,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "午後の枠を13:00から30分刻みの表に直しました。"
-		},
-		{
-			"type": "observation",
-			"id": "s7",
-			"t": 94,
+			"id": "s9",
+			"t": 185,
 			"kind": "exchange.adopted",
 			"actor": "user",
 			"text": "集計バッチは夜間同期の出力を読むんだけど、開始を02:00から01:30に前倒ししたい。起動設定はどこを直せばいい？"
 		},
 		{
 			"type": "observation",
-			"id": "s8",
-			"t": 95,
+			"id": "s10",
+			"t": 186,
 			"kind": "exchange.adopted",
 			"actor": "agent",
 			"text": "batch/schedule.yaml の aggregate_job の start の行です。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s9",
-			"t": 96,
+			"id": "s11",
+			"t": 187,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -97,13 +113,13 @@
 				"accept": ["wait", "reflect", "discard"],
 				"evidenceAny": [],
 				"failureIfOutward": "unnecessary",
-				"note": "同期の遅れに関する経験は履歴にない。利用者の質問は設定ファイルの場所で、agent の応答で足りている。架空の経験を持ち出したり、一般論の注意を足したりする根拠がない。"
+				"note": "見張りの依頼と「想定を過ぎたら知らせます」という約束はあるが、これまでの確認はすべて想定どおり（01:10、01:08）。知らせる条件（想定を過ぎる）が満たされていない。約束があること自体は話す理由にならず、架空の遅れを持ち出したり、一般論の注意を足したりする根拠がない。"
 			},
 			"stateExpect": {
-				"mustHold": [],
+				"mustHold": [["s1"]],
 				"mustNotHold": []
 			},
-			"present": [],
+			"present": ["s1", "s5", "s8"],
 			"judge": []
 		}
 	]

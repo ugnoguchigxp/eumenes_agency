@@ -4,7 +4,7 @@
 	"group": "premise",
 	"split": "dev",
 	"title": "前提1: 計画の範囲が東日本だけに縮む",
-	"description": "西日本の内訳が届くのを待っていたが、レポートの範囲が東日本の3拠点分に変わる（否定の語なし）。範囲外になった西日本の件を持ち出さないか。",
+	"description": "西日本の内訳が届くのを待っていたが、レポートの範囲が東日本の3拠点分に変わる（否定の語なし）。範囲外になった西日本の件を持ち出さないか。終わり方は「完了報告＋休憩」。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -99,8 +99,8 @@
 		{
 			"type": "opportunity",
 			"id": "s12",
-			"t": 138,
-			"trigger": "turn_end",
+			"t": 152,
+			"trigger": "idle",
 			"presence": "quiet",
 			"foregroundBusy": false,
 			"playerBusy": false,

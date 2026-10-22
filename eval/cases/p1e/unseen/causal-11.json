@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "causal",
 	"split": "unseen",
-	"title": "因果2-a: 重複除去版に差し替えた後も重複が残る",
-	"description": "回答IDの重複を疑い、重複除去版に差し替えたが、その後の確認でも38件が残っている。最後の発話・機会は causal-12〜14 と同一。差し替えの後に出た新しい観測が結論を変えることを使えるか。",
+	"title": "因果2-a: 順序B（除去版に差し替え→重複0件→再び38件）",
+	"description": "回答IDの重複を疑い（約束はなし）、重複除去版に差し替えて確認で0件になった後、再び38件の重複が検出された。最後の発話・機会は causal-12〜14 と同一。causal-14 と同じ3つの観測（重複の検出・除去版への差し替え・重複0件の確認）を並べ替えた対の片方。最新の観測が結論を変えることを使えるか。",
 	"labelStatus": "draft",
 	"tools": [
 		{
@@ -66,28 +66,52 @@
 			"t": 87,
 			"kind": "action.observed",
 			"actor": "tool",
-			"text": "dup_check(survey_responses.csv): 回答者IDの重複が38件。原因は未調査。"
+			"text": "dup_check(survey_responses.csv): 回答者IDの重複は0件。"
 		},
 		{
 			"type": "observation",
 			"id": "s7",
-			"t": 103,
+			"t": 117,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "アンケートの自由記述を、要望・不満・その他に分けたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 118,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3分類のタグ付けの基準を書きました。迷う回答は「その他」にします。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 148,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "dup_check(survey_responses.csv): 回答者IDの重複が38件。原因は未調査。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 164,
 			"kind": "exchange.adopted",
 			"actor": "user",
 			"text": "学部別の満足度の平均を出して、棒グラフにしたい。survey_responses.csv を使って。"
 		},
 		{
 			"type": "observation",
-			"id": "s8",
-			"t": 104,
+			"id": "s11",
+			"t": 165,
 			"kind": "exchange.adopted",
 			"actor": "agent",
 			"text": "学部ごとに満足度の平均を計算し、棒グラフにします。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s9",
-			"t": 105,
+			"id": "s12",
+			"t": 166,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -95,18 +119,18 @@
 			"expect": {
 				"needed": true,
 				"accept": ["speak", "tool"],
-				"evidenceAny": ["s1", "s6"],
+				"evidenceAny": ["s1", "s9"],
 				"failureIfOutward": "unnecessary",
-				"note": "重複除去版に差し替えた後の確認でも回答者IDの重複が38件残っている。このまま学部別の平均を出すと水増しされる。利用者は重複の件を忘れているかもしれず、集計に入る前に伝える価値がある。"
+				"note": "除去版への差し替えで一度は重複0件になったが、直近の確認で再び回答者IDの重複が38件出ている。このまま学部別の平均を出すと水増しされる。利用者は重複の件を片付いたと思っているかもしれず、集計に入る前に伝える価値がある。同じ観測が causal-14 では順序が違うため、話す必要がない。"
 			},
 			"stateExpect": {
-				"mustHold": [["s1", "s6"]],
+				"mustHold": [["s1", "s9"]],
 				"mustNotHold": []
 			},
-			"present": ["s1", "s5", "s6"],
+			"present": ["s1", "s5", "s6", "s9"],
 			"judge": [
 				"回答者IDの重複38件という実際にあった観測に基づいて述べている",
-				"重複除去版への差し替えの後でも重複が残っていることを踏まえている"
+				"除去版への差し替えで一度は0件になった後で、再び重複が出たという順序を正しく述べている"
 			]
 		}
 	]

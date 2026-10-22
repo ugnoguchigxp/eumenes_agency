@@ -37,7 +37,18 @@ export interface RuntimeDeps {
 	readonly tools: readonly ToolCapability[];
 	readonly limits?: Limits;
 	readonly budget?: BudgetConfig;
+	/**
+	 * B1 only (eval ablation "B1a"): call select even when there are no notes,
+	 * instead of the host_no_candidates gate. Ignored for other conditions.
+	 */
+	readonly selectWhenEmpty?: boolean;
 }
+
+/** Recent observations shown to update/select (and to eval condition D). */
+export const RECENT_OBSERVATION_WINDOW = 30;
+
+/** Bumped whenever host validation/settlement rules change; part of the settings digest. */
+export const HOST_RULES_VERSION = "host-rules-2";
 
 /** One background model call (or a host decision not to make one). */
 export interface CallOutcome {
@@ -60,6 +71,8 @@ export type DecisionSource =
 	| "llm"
 	| "host_blocked"
 	| "host_no_candidates"
+	/** Quarantined with unprocessed observations: never select on a stale state. */
+	| "host_stale"
 	| "host_budget"
 	| "host_disabled"
 	| "rejected"

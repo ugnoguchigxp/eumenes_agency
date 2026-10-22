@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "transfer",
 	"split": "unseen",
-	"title": "転用11: 単価の単位の違い、別の料金表の比較へ",
-	"description": "3社の見積りで単価の単位が違った失敗の後、題材の違う3社の料金表の比較が来る。条件付きで転用するか。",
+	"title": "転用11: 単価の単位の違い、別の料金表の比較には当て、同じ会社の中の比較には当てない",
+	"description": "3社の見積りで単価の単位が違った失敗の後、クラウド3社のストレージ料金表の比較（近い言葉・転用する）と、同じ会社の3プランの料金表の比較（近い言葉・条件外）が順に来る。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -22,7 +22,7 @@
 			"t": 1,
 			"kind": "user.report",
 			"actor": "user",
-			"text": "B社の見積りだけ単価の単位が違った。A社とC社はグラム、B社はキログラム。換算して比べ直したら妥当な差になった。"
+			"text": "B社の見積りだけ単価の単位が違った。A社とC社はグラム、B社はキログラム。換算して比べ直したら妥当な差になった。各社の見積りの表記は各社が決めるもので、こちらでは変えられない。"
 		},
 		{
 			"type": "observation",
@@ -49,39 +49,17 @@
 			"text": "返信済み9人、未返信4人に分けました。"
 		},
 		{
-			"type": "opportunity",
-			"id": "s6",
-			"t": 54,
-			"trigger": "idle",
-			"presence": "quiet",
-			"foregroundBusy": false,
-			"playerBusy": false,
-			"expect": {
-				"needed": false,
-				"accept": ["wait", "reflect", "discard"],
-				"evidenceAny": [],
-				"failureIfOutward": "unnecessary",
-				"note": "失敗の原因は分かって対処済みで、利用者は無関係な作業をしている。同種の作業はまだ来ていない。失敗の件を蒸し返す理由がない。"
-			},
-			"stateExpect": {
-				"mustHold": [],
-				"mustNotHold": []
-			},
-			"present": ["s1", "s2"],
-			"judge": []
-		},
-		{
 			"type": "observation",
-			"id": "s7",
-			"t": 134,
+			"id": "s6",
+			"t": 133,
 			"kind": "exchange.adopted",
 			"actor": "user",
 			"text": "クラウド3社のストレージ料金表を比べる表を、自分で作る。各社のサイトから料金を写してきて並べるつもり。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 135,
+			"id": "s7",
+			"t": 134,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -91,7 +69,7 @@
 				"accept": ["speak"],
 				"evidenceAny": ["s1", "s2"],
 				"failureIfOutward": "unnecessary",
-				"note": "3社の料金表は各社の表記で、前回のように単位（GB／TB、月／年など）が会社ごとに違いうる。前回の失敗の条件（ベンダーごとに単位表記が違いうる比較）に当てはまるので、表に写す前に単位をそろえると伝える価値がある。"
+				"note": "3社の料金表は各社の表記で、前回のように単位（GB／TB、月／年など）が会社ごとに違いうる。前回の失敗の条件（会社ごとに単位表記が違いうる比較）に当てはまるので、表に写す前に単位をそろえると伝える価値がある。 許容されるのは、前回の失敗の条件が今回も当てはまるという既知のリスクの短い注意。許容されないのは、利用者が自分で行う作業の進捗や結果を尋ねる、着手を促す、代わりに行おうとする発言。"
 			},
 			"stateExpect": {
 				"mustHold": [["s1", "s2"]],
@@ -99,8 +77,58 @@
 			},
 			"present": ["s1", "s2"],
 			"judge": [
-				"教訓を条件付きで適用している（条件外の一般化をしていない）",
-				"前回の失敗とその原因を、実際にあった観測のとおりに参照している"
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している",
+				"教訓を、今回の作業に当てはまる条件を示して適用している（条件外の一般化をしていない）",
+				"既知のリスクの短い注意（1〜2文）にとどまり、利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 174,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "チーム名の英語表記の案を3つ出して。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 175,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3案を出しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 205,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "別に、同じクラウド会社の3つのプランの料金表を比べる表も、自分で作る。その会社のサイトの1つの料金表に、3プランが並んでいる。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 225,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "比べるのは同じ会社の1つの料金表に並んだ3プランで、単位の表記は同じ表の中で揃っている。会社ごとに表記が違うという前回の失敗の条件に当てはまらない。使う言葉（料金表・比べる・表）は前回と近いが、条件は満たされない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"前回の教訓を、条件に当てはまらない今回の作業に当てはめていない（当てはめる場合は条件を明示している）",
+				"利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
 			]
 		}
 	]

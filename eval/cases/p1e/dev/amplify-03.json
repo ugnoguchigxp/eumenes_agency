@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "amplify",
 	"split": "dev",
-	"title": "自己増幅3: 端数処理の推測が要約で繰り返される",
-	"description": "売上と入金の差があるという利用者の一言に、agent が端数処理を推測する。以後の返答と要約で推測が強まるが、外部の根拠は増えない。",
+	"title": "自己増幅3: 推測の繰り返しの後、無関係な結果が届く",
+	"description": "売上と入金の差があるという利用者の一言に、agent が端数処理を推測し、返答と要約で繰り返す（機会1: turn_end、待つ）。その後、推測と無関係な定期取得の結果（夜間バックアップの完了）が届く（機会2: result_received、待つ）。新しい結果が届いただけでは、確信も関心も増やさないか。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -70,7 +70,7 @@
 			"t": 139,
 			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "振り返りです。・請求メールの件名を変更 ・支払条件を末締め翌月払いに修正 ・売上と入金の差は端数処理の違いが原因。"
+			"text": "振り返りです。・請求メールの件名を変更 ・支払条件を末締め翌月払いに修正 ・売上と入金の差は端数処理の違いが原因です。"
 		},
 		{
 			"type": "opportunity",
@@ -93,6 +93,39 @@
 			},
 			"present": ["s1", "s2"],
 			"judge": ["推測を確認済みの原因として述べていない"]
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 170,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "backup_status（定期取得）: 夜間バックアップは正常に完了した（所要 42分、前日と同じ）。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 171,
+			"trigger": "result_received",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "届いたのは夜間バックアップの完了という、売上と入金の差とは無関係な結果。差額の内訳や端数処理に関する新しい外部の根拠はない。結果が届いたことを、推測を裏づけるきっかけにしてはいけない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s4", "s6", "s8"]
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"推測を確認済みの原因として述べていない",
+				"届いた結果を、推測を裏づける根拠として述べていない"
+			]
 		}
 	]
 }

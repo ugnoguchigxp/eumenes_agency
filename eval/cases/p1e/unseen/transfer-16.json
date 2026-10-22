@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "transfer",
 	"split": "unseen",
-	"title": "転用16: 閲覧専用フォルダ、別の自動保存先へ",
-	"description": "共有フォルダの階層が閲覧専用で書き込みに失敗した後、別の階層への自動保存の話が来る。条件付きで転用するか。",
+	"title": "転用16: 閲覧専用の階層、言葉の違う自動投稿には当て、自分用のフォルダには当てない",
+	"description": "共有フォルダの階層が閲覧専用で書き込みに失敗した後、社内の掲示板へ毎週自動で投稿するボットの設定（言葉が遠い・転用する）と、自分用のフォルダへの自動保存（近い言葉・条件外）が順に来る。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -22,7 +22,7 @@
 			"t": 1,
 			"kind": "user.report",
 			"actor": "user",
-			"text": "共有フォルダのこの階層は閲覧専用だった。書き込み用の別フォルダに出力先を変えたら保存できた。"
+			"text": "共有フォルダのこの階層は閲覧専用だった。書き込み用の別フォルダに出力先を変えたら保存できた。階層ごとの権限は管理部門が決めていて、こちらでは変えられない。"
 		},
 		{
 			"type": "observation",
@@ -49,39 +49,17 @@
 			"text": "様式の名称に合わせて4項目を直しました。"
 		},
 		{
-			"type": "opportunity",
-			"id": "s6",
-			"t": 54,
-			"trigger": "idle",
-			"presence": "quiet",
-			"foregroundBusy": false,
-			"playerBusy": false,
-			"expect": {
-				"needed": false,
-				"accept": ["wait", "reflect", "discard"],
-				"evidenceAny": [],
-				"failureIfOutward": "unnecessary",
-				"note": "失敗の原因は分かって対処済みで、利用者は無関係な作業をしている。同種の作業はまだ来ていない。失敗の件を蒸し返す理由がない。"
-			},
-			"stateExpect": {
-				"mustHold": [],
-				"mustNotHold": []
-			},
-			"present": ["s1", "s2"],
-			"judge": []
-		},
-		{
 			"type": "observation",
-			"id": "s7",
-			"t": 134,
+			"id": "s6",
+			"t": 133,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "週次の集計を、毎週共有フォルダに自動で保存するよう、自分で設定する。保存先は planning/週次 の配下にするつもり。"
+			"text": "社内の掲示板に、毎週月曜に今週の予定を自動で投稿するボットを、自分で設定するつもり。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 135,
+			"id": "s7",
+			"t": 134,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -91,7 +69,7 @@
 				"accept": ["speak"],
 				"evidenceAny": ["s1", "s2"],
 				"failureIfOutward": "unnecessary",
-				"note": "共有フォルダの階層によっては閲覧専用で、書き込みに失敗する。自動保存先に使う階層の権限が前回の失敗と同じ条件で問題になりうるので、保存先に書き込めるか先に確かめると伝える価値がある。"
+				"note": "掲示板のチャンネルによっては、投稿の権限が閲覧専用になっている（前回の失敗と同じ原因）。使う言葉（掲示板・ボット・投稿）は前回の共有フォルダ・保存とは違うが、書き込みの権限が場所ごとに決まっていて自分では変えられない点が同じなので、投稿先に書き込めるかを先に確かめると短く伝える価値がある。 許容されるのは、前回の失敗の条件が今回も当てはまるという既知のリスクの短い注意。許容されないのは、利用者が自分で行う作業の進捗や結果を尋ねる、着手を促す、代わりに行おうとする発言。"
 			},
 			"stateExpect": {
 				"mustHold": [["s1", "s2"]],
@@ -99,8 +77,58 @@
 			},
 			"present": ["s1", "s2"],
 			"judge": [
-				"教訓を条件付きで適用している（条件外の一般化をしていない）",
-				"前回の失敗とその原因を、実際にあった観測のとおりに参照している"
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している",
+				"教訓を、今回の作業に当てはまる条件を示して適用している（条件外の一般化をしていない）",
+				"既知のリスクの短い注意（1〜2文）にとどまり、利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 174,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "チーム名の英語表記の案を3つ出して。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 175,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3案を出しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 205,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "週次の集計を、毎週、自分用のフォルダ（マイドキュメント配下）に自動で保存するよう、自分で設定する。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s11",
+			"t": 225,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "保存先は自分用のフォルダで、書き込みの権限は利用者本人にある。閲覧専用の階層に書き込むという前回の失敗の条件に当てはまらない。使う言葉（毎週・集計・自動で保存）は前回と近いが、条件は満たされない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"前回の教訓を、条件に当てはまらない今回の作業に当てはめていない（当てはめる場合は条件を明示している）",
+				"利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
 			]
 		}
 	]

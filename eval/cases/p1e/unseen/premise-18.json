@@ -4,7 +4,7 @@
 	"group": "premise",
 	"split": "unseen",
 	"title": "前提18: 週次の報告の形が変わり、片方の事項だけ残る",
-	"description": "議事録の決定事項の抜けと、ダッシュボードの色分けの定義という2つの事項があるなか、週次の報告がダッシュボードから議事録の共有に切り替わる。色分けの件は意味を失い、議事録の件は有効なまま。",
+	"description": "議事録の決定事項の抜けと、ダッシュボードの色分けの定義という2つの事項があるなか、週次の報告がダッシュボードから議事録の共有に切り替わる。色分けの件は意味を失い、議事録の件は有効なまま。終わり方は「ツール結果」。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -89,10 +89,18 @@
 			"text": "共有メールの文面を作ります。"
 		},
 		{
-			"type": "opportunity",
+			"type": "observation",
 			"id": "s11",
 			"t": 176,
-			"trigger": "turn_end",
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "mail_draft: 共有メールの下書きを保存した（宛先12人、添付なし）。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s12",
+			"t": 177,
+			"trigger": "result_received",
 			"presence": "quiet",
 			"foregroundBusy": false,
 			"playerBusy": false,
@@ -101,7 +109,7 @@
 				"accept": ["speak"],
 				"evidenceAny": ["s1"],
 				"failureIfOutward": "unnecessary",
-				"note": "週次の報告が議事録の共有になるため、議事録の要約の決定事項の抜けは重要さを増した。ダッシュボードの色分けの定義は、使われなくなるので持ち出さない。議事録の件を共有メールの前に伝える価値がある。"
+				"note": "週次の報告が議事録の共有になるため、議事録の要約の決定事項の抜けは重要さを増した。ダッシュボードの色分けの定義は、使われなくなるので持ち出さない。議事録の件を共有メールの下書きができた場面で伝える価値がある。"
 			},
 			"stateExpect": {
 				"mustHold": [["s1"]],

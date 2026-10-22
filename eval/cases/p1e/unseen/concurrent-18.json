@@ -121,17 +121,9 @@
 			"text": "今日の作業の優先順位を、一緒に考えたい。"
 		},
 		{
-			"type": "observation",
+			"type": "opportunity",
 			"id": "s15",
 			"t": 138,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "残っている作業を見て、優先順位を考えます。"
-		},
-		{
-			"type": "opportunity",
-			"id": "s16",
-			"t": 139,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

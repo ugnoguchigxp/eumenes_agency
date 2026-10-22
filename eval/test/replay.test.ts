@@ -294,7 +294,12 @@ describe("replay granularity and integrity", () => {
 				null,
 			),
 		).toBe(true);
-		expect(computeIncomplete("B2", [call("llm:refusal")], null)).toBe(true);
+		// Agent output failures never make a run incomplete (only infra does).
+		expect(computeIncomplete("B2", [call("llm:refusal")], null)).toBe(false);
+		expect(
+			computeIncomplete("B2", [call("llm:schema"), call("rejected:x")], null),
+		).toBe(false);
+		expect(computeIncomplete("B2", [call("aborted")], null)).toBe(true);
 		expect(
 			computeIncomplete(
 				"B2",

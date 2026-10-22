@@ -1,0 +1,110 @@
+{
+	"id": "dilution-12",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "dev",
+	"title": "希釈（校正・K0）: 検査用の温度計の校正期限が切れている件を後で再開",
+	"description": "検査用の温度計T-07の校正期限が切れており、校正の依頼が未了のまま残る。 対照（不要）: A0 と同じ構成（挟む 0 件・180分）だが、事項は挟む前に解決済み。 最後の区間と機会は、同じ原型の他の変種と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "calib_register",
+			"description": "校正管理表で、検査機器の校正期限と依頼状況を確認する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "温度計T-07: 校正期限は先月末（切れている）、依頼状況は未依頼。ほかの検査機器は期限内。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "工場の検査用の温度計のうち、T-07の校正期限が先月末で切れている。来週の外部審査までに、校正に出したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "審査までに間に合うよう、校正の手配が必要ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "calib_register: 温度計T-07の校正期限は先月末（切れている）。校正の依頼はまだ出ていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 24,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "T-07は校正に出して、証明書つきで戻ってきた。期限は来年に更新済みで、審査の準備は済んだ。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 25,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "戻ってきたのですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 205,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "審査当日の見学の動線を、図にしたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 206,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "入口から現場までの動線を図にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 207,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "図はこれでいい。次は、審査員に渡す会社概要の紙を、自分でまとめ直すつもり。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 208,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "温度計T-07の校正期限が切れており、校正の依頼が未了であることの件は、校正に出して証明書つきで戻ってきた（利用者の報告）で解決済み。最後の区切りでも、解決済みの件を持ち出す理由がない（長い間に何があっても、この件は終わっている）。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s3", "s4"]
+			},
+			"present": ["s1", "s3", "s4"],
+			"judge": []
+		}
+	]
+}

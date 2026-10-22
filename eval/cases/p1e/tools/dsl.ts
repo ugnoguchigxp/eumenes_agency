@@ -48,6 +48,12 @@ export interface OppIn {
 	/** stateExpect.mustNotHold (labels). */
 	not?: string[];
 	judge?: string[];
+	/**
+	 * Extra labels to show condition D besides the matter labels. For an opportunity where no
+	 * matter was raised yet (causal "no history" cases) this is the unrelated work raised so far,
+	 * so that `present` is never empty and its size does not signal the label.
+	 */
+	pres?: string[];
 	dt?: number;
 }
 export interface OppItem extends OppIn {
@@ -166,6 +172,7 @@ export function build(def: CaseDef): Case {
 		const present = [
 			...new Set([
 				...labeled.filter((l) => !NON_MATTER.test(l)).map((l) => ids.get(l)!),
+				...(it.pres ?? []).map((l) => ref(l, `${id}.pres`)),
 				...ev,
 			]),
 		].sort((x, y) => Number(x.slice(1)) - Number(y.slice(1)));

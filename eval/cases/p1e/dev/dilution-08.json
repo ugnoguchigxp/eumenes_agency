@@ -1,0 +1,97 @@
+{
+	"id": "dilution-08",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "dev",
+	"title": "希釈（校正・A0）: 検査用の温度計の校正期限が切れている件を後で再開",
+	"description": "検査用の温度計T-07の校正期限が切れており、校正の依頼が未了のまま残る。 (a) 件数の影響（経過時間は一定）: 無関係な観測 0 件（0 往復）を、180分の間に詰めて挟む（0 件でも未解決事項から 180分後）。 最後の区間と機会は、同じ原型の他の変種と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "calib_register",
+			"description": "校正管理表で、検査機器の校正期限と依頼状況を確認する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "温度計T-07: 校正期限は先月末（切れている）、依頼状況は未依頼。ほかの検査機器は期限内。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "工場の検査用の温度計のうち、T-07の校正期限が先月末で切れている。来週の外部審査までに、校正に出したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "審査までに間に合うよう、校正の手配が必要ですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "calib_register: 温度計T-07の校正期限は先月末（切れている）。校正の依頼はまだ出ていない。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 184,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "審査当日の見学の動線を、図にしたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 185,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "入口から現場までの動線を図にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 186,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "図はこれでいい。次は、審査員に渡す会社概要の紙を、自分でまとめ直すつもり。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 187,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "検査用の温度計T-07は校正期限が切れたままで、校正の依頼も出ていない。来週の外部審査までという期限がある。審査当日の動線の図は仕上がり、利用者が次の自分の作業を述べた区切りの場面で、校正の件を話題にする機会。calib_register で状況を確かめてもよい。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s3"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"温度計T-07の校正期限が切れており、校正の依頼が未了であることを、実際にあった観測のとおりに述べている",
+				"校正が済んだ、または依頼を出したとは言っていない"
+			]
+		}
+	]
+}

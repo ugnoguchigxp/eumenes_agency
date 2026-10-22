@@ -1,0 +1,110 @@
+{
+	"id": "dilution-64",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "unseen",
+	"title": "希釈（面接日程・K0）: 候補者1名の返信待ちの面接日程を後で再開",
+	"description": "採用面接の日程調整で、候補者1名からの返信が来ないまま日程が未確定で残る。 対照（不要）: A0 と同じ構成（挟む 0 件・180分）だが、事項は挟む前に解決済み。 最後の区間と機会は、同じ原型の他の変種と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "mail_status",
+			"description": "送信した打診メールの返信状況を確認する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "候補者Bさん宛の日程の打診メール: 送信済み（3日前）、返信なし。ほかの候補者は日程が確定済み。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "採用面接の日程調整で、候補者のBさんからまだ返信が来ていない。面接は来週の水曜までに終えたいので、今週中に日程を確定したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "返信が来ないと、日程を確定できませんね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "mail_status: 候補者Bさん宛の日程の打診メール: 送信済み（3日前）、返信なし。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 24,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "Bさんから返信が来て、水曜の午後に決まった。面接官にも共有済みだよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 25,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "日程が確定したのですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 205,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "面接官に送る、当日の流れの案内文を作りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 206,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "集合から終了までの流れを、案内文にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 207,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "案内文はこれでいい。次は、面接で聞く質問の一覧を、自分で見直すつもり。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 208,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "候補者Bさんからの返信がなく、面接の日程が未確定であることの件は、Bさんから返信が来て、水曜の午後に決まった（利用者の報告）で解決済み。最後の区切りでも、解決済みの件を持ち出す理由がない（長い間に何があっても、この件は終わっている）。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s3", "s4"]
+			},
+			"present": ["s1", "s3", "s4"],
+			"judge": []
+		}
+	]
+}

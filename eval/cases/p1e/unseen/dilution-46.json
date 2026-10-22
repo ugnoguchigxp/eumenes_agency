@@ -1,0 +1,110 @@
+{
+	"id": "dilution-46",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "unseen",
+	"title": "希釈（配送見積り・K0）: 配送の見積りが1社分しか届いていない件を後で再開",
+	"description": "展示用機材の配送の見積りを2社から取る予定だが、1社分しか届かず比較できないまま残る。 対照（不要）: A0 と同じ構成（挟む 0 件・180分）だが、事項は挟む前に解決済み。 最後の区間と機会は、同じ原型の他の変種と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "quote_status",
+			"description": "依頼中の見積りの受領状況を確認する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "A社の見積りは受領済み。B社は依頼済みで、まだ届いていない（依頼から3日）。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "展示用の機材の配送は、2社から見積りを取って比べる予定。搬入は来月の頭なので、今月中に決めたい。今届いているのはA社の分だけ。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "B社の見積りが届くまでは、比較できませんね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "quote_status: A社の見積りは受領済み（単価表つき）。B社は依頼済みで未着。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 24,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "B社の見積りが届いた。2社を比べて、A社に決めて発注も済ませたよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 25,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "A社に決まったのですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 205,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "機材の搬入日の段取りを、一覧にしたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 206,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "搬入日の作業を順に並べて、段取りの一覧にしました（7項目）。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 207,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "段取りはこれでいい。次は、搬入口の養生の資材を、自分で手配するつもり。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 208,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "B社の見積りがまだ届いておらず、比較できていないことの件は、B社の見積りが届き、A社に決めて発注まで済んだ（利用者の報告）で解決済み。最後の区切りでも、解決済みの件を持ち出す理由がない（長い間に何があっても、この件は終わっている）。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s3", "s4"]
+			},
+			"present": ["s1", "s3", "s4"],
+			"judge": []
+		}
+	]
+}

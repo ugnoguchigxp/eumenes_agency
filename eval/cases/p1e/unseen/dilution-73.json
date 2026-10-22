@@ -1,0 +1,110 @@
+{
+	"id": "dilution-73",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "unseen",
+	"title": "希釈（API移行・K0）: 決済API v1の終了前に残る返金処理の移行を後で再開",
+	"description": "決済APIのv1が来月末で終了するのに、返金の処理だけv2への切り替えが未了のまま残る。 対照（不要）: A0 と同じ構成（挟む 0 件・180分）だが、事項は挟む前に解決済み。 最後の区間と機会は、同じ原型の他の変種と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "api_usage",
+			"description": "APIのバージョン別の呼び出し状況を確認する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "直近30日のv1の呼び出し: 返金のエンドポイントのみ142回。ほかはすべてv2。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "決済APIのv1が来月末で終了になる。うちはまだ、返金の処理だけv1のエンドポイントを使っている。終了の前に、v2への切り替えを済ませたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "返金の処理のv2への切り替えが残っていますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "api_usage: 直近30日のv1の呼び出しは、返金のエンドポイントだけで142回。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 24,
+			"kind": "user.report",
+			"actor": "user",
+			"text": "返金の処理もv2に切り替えて、本番で動作を確認した。v1の呼び出しはもうゼロだよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 25,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "切り替えが済んだのですね。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 205,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "リリースノートの下書きを、箇条書きで作りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 206,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "変更点を箇条書きにして、下書きにしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 207,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "下書きはこれでいい。この件はここまでにして、少し休憩する。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 222,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "resolved_reproposal",
+				"note": "決済APIのv1の終了前に、返金の処理がまだv1のままであることの件は、返金の処理もv2に切り替え、本番で確認した（利用者の報告）で解決済み。最後の区切りでも、解決済みの件を持ち出す理由がない（長い間に何があっても、この件は終わっている）。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s3", "s4"]
+			},
+			"present": ["s1", "s3", "s4"],
+			"judge": []
+		}
+	]
+}

@@ -4,6 +4,7 @@ import {
 	actors,
 	conditions,
 	observationKinds,
+	type Condition,
 } from "../src/contracts/model.ts";
 import { participationActions } from "../src/contracts/proposals.ts";
 
@@ -52,9 +53,18 @@ export type FailureType = (typeof failureTypes)[number];
 export const suites = ["p0e", "p1e"] as const;
 export type Suite = (typeof suites)[number];
 
-/** Conditions an eval run may use: the runtime ones plus D (diagnostic, no stored state). */
-export const evalConditions = [...conditions, "D"] as const;
+/**
+ * Conditions an eval run may use: the runtime ones plus
+ * - B1a (ablation): B1 with `selectWhenEmpty`, i.e. select is called even with 0 notes
+ *   (removes the host_no_candidates gate; scored, state-checked and judged like B1),
+ * - D (diagnostic, no stored state).
+ */
+export const evalConditions = [...conditions, "B1a", "D"] as const;
 export type EvalCondition = (typeof evalConditions)[number];
+
+/** The runtime condition an eval condition runs as (B1a runs as B1); null for D (own runtime). */
+export const runtimeConditionOf = (c: EvalCondition): Condition | null =>
+	c === "D" ? null : c === "B1a" ? "B1" : c;
 
 export const expectSchema = z.strictObject({
 	/** Whether an outward action (speak/tool) is needed at this opportunity. */
@@ -148,6 +158,8 @@ export const caseSchema = z
 	})
 	.superRefine((c, ctx) => {
 		const ids = new Set<string>();
+		// mustHold/mustNotHold/present/evidenceAny name observations, never opportunities.
+		const observationIds = new Set<string>();
 		let last = -1;
 		for (const s of c.steps) {
 			if (ids.has(s.id))
@@ -156,6 +168,7 @@ export const caseSchema = z
 			if (s.t < last)
 				ctx.addIssue({ code: "custom", message: `time order ${s.id}` });
 			last = s.t;
+			if (s.type === "observation") observationIds.add(s.id);
 			if (s.type === "opportunity") {
 				const refs = [
 					...(s.expect?.evidenceAny ?? []),
@@ -164,20 +177,24 @@ export const caseSchema = z
 					...s.present,
 				];
 				for (const e of refs)
-					if (!ids.has(e))
+					if (!observationIds.has(e))
 						ctx.addIssue({
 							code: "custom",
-							message: `${s.id} ref ${e} not an earlier step`,
+							message: ids.has(e)
+								? `${s.id} ref ${e} is an opportunity, not an observation step`
+								: `${s.id} ref ${e} not an earlier observation step`,
 						});
 				if (c.suite === "p1e" && s.expect !== null && s.stateExpect === null)
 					ctx.addIssue({
 						code: "custom",
 						message: `${s.id} p1e opportunity needs stateExpect`,
 					});
-				if (c.suite === "p1e" && s.expect?.needed && s.present.length === 0)
+				// D needs a non-empty `present` at every scored p1e opportunity: an empty one
+				// at "not needed" opportunities would make D's input shape itself a hint.
+				if (c.suite === "p1e" && s.expect !== null && s.present.length === 0)
 					ctx.addIssue({
 						code: "custom",
-						message: `${s.id} p1e needed opportunity needs present (condition D)`,
+						message: `${s.id} p1e opportunity needs present (condition D), needed or not`,
 					});
 			}
 		}
@@ -208,6 +225,8 @@ export const opportunityRecordSchema = z.strictObject({
 	source: z.string(),
 	utterance: z.string().nullable(),
 	toolName: z.string().nullable(),
+	/** Tool input text of a tool action (judge input). Absent in records made before 2026-10-22. */
+	toolInput: z.string().nullable().optional(),
 	evidenceRefs: z.array(z.string()),
 	reason: z.string(),
 	rejectCodes: z.array(z.string()),
@@ -249,6 +268,8 @@ export const runRecordSchema = z.strictObject({
 	condition: z.enum(evalConditions),
 	rep: z.int().min(1),
 	labelStatus: z.enum(["draft", "confirmed"]),
+	/** Content hash of the case file at run time (cases.ts caseHash). Absent in older records. */
+	caseHash: z.string().optional(),
 	/** Experiment settings digest (model route, effort, budgets), no secrets. */
 	settingsDigest: z.string(),
 	instructionVersion: z.string(),
@@ -304,3 +325,11 @@ export const stateJudgmentSchema = z.strictObject({
 	judgeDigest: z.string().default(""),
 });
 export type StateJudgment = z.infer<typeof stateJudgmentSchema>;
+
+/**
+ * True for the automatic "no open items at all" verdict (model "none", no call made).
+ * It says nothing about whether the agent let the matter go, so it is reported apart
+ * from a judged `absent` (items exist, none about this matter).
+ */
+export const isEmptyStateJudgment = (j: StateJudgment): boolean =>
+	j.verdict === "absent" && j.model === "none";

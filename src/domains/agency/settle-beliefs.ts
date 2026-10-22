@@ -14,22 +14,36 @@ type Of<K extends Op["op"]> = Extract<Op, { op: K }>;
 
 const rank: Record<Confidence, number> = { low: 0, medium: 1, high: 2 };
 
-/** At least one ref that is independent evidence and not already counted. */
+/**
+ * At least one ref that is independent evidence, not already counted, and newer than `floor`
+ * (the creation point of the belief or desire, mirroring the intent completion rule).
+ */
 const hasIndependent = (
 	ctx: SettleCtx,
 	refs: readonly string[],
 	counted: readonly string[],
+	floor: number,
 ) =>
 	refs.some((r) => {
 		const o = ctx.obs.get(r);
-		return o !== undefined && isIndependent(ctx, o) && !counted.includes(r);
+		return (
+			o !== undefined &&
+			isIndependent(ctx, o) &&
+			!counted.includes(r) &&
+			o.seq > floor
+		);
 	});
 
 export const applyBeliefAdd = (ctx: SettleCtx, op: Of<"belief.add">) => {
 	const id = ctx.local.get(op.localId);
 	if (id === undefined) return;
 	let ok = evidenceOk(ctx, op.evidenceRefs);
-	if (op.confidence === "high" && !hasIndependent(ctx, op.evidenceRefs, [])) {
+	// A new item has no earlier creation point: high confidence needs independent evidence that
+	// came with the batch being interpreted, not an old observation that was already processed.
+	if (
+		op.confidence === "high" &&
+		!hasIndependent(ctx, op.evidenceRefs, [], ctx.batchStartSeq - 1)
+	) {
 		reject(ctx, "missing_evidence");
 		ok = false;
 	}
@@ -44,6 +58,7 @@ export const applyBeliefAdd = (ctx: SettleCtx, op: Of<"belief.add">) => {
 		confidence: op.confidence,
 		evidence: unique(op.evidenceRefs),
 		status: "active",
+		createdSeq: ctx.floorSeq,
 	});
 	ctx.touched.add(id);
 };
@@ -64,7 +79,7 @@ export const applyBeliefUpdate = (ctx: SettleCtx, op: Of<"belief.update">) => {
 	}
 	let ok = evidenceOk(ctx, op.evidenceRefs);
 	if (op.confidence !== null && rank[op.confidence] > rank[b.confidence]) {
-		if (!hasIndependent(ctx, op.evidenceRefs, b.evidence)) {
+		if (!hasIndependent(ctx, op.evidenceRefs, b.evidence, b.createdSeq ?? 0)) {
 			reject(ctx, "self_reinforcement");
 			ok = false;
 		}
@@ -103,6 +118,7 @@ export const applyDesireAdd = (ctx: SettleCtx, op: Of<"desire.add">) => {
 		evidence: unique(op.evidenceRefs),
 		beliefRefs: unique(beliefRefs),
 		status: "open",
+		createdSeq: ctx.floorSeq,
 	});
 	ctx.touched.add(id);
 };
@@ -122,7 +138,10 @@ export const applyDesireUpdate = (ctx: SettleCtx, op: Of<"desire.update">) => {
 		return;
 	}
 	let ok = evidenceOk(ctx, op.evidenceRefs);
-	if (op.status === "satisfied" && !hasIndependent(ctx, op.evidenceRefs, [])) {
+	if (
+		op.status === "satisfied" &&
+		!hasIndependent(ctx, op.evidenceRefs, [], d.createdSeq ?? 0)
+	) {
 		reject(ctx, "missing_evidence");
 		ok = false;
 	}

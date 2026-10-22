@@ -41,22 +41,46 @@ export const judgeSystemPrompt = [
 	"出力は指定された JSON スキーマに厳密に従う。criterion には、基準の番号（1から）を入れ、全ての基準に一つずつ答える。",
 ].join("\n");
 
-/** Observation steps of the case that precede the opportunity, in order. */
-export function factsBefore(c: Case, opportunityId: string): string[] {
+/**
+ * Bumped whenever the judge prompt building changes (judgePrompt, factsBefore,
+ * describeAction). Folded into the judge digest with a rendering of a fixed sample, so a
+ * different prompt shape cannot be mixed into one judgments file on resume.
+ */
+export const JUDGE_PROMPT_VERSION = "judge-prompt-2";
+
+/**
+ * Facts the judge may use for an opportunity: the observation steps before it in order
+ * and, when `earlier` (the run's records of the earlier opportunities) is given, the
+ * agent's own earlier outward actions of the same run at the position they were taken
+ * (a rerun of the case can differ there, and the scripted steps do not contain them).
+ */
+export function factsBefore(
+	c: Case,
+	opportunityId: string,
+	earlier: readonly OpportunityRecord[] = [],
+): string[] {
 	const out: string[] = [];
+	const byOpp = new Map(earlier.map((o) => [o.opportunityId, o]));
 	for (const s of c.steps) {
 		if (s.id === opportunityId) break;
 		if (s.type === "observation")
 			out.push(
 				`[${s.id}] ${s.kind} / actor=${s.actor} / t=${s.t}分\n  本文: ${JSON.stringify(s.text)}`,
 			);
+		else {
+			const o = byOpp.get(s.id);
+			if (o && isOutward(o.action))
+				out.push(
+					`[${s.id}] （エージェント自身がこの run の先の機会で行った外向きの行動 / t=${s.t}分）\n  ${describeAction(o).replaceAll("\n", "\n  ")}`,
+				);
+		}
 	}
 	return out;
 }
 
 export function describeAction(o: OpportunityRecord): string {
 	if (o.action === "tool")
-		return `ツール使用: ${o.toolName ?? "(none)"}${o.utterance ? `\n付随する発話: ${JSON.stringify(o.utterance)}` : ""}`;
+		return `ツール使用: ${o.toolName ?? "(none)"}${o.toolInput ? `\nツールへの入力: ${JSON.stringify(o.toolInput)}` : ""}${o.utterance ? `\n付随する発話: ${JSON.stringify(o.utterance)}` : ""}`;
 	return `発話: ${JSON.stringify(o.utterance ?? "")}`;
 }
 
@@ -111,7 +135,47 @@ export function readJudgments(file: string): Judgment[] {
 		: [];
 }
 
-/** Route + system prompt digest stored on every row; resume refuses a different one. */
+/** Opportunity records of the run before `opportunityId`, in order (what the agent had done). */
+export const earlierOpportunities = (
+	record: { readonly opportunities: readonly OpportunityRecord[] },
+	opportunityId: string,
+): OpportunityRecord[] => {
+	const i = record.opportunities.findIndex(
+		(o) => o.opportunityId === opportunityId,
+	);
+	return i < 0 ? [] : record.opportunities.slice(0, i);
+};
+
+/**
+ * What the judge digest covers besides the route: the system prompt, a version constant
+ * and the prompt builder's rendering of a fixed sample (so a builder change alone moves
+ * the digest even if the version constant was forgotten).
+ */
+export function judgeFingerprint(): string {
+	const sample: OpportunityRecord = {
+		opportunityId: "s9",
+		expect: null,
+		action: "tool",
+		source: "llm",
+		utterance: "U",
+		toolName: "T",
+		toolInput: "I",
+		evidenceRefs: [],
+		reason: "r",
+		rejectCodes: [],
+		agentAuthoredRefs: [],
+		stateCheck: null,
+		stateItems: null,
+		stateExcluded: null,
+	};
+	return [
+		JUDGE_PROMPT_VERSION,
+		judgeSystemPrompt,
+		judgePrompt(["F1", "F2"], sample, ["C1", "C2"]),
+	].join("\n=====\n");
+}
+
+/** Route + prompt fingerprint digest stored on every row; resume refuses a different one. */
 export function judgeDigest(
 	role: { readonly model: string; readonly effort: string },
 	system: string,
@@ -270,7 +334,11 @@ export function runJudge(args: {
 					purpose: "respond",
 					system: judgeSystemPrompt,
 					prompt: judgePrompt(
-						factsBefore(t.case, t.opportunity.opportunityId),
+						factsBefore(
+							t.case,
+							t.opportunity.opportunityId,
+							earlierOpportunities(t.record, t.opportunity.opportunityId),
+						),
 						t.opportunity,
 						t.criteria,
 					),

@@ -4,8 +4,9 @@
  * (for judge sheets) holds the judge's verdicts. Claude's `expect` is never written
  * to a sheet.
  */
+import { allowUnverifiedHint, assertCaseVersions, caseHash } from "./cases.ts";
 import type { Case, Judgment, OpportunityRecord, Suite } from "./contracts.ts";
-import { factsBefore } from "./judge.ts";
+import { earlierOpportunities, factsBefore } from "./judge.ts";
 
 export const defaultSeed = "eumenes-label-1";
 
@@ -79,6 +80,8 @@ export interface LabelKey {
 	readonly split: "dev" | "unseen";
 	readonly seed: string;
 	readonly items: LabelKeyItem[];
+	/** caseId -> caseHash at export; agreement refuses when a case changed. Absent in old keys. */
+	readonly caseHashes?: Record<string, string>;
 }
 
 interface LabelCandidate extends Pickable {
@@ -176,9 +179,11 @@ export function buildLabelSheet(
 		"",
 	];
 	const keyItems: LabelKeyItem[] = [];
+	const caseHashes: Record<string, string> = {};
 	picks.forEach((p, i) => {
 		const num = i + 1;
 		const opp = opportunityOf(p.case, p.opportunityId);
+		caseHashes[p.case.id] = caseHash(p.case);
 		keyItems.push({
 			item: num,
 			caseId: p.case.id,
@@ -201,7 +206,7 @@ export function buildLabelSheet(
 	});
 	return {
 		sheet: `${lines.join("\n").trimEnd()}\n`,
-		key: { kind: "label", suite, split, seed, items: keyItems },
+		key: { kind: "label", suite, split, seed, items: keyItems, caseHashes },
 	};
 }
 
@@ -218,12 +223,46 @@ const japanese: readonly [RegExp, AnswerAction][] = [
 ];
 
 /**
+ * A negation attached to the action word itself: 話さない / 話しかけない / 伝えない /
+ * 声をかけない / ツールを使わない / 待たない / 待機しない / 話すべきではない ...
+ * Anything after the action word (the reason) is ignored, so "待つ 邪魔にならないように"
+ * is an ordinary wait.
+ */
+const negatedJapanese = new RegExp(
+	[
+		"^(?:",
+		"(?:発話|記録|待機|使用|破棄|取り下げ)(?:し|せ)",
+		"|話しかけ|話し|話さ|声をかけ|伝え|待た|待ち|待て|捨て|使わ|使い|使え",
+		"|ツール(?:を|は|も)?(?:使わ|使い|使え|使用し|使用せ)",
+		"|(?:話す|伝える|待つ|使う|声をかける)(?:べきでは?|必要(?:は|も)?)",
+		")(?:ない|なかった|ません|ず|なく)",
+	].join(""),
+);
+const negatedEnglish =
+	/^(?:don['’]?t|do\s+not|never|not)\s+(?:to\s+)?(speak|tool|wait|reflect|discard)\b/i;
+
+/** Thrown for an answer whose action cannot be read without guessing (negation). */
+export class AnswerParseError extends Error {
+	constructor(readonly raw: string) {
+		super(
+			`否定形の回答は行動として読み取れません（「${raw.slice(0, 40)}」）。speak / tool / wait / reflect / discard のどれかを肯定の形で書き直してください`,
+		);
+		this.name = "AnswerParseError";
+	}
+}
+
+/**
  * The action named by the FIRST token of the answer: an English action word, or a
  * Japanese synonym at the very start. Later mentions (inside the reason) are ignored,
- * so "待つ。ここで speak すると邪魔" is wait.
+ * so "待つ。ここで speak すると邪魔" is wait. A negation attached to the action word
+ * itself ("話しかけない", "ツールを使わない", "待たない", "don't speak") throws
+ * AnswerParseError instead of being read as the positive form; negations in the reason
+ * after the action word are ignored. "何もしない" is the wait synonym, not a negation.
  */
 export function parseAnswerAction(text: string): AnswerAction | null {
 	const head = text.trim().replace(/^[\s`*_>"'「『(（\-–—:：]+/, "");
+	if (negatedEnglish.test(head) || negatedJapanese.test(head))
+		throw new AnswerParseError(head);
 	const word = /^[A-Za-z]+/.exec(head)?.[0]?.toLowerCase();
 	if (word)
 		return (answerWords as readonly string[]).includes(word)
@@ -249,10 +288,18 @@ export function parseLabelSheet(text: string): ParsedAnswer[] {
 		const body = sections[i + 1] ?? "";
 		const m = /^回答\s*[:：]([\s\S]*)$/m.exec(body);
 		const raw = (m?.[1] ?? "").trim();
+		let action: AnswerAction | null;
+		try {
+			action = parseAnswerAction(raw);
+		} catch (error) {
+			if (error instanceof AnswerParseError)
+				throw new Error(`項目 ${item}: ${error.message}`);
+			throw error;
+		}
 		out.push({
 			item,
 			raw,
-			action: parseAnswerAction(raw),
+			action,
 			skipped: /^\s*skip\b/i.test(raw),
 		});
 	}
@@ -285,7 +332,21 @@ export function labelAgreement(
 	answers: readonly ParsedAnswer[],
 	key: LabelKey,
 	cases: readonly Case[],
+	allowUnverified = false,
 ): LabelAgreement {
+	if (key.caseHashes === undefined && !allowUnverified)
+		throw new Error(
+			`cannot compute label agreement: the key has no caseHashes, so the case versions cannot be verified; ${allowUnverifiedHint}.`,
+		);
+	if (key.caseHashes !== undefined)
+		assertCaseVersions(
+			Object.entries(key.caseHashes).map(([caseId, hash]) => ({
+				caseId,
+				caseHash: hash,
+			})),
+			cases,
+			"cannot compute label agreement",
+		);
 	const byId = new Map(cases.map((c) => [c.id, c]));
 	const byItem = new Map(answers.map((a) => [a.item, a]));
 	let answered = 0;
@@ -360,11 +421,14 @@ export interface JudgeKeyItem {
 	readonly condition: string;
 	readonly rep: number;
 	readonly opportunityId: string;
+	/** Only criteria the judge has a row for; position k is the sheet's "回答 k+1". */
 	readonly verdicts: {
 		criterion: string;
 		verdict: Judgment["verdict"];
 		reason: string;
 	}[];
+	/** Sampled for having a judge fail/unclear verdict (the oversampled stratum). */
+	readonly flagged?: boolean;
 }
 export interface JudgeKey {
 	readonly kind: "judge";
@@ -372,11 +436,24 @@ export interface JudgeKey {
 	readonly seed: string;
 	readonly model: string;
 	readonly items: JudgeKeyItem[];
+	readonly suite?: Suite;
+	/** Judge route/prompt digest of the judgments sampled (calibration is valid for that digest only). */
+	readonly judgeDigest?: string;
+	/** caseId -> caseHash at export; agreement refuses when a case changed. Absent in old keys. */
+	readonly caseHashes?: Record<string, string>;
+	/** Sample composition: the sheet oversamples judge fail/unclear, so raw rates are not population rates. */
+	readonly sampling?: { flagged: number; other: number };
 }
 
 export interface JudgedAction {
 	readonly case: Case;
-	readonly record: { caseId: string; condition: string; rep: number };
+	readonly record: {
+		caseId: string;
+		condition: string;
+		rep: number;
+		suite?: Suite;
+		opportunities: readonly OpportunityRecord[];
+	};
 	readonly opportunity: OpportunityRecord;
 	readonly judgments: readonly Judgment[];
 }
@@ -387,6 +464,7 @@ export function judgedActions(
 		caseId: string;
 		condition: string;
 		rep: number;
+		suite?: Suite;
 		opportunities: readonly OpportunityRecord[];
 	}[],
 	cases: readonly Case[],
@@ -412,19 +490,60 @@ export function judgedActions(
 	return out;
 }
 
+/** The criteria of the action the judge has a row for (a criterion without a row is skipped). */
+const judgedCriteria = (a: JudgedAction): string[] =>
+	opportunityOf(a.case, a.opportunity.opportunityId).judge.filter((cr) =>
+		a.judgments.some((j) => j.criterion === cr),
+	);
+
+const isFlagged = (a: JudgedAction): boolean =>
+	a.judgments.some((j) => j.verdict !== "pass");
+
+/**
+ * Judge-calibration sample. The judge says `pass` almost always, so a plain sample says
+ * nothing about fail/unclear: actions with any fail/unclear verdict are included up to
+ * half the sample (all of them when there are fewer), the rest is spread over
+ * conditions. The key records the composition.
+ */
+export function pickJudgeActions(
+	actions: readonly JudgedAction[],
+	n: number,
+	seed: string,
+): { picks: { action: JudgedAction; flagged: boolean }[] } {
+	const wrap = (a: JudgedAction) => ({
+		id: `${a.record.caseId}/${a.record.condition}/${a.record.rep}/${a.opportunity.opportunityId}`,
+		// Spread over conditions so no one condition dominates the sample.
+		group: a.record.condition,
+		action: a,
+	});
+	const flagged = actions.filter(isFlagged).map(wrap);
+	const rest = actions.filter((a) => !isFlagged(a)).map(wrap);
+	const wantFlagged = Math.min(flagged.length, Math.ceil(n / 2));
+	const first = pickSpread(flagged, wantFlagged, `${seed}:flagged`);
+	const second = pickSpread(rest, n - first.length, `${seed}:rest`);
+	const fill =
+		first.length + second.length < n
+			? pickSpread(
+					flagged.filter((x) => !first.includes(x)),
+					n - first.length - second.length,
+					`${seed}:fill`,
+				)
+			: [];
+	return {
+		picks: shuffleBySeed([...first, ...second, ...fill], seed).map((x) => ({
+			action: x.action,
+			flagged: isFlagged(x.action),
+		})),
+	};
+}
+
 export function buildJudgeSheet(
 	run: string,
 	actions: readonly JudgedAction[],
 	n: number,
 	seed: string = defaultSeed,
 ): { sheet: string; key: JudgeKey } {
-	const items = actions.map((a) => ({
-		id: `${a.record.caseId}/${a.record.condition}/${a.record.rep}/${a.opportunity.opportunityId}`,
-		// Spread over conditions so no one condition dominates the sample.
-		group: a.record.condition,
-		action: a,
-	}));
-	const picks = shuffleBySeed(pickSpread(items, n, seed), seed);
+	const { picks } = pickJudgeActions(actions, n, seed);
 	const lines: string[] = [
 		`# 判定器の較正シート（${run}、${picks.length} 件、条件・判定器の判定は伏せてある）`,
 		"",
@@ -435,13 +554,18 @@ export function buildJudgeSheet(
 		"",
 	];
 	const keyItems: JudgeKeyItem[] = [];
+	const caseHashes: Record<string, string> = {};
 	let model = "";
+	let suite: Suite | undefined;
+	let judgeDigest = "";
 	picks.forEach((p, i) => {
 		const num = i + 1;
 		const a = p.action;
-		const opp = opportunityOf(a.case, a.opportunity.opportunityId);
-		const criteria = opp.judge;
+		suite ??= a.record.suite;
+		caseHashes[a.case.id] = caseHash(a.case);
+		const criteria = judgedCriteria(a);
 		model = a.judgments[0]?.model ?? model;
+		judgeDigest ||= a.judgments[0]?.judgeDigest ?? "";
 		keyItems.push({
 			item: num,
 			caseId: a.record.caseId,
@@ -456,20 +580,22 @@ export function buildJudgeSheet(
 					reason: j?.reason ?? "",
 				};
 			}),
+			flagged: p.flagged,
 		});
 		const action =
 			a.opportunity.action === "tool"
-				? `ツール使用: ${a.opportunity.toolName ?? "(none)"}${a.opportunity.utterance ? ` / 付随する発話: ${oneLine(a.opportunity.utterance)}` : ""}`
+				? `ツール使用: ${a.opportunity.toolName ?? "(none)"}${a.opportunity.toolInput ? ` / ツールへの入力: ${oneLine(a.opportunity.toolInput)}` : ""}${a.opportunity.utterance ? ` / 付随する発話: ${oneLine(a.opportunity.utterance)}` : ""}`
 				: `発話: ${oneLine(a.opportunity.utterance ?? "")}`;
+		const facts = factsBefore(
+			a.case,
+			a.opportunity.opportunityId,
+			earlierOpportunities(a.record, a.opportunity.opportunityId),
+		);
 		lines.push(
 			`## 項目 ${num}`,
 			"",
-			"事実（この機会より前の観測）:",
-			...(factsBefore(a.case, a.opportunity.opportunityId).length
-				? factsBefore(a.case, a.opportunity.opportunityId).map(
-						(f) => `- ${oneLine(f)}`,
-					)
-				: ["- （なし）"]),
+			"事実（この機会より前の観測と、エージェント自身の先の行動）:",
+			...(facts.length ? facts.map((f) => `- ${oneLine(f)}`) : ["- （なし）"]),
 			"",
 			"判定する行動:",
 			`- ${action}`,
@@ -481,9 +607,20 @@ export function buildJudgeSheet(
 			"",
 		);
 	});
+	const flaggedCount = picks.filter((p) => p.flagged).length;
 	return {
 		sheet: `${lines.join("\n").trimEnd()}\n`,
-		key: { kind: "judge", run, seed, model, items: keyItems },
+		key: {
+			kind: "judge",
+			run,
+			seed,
+			model,
+			items: keyItems,
+			...(suite === undefined ? {} : { suite }),
+			...(judgeDigest === "" ? {} : { judgeDigest }),
+			caseHashes,
+			sampling: { flagged: flaggedCount, other: picks.length - flaggedCount },
+		},
 	};
 }
 
@@ -510,11 +647,57 @@ export function parseJudgeSheet(text: string): ParsedVerdicts[] {
 	return out;
 }
 
+const verdictOrder = ["pass", "fail", "unclear"] as const;
+type Verdict = (typeof verdictOrder)[number];
+
+/** human -> judge -> count. */
+export type Confusion = Record<Verdict, Record<Verdict, number>>;
+
+const emptyConfusion = (): Confusion => ({
+	pass: { pass: 0, fail: 0, unclear: 0 },
+	fail: { pass: 0, fail: 0, unclear: 0 },
+	unclear: { pass: 0, fail: 0, unclear: 0 },
+});
+
+/**
+ * Cohen's kappa over a confusion matrix (null when chance agreement is 1, e.g. all
+ * answers in one category, or when there are no pairs).
+ */
+export function cohenKappa(m: Confusion): number | null {
+	const n = verdictOrder.reduce(
+		(t, h) => t + verdictOrder.reduce((u, j) => u + m[h][j], 0),
+		0,
+	);
+	if (n === 0) return null;
+	const po = verdictOrder.reduce((t, v) => t + m[v][v], 0) / n;
+	const pe = verdictOrder.reduce((t, v) => {
+		const row = verdictOrder.reduce((u, j) => u + m[v][j], 0) / n;
+		const col = verdictOrder.reduce((u, h) => u + m[h][v], 0) / n;
+		return t + row * col;
+	}, 0);
+	return pe >= 1 ? null : (po - pe) / (1 - pe);
+}
+
+export interface CriterionAgreement {
+	/** Pairs compared (answered, excluding human-unclear vs judge-unclear). */
+	compared: number;
+	agree: number;
+	bothUnclear: number;
+}
+
 export interface JudgeAgreement {
+	/** Answered pairs, including both-unclear ones. */
 	readonly answered: number;
+	/** Pairs compared: answered minus the both-unclear ones (reported apart, not agreement). */
+	readonly compared: number;
 	readonly agree: number;
-	/** Per criterion text: answered and agreeing counts. */
-	readonly byCriterion: Map<string, { answered: number; agree: number }>;
+	readonly bothUnclear: number;
+	/** Human x judge over all answered pairs. */
+	readonly confusion: Confusion;
+	/** Cohen's kappa over the compared pairs (both-unclear excluded). */
+	readonly kappa: number | null;
+	/** Per criterion text. */
+	readonly byCriterion: Map<string, CriterionAgreement>;
 	readonly disagreements: {
 		item: number;
 		caseId: string;
@@ -525,6 +708,7 @@ export interface JudgeAgreement {
 		judgeReason: string;
 	}[];
 	readonly unanswered: number;
+	readonly sampling: { flagged: number; other: number } | null;
 }
 
 export function judgeAgreement(
@@ -532,10 +716,13 @@ export function judgeAgreement(
 	key: JudgeKey,
 ): JudgeAgreement {
 	const byItem = new Map(parsed.map((p) => [p.item, p]));
-	const byCriterion = new Map<string, { answered: number; agree: number }>();
+	const byCriterion = new Map<string, CriterionAgreement>();
 	const disagreements: JudgeAgreement["disagreements"] = [];
+	const confusion = emptyConfusion();
+	const compare = emptyConfusion();
 	let answered = 0;
 	let agree = 0;
+	let bothUnclear = 0;
 	let unanswered = 0;
 	for (const k of key.items) {
 		const p = byItem.get(k.item);
@@ -545,9 +732,21 @@ export function judgeAgreement(
 				unanswered++;
 				return;
 			}
-			const slot = byCriterion.get(v.criterion) ?? { answered: 0, agree: 0 };
-			slot.answered++;
+			const slot = byCriterion.get(v.criterion) ?? {
+				compared: 0,
+				agree: 0,
+				bothUnclear: 0,
+			};
+			byCriterion.set(v.criterion, slot);
 			answered++;
+			confusion[human][v.verdict]++;
+			if (human === "unclear" && v.verdict === "unclear") {
+				bothUnclear++;
+				slot.bothUnclear++;
+				return;
+			}
+			compare[human][v.verdict]++;
+			slot.compared++;
 			if (human === v.verdict) {
 				slot.agree++;
 				agree++;
@@ -561,21 +760,53 @@ export function judgeAgreement(
 					judge: v.verdict,
 					judgeReason: v.reason,
 				});
-			byCriterion.set(v.criterion, slot);
 		});
 	}
-	return { answered, agree, byCriterion, disagreements, unanswered };
+	return {
+		answered,
+		compared: answered - bothUnclear,
+		agree,
+		bothUnclear,
+		confusion,
+		kappa: cohenKappa(compare),
+		byCriterion,
+		disagreements,
+		unanswered,
+		sampling: key.sampling ?? null,
+	};
 }
+
+const kappaText = (k: number | null): string =>
+	k === null ? "-（片方が単一のカテゴリのみ、または対がない）" : k.toFixed(2);
 
 export function formatJudgeAgreement(r: JudgeAgreement): string {
 	const out = [
 		`回答あり: ${r.answered}${r.unanswered ? `（未回答 ${r.unanswered}）` : ""}`,
-		`判定器との一致: ${rate(r.agree, r.answered)}`,
-		"",
-		"基準ごとの一致（一致が低い基準は判定器に任せず、人の判定だけで扱う）:",
+		`判定器との一致（人も判定器も unclear の ${r.bothUnclear} 件は一致に数えず、分母からも外して別掲）: ${rate(r.agree, r.compared)}`,
+		`Cohen's κ（上と同じ対、pass/fail/unclear の3値）: ${kappaText(r.kappa)}`,
+		`人も判定器も unclear: ${r.bothUnclear} 件`,
 	];
+	if (r.sampling)
+		out.push(
+			`標本の構成: 判定器が fail/unclear を出した行動 ${r.sampling.flagged} 件を多めに抽出（残り ${r.sampling.other} 件）。一致率は母集団の率ではない`,
+		);
+	out.push(
+		"",
+		"混同行列（行 = 人、列 = 判定器、全回答対）:",
+		"",
+		"| 人＼判定器 | pass | fail | unclear |",
+		"| --- | --- | --- | --- |",
+		...verdictOrder.map(
+			(h) =>
+				`| ${h} | ${verdictOrder.map((j) => r.confusion[h][j]).join(" | ")} |`,
+		),
+		"",
+		"基準ごとの一致（n が小さい。一致が低い基準は判定器に任せず、人の判定だけで扱う）:",
+	);
 	for (const [criterion, s] of [...r.byCriterion.entries()].sort())
-		out.push(`- ${rate(s.agree, s.answered)}  ${criterion}`);
+		out.push(
+			`- ${rate(s.agree, s.compared)}${s.bothUnclear ? `（両方 unclear ${s.bothUnclear}）` : ""}  ${criterion}`,
+		);
 	if (r.disagreements.length > 0) {
 		out.push("", "食い違い:");
 		for (const d of r.disagreements)

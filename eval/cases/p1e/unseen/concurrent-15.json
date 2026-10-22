@@ -137,8 +137,8 @@
 		{
 			"type": "opportunity",
 			"id": "s15",
-			"t": 153,
-			"trigger": "turn_end",
+			"t": 157,
+			"trigger": "idle",
 			"presence": "quiet",
 			"foregroundBusy": false,
 			"playerBusy": false,

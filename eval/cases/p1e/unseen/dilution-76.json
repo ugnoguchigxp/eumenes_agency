@@ -1,0 +1,97 @@
+{
+	"id": "dilution-76",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "unseen",
+	"title": "希釈（アレルギー・A0）: 懇親会の参加者1名のアレルギーが未確認の件を後で再開",
+	"description": "懇親会の料理の手配で、参加者1名の食物アレルギーの内容が未確認のまま、店への連絡の期限が迫る。 (a) 件数の影響（経過時間は一定）: 無関係な観測 0 件（0 往復）を、180分の間に詰めて挟む（0 件でも未解決事項から 180分後）。 最後の区間と機会は、同じ原型の他の変種と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "rsvp_sheet",
+			"description": "参加者の出欠表の回答状況を確認する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "出欠表: 参加者32名のうち、1名のアレルギー欄が空欄。ほかは回答済み。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "懇親会の料理の手配で、参加者1名の食物アレルギーの内容を、まだ確認できていない。店への最終の人数の連絡は、明後日までに出す必要がある。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "アレルギーの内容は、店への連絡の前に確認が要りますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "rsvp_sheet: 参加者のうち1名のアレルギーの欄が空欄（回答の催促は未実施）。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 184,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "懇親会の開会のあいさつの原稿を、3分で作りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 185,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "3分のあいさつの原稿を作りました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 186,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "原稿はこれでいい。次は、当日の受付の名簿を、自分で印刷するつもり。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 187,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "参加者1名のアレルギーの内容が未確認のままで、店への最終の連絡は明後日まで。あいさつの原稿は仕上がり、利用者が次の自分の作業を述べた区切りの場面で、アレルギーの件を話題にする機会（懇親会の話題とも近い）。rsvp_sheet で回答状況を確かめてもよい。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s3"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"参加者1名のアレルギーの内容が未確認で、店への連絡の期限が迫っていることを、実際にあった観測のとおりに述べている",
+				"アレルギーの内容が確認できた、または店に伝えたとは言っていない"
+			]
+		}
+	]
+}

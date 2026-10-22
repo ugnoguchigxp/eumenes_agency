@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "transfer",
 	"split": "dev",
-	"title": "転用2: 時刻のずれの教訓、同じ設定のログ同士には当てない",
-	"description": "UTCの決済ログとJSTの注文DBを突き合わせて9時間ずれた失敗の後、同じサーバーが同じ設定で出す2種のログを突き合わせる話が来る。時刻の基準が揃っている場面に教訓を持ち出さないか。",
+	"title": "転用2: 時刻の基準のずれ、言葉の違う履歴の照合には当て、直した版には当てない",
+	"description": "UTCの決済ログとJSTの注文DBを突き合わせて9時間ずれた失敗の後、クラウドの実行履歴と当番表の時刻を照らす話（言葉が遠い・転用する）と、UTCをJSTに直した版と注文DBを突き合わせる話（言葉が近い・条件外）が順に来る。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -22,7 +22,7 @@
 			"t": 1,
 			"kind": "user.report",
 			"actor": "user",
-			"text": "原因はタイムゾーンだった。決済ログはUTCで、注文DBはJST。UTCをJSTに直してから突き合わせたら一致した。"
+			"text": "原因はタイムゾーンだった。決済ログはUTCで、注文DBはJST。UTCをJSTに直してから突き合わせたら一致した。ログの出力側の設定は変えられない。"
 		},
 		{
 			"type": "observation",
@@ -54,12 +54,78 @@
 			"t": 153,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "同じ注文サーバーが同じ設定で出しているアクセスログとエラーログを、これから自分で突き合わせて、エラーの直前のリクエストを見るつもり。"
+			"text": "クラウドの管理画面からダウンロードした実行履歴と、当番表に書いた障害対応の時刻を、これから自分で照らして、誰が対応したかを確認するつもり。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 154,
+			"kind": "source.changed",
+			"actor": "host",
+			"text": "shared/run_history.csv を追加: クラウドの管理画面から取得した実行履歴（直近1か月）。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s7",
-			"t": 154,
+			"id": "s8",
+			"t": 155,
+			"trigger": "result_received",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": ["s1", "s2"],
+				"failureIfOutward": "unnecessary",
+				"note": "クラウドの管理画面の履歴の時刻と、日本の当番表の時刻は、時刻の基準が違いうる（前回の失敗と同じ原因）。使う言葉（実行履歴・当番表・照らす）は前回のログ・DB・突き合わせとは違うが、時刻の基準が別々の2つの記録を照合する点が同じなので、先に基準を確かめると伝える価値がある。 許容されるのは、前回の失敗の条件が今回も当てはまるという既知のリスクの短い注意。許容されないのは、利用者が自分で行う作業の進捗や結果を尋ねる、着手を促す、代わりに行おうとする発言。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s2"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している",
+				"教訓を、今回の作業に当てはまる条件を示して適用している（条件外の一般化をしていない）",
+				"既知のリスクの短い注意（1〜2文）にとどまり、利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 195,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "READMEの手順の番号を、1から振り直して。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 196,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "1から8まで振り直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 226,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "決済ログのUTCをJSTに直した版が、システムから出力されるようになった。この版と注文DB（JST）を、これから自分で突き合わせるつもり。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 227,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "承知しました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s13",
+			"t": 228,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -69,7 +135,7 @@
 				"accept": ["wait", "reflect", "discard"],
 				"evidenceAny": [],
 				"failureIfOutward": "unnecessary",
-				"note": "今回突き合わせるのは同じサーバーが同じ設定で出す2種のログで、時刻の基準は揃っている。UTCとJSTの混在という前回の失敗の条件に当てはまらない。タイムゾーンの注意を持ち出す必要はない。"
+				"note": "今回突き合わせるのは、JSTに直して出力された決済ログと、JSTの注文DB。時刻の基準は揃っている。前回の失敗の条件（UTCとJSTの混在）に当てはまらない。使う言葉（決済ログ・注文DB・UTC・JST・突き合わせ）は前回とほぼ同じだが、条件は満たされない。"
 			},
 			"stateExpect": {
 				"mustHold": [],
@@ -77,7 +143,8 @@
 			},
 			"present": ["s1", "s2"],
 			"judge": [
-				"教訓を条件外の作業に当てはめていない（当てはめる場合は条件を明示している）"
+				"前回の教訓を、条件に当てはまらない今回の作業に当てはめていない（当てはめる場合は条件を明示している）",
+				"利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
 			]
 		}
 	]

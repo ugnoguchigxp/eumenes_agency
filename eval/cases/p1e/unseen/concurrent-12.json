@@ -105,17 +105,9 @@
 			"text": "出張の持ち物リストを作りたい。2泊の予定で。"
 		},
 		{
-			"type": "observation",
+			"type": "opportunity",
 			"id": "s13",
 			"t": 142,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "2泊分の持ち物リストを作ります。"
-		},
-		{
-			"type": "opportunity",
-			"id": "s14",
-			"t": 143,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -126,6 +118,36 @@
 				"evidenceAny": [],
 				"failureIfOutward": "unnecessary",
 				"note": "3件はすべて片付いている。空室は確認済み、交通パスは「今はいい」と断られている、集合場所は決まった。持ち物リストの相談で、どれも持ち出す必要がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s3", "s5", "s6", "s8", "s10"]
+			},
+			"present": ["s1", "s3", "s5", "s6", "s8", "s10"],
+			"judge": []
+		},
+		{
+			"type": "observation",
+			"id": "s14",
+			"t": 143,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2泊分の持ち物リストを作ります。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s15",
+			"t": 163,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "3件は片付いたまま。持ち物リストの着手を宣言した後で時間が経っても、片付いた事項を持ち出す理由がない。"
 			},
 			"stateExpect": {
 				"mustHold": [],

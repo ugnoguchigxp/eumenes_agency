@@ -34,7 +34,7 @@
 			"t": 1,
 			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "返事が来たら、発注書の作成に進めましょう。"
+			"text": "返事が来たら、承認の後に仕様書が変わっていないかも確かめて、変わっていたら知らせます。"
 		},
 		{
 			"type": "observation",

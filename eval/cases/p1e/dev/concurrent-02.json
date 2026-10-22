@@ -141,6 +141,74 @@
 			},
 			"present": ["s1", "s3", "s5", "s6", "s7", "s9", "s11"],
 			"judge": []
+		},
+		{
+			"type": "observation",
+			"id": "s16",
+			"t": 164,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "設置場所はこの案でいい。次は、設置の日程の調整表を作りたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s17",
+			"t": 165,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "設置の日程の調整表を作りました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s18",
+			"t": 180,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "3件は片付いたまま。調整表が仕上がって一息ついた区切りでも、片付いた事項を持ち出す理由がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s3", "s5", "s6", "s7", "s9", "s11"]
+			},
+			"present": ["s1", "s3", "s5", "s6", "s7", "s9", "s11"],
+			"judge": []
+		},
+		{
+			"type": "observation",
+			"id": "s19",
+			"t": 190,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "調整表はこれでいい。次は、関係者への連絡文を書きたい。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s20",
+			"t": 191,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "3件は片付いたまま。連絡文の依頼を受けた場面でも、片付いた事項を持ち出す理由がない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": ["s1", "s3", "s5", "s6", "s7", "s9", "s11"]
+			},
+			"present": ["s1", "s3", "s5", "s6", "s7", "s9", "s11"],
+			"judge": []
 		}
 	]
 }

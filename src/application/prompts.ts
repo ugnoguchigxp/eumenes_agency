@@ -11,7 +11,7 @@ import { isOpenCandidate, isOpenIntent } from "../contracts/model.ts";
 import type { Due } from "../domains/agency/due.ts";
 
 /** Bump when any instruction text below changes; recorded in run metadata. */
-export const INSTRUCTION_VERSION = "p0e-instructions-8";
+export const INSTRUCTION_VERSION = "p0e-instructions-9";
 
 const common = [
 	"出力は指定された JSON スキーマに厳密に従う。説明文や前置きは付けない。",
@@ -55,15 +55,16 @@ const b2Rules = [
 	"completed にできるのは、ユーザー・ツール・ホストなど agent 以外の観測で、その意図ができた後に届いたものを evidenceRefs に挙げられるときだけ。ユーザー本人の「終わった」「送った」「解決した」は外部の観測として根拠になる。自分の発言や配信記録は完了の根拠にならない。",
 	"ユーザーが断った、不要と言った、すでに解決したと言った場合は、関連する意図を held または abandoned にし、候補を閉じる。言い換えて再提案する候補を作らない。解決・訂正の観測が来たら、古い候補を閉じ（dismissed か superseded）、意図の完了条件を満たすなら外部の観測を根拠に completed にする。",
 	"候補の kind は question / propose / share / tool。tool は下の「使えるツール」の名前と toolInput を付ける。それ以外は toolName と toolInput を null にする。applyWhen には、どんな状況なら言う価値があるかを書く。hours（1〜168）で候補の有効期間を決める。applyWhen の状況が来るまで失効しないよう、短くしすぎない（目安: 意図の見直しまでと同じか、それより長く）。",
-	"同じ内容を言い換えた候補を重ねない。置き換えるときは supersedes に古い候補を指定する。実行や発言が済んだ候補は candidate.close の fulfilled（evidenceRefs 必須）で閉じる。",
-	"通常の応答（actor が agent、kind が exchange.adopted）がすでに候補の内容をユーザーへ伝えている場合は、reconciliations に candidateId と、その応答の観測 ID（observationRef）を入れる。候補はホストが fulfilled で閉じる。",
+	"同じ内容を言い換えた候補を重ねない。置き換えるときは supersedes に古い候補を指定する。実行や発言が済んだ候補は candidate.close の fulfilled（evidenceRefs 必須）で閉じる。evidenceRefs には、その候補ができた後に届いた観測を少なくとも1件含める。",
+	"状態が awaiting_outcome（実行結果が不明）の候補は、ホストからの結果の報告を待つ。candidate.close の対象にも supersedes の対象にもしない。",
+	"通常の応答（actor が agent、kind が exchange.adopted）がすでに候補の内容をユーザーへ伝えている場合は、reconciliations に candidateId と、その応答の観測 ID（observationRef）を入れる。その応答は、候補ができた後に届いたものでなければならない。候補はホストが fulfilled で閉じる。",
 	"desireRef は常に null。",
 ];
 
 const fRules = [
 	"【追加で保存できるもの】信念（belief）と欲求（desire）。信念は外界についての訂正可能な推定、欲求は対象のある関心（understand=理解したい / finish=終わらせたい / share=共有したい）。",
-	"信念の confidence を上げられるのは、agent 以外の新しい観測（その信念の根拠にまだ入っていないもの）を evidenceRefs に挙げられるときだけ。確信度が高いことは事実であることを意味しない。反証・訂正が来たら status を disputed / retracted / superseded にする。",
-	"欲求は、対象と根拠があるときだけ作る。beliefRefs には関連する信念を挙げる。満たされた・取り下げた欲求は status で閉じる。",
+	"信念の confidence を上げられるのは、agent 以外の新しい観測（その信念の根拠にまだ入っていないもの）を evidenceRefs に挙げられるときだけ。信念ができた後に届いた観測だけが、確信度を上げる根拠になる。high で新しく作るときも、今回の新着の観測を根拠に挙げる。確信度が高いことは事実であることを意味しない。反証・訂正が来たら status を disputed / retracted / superseded にする。",
+	"欲求は、対象と根拠があるときだけ作る。beliefRefs には関連する信念を挙げる。満たされた・取り下げた欲求は status で閉じる。satisfied にできるのは、agent 以外の観測で、その欲求ができた後に届いたものを evidenceRefs に挙げられるときだけ。",
 	"意図の desireRef には、動機となる欲求の ID または localId を入れてよい（なければ null）。",
 	"欲求や信念から、毎回すべての層を作る必要はない。必要な層だけを作る。",
 ];

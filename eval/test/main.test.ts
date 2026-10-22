@@ -100,9 +100,17 @@ describe("jsonl and commands", () => {
 		);
 	});
 	test("evaluateStop", () => {
-		expect(evaluateStop(rec, 1)).toEqual({ consecutive: 0, stop: null });
+		expect(evaluateStop(rec, 1)).toEqual({
+			consecutive: 0,
+			outputFailures: 0,
+			stop: null,
+		});
 		const inc = { ...rec, incomplete: true };
-		expect(evaluateStop(inc, 0)).toEqual({ consecutive: 1, stop: null });
+		expect(evaluateStop(inc, 0)).toEqual({
+			consecutive: 1,
+			outputFailures: 0,
+			stop: null,
+		});
 		expect(evaluateStop(inc, 1).stop?.message).toContain(
 			"consecutive incomplete",
 		);

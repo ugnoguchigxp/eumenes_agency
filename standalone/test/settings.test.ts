@@ -3,7 +3,11 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
-import { defaultBudget } from "../../src/contracts/index.ts";
+import { createHash } from "node:crypto";
+import {
+	defaultBudget,
+	HOST_RULES_VERSION,
+} from "../../src/contracts/index.ts";
 import {
 	type ExperimentSettings,
 	loadSettings,
@@ -89,6 +93,16 @@ describe("loadSettings", () => {
 	});
 });
 
+const sortedSpend = () => {
+	const { pricing, limitUsd } = base.spend;
+	return {
+		limitUsd,
+		pricing: Object.fromEntries(
+			Object.entries(pricing).sort(([a], [b]) => (a < b ? -1 : 1)),
+		),
+	};
+};
+
 describe("settingsDigest", () => {
 	test("is 16 hex chars, key-order independent and change sensitive", () => {
 		const digest = settingsDigest(base);
@@ -101,6 +115,27 @@ describe("settingsDigest", () => {
 		expect(
 			settingsDigest({ ...base, spend: { ...base.spend, limitUsd: 2 } }),
 		).not.toBe(digest);
+	});
+
+	test("includes the host rules version, so a rule change blocks --resume", () => {
+		// key-sorted JSON of the settings plus hostRules, hashed like settingsDigest does.
+		const expected = createHash("sha256")
+			.update(
+				'{"hostRules":' +
+					JSON.stringify(HOST_RULES_VERSION) +
+					',"llm":{"background":{"effort":"low","model":"m-small","thinkingHeadroom":100},' +
+					'"main":{"effort":"medium","model":"m-small","thinkingHeadroom":200}},' +
+					`"spend":${JSON.stringify(sortedSpend())}}`,
+			)
+			.digest("hex")
+			.slice(0, 16);
+		expect(settingsDigest(base)).toBe(expected);
+		// And it differs from the digest of the same settings without the version.
+		const without = createHash("sha256")
+			.update(JSON.stringify({ ...base, llm: base.llm }))
+			.digest("hex")
+			.slice(0, 16);
+		expect(settingsDigest(base)).not.toBe(without);
 	});
 });
 

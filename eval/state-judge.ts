@@ -14,7 +14,7 @@
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import type { Case, OpenItem, RunRecord, StateJudgment } from "./contracts.ts";
-import { stateJudgmentSchema } from "./contracts.ts";
+import { caseSchema, stateJudgmentSchema } from "./contracts.ts";
 import { judgeDigest, runPool, type JudgeResult } from "./judge.ts";
 import { latestRecords } from "./score.ts";
 import type { LlmPort } from "../src/contracts/ports.ts";
@@ -183,8 +183,63 @@ export function pendingStateTasks(
 	return tasks;
 }
 
+/** Bumped whenever the state judge prompt building changes (stateJudgePrompt, renderItems). */
+export const STATE_JUDGE_PROMPT_VERSION = "state-judge-prompt-1";
+
+/** System prompt + version + the builder's rendering of a fixed sample (see judgeFingerprint). */
+export function stateJudgeFingerprint(): string {
+	const sample = caseSchema.parse({
+		id: "sample-01",
+		group: "resume",
+		split: "dev",
+		title: "t",
+		description: "d",
+		labelStatus: "draft",
+		tools: [],
+		steps: [
+			{
+				type: "observation",
+				id: "s1",
+				t: 0,
+				kind: "user.report",
+				actor: "user",
+				text: "O1",
+			},
+			{
+				type: "opportunity",
+				id: "s2",
+				t: 1,
+				trigger: "idle",
+				presence: "quiet",
+				foregroundBusy: false,
+				playerBusy: false,
+				expect: null,
+			},
+		],
+	});
+	return [
+		STATE_JUDGE_PROMPT_VERSION,
+		stateJudgeSystemPrompt,
+		stateJudgePrompt(
+			sample,
+			"s2",
+			["s1"],
+			[
+				{
+					id: "n1",
+					kind: "note",
+					text: "T",
+					state: null,
+					holdReason: null,
+					evidence: ["s1"],
+				},
+			],
+		),
+	].join("\n=====\n");
+}
+
 export const stateDigest = (role: { model: string; effort: string }): string =>
-	judgeDigest(role, stateJudgeSystemPrompt);
+	judgeDigest(role, stateJudgeFingerprint());
 
 export function runStateJudge(args: {
 	readonly tasks: readonly StateJudgeTask[];

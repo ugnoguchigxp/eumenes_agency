@@ -4,7 +4,7 @@
 	"group": "premise",
 	"split": "unseen",
 	"title": "前提17: 予算申請の締切が延びても承認待ちは残る",
-	"description": "モニター購入が部長の承認待ちの状態で、予算申請の締切が延びる。締切が延びても承認待ちという事項は有効なまま。関連する作業が始まったところで伝えられるか。",
+	"description": "モニター購入が部長の承認待ちの状態で、予算申請の締切が延びる。締切が延びても承認待ちという事項は有効なまま。関連する作業が一段落した区切りで伝えられるか。終わり方は「完了報告＋休憩」。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -70,13 +70,21 @@
 			"t": 154,
 			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "スタンドの価格を3社分調べます。"
+			"text": "スタンドの価格を3社分調べました。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 155,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "価格はこれでいい。この件はここまでにして、少し休憩する。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s9",
-			"t": 155,
-			"trigger": "turn_end",
+			"id": "s10",
+			"t": 170,
+			"trigger": "idle",
 			"presence": "quiet",
 			"foregroundBusy": false,
 			"playerBusy": false,
@@ -85,7 +93,7 @@
 				"accept": ["speak"],
 				"evidenceAny": ["s1"],
 				"failureIfOutward": "unnecessary",
-				"note": "締切が延びても、モニターの購入が部長の承認待ちという状況は変わらない。スタンドの購入を一緒に考える段階で、承認が出るまで発注できない点を伝える価値がある。"
+				"note": "締切が延びても、モニターの購入が部長の承認待ちという状況は変わらない。スタンドの価格の相談が済んで一息ついた区切りで、承認が出るまで発注できない点を伝える価値がある。"
 			},
 			"stateExpect": {
 				"mustHold": [["s1"]],

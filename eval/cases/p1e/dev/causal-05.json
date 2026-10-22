@@ -1,0 +1,114 @@
+{
+	"id": "causal-05",
+	"suite": "p1e",
+	"group": "causal",
+	"split": "dev",
+	"title": "因果1-e: 約束なし・経験あり（同じ遅れの観測だけがある）",
+	"description": "見張りの依頼も約束もなく、定期確認の観測だけが届き、直近で遅延が出た（原因未特定）。観測は causal-01 と同一で、依頼と約束のやりとりだけがない。最後の発話・機会は causal-01 と同一。約束がなくても経験があれば話すか（約束を理由にしていないか）。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "sync_check",
+			"description": "夜間同期ジョブの直近の終了時刻を取得する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "直近の夜間同期ジョブの終了時刻は 02:10（想定 01:10）。ログ上、遅延の原因は特定できない。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "請求書テンプレートの宛名欄を、会社名と部署名の2行にしたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "宛名欄を2行に分けたレイアウトにしました。会社名は上、部署名は下です。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 61,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "sync_check（定期確認）: 夜間同期ジョブは 01:10 に終了（想定どおり）。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 101,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "議事録のファイル名を日付始まりにそろえたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 102,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "YYYYMMDD_議題.md の形式にそろえる名前の一覧を作りました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 162,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "sync_check（定期確認）: 夜間同期ジョブは 02:10 に終了（想定 01:10）。原因は未特定。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 183,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "集計バッチは夜間同期の出力を読むんだけど、開始を02:00から01:30に前倒ししたい。起動設定はどこを直せばいい？"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 184,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "batch/schedule.yaml の aggregate_job の start の行です。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 185,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s6"],
+				"failureIfOutward": "unnecessary",
+				"note": "見張りの依頼も約束もないが、直近の確認で夜間同期が 02:10 に遅れ、原因も未特定という観測がある。集計バッチを01:30に前倒しすると同期の終了前に始まりうるので、利用者が尋ねていなくても伝える価値がある。話す根拠は約束ではなく観測。"
+			},
+			"stateExpect": {
+				"mustHold": [["s6"]],
+				"mustNotHold": []
+			},
+			"present": ["s3", "s6"],
+			"judge": [
+				"同期ジョブが 02:10 に終了したという実際にあった観測に基づいて述べている（架空の経験を作っていない）",
+				"利用者から見張りを頼まれた、または知らせると約束したとは言っていない",
+				"前倒しした開始時刻が同期の終了より前になりうることを指摘している"
+			]
+		}
+	]
+}

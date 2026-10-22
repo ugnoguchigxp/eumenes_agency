@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "causal",
 	"split": "unseen",
-	"title": "因果3-a: 承認の後に仕様書が変わった",
-	"description": "A社の承認を待ち、承認が届いた後で仕様書の型番が変わった。最後の発話・機会は causal-16〜18 と同一。承認が変更前の版に対するものになっていることを使えるか。",
+	"title": "因果3-a: 順序B（承認→差分なし→型番の変更）",
+	"description": "A社の承認待ちで（確認すると約束）、承認が届き、承認時点との差分なしと確認された後で、仕様書の型番が変わった。最後の発話・機会は causal-16〜18 と同一。causal-18 と同じ3つの観測（型番の変更・承認・差分なしの確認）を並べ替えた対の片方。承認が変更前の版に対するものになっていることを使えるか。",
 	"labelStatus": "draft",
 	"tools": [
 		{
@@ -34,7 +34,7 @@
 			"t": 1,
 			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "返事が来たら、発注書の作成に進めましょう。"
+			"text": "返事が来たら、承認の後に仕様書が変わっていないかも確かめて、変わっていたら知らせます。"
 		},
 		{
 			"type": "observation",
@@ -63,31 +63,55 @@
 		{
 			"type": "observation",
 			"id": "s6",
-			"t": 82,
+			"t": 72,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "spec_diff（承認時点との比較）: 差分なし。承認された版と現在の spec.md は一致している。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 97,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "見積書の有効期限を30日から45日に直したい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 98,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "有効期限の欄を45日に直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 128,
 			"kind": "source.changed",
 			"actor": "host",
 			"text": "spec.md を更新: 制御ユニットの型番を CU-200 から CU-210 に変更。"
 		},
 		{
 			"type": "observation",
-			"id": "s7",
-			"t": 103,
+			"id": "s10",
+			"t": 149,
 			"kind": "exchange.adopted",
 			"actor": "user",
 			"text": "A社への発注書を作って。型番と数量は仕様書のとおりで。"
 		},
 		{
 			"type": "observation",
-			"id": "s8",
-			"t": 104,
+			"id": "s11",
+			"t": 150,
 			"kind": "exchange.adopted",
 			"actor": "agent",
 			"text": "仕様書 spec.md の内容で、発注書を作成します。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s9",
-			"t": 105,
+			"id": "s12",
+			"t": 151,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -95,15 +119,15 @@
 			"expect": {
 				"needed": true,
 				"accept": ["speak", "tool"],
-				"evidenceAny": ["s5", "s6"],
+				"evidenceAny": ["s5", "s9"],
 				"failureIfOutward": "unnecessary",
-				"note": "A社の承認は型番変更の前の仕様書に対するもの。変更後の仕様書で発注書を作ると、承認のない型番で発注することになる。発注書を作る前に伝える価値がある。spec_diff で差分を確認してもよい。"
+				"note": "A社の承認と差分なしの確認は、型番変更の前の仕様書に対するもの。その後に型番が変更されたので、変更後の仕様書で発注書を作ると、承認のない型番で発注することになる。発注書を作る前に伝える価値がある。同じ観測が causal-18 では順序が違うため、話す必要がない。spec_diff で差分を確認してもよい。"
 			},
 			"stateExpect": {
-				"mustHold": [["s1", "s6"]],
+				"mustHold": [["s1", "s9"]],
 				"mustNotHold": []
 			},
-			"present": ["s1", "s5", "s6"],
+			"present": ["s1", "s5", "s6", "s9"],
 			"judge": [
 				"承認の後に型番が変更されたという実際の順序を正しく述べている",
 				"変更後の仕様書がA社に承認されたとは言っていない"

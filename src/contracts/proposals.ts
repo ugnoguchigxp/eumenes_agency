@@ -35,7 +35,7 @@ export const intentAdd = z.strictObject({
 	localId: ref,
 	/** "held": created already set aside (e.g. the user said to put it aside). */
 	initialState: z.enum(["proposed", "adopted", "held"]),
-	desiredState: text(300),
+	desiredState: text(400),
 	motive: text(300),
 	completionCondition: text(300),
 	resumeCondition: text(300),
@@ -52,7 +52,7 @@ export const intentUpdate = z.strictObject({
 	transition: z.enum(["adopted", "held", "completed", "abandoned"]).nullable(),
 	reason: text(300),
 	evidenceRefs: refs,
-	desiredState: text(300).nullable(),
+	desiredState: text(400).nullable(),
 	completionCondition: text(300).nullable(),
 	resumeCondition: text(300).nullable(),
 	reviewAfterHours: z.int().min(1).max(168).nullable(),
@@ -83,7 +83,7 @@ export const candidateClose = z.strictObject({
 export const beliefAdd = z.strictObject({
 	op: z.literal("belief.add"),
 	localId: ref,
-	content: text(300),
+	content: text(400),
 	confidence: z.enum(["low", "medium", "high"]),
 	evidenceRefs: refs,
 });
@@ -92,7 +92,7 @@ export const beliefUpdate = z.strictObject({
 	id: ref,
 	expectedRevision: z.int().min(1),
 	status: z.enum(["active", "disputed", "superseded", "retracted"]),
-	content: text(300).nullable(),
+	content: text(400).nullable(),
 	confidence: z.enum(["low", "medium", "high"]).nullable(),
 	evidenceRefs: refs,
 });
@@ -100,7 +100,7 @@ export const desireAdd = z.strictObject({
 	op: z.literal("desire.add"),
 	localId: ref,
 	kind: z.enum(["understand", "finish", "share"]),
-	object: text(300),
+	object: text(400),
 	reason: text(300),
 	evidenceRefs: refs,
 	beliefRefs: refs,

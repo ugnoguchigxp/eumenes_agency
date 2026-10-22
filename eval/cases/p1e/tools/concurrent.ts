@@ -1,6 +1,12 @@
 import { a, opp, rep, src, tr, u, type CaseDef, type Item } from "./dsl.ts";
 
 /**
+ * Redesign 2026-10-22: concurrent-13/14 were removed (13 duplicated 11 and 03; 14 had no deadline and
+ * an ambiguous label, README §7) to fit the unseen size budget, and the endings were varied so
+ * that neither the trigger nor the ending shape is tied to the label: the agent's reply (will),
+ * the user's own statement (plan), the agent's greeting after the user came back (agent_done), the
+ * user stepping away (away, where waiting is right for a semantic reason: the user is busy).
+ *
  * concurrent: 3-5 unresolved items open in parallel with different statuses (resolved by a tool or
  * the user, refused, near deadline, still open). At the opportunity only the right one is raised;
  * mustNotHold lists the resolved/refused items' distinctive steps, mustHold the still-open ones.
@@ -102,6 +108,27 @@ export const concurrentDev: CaseDef[] = [
 				not: ["a1", "a2", "b0", "b1", "b2", "c1", "c2"],
 				note: "3件はすべて片付いている。ドライバーは対応を確認済み、旧機の処分は断られて倉庫保管、ネットワーク設定は利用者の報告で済んだ。設置場所の相談で、どれも持ち出す必要がない。",
 			}),
+			u(
+				"設置場所はこの案でいい。次は、設置の日程の調整表を作りたい。",
+				"t2",
+				20,
+			),
+			a("設置の日程の調整表を作りました。"),
+			opp({
+				trig: "idle",
+				dt: 15,
+				needed: false,
+				hold: [],
+				not: ["a1", "a2", "b0", "b1", "b2", "c1", "c2"],
+				note: "3件は片付いたまま。調整表が仕上がって一息ついた区切りでも、片付いた事項を持ち出す理由がない。",
+			}),
+			u("調整表はこれでいい。次は、関係者への連絡文を書きたい。", "t3", 10),
+			opp({
+				needed: false,
+				hold: [],
+				not: ["a1", "a2", "b0", "b1", "b2", "c1", "c2"],
+				note: "3件は片付いたまま。連絡文の依頼を受けた場面でも、片付いた事項を持ち出す理由がない。",
+			}),
 		],
 	},
 	{
@@ -150,7 +177,6 @@ export const concurrentDev: CaseDef[] = [
 				"t",
 				30,
 			),
-			a("住所、電話、メールの順に整えます。"),
 			opp({
 				needed: true,
 				ev: ["n1"],
@@ -269,88 +295,20 @@ export const concurrentUnseen: CaseDef[] = [
 			rep("集合場所は、駅の北口の改札前に決まった。", "c2", 40),
 			a("北口の改札前ですね。"),
 			u("出張の持ち物リストを作りたい。2泊の予定で。", "t", 30),
-			a("2泊分の持ち物リストを作ります。"),
 			opp({
 				needed: false,
 				hold: [],
 				not: ["a1", "a2", "b1", "b2", "c1", "c2"],
 				note: "3件はすべて片付いている。空室は確認済み、交通パスは「今はいい」と断られている、集合場所は決まった。持ち物リストの相談で、どれも持ち出す必要がない。",
 			}),
-		],
-	},
-	{
-		id: "concurrent-13",
-		group: "concurrent",
-		split: "unseen",
-		title: "並行13: サーバー移行の5件から、切替前に要る1件",
-		description:
-			"サーバー移行で5件が並行する。ディスク容量（ツールで解決）、旧監視設定の移行（不要と断られた）、DNSのTTL引き下げ（切替は明日の夜で、今日中に要る）、ログ回転と接続数の見直し（急がない）。切替手順書の話題で、期限の迫る1件を選べるか。",
-		items: [
-			u("新しいサーバーのディスク容量が足りるか、確認できていない。", "a1"),
-			a("現在のデータ量と比べる必要がありますね。"),
-			tr("disk_check: 新サーバーの空きは800GB。現データは310GB。", "a2", 15),
-			a("容量は足ります。"),
-			a("旧サーバーの監視設定も、新サーバーに移しましょうか。", "b1", 20),
-			u("監視設定は移さなくていい。新しく作り直すから。", "b2"),
-			a("わかりました。移行の対象から外します。"),
-			u(
-				"切替は明日の夜。DNSのTTLを、切替の前に短くしておく必要がある。まだ下げていなくて、今日中にやらないと間に合わない。",
-				"n1",
-				30,
-			),
-			a("TTLを下げる作業が残っていますね。"),
-			u("ログの回転の設定は、移行が落ち着いてから見直したい。", "oa", 20),
-			a("落ち着いてから、保持期間も含めて見直しましょう。"),
-			u("同時接続数の上限の設定も、そのうち調整したい。", "ob", 20),
-			a("負荷を見ながら、調整しましょう。"),
-			u("切替の手順書に、チェックリストを付けたい。", "t", 30),
-			a("切替前・切替中・切替後の3段のチェックリストを付けます。"),
+			a("2泊分の持ち物リストを作ります。"),
 			opp({
-				needed: true,
-				ev: ["n1"],
-				hold: [["n1"], ["oa"], ["ob"]],
-				not: ["a1", "a2", "b1", "b2"],
-				note: "ディスク容量はツールで解決、旧監視設定の移行は不要と断られた。切替が明日の夜で、DNSのTTLを今日中に下げる件が期限の迫る未解決事項で、切替の手順書の話題とも重なる。ログ回転と接続数は急がない。",
-				judge: J_ONE("DNSのTTLを下げる作業"),
-			}),
-		],
-	},
-	{
-		id: "concurrent-14",
-		group: "concurrent",
-		split: "unseen",
-		title: "並行14: 急ぎがない中で、作業に関わる1件だけを扱う",
-		description:
-			"分析レポートで4件が並行する。縦軸の単位（未確認）、参考文献の書式（急がない）、データの欠損（報告で解決）、図の配色（断られた）。急ぎの期限はない。売上推移のグラフを作り始めたところで、グラフに関わる1件だけを選べるか。",
-		items: [
-			u("売上のデータに、欠損が数行あるのが気になる。", "a1"),
-			a("欠損の行は、集計の前に確認が必要ですね。"),
-			rep(
-				"欠損は、元のシステムの出力の漏れだった。再出力してもらって埋まった。",
-				"a2",
-				40,
-			),
-			a("埋まったのですね。"),
-			a("図の配色を、色覚に配慮した配色に直しましょうか。", "b1", 20),
-			u("配色は今のままでいい。社内の標準だから。", "b2"),
-			a("わかりました。今の配色のままにします。"),
-			u(
-				"レポートで使う売上のグラフは、縦軸の単位が千円か万円か、まだ決めていない。",
-				"c1",
-				30,
-			),
-			a("読み手に合わせて、単位を決める必要がありますね。"),
-			u("参考文献の書式は、最後に整えるつもり。", "d1", 20),
-			a("最後に、書式をそろえましょう。"),
-			u("売上推移のグラフを作りたい。月別で、1年分。", "t", 30),
-			a("月別・1年分の売上推移のグラフを作ります。"),
-			opp({
-				needed: true,
-				ev: ["c1"],
-				hold: [["c1"], ["d1"]],
-				not: ["a1", "a2", "b1", "b2"],
-				note: "欠損は報告で解決し、配色は断られた。急ぎの期限はないが、いまグラフを作り始めようとしており、縦軸の単位が未決という件が直接関わる。参考文献の書式は最後に整えると利用者が言っており、今は関係がない。",
-				judge: J_ONE("グラフの縦軸の単位"),
+				trig: "idle",
+				dt: 20,
+				needed: false,
+				hold: [],
+				not: ["a1", "a2", "b1", "b2", "c1", "c2"],
+				note: "3件は片付いたまま。持ち物リストの着手を宣言した後で時間が経っても、片付いた事項を持ち出す理由がない。",
 			}),
 		],
 	},
@@ -388,7 +346,8 @@ export const concurrentUnseen: CaseDef[] = [
 			u("受付の担当表を見ておきたい。", "t", 10),
 			a("受付の担当表を開きます。"),
 			opp({
-				trig: "turn_end",
+				trig: "idle",
+				dt: 5,
 				needed: true,
 				ev: ["x1", "ddl"],
 				hold: [["x1"], ["y1"]],
@@ -422,7 +381,6 @@ export const concurrentUnseen: CaseDef[] = [
 				60,
 			),
 			u("発表が終わった。さて、2社の見積りの比較を進めようか。", "t", 120),
-			a("お疲れさまです。比較の準備に入りましょう。"),
 			opp({
 				needed: true,
 				accept: ["speak", "tool"],
@@ -506,7 +464,6 @@ export const concurrentUnseen: CaseDef[] = [
 			u("棚卸し表の整理は、月が明けてからやる。", "oa", 20),
 			a("月が明けてから、一緒に整理しましょう。"),
 			u("今日の作業の優先順位を、一緒に考えたい。", "t", 20),
-			a("残っている作業を見て、優先順位を考えます。"),
 			opp({
 				needed: true,
 				ev: ["n1"],

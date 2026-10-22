@@ -5,10 +5,12 @@ import { unique } from "./ids.ts";
 import {
 	closeCandidate,
 	closeCandidatesOfIntent,
+	hasUnknownOutcome,
 	isInFlight,
 } from "./lifecycle.ts";
 import {
 	evidenceOk,
+	hasNewerThan,
 	isIndependent,
 	hoursToMs,
 	reject,
@@ -88,8 +90,8 @@ export const applyIntentAdd = (ctx: SettleCtx, op: Of<"intent.add">) => {
 		reviewAt: ctx.now + hoursToMs(op.reviewAfterHours),
 		evidence: unique(op.evidenceRefs),
 		desireRef,
-		createdSeq: ctx.maxPresentedSeq,
-		stateSeq: ctx.maxPresentedSeq,
+		createdSeq: ctx.floorSeq,
+		stateSeq: ctx.floorSeq,
 		createdAt: ctx.now,
 		lastReason: op.motive,
 	});
@@ -113,6 +115,18 @@ const hasExternalNewer = (
 		const o = ctx.obs.get(r);
 		return o !== undefined && isIndependent(ctx, o) && o.seq > floor;
 	});
+};
+
+/**
+ * Contract section 8: while a candidate's attempt has an unknown outcome, the same effect must
+ * not be reserved again, so the candidate can be neither closed nor superseded from outside.
+ * Only the host's receipt reconciliation moves it. Returns the reject code, or null if free.
+ */
+const lockCode = (ctx: SettleCtx, c: Candidate): string | null => {
+	if (isInFlight(c)) return "candidate_in_flight";
+	if (c.holdReason === "awaiting_outcome" || hasUnknownOutcome(ctx.next, c.id))
+		return "candidate_awaiting_outcome";
+	return null;
 };
 
 const addedHere = (ctx: SettleCtx) => new Set(ctx.local.values());
@@ -163,7 +177,7 @@ export const applyIntentUpdate = (ctx: SettleCtx, op: Of<"intent.update">) => {
 	if (!ok) return;
 	if (transition !== null) {
 		intent.state = transition;
-		intent.stateSeq = ctx.maxPresentedSeq;
+		intent.stateSeq = ctx.floorSeq;
 	}
 	if (op.desiredState !== null) intent.desiredState = op.desiredState;
 	if (op.completionCondition !== null)
@@ -229,9 +243,12 @@ export const applyCandidateAdd = (ctx: SettleCtx, op: Of<"candidate.add">) => {
 			if (!old || (!isOpenCandidate(old) && !oldCascaded)) {
 				reject(ctx, "stale_revision");
 				ok = false;
-			} else if (isInFlight(old)) {
-				reject(ctx, "candidate_in_flight");
-				ok = false;
+			} else {
+				const lock = lockCode(ctx, old);
+				if (lock !== null) {
+					reject(ctx, lock);
+					ok = false;
+				}
 			}
 		}
 	}
@@ -255,6 +272,7 @@ export const applyCandidateAdd = (ctx: SettleCtx, op: Of<"candidate.add">) => {
 		content: op.content,
 		toolName: op.kind === "tool" ? op.toolName : null,
 		toolInput: op.kind === "tool" ? op.toolInput : null,
+		createdSeq: ctx.floorSeq,
 		applyWhen: op.applyWhen,
 		expiresAt: ctx.now + hoursToMs(op.expireAfterHours),
 		evidence: unique(op.evidenceRefs),
@@ -264,6 +282,26 @@ export const applyCandidateAdd = (ctx: SettleCtx, op: Of<"candidate.add">) => {
 		supersedes: old?.id ?? null,
 	});
 	ctx.touched.add(id);
+};
+
+/**
+ * fulfilled needs evidence, and at least one cited observation must have arrived after the
+ * candidate was created (an old response cannot show a later candidate was conveyed).
+ */
+const fulfilledEvidenceOk = (
+	ctx: SettleCtx,
+	c: Candidate,
+	op: { evidenceRefs: readonly string[] },
+): boolean => {
+	if (op.evidenceRefs.length === 0) {
+		reject(ctx, "missing_evidence");
+		return false;
+	}
+	if (!hasNewerThan(ctx, op.evidenceRefs, c.createdSeq ?? 0)) {
+		reject(ctx, "stale_evidence");
+		return false;
+	}
+	return true;
 };
 
 export const applyCandidateClose = (
@@ -280,25 +318,20 @@ export const applyCandidateClose = (
 			return;
 		}
 		if (!evidenceOk(ctx, op.evidenceRefs)) return;
-		if (op.reason === "fulfilled" && op.evidenceRefs.length === 0) {
-			reject(ctx, "missing_evidence");
-			return;
-		}
+		if (op.reason === "fulfilled" && !fulfilledEvidenceOk(ctx, c, op)) return;
 		ctx.cascaded.delete(op.id);
 		c.closedReason = op.reason;
 		c.evidence = unique([...c.evidence, ...op.evidenceRefs]);
 		return;
 	}
 	if (!checkExisting(ctx, c, isOpenCandidate, op.expectedRevision)) return;
-	if (isInFlight(c)) {
-		reject(ctx, "candidate_in_flight");
+	const lock = lockCode(ctx, c);
+	if (lock !== null) {
+		reject(ctx, lock);
 		return;
 	}
 	let ok = evidenceOk(ctx, op.evidenceRefs);
-	if (op.reason === "fulfilled" && op.evidenceRefs.length === 0) {
-		reject(ctx, "missing_evidence");
-		ok = false;
-	}
+	if (op.reason === "fulfilled" && !fulfilledEvidenceOk(ctx, c, op)) ok = false;
 	if (!ok) return;
 	closeCandidate(c, op.reason);
 	c.evidence = unique([...c.evidence, ...op.evidenceRefs]);
@@ -312,8 +345,9 @@ export const applyReconciliation = (
 ) => {
 	const c = findCandidate(ctx, r.candidateId);
 	const o = ctx.obs.get(r.observationRef);
-	if (c && isInFlight(c)) {
-		reject(ctx, "candidate_in_flight");
+	const lock = c ? lockCode(ctx, c) : null;
+	if (lock !== null) {
+		reject(ctx, lock);
 		return;
 	}
 	// A candidate already closed by this proposal's goal-terminal cascade is still reconcilable.
@@ -323,7 +357,9 @@ export const applyReconciliation = (
 		(!isOpenCandidate(c) && !cascaded) ||
 		!o ||
 		o.kind !== "exchange.adopted" ||
-		o.actor !== "agent"
+		o.actor !== "agent" ||
+		// The response must have arrived after the candidate was created.
+		o.seq <= (c.createdSeq ?? 0)
 	) {
 		reject(ctx, "bad_reconciliation");
 		return;

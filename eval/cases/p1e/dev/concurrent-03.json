@@ -121,17 +121,9 @@
 			"text": "フッターの会社情報の並びを整えたい。住所、電話、メールの順で。"
 		},
 		{
-			"type": "observation",
+			"type": "opportunity",
 			"id": "s15",
 			"t": 143,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "住所、電話、メールの順に整えます。"
-		},
-		{
-			"type": "opportunity",
-			"id": "s16",
-			"t": 144,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

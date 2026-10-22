@@ -69,10 +69,13 @@ export interface Intent {
 	reviewAt: number;
 	evidence: string[];
 	desireRef: string | null;
-	/** Ledger seq at creation; completion needs evidence received after it. */
+	/**
+	 * Highest seq of the processed batch that created the intent (not of everything presented);
+	 * completion needs evidence received after it.
+	 */
 	readonly createdSeq: number;
 	/**
-	 * Highest presented seq when the state last changed; completing from held needs evidence
+	 * Highest seq of the processed batch when the state last changed; completing from held needs evidence
 	 * newer than this. Absent (older snapshots) means createdSeq.
 	 */
 	stateSeq?: number;
@@ -108,6 +111,11 @@ export interface Candidate {
 	content: string;
 	readonly toolName: string | null;
 	readonly toolInput: string | null;
+	/**
+	 * Highest seq of the processed batch that created it; closing it as fulfilled needs
+	 * evidence received after it. Absent (older snapshots) means no floor.
+	 */
+	readonly createdSeq?: number;
 	applyWhen: string;
 	expiresAt: number;
 	evidence: string[];
@@ -145,6 +153,8 @@ export interface Belief {
 	confidence: Confidence;
 	evidence: string[];
 	status: BeliefStatus;
+	/** Highest seq of the processed batch that created it; absent (older snapshots) means no floor. */
+	readonly createdSeq?: number;
 }
 
 export type DesireKind = "understand" | "finish" | "share";
@@ -159,6 +169,8 @@ export interface Desire {
 	evidence: string[];
 	beliefRefs: string[];
 	status: DesireStatus;
+	/** Highest seq of the processed batch that created it; absent (older snapshots) means no floor. */
+	readonly createdSeq?: number;
 }
 
 export interface Note {

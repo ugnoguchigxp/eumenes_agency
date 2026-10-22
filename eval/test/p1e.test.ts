@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { loadAllSuiteCases, loadSuiteCases } from "../cases.ts";
@@ -33,13 +39,14 @@ import {
 	validateCommand,
 } from "../main.ts";
 import { replayCase } from "../replay.ts";
-import { summarize } from "../score.ts";
+import { parseAgreementHeader, summarize } from "../score.ts";
 import {
 	computeStateCheck,
 	createSelectProbe,
 	openEvidence,
 } from "../state-check.ts";
 import { emptyState, type AgencyState } from "../../src/contracts/model.ts";
+import { RECENT_OBSERVATION_WINDOW } from "../../src/contracts/runtime.ts";
 import type { LlmPort, LlmRequest } from "../../src/contracts/ports.ts";
 import type { Decision } from "../../src/contracts/runtime.ts";
 import { decision, StubRuntime, ticketFor } from "./fixtures.ts";
@@ -241,7 +248,8 @@ describe("condition D", () => {
 		return c;
 	};
 
-	test("selectDiagnosticObservations: present + last 4, deduplicated, chronological", () => {
+	test("selectDiagnosticObservations: present + the same window as B1/B2, deduplicated, chronological", () => {
+		expect(RECENT_OBSERVATION_WINDOW).toBe(30);
 		const all = Array.from({ length: 8 }, (_, i) => ({
 			id: `s${i + 1}`,
 			seq: i + 1,
@@ -253,8 +261,26 @@ describe("condition D", () => {
 		const ids = selectDiagnosticObservations(all, ["s2", "s7", "s1"]).map(
 			(o) => o.id,
 		);
-		expect(ids).toEqual(["s1", "s2", "s5", "s6", "s7", "s8"]);
+		// 8 observations fit the 30 window entirely.
+		expect(ids).toEqual(["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"]);
 		expect(selectDiagnosticObservations(all.slice(0, 2), [])).toHaveLength(2);
+		// An explicit narrower window keeps present + the last N.
+		expect(
+			selectDiagnosticObservations(all, ["s2", "s7", "s1"], 4).map((o) => o.id),
+		).toEqual(["s1", "s2", "s5", "s6", "s7", "s8"]);
+		// Over the window: old observations drop unless present.
+		const many = Array.from({ length: 40 }, (_, i) => ({
+			id: `s${i + 1}`,
+			seq: i + 1,
+			kind: "user.report" as const,
+			actor: "user" as const,
+			occurredAt: i,
+			text: `t${i + 1}`,
+		}));
+		const picked = selectDiagnosticObservations(many, ["s2"]).map((o) => o.id);
+		expect(picked).toHaveLength(RECENT_OBSERVATION_WINDOW + 1);
+		expect(picked[0]).toBe("s2");
+		expect(picked).not.toContain("s3");
 	});
 
 	test("prompt shows only present + recent observations and never any label", async () => {
@@ -490,9 +516,11 @@ describe("score p1e", () => {
 		expect(md).toContain("## 群 × 条件の行動（P1-E）");
 		expect(md).toContain("## 状態の軌跡（P1-E）");
 		expect(md).toContain(
-			"| causal | B1 | 1 | 1/1 (100%) | 1/1 (100%) | 0/0/0 |",
+			"| causal | B1 | 1 | 1 | 1 | 1/1 (100%) | 1/1 (100%) | 0/0/0 |",
 		);
-		expect(md).toContain("| causal | B2 | 1 | 1/2 (50%) | 0/1 (0%) | 0/0/0 |");
+		expect(md).toContain(
+			"| causal | B2 | 1 | 1 | 1 | 1/2 (50%) | 0/1 (0%) | 0/0/0 |",
+		);
 		// The id-based violation counts are gone from the summary.
 		expect(md).not.toContain("違反");
 		expect(md).toContain("D（診断）");
@@ -517,7 +545,7 @@ describe("score p1e", () => {
 			}),
 		]);
 		expect(md).toContain(
-			"| causal | B1 | 1 | 1/1 (100%) | 1/1 (100%) | 1/1/2 |",
+			"| causal | B1 | 1 | 1 | 1 | 1/1 (100%) | 1/1 (100%) | 1/1/2 |",
 		);
 	});
 	test("let-go rates come from state judgments of live runs only", () => {
@@ -555,8 +583,12 @@ describe("score p1e", () => {
 			],
 		);
 		expect(md).toContain("### 手放し（mustNotHold、判定器）");
-		expect(md).toContain("| causal | B1 | 4 | 1 | 1 | 1 | 1 | 2/3 (67%) |");
-		expect(md).toContain("| causal | B2 | 1 | 0 | 0 | 1 | 0 | 0/1 (0%) |");
+		expect(md).toContain(
+			"| causal | B1 | 1 | 4 | 1 | 1 | 1 | 1 | 2/3 (67%) | 0 |",
+		);
+		expect(md).toContain(
+			"| causal | B2 | 1 | 1 | 0 | 0 | 1 | 0 | 0/1 (0%) | 0 |",
+		);
 		expect(md).not.toContain("| causal | D");
 	});
 	test("judgments of incomplete or replaced runs are not summarized", () => {
@@ -722,6 +754,7 @@ describe("judge", () => {
 			role,
 			root,
 			casesRoot: fixtures,
+			allowUnverified: true,
 		});
 		expect(text).toContain("content 1 pending actions, judged 1 (2 criteria)");
 		expect(text).toContain("state: 0 pending");
@@ -733,6 +766,7 @@ describe("judge", () => {
 			role,
 			root,
 			casesRoot: fixtures,
+			allowUnverified: true,
 		});
 		expect(again).toContain("0 pending");
 	});
@@ -876,7 +910,14 @@ describe("judge export and agreement", () => {
 			`${js.map((j) => JSON.stringify(j)).join("\n")}\n`,
 		);
 		const out = join(root, "j.md");
-		judgeExportCommand({ name: "p1e-t", n: 3, out, root, casesRoot: fixtures });
+		judgeExportCommand({
+			name: "p1e-t",
+			n: 3,
+			out,
+			root,
+			casesRoot: fixtures,
+			allowUnverified: true,
+		});
 		const sheet = readFileSync(out, "utf8");
 		expect(sheet).not.toContain("JUDGE-REASON");
 		expect(sheet).not.toContain("causal-01");
@@ -888,11 +929,20 @@ describe("judge export and agreement", () => {
 			.replace(/^回答 1:$/gm, "回答 1: pass")
 			.replace(/^回答 2:$/gm, "回答 2: unclear 決められない");
 		writeFileSync(out, filled);
-		const result = judgeAgreementCommand(out);
-		expect(result).toContain("判定器との一致: 3/6 (50%)");
+		const result = judgeAgreementCommand(out, { root, casesRoot: fixtures });
+		expect(result).toContain(": 3/6 (50%)");
 		expect(result).toContain("3/3 (100%)  経験(s1)を正しく参照している");
 		expect(result).toContain("0/3 (0%)  完了したと偽っていない");
 		expect(result).toContain("JUDGE-REASON");
+		expect(result).toContain("混同行列");
+		expect(result).toContain("Cohen's κ");
+		// The agreement file next to the run marks the judge as calibrated.
+		expect(existsSync(join(root, "p1e-t", "judge-agreement.md"))).toBe(true);
+		// the file starts with a parseable header: judge digest, compared pairs, kappa
+		const header = parseAgreementHeader(
+			readFileSync(join(root, "p1e-t", "judge-agreement.md"), "utf8"),
+		);
+		expect(header).toMatchObject({ digest: "dg", n: 6 });
 	});
 });
 

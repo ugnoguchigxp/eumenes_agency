@@ -1,0 +1,337 @@
+{
+	"id": "dilution-50",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "unseen",
+	"title": "希釈（ポスター・A30）: 学会ポスターの図2の解像度が低いままの件を後で再開",
+	"description": "学会発表のポスターの図2の解像度が低く、元の画像への差し替えが未了のまま残る。 (a) 件数の影響（経過時間は一定）: 無関係な観測 30 件（15 往復）を、180分の間に詰めて挟む（0 件でも未解決事項から 180分後）。 最後の区間と機会は、同じ原型の他の変種と同一。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "poster_check",
+			"description": "ポスターの画像の解像度と差し替え状況を確認する",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "図2: 72dpi（印刷の目安は300dpi）、元の画像への差し替えは未了。ほかの図は300dpi以上。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "学会発表のポスターの図2が、解像度が低くて印刷するとぼやけそう。元の画像に差し替えたいが、まだ差し替えられていない。入稿は金曜。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "入稿の前に、元の画像に差し替える必要がありますね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "poster_check: 図2の解像度は72dpi（印刷の目安は300dpi）。元の画像の差し替えは未了。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 10,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ファイル名の拡張子が大文字のものを、小文字にそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 16,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": ".PDF と .CSV の計9件を小文字にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 21,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "電話番号の書式を、ハイフン入りにそろえたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 27,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "03-1234-5678 の形にそろえました。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 33,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "午前10時の会議を、30分後ろにずらすと何時？"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 39,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "10時30分です。"
+		},
+		{
+			"type": "observation",
+			"id": "s10",
+			"t": 45,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "報告書の「である調」と「ですます調」が混ざっているので、ですます調にして。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 50,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ですます調に直しました。7か所です。"
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 56,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "この正規表現で、郵便番号（123-4567）に一致する？ ^\\d{3}-\\d{4}$"
+		},
+		{
+			"type": "observation",
+			"id": "s13",
+			"t": 62,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "一致します。ハイフン付きの7桁だけに一致する式です。"
+		},
+		{
+			"type": "observation",
+			"id": "s14",
+			"t": 68,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "表の合計行を、一番下に移して。"
+		},
+		{
+			"type": "observation",
+			"id": "s15",
+			"t": 74,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "合計行を最下行に移しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s16",
+			"t": 79,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "打ち合わせの議題を、5つ以内に絞って。"
+		},
+		{
+			"type": "observation",
+			"id": "s17",
+			"t": 85,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "優先度の高い5つに絞りました。"
+		},
+		{
+			"type": "observation",
+			"id": "s18",
+			"t": 91,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "見積書の「単価」を「単価（税抜）」に直して。"
+		},
+		{
+			"type": "observation",
+			"id": "s19",
+			"t": 97,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "見出しを直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s20",
+			"t": 103,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "3月は何日まである？ 今年は閏年じゃない。"
+		},
+		{
+			"type": "observation",
+			"id": "s21",
+			"t": 109,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "31日です。"
+		},
+		{
+			"type": "observation",
+			"id": "s22",
+			"t": 114,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "資料のページ番号を、表紙を除いて1から振り直して。"
+		},
+		{
+			"type": "observation",
+			"id": "s23",
+			"t": 120,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "表紙の次のページを1にして振り直しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s24",
+			"t": 126,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "スライドの箇条書きを、1枚あたり4項目までにして。"
+		},
+		{
+			"type": "observation",
+			"id": "s25",
+			"t": 132,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "2枚に分けて、各4項目以内にしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s26",
+			"t": 138,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "CSVの区切りを、カンマからタブに変えたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s27",
+			"t": 143,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "タブ区切りのファイルに変換しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s28",
+			"t": 149,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "担当者の名前の敬称を、「さん」にそろえて。"
+		},
+		{
+			"type": "observation",
+			"id": "s29",
+			"t": 155,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "「様」「氏」を「さん」にそろえました。"
+		},
+		{
+			"type": "observation",
+			"id": "s30",
+			"t": 161,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "配布資料の余白を、上下2cmにして。"
+		},
+		{
+			"type": "observation",
+			"id": "s31",
+			"t": 167,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "上下の余白を2cmにしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s32",
+			"t": 172,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "文字数を数えて。「本日はご多用のところ、ありがとうございます。」"
+		},
+		{
+			"type": "observation",
+			"id": "s33",
+			"t": 178,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "句読点を含めて27字です。"
+		},
+		{
+			"type": "observation",
+			"id": "s34",
+			"t": 184,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "発表の持ち時間の配分を、5分と3分で組みたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s35",
+			"t": 185,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "発表5分、質疑3分で、話す順を組みました。"
+		},
+		{
+			"type": "observation",
+			"id": "s36",
+			"t": 186,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "配分はこれでいい。この件はここまでにして、少し休憩する。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s37",
+			"t": 201,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1", "s3"],
+				"failureIfOutward": "unnecessary",
+				"note": "ポスターの図2は解像度が低いままで、元の画像への差し替えが未了。入稿は金曜という期限がある。発表の持ち時間の配分は仕上がり、利用者も一息ついた区切りの場面で、図2の件を話題にする機会（ポスターの話題とも近い）。poster_check で状況を確かめてもよい。"
+			},
+			"stateExpect": {
+				"mustHold": [["s1", "s3"]],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"ポスターの図2の解像度が低く、元の画像への差し替えが未了であることを、実際にあった観測のとおりに述べている",
+				"差し替えが済んだ、または解像度が足りたとは言っていない"
+			]
+		}
+	]
+}

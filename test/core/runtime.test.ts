@@ -1295,7 +1295,7 @@ describe("prompt fairness", () => {
 				expect(t).toContain("断った");
 				expect(t).toContain("言い換え");
 				expect(t).toContain("exchange.adopted");
-				expect(t).toContain("p0e-instructions-8");
+				expect(t).toContain("p0e-instructions-9");
 			}
 			expect(f).not.toContain("意図を保つべき");
 		});

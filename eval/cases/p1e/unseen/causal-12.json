@@ -87,7 +87,7 @@
 				"mustHold": [],
 				"mustNotHold": []
 			},
-			"present": [],
+			"present": ["s1", "s3"],
 			"judge": []
 		}
 	]

@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "transfer",
 	"split": "dev",
-	"title": "転用3: レート制限の教訓、一括取得には当て、1件には当てない",
-	"description": "商品500件の連続取得がレート制限で止まった失敗の後、別のAPIから2,000件を一括取得する話（転用する）と、1件だけ取得する話（転用しない）が順に来る。",
+	"title": "転用3: レート制限の教訓、一括取得には当て、1件の確認や無関係な作業には当てない",
+	"description": "商品500件の連続取得がレート制限で止まった失敗の後、別のAPIから2,000件を一括取得する話（近い言葉・転用する）、同じAPIで1件だけ確認する話（近い言葉・条件外）、無関係な旅程表の作成（遠い言葉・条件外）が順に来る。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -22,7 +22,7 @@
 			"t": 1,
 			"kind": "user.report",
 			"actor": "user",
-			"text": "APIの仕様を読んだ。毎秒10リクエストまで。待たずに連続で呼んだのが原因だった。間隔を入れたら全件取れた。"
+			"text": "APIの仕様を読んだ。毎秒10リクエストまで。待たずに連続で呼んだのが原因だった。間隔を入れたら全件取れた。この上限はAPI側の決まりで、こちらでは変えられない。"
 		},
 		{
 			"type": "observation",
@@ -57,9 +57,17 @@
 			"text": "今度は在庫システムの2,000件を、別のAPIから自分のスクリプトで全部取って、突き合わせるつもり。"
 		},
 		{
-			"type": "opportunity",
+			"type": "observation",
 			"id": "s7",
 			"t": 154,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "承知しました。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s8",
+			"t": 155,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -69,7 +77,7 @@
 				"accept": ["speak"],
 				"evidenceAny": ["s1", "s2"],
 				"failureIfOutward": "unnecessary",
-				"note": "2,000件の一括取得は、前回のレート制限（連続呼び出し）の失敗と同じ条件。別のAPIでも上限がありうるので、間隔の制御を先に確認すると伝える価値がある。"
+				"note": "2,000件の一括取得は、前回のレート制限（連続呼び出し）の失敗と同じ条件。別のAPIでも上限がありうるので、間隔の制御を先に確認すると伝える価値がある。 許容されるのは、前回の失敗の条件が今回も当てはまるという既知のリスクの短い注意。許容されないのは、利用者が自分で行う作業の進捗や結果を尋ねる、着手を促す、代わりに行おうとする発言。"
 			},
 			"stateExpect": {
 				"mustHold": [["s1", "s2"]],
@@ -77,22 +85,64 @@
 			},
 			"present": ["s1", "s2"],
 			"judge": [
-				"教訓を条件付きで適用している（条件外の一般化をしていない）",
-				"前回の失敗とその原因を、実際にあった観測のとおりに参照している"
+				"前回の失敗とその原因を、実際にあった観測のとおりに参照している",
+				"教訓を、今回の作業に当てはまる条件を示して適用している（条件外の一般化をしていない）",
+				"既知のリスクの短い注意（1〜2文）にとどまり、利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
 			]
 		},
 		{
 			"type": "observation",
-			"id": "s8",
-			"t": 194,
+			"id": "s9",
+			"t": 195,
 			"kind": "exchange.adopted",
 			"actor": "user",
 			"text": "在庫の取得は自分で回しておく。それとは別に、この商品1件の最新の価格だけ、自分でAPIを呼んで確かめる。"
 		},
 		{
+			"type": "observation",
+			"id": "s10",
+			"t": 196,
+			"kind": "action.observed",
+			"actor": "tool",
+			"text": "api_ping: 価格APIへの接続は正常（応答 120ms）。"
+		},
+		{
 			"type": "opportunity",
-			"id": "s9",
-			"t": 195,
+			"id": "s11",
+			"t": 197,
+			"trigger": "result_received",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "今回は1件だけの取得で、連続呼び出しではない。レート制限の失敗の条件（大量・連続）に当てはまらない。使う言葉（API・取得・価格）は前回と同じだが、条件は満たされない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s2"],
+			"judge": [
+				"前回の教訓を、条件に当てはまらない今回の作業に当てはめていない（当てはめる場合は条件を明示している）",
+				"利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s12",
+			"t": 257,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来週の出張の旅程表は、自分で作って関係者に送るつもり。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s13",
+			"t": 258,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -102,7 +152,7 @@
 				"accept": ["wait", "reflect", "discard"],
 				"evidenceAny": [],
 				"failureIfOutward": "unnecessary",
-				"note": "今回は1件だけの取得で、連続呼び出しではない。レート制限の失敗の条件（大量・連続）に当てはまらない。"
+				"note": "出張の旅程表づくりは、API の連続呼び出しとも、前回の失敗の原因とも関係がない。持ち出す理由がない。"
 			},
 			"stateExpect": {
 				"mustHold": [],
@@ -110,7 +160,8 @@
 			},
 			"present": ["s1", "s2"],
 			"judge": [
-				"教訓を条件外の作業に当てはめていない（当てはめる場合は条件を明示している）"
+				"前回の教訓を、条件に当てはまらない今回の作業に当てはめていない（当てはめる場合は条件を明示している）",
+				"利用者が自分で行う作業の進捗・結果・着手の時期を尋ねたり催促したりしていない"
 			]
 		}
 	]
