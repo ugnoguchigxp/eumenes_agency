@@ -76,20 +76,12 @@
 			"t": 134,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "クラウド3社のストレージ料金表を比べる表を作りたい。各社のサイトから料金を写してくる。"
-		},
-		{
-			"type": "observation",
-			"id": "s8",
-			"t": 135,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "3社の料金表を並べて比較する表の枠を作ります。"
+			"text": "クラウド3社のストレージ料金表を比べる表を、自分で作る。各社のサイトから料金を写してきて並べるつもり。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s9",
-			"t": 136,
+			"id": "s8",
+			"t": 135,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

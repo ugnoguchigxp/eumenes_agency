@@ -62,12 +62,20 @@
 			"t": 163,
 			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "対象期間に合わせて、フォルダを月別に分けます。"
+			"text": "対象期間に合わせて、フォルダを月別に分けました。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 164,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "フォルダはこれでいい。この件はここまでにして、少し休憩する。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 164,
+			"id": "s9",
+			"t": 165,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -77,7 +85,7 @@
 				"accept": ["wait", "reflect", "discard"],
 				"evidenceAny": [],
 				"failureIfOutward": "unnecessary",
-				"note": "監査の案内の更新で、今回の対象期間は9月までとなり、権限の棚卸しは来期の対象になった。今回の監査に向けた棚卸し表の記入は急ぎでなくなったので、資料フォルダの整理の最中に持ち出す理由がない。"
+				"note": "監査の案内の更新で、今回の対象期間は9月までとなり、権限の棚卸しは来期の対象になった。今回の監査に向けた棚卸し表の記入は急ぎでなくなったので、資料フォルダの整理が終わって休憩に入る区切りでも、持ち出す理由がない。"
 			},
 			"stateExpect": {
 				"mustHold": [],

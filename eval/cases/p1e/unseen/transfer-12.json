@@ -54,20 +54,12 @@
 			"t": 133,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "検索サーバーの構成を2通り比べたい。測定は本番の全データ（1,200万件）のコピーでやる。"
-		},
-		{
-			"type": "observation",
-			"id": "s7",
-			"t": 134,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "2通りの構成を、同じ全データのコピーで測定します。"
+			"text": "検索サーバーの構成を2通り、自分で比べる。測定は本番の全データ（1,200万件）のコピーでやるつもり。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 135,
+			"id": "s7",
+			"t": 134,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

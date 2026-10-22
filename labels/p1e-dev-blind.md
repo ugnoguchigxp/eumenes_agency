@@ -9,7 +9,44 @@
 
 ## 項目 1
 
-機会: trigger=turn_end / t=277分 / 在席=quiet / 前景作業=なし / 再生中=なし
+機会: trigger=turn_end / t=156分 / 在席=quiet / 前景作業=なし / 再生中=なし
+
+観測の経過:
+- [s1] t=0分 exchange.adopted (user): 売上の集計は、Q3の確定報告に載せるために、9月末時点の暫定値のデータで進めている。暫定値には未計上の3件が入っていない。確定版が出たら入れ直したい。
+- [s2] t=1分 exchange.adopted (agent): 確定版が出たら、集計を入れ直します。
+- [s3] t=81分 exchange.adopted (user): お礼メールの文面を、もう少し短くして。
+- [s4] t=82分 exchange.adopted (agent): 3文に短くしました。
+- [s5] t=142分 exchange.adopted (user): Q3の確定報告の資料は、経理が確定値から作ることになった。この集計は、来週の営業会議で拠点ごとの傾向を話す材料として使う。
+- [s6] t=143分 exchange.adopted (agent): この集計は営業会議の材料として仕上げる、と理解しました。
+- [s7] t=153分 exchange.adopted (user): 営業会議用に、拠点別の構成比を円グラフにしたい。
+- [s8] t=154分 exchange.adopted (agent): 拠点別の構成比を円グラフにしました。
+- [s9] t=155分 exchange.adopted (user): グラフはこれでいい。この件はここまでにして、少し休憩する。
+
+使えるツール:
+- （使えるツールなし）
+
+回答:
+
+## 項目 2
+
+機会: trigger=turn_end / t=154分 / 在席=quiet / 前景作業=なし / 再生中=なし
+
+観測の経過:
+- [s1] t=0分 action.observed (tool): import_check(zip_list.csv): 取り込み失敗。127行で郵便番号が7桁でなく6桁になっている（先頭の0が欠落）。
+- [s2] t=1分 user.report (user): 原因が分かった。表計算ソフトで開いて保存したときに、数字として扱われて先頭の0が落ちていた。文字列として開き直したら直った。
+- [s3] t=2分 exchange.adopted (agent): 文字列として開き直す手順をメモしておきます。
+- [s4] t=62分 exchange.adopted (user): 打ち合わせの議題を、優先度の高い順に並べ替えて。
+- [s5] t=63分 exchange.adopted (agent): 優先度順に5項目を並べ替えました。
+- [s6] t=153分 exchange.adopted (user): 店舗コード（0123のような4桁）の一覧を、自分で表計算ソフトで開いて、見やすく整えてから保存するつもり。
+
+使えるツール:
+- （使えるツールなし）
+
+回答:
+
+## 項目 3
+
+機会: trigger=turn_end / t=278分 / 在席=quiet / 前景作業=なし / 再生中=なし
 
 観測の経過:
 - [s1] t=0分 exchange.adopted (user): ステージング環境の証明書の自動更新が、昨夜失敗していた。原因はまだ分かっていない。
@@ -76,14 +113,37 @@
 - [s62] t=243分 exchange.adopted (user): タスク表の「担当」の列を、「担当者」に変えて。
 - [s63] t=244分 exchange.adopted (agent): 列の見出しを直しました。
 - [s64] t=275分 exchange.adopted (user): 来月のメンテナンス窓で行う作業の一覧を作りたい。
-- [s65] t=276分 exchange.adopted (agent): メンテナンス窓で行う作業を洗い出して、一覧にします。
+- [s65] t=276分 exchange.adopted (agent): メンテナンス窓で行う作業を洗い出して、一覧にしました（5項目）。
+- [s66] t=277分 exchange.adopted (user): 一覧はこれでいい。この件はここまでにして、少し休憩する。
 
 使えるツール:
 - cert_renew_check: ステージング環境の証明書の有効期限と更新状態を確認する
 
 回答:
 
-## 項目 2
+## 項目 4
+
+機会: trigger=turn_end / t=138分 / 在席=quiet / 前景作業=なし / 再生中=なし
+
+観測の経過:
+- [s1] t=0分 exchange.adopted (user): 今期の販売レポートを、東日本と西日本の6拠点で作る。
+- [s2] t=1分 exchange.adopted (agent): 6拠点の構成でレポートの骨組みを作ります。
+- [s3] t=2分 exchange.adopted (user): 西日本の3拠点は、商品別の内訳がまだ届いていない。届いたら入れたい。
+- [s4] t=3分 exchange.adopted (agent): 西日本の内訳が届いたら、その3拠点分を足します。
+- [s5] t=63分 exchange.adopted (user): 会議の議題の順番を、報告・相談・連絡の順にして。
+- [s6] t=64分 exchange.adopted (agent): 報告・相談・連絡の順に並べました。
+- [s7] t=124分 exchange.adopted (user): 今期の販売レポートは、東日本の3拠点の分だけで作ることになった。
+- [s8] t=125分 exchange.adopted (agent): 東日本の3拠点で構成します。
+- [s9] t=135分 exchange.adopted (user): 東日本の売上の推移は、折れ線グラフにしたい。
+- [s10] t=136分 exchange.adopted (agent): 月別の折れ線グラフにしました。
+- [s11] t=137分 exchange.adopted (user): グラフはこれでいい。この件はここまでにして、少し休憩する。
+
+使えるツール:
+- （使えるツールなし）
+
+回答:
+
+## 項目 5
 
 機会: trigger=turn_end / t=124分 / 在席=quiet / 前景作業=なし / 再生中=なし
 
@@ -101,28 +161,7 @@
 
 回答:
 
-## 項目 3
-
-機会: trigger=turn_end / t=137分 / 在席=quiet / 前景作業=なし / 再生中=なし
-
-観測の経過:
-- [s1] t=0分 exchange.adopted (user): 今期の販売レポートを、東日本と西日本の6拠点で作る。
-- [s2] t=1分 exchange.adopted (agent): 6拠点の構成でレポートの骨組みを作ります。
-- [s3] t=2分 exchange.adopted (user): 西日本の3拠点は、商品別の内訳がまだ届いていない。届いたら入れたい。
-- [s4] t=3分 exchange.adopted (agent): 西日本の内訳が届いたら、その3拠点分を足します。
-- [s5] t=63分 exchange.adopted (user): 会議の議題の順番を、報告・相談・連絡の順にして。
-- [s6] t=64分 exchange.adopted (agent): 報告・相談・連絡の順に並べました。
-- [s7] t=124分 exchange.adopted (user): 今期の販売レポートは、東日本の3拠点の分だけで作ることになった。
-- [s8] t=125分 exchange.adopted (agent): 東日本の3拠点で構成します。
-- [s9] t=135分 exchange.adopted (user): 東日本の売上の推移は、折れ線グラフにしたい。
-- [s10] t=136分 exchange.adopted (agent): 月別の折れ線グラフにします。
-
-使えるツール:
-- （使えるツールなし）
-
-回答:
-
-## 項目 4
+## 項目 6
 
 機会: trigger=turn_end / t=187分 / 在席=quiet / 前景作業=なし / 再生中=なし
 
@@ -143,7 +182,7 @@
 
 回答:
 
-## 項目 5
+## 項目 7
 
 機会: trigger=turn_end / t=144分 / 在席=quiet / 前景作業=なし / 再生中=なし
 
@@ -168,7 +207,7 @@
 
 回答:
 
-## 項目 6
+## 項目 8
 
 機会: trigger=turn_end / t=115分 / 在席=quiet / 前景作業=なし / 再生中=なし
 
@@ -195,27 +234,7 @@
 
 回答:
 
-## 項目 7
-
-機会: trigger=turn_end / t=277分 / 在席=quiet / 前景作業=なし / 再生中=なし
-
-観測の経過:
-- [s1] t=0分 action.observed (tool): merge_check(sales_all.csv): 2,140行で日付が入れ替わっている（3/4 が4月3日と3月4日で混在）。
-- [s2] t=1分 user.report (user): 拠点ごとに日付の書式が違ったのが原因。米国拠点は月/日、国内拠点は日/月で出していた。拠点別に書式を直してから結合したら合った。
-- [s3] t=2分 exchange.adopted (agent): 結合の前に、拠点別に書式をそろえる手順にします。
-- [s4] t=62分 exchange.adopted (user): 来週の出張の持ち物リストを、仕事用と私物に分けて。
-- [s5] t=63分 exchange.adopted (agent): 仕事用8点、私物6点に分けました。
-- [s6] t=153分 exchange.adopted (user): システム側で、全拠点のデータをISO形式（YYYY-MM-DD）に統一して出すようになった。そのファイル3つを結合してほしい。
-- [s7] t=154分 exchange.adopted (agent): 3つのファイルを結合します。
-- [s9] t=275分 exchange.adopted (user): 結合できた。次に、新しく加わる別の国の拠点の売上CSVも足したい。出力は各拠点のシステム任せ。
-- [s10] t=276分 exchange.adopted (agent): 新拠点のファイルも結合の対象に加えます。
-
-使えるツール:
-- （使えるツールなし）
-
-回答:
-
-## 項目 8
+## 項目 9
 
 機会: trigger=result_received / t=134分 / 在席=quiet / 前景作業=なし / 再生中=なし
 
@@ -233,7 +252,7 @@
 
 回答:
 
-## 項目 9
+## 項目 10
 
 機会: trigger=turn_end / t=96分 / 在席=quiet / 前景作業=なし / 再生中=なし
 
@@ -252,25 +271,24 @@
 
 回答:
 
-## 項目 10
+## 項目 11
 
 機会: trigger=turn_end / t=154分 / 在席=quiet / 前景作業=なし / 再生中=なし
 
 観測の経過:
-- [s1] t=0分 exchange.adopted (user): 売上の集計は、9月末時点の暫定値のデータで進めている。暫定値には未計上の3件が入っていない。確定版が出たら入れ直したい。
-- [s2] t=1分 exchange.adopted (agent): 確定版が出たら、集計を入れ直します。
-- [s3] t=81分 exchange.adopted (user): お礼メールの文面を、もう少し短くして。
-- [s4] t=82分 exchange.adopted (agent): 3文に短くしました。
-- [s5] t=142分 source.changed (host): sales_2026q3.csv を差し替え: 確定値版（9月末の締め後。未計上の3件を含む）。
-- [s6] t=152分 exchange.adopted (user): Q3の拠点別の構成比を、円グラフにしたい。
-- [s7] t=153分 exchange.adopted (agent): 拠点別の構成比を円グラフにします。
+- [s1] t=0分 action.observed (tool): log_join: 注文DBと決済ログの突き合わせで、一致が0件だった。
+- [s2] t=1分 user.report (user): 原因はタイムゾーンだった。決済ログはUTCで、注文DBはJST。UTCをJSTに直してから突き合わせたら一致した。
+- [s3] t=2分 exchange.adopted (agent): 突き合わせるときは時刻の基準をそろえます。
+- [s4] t=62分 exchange.adopted (user): エラーメッセージの文言を、利用者向けにやわらかくして。
+- [s5] t=63分 exchange.adopted (agent): 「処理できませんでした。時間をおいてもう一度お試しください」にしました。
+- [s6] t=153分 exchange.adopted (user): 同じ注文サーバーが同じ設定で出しているアクセスログとエラーログを、これから自分で突き合わせて、エラーの直前のリクエストを見るつもり。
 
 使えるツール:
 - （使えるツールなし）
 
 回答:
 
-## 項目 11
+## 項目 12
 
 機会: trigger=turn_end / t=140分 / 在席=quiet / 前景作業=なし / 再生中=なし
 
@@ -283,24 +301,6 @@
 - [s6] t=93分 exchange.adopted (agent): 「末締め翌月払い」に直しました。売上と入金の差は、端数処理の違いが原因と考えてよさそうです。
 - [s7] t=138分 exchange.adopted (user): 今日の依頼を、箇条書きで振り返って。
 - [s8] t=139分 exchange.adopted (agent): 振り返りです。・請求メールの件名を変更 ・支払条件を末締め翌月払いに修正 ・売上と入金の差は端数処理の違いが原因。
-
-使えるツール:
-- （使えるツールなし）
-
-回答:
-
-## 項目 12
-
-機会: trigger=turn_end / t=155分 / 在席=quiet / 前景作業=なし / 再生中=なし
-
-観測の経過:
-- [s1] t=0分 action.observed (tool): log_join: 注文DBと決済ログの突き合わせで、一致が0件だった。
-- [s2] t=1分 user.report (user): 原因はタイムゾーンだった。決済ログはUTCで、注文DBはJST。UTCをJSTに直してから突き合わせたら一致した。
-- [s3] t=2分 exchange.adopted (agent): 突き合わせるときは時刻の基準をそろえます。
-- [s4] t=62分 exchange.adopted (user): エラーメッセージの文言を、利用者向けにやわらかくして。
-- [s5] t=63分 exchange.adopted (agent): 「処理できませんでした。時間をおいてもう一度お試しください」にしました。
-- [s6] t=153分 exchange.adopted (user): 同じ注文サーバーが同じ設定で出しているアクセスログとエラーログを突き合わせて、エラーの直前のリクエストを見たい。
-- [s7] t=154分 exchange.adopted (agent): エラーの時刻の前後のアクセスログを抜き出して並べます。
 
 使えるツール:
 - （使えるツールなし）

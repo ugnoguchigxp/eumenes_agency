@@ -54,20 +54,12 @@
 			"t": 133,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "今度は2.5GBのCSVを集計したい。pandasで読み込んで、列ごとの合計を出す予定。"
-		},
-		{
-			"type": "observation",
-			"id": "s7",
-			"t": 134,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "pandasで読み込んで列ごとに合計する処理を書きます。"
+			"text": "今度は2.5GBのCSVを集計する。自分で、pandasで読み込んで、列ごとの合計を出すつもり。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 135,
+			"id": "s7",
+			"t": 134,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -91,24 +83,16 @@
 		},
 		{
 			"type": "observation",
-			"id": "s9",
-			"t": 225,
+			"id": "s8",
+			"t": 224,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "それでいこう。別に、設定用の50KBくらいのJSONを読んで検証するスクリプトも書きたい。"
-		},
-		{
-			"type": "observation",
-			"id": "s10",
-			"t": 226,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "JSONを読んで必須項目を検証するスクリプトを書きます。"
+			"text": "集計は自分でやっておく。別に、設定用の50KBくらいのJSONを読んで検証するスクリプトも、自分で書くつもり。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s11",
-			"t": 227,
+			"id": "s9",
+			"t": 225,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

@@ -54,20 +54,12 @@
 			"t": 153,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "店舗コードの一覧（0123のような4桁）を、確認用に表計算ソフトで開いて、見やすく整えておきたい。"
-		},
-		{
-			"type": "observation",
-			"id": "s7",
-			"t": 154,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "店舗コードの一覧を、列幅と並びを整えた形にします。"
+			"text": "店舗コード（0123のような4桁）の一覧を、自分で表計算ソフトで開いて、見やすく整えてから保存するつもり。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 155,
+			"id": "s7",
+			"t": 154,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

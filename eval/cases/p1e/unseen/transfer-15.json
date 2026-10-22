@@ -54,20 +54,12 @@
 			"t": 133,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "交通費の精算表の合計を出したい。金額はすべて整数の円で、割り算も税率の計算もない。"
-		},
-		{
-			"type": "observation",
-			"id": "s7",
-			"t": 134,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "精算表の金額を合計します。"
+			"text": "交通費の精算表の合計を、自分で出す。金額はすべて整数の円で、割り算も税率の計算もない。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 135,
+			"id": "s7",
+			"t": 134,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

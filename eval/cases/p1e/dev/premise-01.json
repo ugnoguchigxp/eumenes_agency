@@ -86,12 +86,20 @@
 			"t": 136,
 			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "月別の折れ線グラフにします。"
+			"text": "月別の折れ線グラフにしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s11",
+			"t": 137,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "グラフはこれでいい。この件はここまでにして、少し休憩する。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s11",
-			"t": 137,
+			"id": "s12",
+			"t": 138,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

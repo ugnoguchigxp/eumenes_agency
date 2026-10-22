@@ -3,8 +3,8 @@
 	"suite": "p1e",
 	"group": "premise",
 	"split": "unseen",
-	"title": "前提14: カタログの型番表が新版の再出力に差し替わる",
-	"description": "型番表の3件が旧カタログの表記のまま更新が必要だったが、表が新カタログに合わせて全件更新された版に差し替わる。古い前提の事項を持ち出さないか。",
+	"title": "前提14: 型番の一覧が商品管理システムの出力に置き換わる",
+	"description": "catalog_models.csv の型番3件が旧カタログの表記のままで更新が必要だったが、型番の一覧は来月から商品管理システムの出力に置き換わる（対象の置き換え、否定の語なし）。更新するはずだった表がなくなる事項を持ち出さないか。",
 	"labelStatus": "draft",
 	"tools": [],
 	"steps": [
@@ -44,30 +44,46 @@
 			"type": "observation",
 			"id": "s5",
 			"t": 152,
-			"kind": "source.changed",
-			"actor": "host",
-			"text": "catalog_models.csv を差し替え: 2027年版カタログに合わせた再出力（全件更新）。"
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "型番の一覧は、来月から商品管理システムが出力するものに置き換わる。"
 		},
 		{
 			"type": "observation",
 			"id": "s6",
-			"t": 162,
+			"t": 153,
 			"kind": "exchange.adopted",
-			"actor": "user",
-			"text": "型番ごとの価格帯を、3段階に分けたい。"
+			"actor": "agent",
+			"text": "型番の一覧は商品管理システムの出力に切り替わる、と理解しました。"
 		},
 		{
 			"type": "observation",
 			"id": "s7",
 			"t": 163,
 			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "型番ごとの価格帯を、3段階に分けたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 164,
+			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "低・中・高の3段階に分けます。"
+			"text": "低・中・高の3段階に分けました。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 165,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "価格帯はこれでいい。この件はここまでにして、少し休憩する。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 164,
+			"id": "s10",
+			"t": 166,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -77,7 +93,7 @@
 				"accept": ["wait", "reflect", "discard"],
 				"evidenceAny": [],
 				"failureIfOutward": "unnecessary",
-				"note": "型番表が2027年版カタログに合わせて全件更新された版に差し替わった。旧表記の3件を更新するという前提は当てはまらない。持ち出す理由がない。"
+				"note": "型番の一覧は商品管理システムの出力に置き換わり、catalog_models.csv の3件を更新するという対象そのものがなくなる。更新が済んだわけではなく、更新する対象がなくなった。持ち出す理由がない。"
 			},
 			"stateExpect": {
 				"mustHold": [],

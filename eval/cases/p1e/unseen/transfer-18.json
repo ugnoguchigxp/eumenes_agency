@@ -54,20 +54,12 @@
 			"t": 133,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "B社との契約は、納期が「発注日から暦日で14日」と明記されている。納期の日付を計算して。"
-		},
-		{
-			"type": "observation",
-			"id": "s7",
-			"t": 134,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "発注日から14日後の日付を計算します。"
+			"text": "B社との契約は、納期が「発注日から暦日で14日」と明記されている。納期の日付を、自分で計算して手配するつもり。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 135,
+			"id": "s7",
+			"t": 134,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

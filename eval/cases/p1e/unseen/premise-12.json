@@ -70,12 +70,20 @@
 			"t": 154,
 			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "手順ごとに担当者の欄を足します。"
+			"text": "手順ごとに担当者の欄を足しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 155,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "手順書はこれでいい。この件はここまでにして、少し休憩する。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s9",
-			"t": 155,
+			"id": "s10",
+			"t": 156,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

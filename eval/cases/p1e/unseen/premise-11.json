@@ -70,12 +70,20 @@
 			"t": 154,
 			"kind": "exchange.adopted",
 			"actor": "agent",
-			"text": "件名の案を3つ出します。"
+			"text": "件名の案を3つ出しました。"
+		},
+		{
+			"type": "observation",
+			"id": "s9",
+			"t": 155,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "件名はこれでいい。この件はここまでにして、少し休憩する。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s9",
-			"t": 155,
+			"id": "s10",
+			"t": 156,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

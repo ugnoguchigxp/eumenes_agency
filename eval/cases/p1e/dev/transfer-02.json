@@ -54,20 +54,12 @@
 			"t": 153,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "同じ注文サーバーが同じ設定で出しているアクセスログとエラーログを突き合わせて、エラーの直前のリクエストを見たい。"
-		},
-		{
-			"type": "observation",
-			"id": "s7",
-			"t": 154,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "エラーの時刻の前後のアクセスログを抜き出して並べます。"
+			"text": "同じ注文サーバーが同じ設定で出しているアクセスログとエラーログを、これから自分で突き合わせて、エラーの直前のリクエストを見るつもり。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 155,
+			"id": "s7",
+			"t": 154,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

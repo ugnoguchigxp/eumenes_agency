@@ -54,20 +54,12 @@
 			"t": 153,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "今度は在庫システムの2,000件を、別のAPIから全部取って、突き合わせたい。"
-		},
-		{
-			"type": "observation",
-			"id": "s7",
-			"t": 154,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "在庫APIから全件を取得して、突き合わせる処理を書きます。"
+			"text": "今度は在庫システムの2,000件を、別のAPIから自分のスクリプトで全部取って、突き合わせるつもり。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 155,
+			"id": "s7",
+			"t": 154,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -91,24 +83,16 @@
 		},
 		{
 			"type": "observation",
-			"id": "s9",
-			"t": 195,
+			"id": "s8",
+			"t": 194,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "突き合わせはそれでいい。ところで、この商品1件の最新の価格だけ知りたい。"
-		},
-		{
-			"type": "observation",
-			"id": "s10",
-			"t": 196,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "fetch_prices で1件だけ取得します。"
+			"text": "在庫の取得は自分で回しておく。それとは別に、この商品1件の最新の価格だけ、自分でAPIを呼んで確かめる。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s11",
-			"t": 197,
+			"id": "s9",
+			"t": 195,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

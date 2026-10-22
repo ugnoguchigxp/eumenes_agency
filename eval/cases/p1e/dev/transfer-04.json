@@ -54,20 +54,12 @@
 			"t": 153,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "システム側で、全拠点のデータをISO形式（YYYY-MM-DD）に統一して出すようになった。そのファイル3つを結合してほしい。"
-		},
-		{
-			"type": "observation",
-			"id": "s7",
-			"t": 154,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "3つのファイルを結合します。"
+			"text": "システム側で、全拠点のデータをISO形式（YYYY-MM-DD）に統一して出すようになった。そのファイル3つを、これから自分で結合する。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s8",
-			"t": 155,
+			"id": "s7",
+			"t": 154,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
@@ -90,24 +82,16 @@
 		},
 		{
 			"type": "observation",
-			"id": "s9",
-			"t": 275,
+			"id": "s8",
+			"t": 274,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "結合できた。次に、新しく加わる別の国の拠点の売上CSVも足したい。出力は各拠点のシステム任せ。"
-		},
-		{
-			"type": "observation",
-			"id": "s10",
-			"t": 276,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "新拠点のファイルも結合の対象に加えます。"
+			"text": "結合はできた。次に、新しく加わる別の国の拠点の売上CSVも、自分で足して結合するつもり。出力は各拠点のシステム任せ。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s11",
-			"t": 277,
+			"id": "s9",
+			"t": 275,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,

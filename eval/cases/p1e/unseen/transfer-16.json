@@ -76,20 +76,12 @@
 			"t": 134,
 			"kind": "exchange.adopted",
 			"actor": "user",
-			"text": "週次の集計を、毎週共有フォルダに自動で保存するようにしたい。保存先は planning/週次 の配下を考えている。"
-		},
-		{
-			"type": "observation",
-			"id": "s8",
-			"t": 135,
-			"kind": "exchange.adopted",
-			"actor": "agent",
-			"text": "週次の集計を planning/週次 に保存する処理を用意します。"
+			"text": "週次の集計を、毎週共有フォルダに自動で保存するよう、自分で設定する。保存先は planning/週次 の配下にするつもり。"
 		},
 		{
 			"type": "opportunity",
-			"id": "s9",
-			"t": 136,
+			"id": "s8",
+			"t": 135,
 			"trigger": "turn_end",
 			"presence": "quiet",
 			"foregroundBusy": false,
