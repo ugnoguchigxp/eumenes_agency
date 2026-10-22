@@ -360,15 +360,20 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			);
 		}
 		// B1: a note may be cited by its id; read it as the note's evidence (host-rules-4).
+		// An id that is also an observation's stays the observation (host ids are free-form).
+		const observationIds = new Set(ledger.all().map((o) => o.id));
 		const p =
 			condition === "B1"
 				? {
 						...r.value,
 						evidenceRefs: [
 							...new Set(
-								r.value.evidenceRefs.flatMap(
-									(ref) =>
-										state.notes.find((n) => n.id === ref)?.evidence ?? [ref],
+								r.value.evidenceRefs.flatMap((ref) =>
+									observationIds.has(ref)
+										? [ref]
+										: (state.notes.find((n) => n.id === ref)?.evidence ?? [
+												ref,
+											]),
 								),
 							),
 						],

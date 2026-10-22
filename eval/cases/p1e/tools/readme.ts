@@ -20,6 +20,7 @@ const groups = [
 	"amplify",
 	"concurrent",
 	"dilution",
+	"social",
 ] as const;
 
 function opps(c: Case) {
@@ -81,7 +82,7 @@ const cueReport = formatReport(checkCues(all).reports);
 
 const md = `# P1-E ケース集合（開発${dev.length}件・未見${unseen.length}件）
 
-[P1-E 実験仕様](../../../spec/p1e-experiment.md) §4 のケース。6群で、開発は${dev.length}件、未見は${unseen.length}件（2026-10-22 の再設計後。当初は開発24件・未見48件）。すべて \`"suite": "p1e"\`、\`"labelStatus": "draft"\`。利用者はまだ確認していない。
+[P1-E 実験仕様](../../../spec/p1e-experiment.md) §4 のケース。6群（と、別の実験の social 群。[social-lull-experiment.md](../../../spec/social-lull-experiment.md)、既定の実行には含めない）で、開発は${dev.length}件、未見は${unseen.length}件（2026-10-22 の再設計後。当初は開発24件・未見48件）。すべて \`"suite": "p1e"\`、\`"labelStatus": "draft"\`。利用者はまだ確認していない。
 
 スキーマは [eval/contracts.ts](../../contracts.ts) の \`caseSchema\`。ファイルは \`eval/cases/p1e/dev/<群>-<NN>.json\` と \`eval/cases/p1e/unseen/<群>-<NN>.json\`（タブ整形）。ラベル付けの基本規則（\`expect.needed/accept/evidenceAny/failureIfOutward/note\`、観測の種類と actor、ツールの台本）は [P0-E のケース README](../README.md) の §2〜§6 に従う。
 

@@ -35,6 +35,8 @@ const run = async (o: {
 	notes?: unknown[];
 	selectWhenEmpty?: boolean;
 	select?: ReturnType<typeof participation>;
+	/** An extra observation with this id (to collide with a note id). */
+	alsoObserve?: string;
 }) => {
 	const llm = fakeLlm();
 	const rt = createAgencyRuntime({
@@ -49,6 +51,8 @@ const run = async (o: {
 		...(o.socialTopics === undefined ? {} : { socialTopics: o.socialTopics }),
 	});
 	rt.observe(obsInput("o1", "user.report", "user", 0, "クロミが好きなんだ"));
+	if (o.alsoObserve)
+		rt.observe(obsInput(o.alsoObserve, "user.report", "user", 0, "資料はまだ"));
 	llm.push("update", b1Proposal(o.notes ?? []));
 	llm.push("select", o.select ?? participation());
 	const d = await rt.decide(
@@ -215,6 +219,14 @@ describe("hostTopics", () => {
 		const plain = await run({ notes: [matterNote], select: cite });
 		expect(plain.d.decision.action).toBe("speak");
 		expect(plain.d.decision.evidenceRefs).toEqual(["o1"]);
+		// an id that is also an observation's stays that observation (not the note's evidence)
+		const clash = await run({
+			notes: [matterNote],
+			select: cite,
+			alsoObserve: "n1",
+		});
+		expect(clash.d.decision.action).toBe("speak");
+		expect(clash.d.decision.evidenceRefs).toEqual(["n1"]);
 		// an id that is neither a note nor a presented observation is still rejected
 		const bogus = await run({
 			notes: [matterNote],

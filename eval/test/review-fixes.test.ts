@@ -53,6 +53,8 @@ import {
 	assertResumeCases,
 	defaultConditions,
 	evaluateStop,
+	groupsOf,
+	parseGroups,
 	judgeCommand,
 	judgeAgreementCommand,
 	judgeExportCommand,
@@ -141,6 +143,14 @@ describe("B1a ablation condition", () => {
 		expect(defaultConditions("p1e")).toBe("B1,B1a,B2,D");
 		expect(defaultConditions("p0e")).toBe("B0,B1,B2,F");
 		expect(parseConditions("B1,B1a")).toEqual(["B1", "B1a"]);
+		// social lull: B1h is run as B1; the social group alone defaults to B1a,B1h,D
+		expect(runtimeConditionOf("B1h")).toBe("B1");
+		expect(defaultConditions("p1e", ["social"])).toBe("B1a,B1h,D");
+		expect(defaultConditions("p1e", ["social", "causal"])).toBe("B1,B1a,B2,D");
+		expect(groupsOf("p1e")).not.toContain("social");
+		expect(groupsOf("p0e")).not.toContain("social");
+		expect(parseGroups("social,social")).toEqual(["social"]);
+		expect(() => parseGroups("nope")).toThrow("unknown group");
 		const plan = planRuns([causal01()], parseConditions("B1,B1a,B2,D"), 1);
 		expect(plan.map((p) => p.condition).sort()).toEqual([
 			"B1",

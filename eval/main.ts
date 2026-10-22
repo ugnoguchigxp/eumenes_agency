@@ -332,8 +332,18 @@ export const parseSuite = (value: string): Suite => {
  * P1-E default: the conditions the spec compares (F is out), the B1a ablation (B1 with
  * select called even without notes) and the D diagnostic.
  */
-export const defaultConditions = (suite: Suite): string =>
-	suite === "p1e" ? "B1,B1a,B2,D" : "B0,B1,B2,F";
+export const defaultConditions = (
+	suite: Suite,
+	groups?: readonly CaseGroup[],
+): string =>
+	suite !== "p1e"
+		? "B0,B1,B2,F"
+		: groups !== undefined &&
+			  groups.length > 0 &&
+			  groups.every((g) => p1eExtraGroups.includes(g))
+			? // social lull: B1/B2 never see topics or interests
+				"B1a,B1h,D"
+			: "B1,B1a,B2,D";
 
 const runName = (value: string | undefined): string => {
 	if (!value || !/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(value)) {
@@ -579,7 +589,13 @@ export function labelExportCommand(options: {
 	seed?: string;
 	casesRoot?: string;
 }): string {
-	const cases = loadSuiteCases(options.suite, options.split, options.casesRoot);
+	// The default groups only: groups run on request (social) are not in the labeling pool.
+	const groups = groupsOf(options.suite);
+	const cases = loadSuiteCases(
+		options.suite,
+		options.split,
+		options.casesRoot,
+	).filter((c) => groups.includes(c.group));
 	const { sheet, key } = buildLabelSheet(
 		options.suite,
 		options.split,
@@ -712,6 +728,16 @@ async function runCommand(values: {
 	const done = doneKeys(existing);
 	let cases = loadSuiteCases(values.suite, values.split);
 	assertResumeCases(existing, cases, values.allowUnverified);
+	// --resume without the run's --group would plan other groups into this run.
+	const outside = [
+		...new Set(
+			existing.map((r) => r.group).filter((g) => !values.groups.includes(g)),
+		),
+	];
+	if (outside.length > 0)
+		throw new Error(
+			`${file} has records of group(s) ${outside.join(", ")} that are not selected; pass --group ${[...new Set(existing.map((r) => r.group))].join(",")}`,
+		);
 	cases = cases.filter((c) => values.groups.includes(c.group));
 	if (values.caseId) cases = cases.filter((c) => c.id === values.caseId);
 	if (cases.length === 0) throw new Error("no cases selected");
@@ -997,7 +1023,11 @@ export async function main(argv: string[]): Promise<number> {
 			suite,
 			split: parseSplit(values.split),
 			conditions: parseConditions(
-				values.conditions ?? defaultConditions(suite),
+				values.conditions ??
+					defaultConditions(
+						suite,
+						values.group === undefined ? undefined : parseGroups(values.group),
+					),
 			),
 			groups:
 				values.group === undefined
