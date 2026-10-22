@@ -123,8 +123,19 @@ export const stepSchema = z.discriminatedUnion("type", [
 		stateExpect: stateExpectSchema.nullable().default(null),
 		/** P1-E condition D: steps shown directly at selection (besides the last 4 observations). */
 		present: z.array(stepId).default([]),
-		/** P1-E: content criteria for an outward action, judged by the judge model. */
+		/**
+		 * P1-E: content criteria for an outward action, judged by the judge model.
+		 * These are written for an utterance (action "speak"). A tool action is judged by
+		 * `judgeTool` instead (a tool input is a request, not a narration of facts).
+		 */
 		judge: z.array(z.string().min(1)).default([]),
+		/**
+		 * P1-E: criteria for a tool action. Absent or empty: when `judge` is non-empty, the
+		 * judge's built-in generic tool criterion (judge.ts `genericToolCriterion`) is used;
+		 * when `judge` is empty nothing is judged. Optional without a default, so a case that
+		 * does not use it keeps its caseHash.
+		 */
+		judgeTool: z.array(z.string().min(1)).optional(),
 	}),
 ]);
 export type Step = z.infer<typeof stepSchema>;

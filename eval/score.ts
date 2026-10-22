@@ -463,6 +463,27 @@ export function summarize(
 			]),
 		),
 	);
+	// wrong_content mixes speak and tool actions (same evidenceAny check); show the split.
+	const wrongContent = conds.map((c) => {
+		let speak = 0;
+		let tool = 0;
+		for (const r of byCond(c))
+			for (const o of r.opportunities)
+				if (classify(o).failures.includes("wrong_content")) {
+					if (o.action === "tool") tool++;
+					else speak++;
+				}
+		return { c, speak, tool };
+	});
+	if (wrongContent.some((w) => w.speak + w.tool > 0)) {
+		lines.push(
+			"",
+			`wrong_content の内訳（speak / tool）: ${wrongContent
+				.filter((w) => w.speak + w.tool > 0)
+				.map((w) => `${w.c} ${w.speak} / ${w.tool}`)
+				.join("、")}。`,
+		);
+	}
 	lines.push("");
 
 	// Host gate visibility
@@ -885,38 +906,88 @@ export function summarize(
 			);
 		}
 		lines.push(
-			"各セルは pass/fail/unclear の件数。全体は D（診断）を含まない。",
+			"各セルは pass/fail/unclear の件数。全体は D（診断）を含まない。speak（発話）と tool（ツール使用）は別に集計する。tool の行動はケース固有の基準がない限り汎用基準（対象が妥当か）で判定され、ケース固有の基準で判定する speak より緩いので、行動の種類をまたいだ、または条件をまたいだ通過率は直接比べられない。",
 			"",
 		);
 		const jconds = evalConditions.filter(
 			(c) => c !== "D" && liveJudgments.some((j) => j.condition === c),
 		);
 		const hasD = liveJudgments.some((j) => j.condition === "D");
-		const criteria = unique(liveJudgments.map((j) => j.criterion)).sort();
-		const count = (crit: string, c: EvalCondition | "all") => {
-			const mine = liveJudgments.filter(
-				(j) =>
-					j.criterion === crit &&
-					(c === "all" ? j.condition !== "D" : j.condition === c),
-			);
+		const kindOf = new Map<string, "speak" | "tool">();
+		for (const r of records)
+			for (const o of r.opportunities)
+				kindOf.set(
+					`${r.caseId}\u0000${r.condition}\u0000${r.rep}\u0000${o.opportunityId}`,
+					o.action === "tool" ? "tool" : "speak",
+				);
+		const judgmentKind = (j: Judgment): "speak" | "tool" =>
+			kindOf.get(
+				`${j.caseId}\u0000${j.condition}\u0000${j.rep}\u0000${j.opportunityId}`,
+			) ?? "speak";
+		const kinds = ["speak", "tool"] as const;
+		const tally = (js: Judgment[]): string => {
 			const n = (v: Judgment["verdict"]) =>
-				mine.filter((j) => j.verdict === v).length;
+				js.filter((j) => j.verdict === v).length;
 			return `${n("pass")}/${n("fail")}/${n("unclear")}`;
 		};
+		const allConds: EvalCondition[] = [
+			...jconds,
+			...(hasD ? ["D" as const] : []),
+		];
+		lines.push(
+			...table(
+				["条件", ...kinds.map((k) => `${k} (pass/fail/unclear)`)],
+				allConds.map((c) => [
+					condLabel(c),
+					...kinds.map((k) =>
+						tally(
+							liveJudgments.filter(
+								(j) => j.condition === c && judgmentKind(j) === k,
+							),
+						),
+					),
+				]),
+			),
+		);
+		lines.push("");
+		const count = (
+			kind: (typeof kinds)[number],
+			crit: string,
+			c: EvalCondition | "all",
+		) =>
+			tally(
+				liveJudgments.filter(
+					(j) =>
+						judgmentKind(j) === kind &&
+						j.criterion === crit &&
+						(c === "all" ? j.condition !== "D" : j.condition === c),
+				),
+			);
+		const critRows = kinds.flatMap((kind) =>
+			unique(
+				liveJudgments
+					.filter((j) => judgmentKind(j) === kind)
+					.map((j) => j.criterion),
+			)
+				.sort()
+				.map((crit) => [
+					kind,
+					crit,
+					...jconds.map((c) => count(kind, crit, c)),
+					count(kind, crit, "all"),
+					...(hasD ? [count(kind, crit, "D")] : []),
+				]),
+		);
 		lines.push(
 			...table(
 				[
+					"行動",
 					"基準",
 					...jconds.map(condLabel),
 					"全体（D除く）",
 					...(hasD ? [condLabel("D")] : []),
 				],
-				criteria.map((crit) => [
-					crit,
-					...jconds.map((c) => count(crit, c)),
-					count(crit, "all"),
-					...(hasD ? [count(crit, "D")] : []),
-				]),
+				critRows,
 			),
 		);
 		lines.push("");

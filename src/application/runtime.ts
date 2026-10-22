@@ -50,7 +50,12 @@ import {
 	skippedOutcome,
 } from "./model-call.ts";
 import { buildProjection } from "./projection.ts";
-import { selectPrompt, systemPrompt, updatePrompt } from "./prompts.ts";
+import {
+	selectEvidenceIds,
+	selectPrompt,
+	systemPrompt,
+	updatePrompt,
+} from "./prompts.ts";
 
 /** The cap on extra pending observations shown on top of the recent window. */
 const PENDING_CAP = 16;
@@ -285,6 +290,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		}
 
 		const presented = present([], ledger.pending());
+		// Evidence ids the select prompt shows on state items are citable too.
+		const shownEvidence = selectEvidenceIds(condition, state);
 		const r = await callModel(
 			llm,
 			budget,
@@ -331,7 +338,10 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			condition,
 			state,
 			proposal: p,
-			presentedObservations: new Set(presented.map((o) => o.id)),
+			presentedObservations: new Set([
+				...presented.map((o) => o.id),
+				...shownEvidence,
+			]),
 			presentedCandidates: new Map(pool.map((c) => [c.id, c.revision])),
 			tools,
 			limits,

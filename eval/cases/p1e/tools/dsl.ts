@@ -47,7 +47,10 @@ export interface OppIn {
 	hold?: string[][];
 	/** stateExpect.mustNotHold (labels). */
 	not?: string[];
+	/** Content criteria for an utterance (speak). */
 	judge?: string[];
+	/** Content criteria for a tool action; absent = the judge's generic tool criterion. */
+	judgeTool?: string[];
 	/**
 	 * Extra labels to show condition D besides the matter labels. For an opportunity where no
 	 * matter was raised yet (causal "no history" cases) this is the unrelated work raised so far,
@@ -200,6 +203,7 @@ export function build(def: CaseDef): Case {
 			stateExpect: { mustHold: hold, mustNotHold: not },
 			present,
 			judge: it.judge ?? [],
+			...(it.judgeTool ? { judgeTool: it.judgeTool } : {}),
 		});
 	}
 	const tools = (def.tools ?? []).map((tl) => ({

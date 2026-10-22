@@ -6,7 +6,7 @@
  */
 import { allowUnverifiedHint, assertCaseVersions, caseHash } from "./cases.ts";
 import type { Case, Judgment, OpportunityRecord, Suite } from "./contracts.ts";
-import { earlierOpportunities, factsBefore } from "./judge.ts";
+import { criteriaFor, earlierOpportunities, factsBefore } from "./judge.ts";
 
 export const defaultSeed = "eumenes-label-1";
 
@@ -492,9 +492,10 @@ export function judgedActions(
 
 /** The criteria of the action the judge has a row for (a criterion without a row is skipped). */
 const judgedCriteria = (a: JudgedAction): string[] =>
-	opportunityOf(a.case, a.opportunity.opportunityId).judge.filter((cr) =>
-		a.judgments.some((j) => j.criterion === cr),
-	);
+	criteriaFor(
+		opportunityOf(a.case, a.opportunity.opportunityId),
+		a.opportunity.action,
+	).filter((cr) => a.judgments.some((j) => j.criterion === cr));
 
 const isFlagged = (a: JudgedAction): boolean =>
 	a.judgments.some((j) => j.verdict !== "pass");

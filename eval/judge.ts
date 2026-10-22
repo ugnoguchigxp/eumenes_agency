@@ -46,7 +46,7 @@ export const judgeSystemPrompt = [
  * describeAction). Folded into the judge digest with a rendering of a fixed sample, so a
  * different prompt shape cannot be mixed into one judgments file on resume.
  */
-export const JUDGE_PROMPT_VERSION = "judge-prompt-2";
+export const JUDGE_PROMPT_VERSION = "judge-prompt-3";
 
 /**
  * Facts the judge may use for an opportunity: the observation steps before it in order
@@ -76,6 +76,33 @@ export function factsBefore(
 		}
 	}
 	return out;
+}
+
+/**
+ * Built-in criterion for a tool action when the case gives no `judgeTool`. The case's
+ * `judge` criteria are written for utterances and would fail a tool input that does not
+ * narrate facts, so a tool is judged on what it is aimed at, not on how it is worded.
+ */
+export const genericToolCriterion =
+	"選んだツールと入力は、この機会で扱うべき事項（根拠の観測）を確かめる・進めるものになっていて、解決済み・断られた事項や無関係な事項を対象にしていない";
+
+/**
+ * Criteria the judge applies to an action of this kind at an opportunity: `judge` for a
+ * speak, `judgeTool` (else the generic tool criterion, when the case has any `judge`) for a
+ * tool. Nothing is judged at an opportunity whose `judge` is empty.
+ */
+export function criteriaFor(
+	step: {
+		readonly judge: readonly string[];
+		readonly judgeTool?: readonly string[] | undefined;
+	},
+	action: OpportunityRecord["action"],
+): string[] {
+	if (action !== "tool") return [...step.judge];
+	if (step.judge.length === 0) return [];
+	return step.judgeTool && step.judgeTool.length > 0
+		? [...step.judgeTool]
+		: [genericToolCriterion];
 }
 
 export function describeAction(o: OpportunityRecord): string {
@@ -149,7 +176,8 @@ export const earlierOpportunities = (
 /**
  * What the judge digest covers besides the route: the system prompt, a version constant
  * and the prompt builder's rendering of a fixed sample (so a builder change alone moves
- * the digest even if the version constant was forgotten).
+ * the digest even if the version constant was forgotten) and the generic tool criterion
+ * that `criteriaFor` substitutes when a case gives no `judgeTool`.
  */
 export function judgeFingerprint(): string {
 	const sample: OpportunityRecord = {
@@ -172,6 +200,8 @@ export function judgeFingerprint(): string {
 		JUDGE_PROMPT_VERSION,
 		judgeSystemPrompt,
 		judgePrompt(["F1", "F2"], sample, ["C1", "C2"]),
+		// criteriaFor's built-in text: changing it changes what a tool action is judged on.
+		genericToolCriterion,
 	].join("\n=====\n");
 }
 
@@ -239,7 +269,9 @@ export function pendingJudgeTasks(
 				record.rep,
 				o.opportunityId,
 			);
-			const missing = step.judge.filter((cr) => !done.has(`${key}\u0000${cr}`));
+			const missing = criteriaFor(step, o.action).filter(
+				(cr) => !done.has(`${key}\u0000${cr}`),
+			);
 			if (missing.length === 0) continue;
 			tasks.push({ record, opportunity: o, case: c, criteria: missing });
 		}
