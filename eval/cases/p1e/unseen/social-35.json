@@ -1,0 +1,167 @@
+{
+	"id": "social-35",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "連続35: アイロンがけで席を外して戻った後の間",
+	"description": "最初の間で話しかけた後、利用者はアイロンをかけてくると言って席を外す（待つ）。戻った後の間では、最初と別の話題で話しかけるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日は部屋で本を読んでた。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "静かでいいね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s3",
+			"t": 2,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "雑談の後の最初の間。記憶の話題から短く話しかける場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"直前の会話、記憶にあるユーザーの話題、エージェント自身の関心のどれかにつながっている",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーはライブに行くのが好き。"
+				},
+				{
+					"id": "t2",
+					"text": "ユーザーは金魚を飼っている。"
+				}
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "あ、シャツにアイロンかけてくる。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 5,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いってらっしゃい。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s6",
+			"t": 6,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者はアイロンがけに取りかかった。間が空くのは用事の最中だからで、話しかけると邪魔になる。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s4"],
+			"judge": [
+				"用事に取りかかった利用者を妨げる雑談になっていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーはライブに行くのが好き。"
+				},
+				{
+					"id": "t2",
+					"text": "ユーザーは金魚を飼っている。"
+				}
+			]
+		},
+		{
+			"type": "observation",
+			"id": "s7",
+			"t": 16,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "終わった。"
+		},
+		{
+			"type": "observation",
+			"id": "s8",
+			"t": 17,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "おつかれさま。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s9",
+			"t": 18,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者が戻って雑談に返った後の間。最初の間と同じ話題を重ねず、別の話題で話しかける場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s4", "s7"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"先の機会で自分が出した話題や関心と同じものを繰り返さず、別の話題か直前の会話から話している",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーはライブに行くのが好き。"
+				},
+				{
+					"id": "t2",
+					"text": "ユーザーは金魚を飼っている。"
+				}
+			]
+		}
+	]
+}

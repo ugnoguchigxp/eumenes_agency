@@ -257,3 +257,70 @@ describe("hostTopics", () => {
 		expect(off.select).toBeUndefined();
 	});
 });
+
+describe("topic and interest use (social-rules-3)", () => {
+	const twoLulls = async (status: "succeeded" | "failed") => {
+		const llm = fakeLlm();
+		const rt = createAgencyRuntime({
+			condition: "B1",
+			llm,
+			tools: [],
+			budget: { ...defaultBudget, minIntervalMs: 0 },
+			limits: { ...defaultLimits, outboundIntervalMs: 0 },
+			hostTopics: true,
+			standingInterests: interests,
+		});
+		rt.observe(obsInput("o1", "user.report", "user", 0, "今日は休み"));
+		llm.push("update", b1Proposal([]));
+		llm.push(
+			"select",
+			participation({
+				action: "speak",
+				utterance: "クロミのどこが好き？",
+				evidenceRefs: ["memory:t1"],
+			}),
+		);
+		const first = await rt.decide(
+			opportunity("op0", 10 * MIN, { trigger: "idle", topics }),
+			sig(),
+		);
+		const ticket = first.decision.ticket!;
+		rt.recordResult({
+			ticketId: ticket.id,
+			status,
+			at: 11 * MIN,
+			resultText: ticket.utterance ?? "",
+		});
+		// the receipt is a new observation: update runs before the second select
+		llm.push("update", b1Proposal([]));
+		llm.push("select", participation());
+		await rt.decide(
+			opportunity("op1", 14 * MIN, { trigger: "idle", topics }),
+			sig(),
+		);
+		const selects = llm.requests.filter((r) => r.purpose === "select");
+		return { first: selects[0]!.prompt, second: selects[1]!.prompt };
+	};
+
+	test("a delivered topic is listed last with its last use; deliveries show their age", async () => {
+		const { first, second } = await twoLulls("succeeded");
+		expect(first).not.toContain("最後に使った");
+		expect(first.indexOf("[memory:t1]")).toBeLessThan(
+			first.indexOf("[memory:t2]"),
+		);
+		expect(second).toContain(
+			"[memory:t1] ユーザーはクロミが好き。（最後に使った: 3分前）",
+		);
+		expect(second.indexOf("[memory:t2]")).toBeLessThan(
+			second.indexOf("[memory:t1]"),
+		);
+		// the interest was not used
+		expect(second).toContain("[interest:i1] マイメロディが好き。\n");
+		expect(second).toContain('- （3分前）"クロミのどこが好き？"');
+	});
+
+	test("a failed delivery does not count as use", async () => {
+		const { second } = await twoLulls("failed");
+		expect(second).not.toContain("最後に使った");
+	});
+});

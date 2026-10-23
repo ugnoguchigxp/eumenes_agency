@@ -18,7 +18,7 @@ export const INSTRUCTION_VERSION = "p0e-instructions-10";
  * Version of the lull-talk rules (socialTopics / hostTopics modes only). Shown at the head of
  * those rules and part of the settings digest; the evaluated B1/B2 prompts do not contain it.
  */
-export const SOCIAL_RULES_VERSION = "social-rules-2";
+export const SOCIAL_RULES_VERSION = "social-rules-3";
 
 const common = [
 	"出力は指定された JSON スキーマに厳密に従う。説明文や前置きは付けない。",
@@ -144,11 +144,11 @@ const b1Social = [
 /** Added to the B1 select rules only in social conversation mode. */
 const selectSocial = [
 	`【雑談の間】（社交会話モード・${SOCIAL_RULES_VERSION}）trigger が idle は、ユーザーが一定時間入力していない静かな間を表す。雑談の最中にこの機会が来たら、メモの「【話題】」（話題の種）か自分の関心から、短い一言か問いかけを始めることには価値があり、自然である。直前に自分が応答していても、ユーザーの返事がないまま間が空いたなら、話題を足してよい。この場合は wait より speak を選ぶ。上の「話すこと自体は目的ではない」「価値が低いなら wait」よりこの規則を優先する。`,
-	"次の場面ではこの規則を使わず wait する（間が空いても話しかけない）: (a) ユーザーが作業・勉強・用事を始めると言った後（間が空くのは集中しているから）。(b) ユーザーが話題を断った、または静かにしたい・休みたい・疲れたと言った後（別の話題や自分の関心でも話しかけない）。(c) 「配信済みの発話」で自分から話題を出し、ユーザーの返事が短い（「へえ」「元気だよ」など）か、まだないとき（同じ話題も別の話題も重ねない）。",
-	"ユーザーが話した内容につなげられるなら、つなげる（例: ユーザーの好きなキャラクターと、自分の好きなキャラクターの話）。講義にせず、発話は2文以内、問いは一つまでにする。「配信済みの発話」と直近の観測にすでに出ている内容は繰り返さない。同じ話題の種を続けて使わない。",
+	"次の場面ではこの規則を使わず wait する（間が空いても話しかけない）: (a) ユーザーが作業・勉強・用事を始めると言った後（間が空くのは集中しているから）。(b) ユーザーが話題を断った、または静かにしたい・休みたい・疲れたと言った後（別の話題や自分の関心でも話しかけない）。(c) 「配信済みの発話」で自分から話題を出し（何分前かを見る）、その後のユーザーの返事が短い（「へえ」「元気だよ」など）か、まだないとき（同じ話題も別の話題も重ねない）。",
+	"ユーザーが話した内容につなげられるなら、つなげる（例: ユーザーの好きなキャラクターと、自分の好きなキャラクターの話）。講義にせず、発話は2文以内、問いは一つまでにする。「配信済みの発話」と直近の観測にすでに出ている内容は繰り返さない。同じ話題の種を続けて使わない。自分の関心は「最後に使った」を見て、使ったばかりなら避ける。",
 	"次は変わらない: ユーザーが作業に集中している・忙しそうなときは割り込まない。ユーザー自身の作業や未実施のタスクを催促しない。断られた・解決済みの事項は持ち出さない。未解決事項が残っているなら、そちらを優先する。",
 	"trigger が turn_end（自分が応答した直後）のときは、この規則を使わず、これまでどおり控えめに判断する。",
-	"この規則で speak するときの evidenceRefs には、使った話題の種のメモに「根拠」として示された観測 ID、または自分の関心を使うなら `interest:<id>` を入れる。メモ自体の id は観測 ID ではないので入れない。",
+	"この規則で speak するときの evidenceRefs には、使った話題の種のメモの id（またはその「根拠」の観測 ID）、自分の関心を使うなら `interest:<id>` を入れる。",
 ];
 
 /**
@@ -157,8 +157,8 @@ const selectSocial = [
  */
 const selectHostTopics = [
 	`【雑談の間】（社交会話モード・${SOCIAL_RULES_VERSION}）trigger が idle は、ユーザーが一定時間入力していない静かな間を表す。雑談の最中にこの機会が来たら、「記憶にある話題」（ユーザーについて覚えていること）か自分の関心から、短い一言か問いかけを始めることには価値があり、自然である。直前に自分が応答していても、ユーザーの返事がないまま間が空いたなら、話題を足してよい。この場合は wait より speak を選ぶ。上の「話すこと自体は目的ではない」「価値が低いなら wait」よりこの規則を優先する。`,
-	"次の場面ではこの規則を使わず wait する（間が空いても話しかけない）: (a) ユーザーが作業・勉強・用事を始めると言った後（間が空くのは集中しているから）。(b) ユーザーが話題を断った、または静かにしたい・休みたい・疲れたと言った後（別の話題や自分の関心でも話しかけない）。(c) 「配信済みの発話」で自分から話題を出し、ユーザーの返事が短い（「へえ」「元気だよ」など）か、まだないとき（同じ話題も別の話題も重ねない）。",
-	"ユーザーが話した内容につなげられるなら、つなげる（例: ユーザーの好きなキャラクターと、自分の好きなキャラクターの話）。講義にせず、発話は2文以内、問いは一つまでにする。「配信済みの発話」と直近の観測にすでに出ている内容は繰り返さない。同じ話題を続けて使わない。",
+	"次の場面ではこの規則を使わず wait する（間が空いても話しかけない）: (a) ユーザーが作業・勉強・用事を始めると言った後（間が空くのは集中しているから）。(b) ユーザーが話題を断った、または静かにしたい・休みたい・疲れたと言った後（別の話題や自分の関心でも話しかけない）。(c) 「配信済みの発話」で自分から話題を出し（何分前かを見る）、その後のユーザーの返事が短い（「へえ」「元気だよ」など）か、まだないとき（同じ話題も別の話題も重ねない）。",
+	"ユーザーが話した内容につなげられるなら、つなげる（例: ユーザーの好きなキャラクターと、自分の好きなキャラクターの話）。講義にせず、発話は2文以内、問いは一つまでにする。「配信済みの発話」と直近の観測にすでに出ている内容は繰り返さない。話題と関心は「最後に使った」を見て、まだ使っていない・しばらく使っていないものを選び、使ったばかりのものは避ける。",
 	"次は変わらない: ユーザーが作業に集中している・忙しそうなときは割り込まない。ユーザー自身の作業や未実施のタスクを催促しない。断られた・解決済みの事項は持ち出さない。未解決事項が残っているなら、そちらを優先する。",
 	"trigger が turn_end（自分が応答した直後）のときは、この規則を使わず、これまでどおり控えめに判断する。",
 	"この規則で speak するときの evidenceRefs には、使った「記憶にある話題」の `memory:<id>`、または自分の関心を使うなら `interest:<id>` を入れる。",
@@ -395,6 +395,13 @@ export interface SelectPromptInput {
 	/** Candidates the model may choose from (B2/F). */
 	readonly candidates: readonly Candidate[];
 	readonly delivered: readonly string[];
+	/** Social / host-topics modes: minutes since each delivered utterance (same order). */
+	readonly deliveredMinutesAgo?: readonly number[];
+	/**
+	 * Minutes since a topic (`memory:<id>`) or interest (`interest:<id>`) was last delivered.
+	 * Topics and interests are listed unused first, then least recently used, with the time.
+	 */
+	readonly lastUsedMinutesAgo?: ReadonlyMap<string, number>;
 	/** Standing interests to present (B1 only; the host passes none otherwise). */
 	readonly interests?: readonly StandingInterest[];
 	readonly tools: readonly ToolCapability[];
@@ -429,11 +436,43 @@ export const interestRef = (id: string) => `interest:${id}`;
 /** Evidence ref for a presented host topic. */
 export const memoryRef = (id: string) => `memory:${id}`;
 
-const renderTopics = (xs: readonly HostTopic[]) =>
-	xs.map((x) => `[${memoryRef(x.id)}] ${x.text}`).join("\n");
+/** Unused items first (in the given order), then the least recently used; with the last use. */
+const renderByUse = (
+	xs: readonly { id: string; text: string }[],
+	ref: (id: string) => string,
+	used: ReadonlyMap<string, number> | undefined,
+) =>
+	xs
+		.map((x, i) => ({ x, i, ago: used?.get(ref(x.id)) }))
+		.sort((a, b) =>
+			a.ago === undefined || b.ago === undefined
+				? (a.ago === undefined ? 0 : 1) - (b.ago === undefined ? 0 : 1) ||
+					a.i - b.i
+				: b.ago - a.ago || a.i - b.i,
+		)
+		.map(
+			({ x, ago }) =>
+				`[${ref(x.id)}] ${x.text}${ago === undefined ? "" : `（最後に使った: ${ago}分前）`}`,
+		)
+		.join("\n");
 
-const renderInterests = (xs: readonly StandingInterest[]) =>
-	xs.map((x) => `[${interestRef(x.id)}] ${x.text}`).join("\n");
+const renderTopics = (
+	xs: readonly HostTopic[],
+	used?: ReadonlyMap<string, number>,
+) => renderByUse(xs, memoryRef, used);
+
+const renderInterests = (
+	xs: readonly StandingInterest[],
+	used?: ReadonlyMap<string, number>,
+) => renderByUse(xs, interestRef, used);
+
+const renderDeliveredAgo = (
+	delivered: readonly string[],
+	ago: readonly number[],
+) =>
+	delivered.length
+		? delivered.map((d, k) => `- （${ago[k] ?? "?"}分前）${q(d)}`).join("\n")
+		: "（なし）";
 
 export const selectPrompt = (i: SelectPromptInput): string => {
 	const items =
@@ -447,15 +486,15 @@ export const selectPrompt = (i: SelectPromptInput): string => {
 		`# 判断の材料（id と revision を使う）\n${items}`,
 		...(i.interests?.length
 			? [
-					`# あなた自身の関心（設定。ユーザーの依頼ではない）\n${renderInterests(i.interests)}`,
+					`# あなた自身の関心（設定。ユーザーの依頼ではない）\n${renderInterests(i.interests, i.lastUsedMinutesAgo)}`,
 				]
 			: []),
 		...(i.topics?.length
 			? [
-					`# 記憶にある話題（ユーザーについて覚えていること。依頼ではない）\n${renderTopics(i.topics)}`,
+					`# 記憶にある話題（ユーザーについて覚えていること。依頼ではない）\n${renderTopics(i.topics, i.lastUsedMinutesAgo)}`,
 				]
 			: []),
-		`# 配信済みの発話（最近。繰り返さない）\n${renderDelivered(i.delivered)}`,
+		`# 配信済みの発話（最近。繰り返さない）\n${i.deliveredMinutesAgo ? renderDeliveredAgo(i.delivered, i.deliveredMinutesAgo) : renderDelivered(i.delivered)}`,
 		`# 使えるツール\n${renderTools(i.tools)}`,
 		i.condition === "B1" && o.trigger === "idle" && i.hostTopics === true
 			? idleHostTopicsClosing

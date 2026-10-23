@@ -64,6 +64,8 @@ import {
 /** The cap on extra pending observations shown on top of the recent window. */
 const PENDING_CAP = 16;
 const DELIVERED_SHOWN = 5;
+/** Speak tickets whose topic/interest refs wait for a receipt (oldest dropped beyond this). */
+const TOPIC_TICKETS_KEPT = 64;
 const NO_DUE: Due = { reviewIntentIds: [], pressure: [] };
 
 export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
@@ -115,12 +117,18 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		for (const o of batch) m.set(o.seq, o);
 		return [...m.values()].sort((a, b) => a.seq - b.seq);
 	};
-	const delivered = () =>
+	const deliveredObs = () =>
 		ledger
 			.all()
 			.filter((o) => o.kind === "delivery.observed" && o.actor === "agent")
-			.slice(-DELIVERED_SHOWN)
-			.map((o) => o.text);
+			.slice(-DELIVERED_SHOWN);
+	const delivered = () => deliveredObs().map((o) => o.text);
+	const minutesAgo = (now: number, at: number) =>
+		Math.max(0, Math.round((now - at) / 60_000));
+	// Lull talk: when each topic (memory:<id>) or interest (interest:<id>) was last delivered,
+	// from the refs of accepted speak tickets and their successful receipts.
+	const topicTickets = new Map<string, readonly string[]>();
+	const lastUsedAt = new Map<string, number>();
 	const minutesSinceUserInput = (now: number): number | null => {
 		const last = ledger
 			.all()
@@ -339,8 +347,25 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					state,
 					candidates: pool,
 					delivered: delivered(),
+					...(social || hostTopics
+						? {
+								deliveredMinutesAgo: deliveredObs().map((o) =>
+									minutesAgo(opp.at, o.occurredAt),
+								),
+							}
+						: {}),
 					...(interests.length > 0 ? { interests } : {}),
 					...(topics.length > 0 ? { topics } : {}),
+					...(lastUsedAt.size > 0
+						? {
+								lastUsedMinutesAgo: new Map(
+									[...lastUsedAt].map(([ref, at]) => [
+										ref,
+										minutesAgo(opp.at, at),
+									]),
+								),
+							}
+						: {}),
 					tools,
 					limits,
 					minutesSinceUserInput: minutesSinceUserInput(opp.at),
@@ -423,6 +448,14 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		if (p.action === "speak" || p.action === "tool") {
 			ticket = reserveOutward(state, opp.id, p.action, verdict, opp.at);
 			issued.set(ticket.id, ticket);
+			const used = p.evidenceRefs.filter(
+				(ref) => ref.startsWith("memory:") || ref.startsWith("interest:"),
+			);
+			if (p.action === "speak" && used.length > 0) {
+				topicTickets.set(ticket.id, used);
+				if (topicTickets.size > TOPIC_TICKETS_KEPT)
+					topicTickets.delete(topicTickets.keys().next().value!);
+			}
 		} else if (p.action === "wait" && verdict.candidate)
 			deferCandidate(state, verdict.candidate);
 		else if (p.action === "discard" && verdict.candidate)
@@ -487,6 +520,11 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			);
 			const obs = ledger.record(observation);
 			receipts.set(key, obs);
+			const used = topicTickets.get(receipt.ticketId);
+			if (used && receipt.status === "succeeded")
+				for (const ref of used) lastUsedAt.set(ref, receipt.at);
+			if (receipt.status !== "outcome_unknown")
+				topicTickets.delete(receipt.ticketId);
 			if (receipt.status !== "outcome_unknown") issued.delete(receipt.ticketId);
 			failures = 0;
 			quarantined = false;
