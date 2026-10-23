@@ -125,6 +125,9 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const delivered = () => deliveredObs().map((o) => o.text);
 	const minutesAgo = (now: number, at: number) =>
 		Math.max(0, Math.round((now - at) / 60_000));
+	/** Unrounded, so that two uses within the same minute still order by recency. */
+	const exactMinutesAgo = (now: number, at: number) =>
+		Math.max(0, (now - at) / 60_000);
 	// Lull talk: when each topic (memory:<id>) or interest (interest:<id>) was last delivered,
 	// from the refs of accepted speak tickets and their successful receipts.
 	const topicTickets = new Map<string, readonly string[]>();
@@ -356,12 +359,12 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 						: {}),
 					...(interests.length > 0 ? { interests } : {}),
 					...(topics.length > 0 ? { topics } : {}),
-					...(lastUsedAt.size > 0
+					...((social || hostTopics) && lastUsedAt.size > 0
 						? {
 								lastUsedMinutesAgo: new Map(
 									[...lastUsedAt].map(([ref, at]) => [
 										ref,
-										minutesAgo(opp.at, at),
+										exactMinutesAgo(opp.at, at),
 									]),
 								),
 							}
@@ -523,7 +526,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			const used = topicTickets.get(receipt.ticketId);
 			if (used && receipt.status === "succeeded")
 				for (const ref of used) lastUsedAt.set(ref, receipt.at);
-			if (receipt.status !== "outcome_unknown")
+			// An interrupted or unknown outcome can still turn into a late success.
+			if (receipt.status === "succeeded" || receipt.status === "failed")
 				topicTickets.delete(receipt.ticketId);
 			if (receipt.status !== "outcome_unknown") issued.delete(receipt.ticketId);
 			failures = 0;

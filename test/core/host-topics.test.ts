@@ -259,7 +259,11 @@ describe("hostTopics", () => {
 });
 
 describe("topic and interest use (social-rules-3)", () => {
-	const twoLulls = async (status: "succeeded" | "failed") => {
+	type Status = "succeeded" | "failed" | "interrupted" | "outcome_unknown";
+	const twoLulls = async (
+		statuses: Status | readonly Status[],
+		mode: "host" | "none" = "host",
+	) => {
 		const llm = fakeLlm();
 		const rt = createAgencyRuntime({
 			condition: "B1",
@@ -267,7 +271,7 @@ describe("topic and interest use (social-rules-3)", () => {
 			tools: [],
 			budget: { ...defaultBudget, minIntervalMs: 0 },
 			limits: { ...defaultLimits, outboundIntervalMs: 0 },
-			hostTopics: true,
+			...(mode === "host" ? { hostTopics: true } : {}),
 			standingInterests: interests,
 		});
 		rt.observe(obsInput("o1", "user.report", "user", 0, "今日は休み"));
@@ -277,7 +281,7 @@ describe("topic and interest use (social-rules-3)", () => {
 			participation({
 				action: "speak",
 				utterance: "クロミのどこが好き？",
-				evidenceRefs: ["memory:t1"],
+				evidenceRefs: mode === "host" ? ["memory:t1"] : ["interest:i1"],
 			}),
 		);
 		const first = await rt.decide(
@@ -285,14 +289,16 @@ describe("topic and interest use (social-rules-3)", () => {
 			sig(),
 		);
 		const ticket = first.decision.ticket!;
-		rt.recordResult({
-			ticketId: ticket.id,
-			status,
-			at: 11 * MIN,
-			resultText: ticket.utterance ?? "",
-		});
-		// the receipt is a new observation: update runs before the second select
-		llm.push("update", b1Proposal([]));
+		for (const status of typeof statuses === "string" ? [statuses] : statuses) {
+			rt.recordResult({
+				ticketId: ticket.id,
+				status,
+				at: 11 * MIN,
+				resultText: ticket.utterance ?? "",
+			});
+			// each receipt is a new observation: update runs before the second select
+			llm.push("update", b1Proposal([]));
+		}
 		llm.push("select", participation());
 		await rt.decide(
 			opportunity("op1", 14 * MIN, { trigger: "idle", topics }),
@@ -322,5 +328,16 @@ describe("topic and interest use (social-rules-3)", () => {
 	test("a failed delivery does not count as use", async () => {
 		const { second } = await twoLulls("failed");
 		expect(second).not.toContain("最後に使った");
+	});
+	test("an interrupted or unknown outcome followed by a late success counts as use", async () => {
+		for (const first of ["interrupted", "outcome_unknown"] as const) {
+			const { second } = await twoLulls([first, "succeeded"]);
+			expect(second).toContain("（最後に使った: 3分前）");
+		}
+	});
+	test("without a social mode nothing is annotated (interests only)", async () => {
+		const { second } = await twoLulls("succeeded", "none");
+		expect(second).not.toContain("最後に使った");
+		expect(second).not.toMatch(/（\d+分前）"/);
 	});
 });

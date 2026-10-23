@@ -398,7 +398,8 @@ export interface SelectPromptInput {
 	/** Social / host-topics modes: minutes since each delivered utterance (same order). */
 	readonly deliveredMinutesAgo?: readonly number[];
 	/**
-	 * Minutes since a topic (`memory:<id>`) or interest (`interest:<id>`) was last delivered.
+	 * Social / host-topics modes: minutes (unrounded; shown rounded) since a topic
+	 * (`memory:<id>`) or interest (`interest:<id>`) was last delivered.
 	 * Topics and interests are listed unused first, then least recently used, with the time.
 	 */
 	readonly lastUsedMinutesAgo?: ReadonlyMap<string, number>;
@@ -452,7 +453,7 @@ const renderByUse = (
 		)
 		.map(
 			({ x, ago }) =>
-				`[${ref(x.id)}] ${x.text}${ago === undefined ? "" : `（最後に使った: ${ago}分前）`}`,
+				`[${ref(x.id)}] ${x.text}${ago === undefined ? "" : `（最後に使った: ${Math.round(ago)}分前）`}`,
 		)
 		.join("\n");
 
