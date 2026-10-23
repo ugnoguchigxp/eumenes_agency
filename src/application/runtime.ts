@@ -1,6 +1,7 @@
 import type {
 	AgencyState,
 	Candidate,
+	HostTodo,
 	HostTopic,
 	Observation,
 } from "../contracts/model.ts";
@@ -57,6 +58,7 @@ import {
 	selectPrompt,
 	interestRef,
 	memoryRef,
+	todoRef,
 	systemPrompt,
 	updatePrompt,
 } from "./prompts.ts";
@@ -73,6 +75,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	// Social conversation mode applies to B1 only; otherwise every prompt stays as before.
 	// Host topics (topics kept by the host's own memory) take precedence over note-based seeds.
 	const hostTopics = condition === "B1" && deps.hostTopics === true;
+	const hostTodos = condition === "B1" && deps.hostTodos === true;
 	const social =
 		condition === "B1" && deps.socialTopics === true && !hostTopics;
 	const wireSchema = wireUpdateSchema(condition === "B0" ? "B2" : condition);
@@ -310,13 +313,19 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		const topics: readonly HostTopic[] = hostTopics
 			? (opp.topics ?? []).filter((x) => x.id !== "" && x.text.trim() !== "")
 			: [];
+		// Work reports (hostTodos mode, B1 only): the host's open and done-unreported items.
+		const todos: readonly HostTodo[] = hostTodos
+			? (opp.todos ?? []).filter((x) => x.id !== "" && x.title.trim() !== "")
+			: [];
+		const doneTodos = todos.filter((x) => x.status === "done").length;
 		// B1a (eval ablation): with no notes, still let select speak from the observations.
 		const selectEmpty = condition === "B1" && deps.selectWhenEmpty === true;
 		if (
 			items === 0 &&
 			!selectEmpty &&
 			interests.length === 0 &&
-			topics.length === 0
+			topics.length === 0 &&
+			doneTodos === 0
 		)
 			return done(
 				hostDecision(opp.id, "host_no_candidates", "nothing to offer"),
@@ -340,6 +349,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					interests: interests.length > 0,
 					...(social ? { social } : {}),
 					...(hostTopics ? { hostTopics } : {}),
+					...(hostTodos ? { hostTodos } : {}),
 				}),
 				prompt: selectPrompt({
 					condition,
@@ -350,7 +360,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					state,
 					candidates: pool,
 					delivered: delivered(),
-					...(social || hostTopics
+					...(social || hostTopics || hostTodos
 						? {
 								deliveredMinutesAgo: deliveredObs().map((o) =>
 									minutesAgo(opp.at, o.occurredAt),
@@ -359,7 +369,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 						: {}),
 					...(interests.length > 0 ? { interests } : {}),
 					...(topics.length > 0 ? { topics } : {}),
-					...((social || hostTopics) && lastUsedAt.size > 0
+					...(todos.length > 0 ? { todos } : {}),
+					...((social || hostTopics || hostTodos) && lastUsedAt.size > 0
 						? {
 								lastUsedMinutesAgo: new Map(
 									[...lastUsedAt].map(([ref, at]) => [
@@ -425,6 +436,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				...shownEvidence,
 				...interests.map((x) => interestRef(x.id)),
 				...topics.map((x) => memoryRef(x.id)),
+				...todos.map((x) => todoRef(x.id)),
 			]),
 			presentedCandidates: new Map(pool.map((c) => [c.id, c.revision])),
 			tools,
@@ -452,7 +464,10 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			ticket = reserveOutward(state, opp.id, p.action, verdict, opp.at);
 			issued.set(ticket.id, ticket);
 			const used = p.evidenceRefs.filter(
-				(ref) => ref.startsWith("memory:") || ref.startsWith("interest:"),
+				(ref) =>
+					ref.startsWith("memory:") ||
+					ref.startsWith("interest:") ||
+					ref.startsWith("todo:"),
 			);
 			if (p.action === "speak" && used.length > 0) {
 				topicTickets.set(ticket.id, used);

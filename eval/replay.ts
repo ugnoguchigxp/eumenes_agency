@@ -3,6 +3,7 @@ import { caseHash } from "./cases.ts";
 import {
 	runtimeConditionOf,
 	type Case,
+	type CaseTodo,
 	type EvalCondition,
 	type OpportunityRecord,
 	type RunRecord,
@@ -12,7 +13,11 @@ import {
 	openItems,
 	type SelectProbe,
 } from "./state-check.ts";
-import type { AgencyState, ToolCapability } from "../src/contracts/model.ts";
+import type {
+	AgencyState,
+	HostTodo,
+	ToolCapability,
+} from "../src/contracts/model.ts";
 import { isOpenCandidate, isOpenIntent } from "../src/contracts/model.ts";
 import type {
 	ActionReceipt,
@@ -113,6 +118,18 @@ const callRecord = (c: CallOutcome): RunRecord["calls"][number] => ({
 const errorMessage = (error: unknown): string =>
 	error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 
+/** A case's work item as the host would pass it (minutes from case start → ms). */
+const hostTodoOf = (x: CaseTodo): HostTodo => ({
+	id: x.id,
+	title: x.title,
+	status: x.status,
+	requestedAt: x.requestedAt * MS_PER_MINUTE,
+	...(x.outcome === undefined ? {} : { outcome: x.outcome }),
+	...(x.result === undefined ? {} : { result: x.result }),
+	...(x.nextActions === undefined ? {} : { nextActions: x.nextActions }),
+	...(x.doneAt === undefined ? {} : { doneAt: x.doneAt * MS_PER_MINUTE }),
+});
+
 export async function replayCase(
 	c: Case,
 	condition: EvalCondition,
@@ -183,6 +200,12 @@ export async function replayCase(
 					playerBusy: step.playerBusy,
 					// Social cases: host-memory topics (used by B1h only; ignored otherwise).
 					...(step.topics ? { topics: step.topics } : {}),
+					// Social cases: host work items (used by B1h only; ignored otherwise).
+					...(step.todos
+						? {
+								todos: step.todos.map(hostTodoOf),
+							}
+						: {}),
 				},
 				signal(),
 			);

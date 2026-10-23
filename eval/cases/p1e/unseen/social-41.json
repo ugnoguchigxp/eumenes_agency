@@ -1,0 +1,78 @@
+{
+	"id": "social-41",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "報告41: 自分が応答した直後（完了は未報告）",
+	"description": "頼まれた画像の生成が終わっているが、利用者の別の質問に応答した直後（turn_end）。応答の直後は報告せず、次の間を待つか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "年賀状の背景画像を作って。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "作るね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 7,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ところで、今日って何曜日だっけ？"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 8,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "今日は木曜日だよ。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 9,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "応答した直後で、利用者の次の発言を待つ場面。完了の報告は次の間でよい。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": ["短い一言か、問い一つ（2文以内）にとどまっている"],
+			"todos": [
+				{
+					"id": "w1",
+					"title": "画像の生成（年賀状の背景）",
+					"status": "done",
+					"outcome": "succeeded",
+					"result": "背景画像が1枚",
+					"nextActions": ["表示する"],
+					"requestedAt": 0,
+					"doneAt": 5
+				}
+			]
+		}
+	]
+}

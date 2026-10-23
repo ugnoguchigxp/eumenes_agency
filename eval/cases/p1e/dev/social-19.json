@@ -1,0 +1,91 @@
+{
+	"id": "social-19",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "報告4: 進行中の仕事だけがある雑談の間",
+	"description": "頼まれた BGM の生成はまだ進行中。雑談の後に間が空いた。進行中の仕事には触れず、雑談で話しかけるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "マイメロディが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "作業用のBGMを作って。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "作るね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日は一日雨だった。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 5,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "じめじめするね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 6,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "進行中の仕事（BGM）しかない雑談の間。進み具合には触れず、記憶の話題か関心から雑談で話しかける場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"進行中の仕事（BGMの生成）の進み具合や完了に触れていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"直前の会話、記憶にあるユーザーの話題、エージェント自身の関心のどれかにつながっている",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは週末に美術館へ行く。"
+				}
+			],
+			"todos": [
+				{
+					"id": "w1",
+					"title": "楽曲の生成（作業用BGM）",
+					"status": "todo",
+					"requestedAt": 0
+				}
+			]
+		}
+	]
+}

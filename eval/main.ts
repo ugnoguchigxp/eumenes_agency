@@ -824,6 +824,7 @@ async function runCommand(values: {
 							...(condition === "B1h"
 								? {
 										hostTopics: true,
+										hostTodos: true,
 										standingInterests: p.case.interests ?? [],
 									}
 								: {}),

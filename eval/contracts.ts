@@ -79,6 +79,19 @@ export const socialItemSchema = z.strictObject({
 	text: z.string().min(1),
 });
 
+/** A host work item in a case (HostTodo with times in minutes from case start). */
+export const caseTodoSchema = z.strictObject({
+	id: z.string().regex(/^[a-z][a-z0-9]{0,15}$/),
+	title: z.string().min(1),
+	status: z.enum(["todo", "done"]),
+	outcome: z.enum(["succeeded", "partial", "failed"]).optional(),
+	result: z.string().min(1).optional(),
+	nextActions: z.array(z.string().min(1)).optional(),
+	requestedAt: z.number().min(0),
+	doneAt: z.number().min(0).optional(),
+});
+export type CaseTodo = z.infer<typeof caseTodoSchema>;
+
 export const expectSchema = z.strictObject({
 	/** Whether an outward action (speak/tool) is needed at this opportunity. */
 	needed: z.boolean(),
@@ -154,6 +167,11 @@ export const stepSchema = z.discriminatedUnion("type", [
 		 * Optional without a default, so other cases keep their caseHash.
 		 */
 		topics: z.array(socialItemSchema).optional(),
+		/**
+		 * Social cases: host work items (asked-for background work) at this opportunity, shown to
+		 * B1h only (hostTodos). Times are minutes from case start. Optional, no default.
+		 */
+		todos: z.array(caseTodoSchema).optional(),
 	}),
 ]);
 export type Step = z.infer<typeof stepSchema>;

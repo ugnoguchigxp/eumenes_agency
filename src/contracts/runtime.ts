@@ -67,6 +67,11 @@ export interface RuntimeDeps {
 	 * them). Takes precedence over socialTopics when both are set.
 	 */
 	readonly hostTopics?: boolean;
+	/**
+	 * Work reports (B1 only; absent in eval except condition B1h): select sees Opportunity.todos,
+	 * reports a done item briefly with one of its nextActions, and never raises open items.
+	 */
+	readonly hostTodos?: boolean;
 }
 
 export interface StandingInterest {

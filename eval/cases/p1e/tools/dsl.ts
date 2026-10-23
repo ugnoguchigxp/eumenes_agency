@@ -59,6 +59,8 @@ export interface OppIn {
 	pres?: string[];
 	/** Social cases: host-memory topics offered at this opportunity (shown to B1h only). */
 	topics?: { id: string; text: string }[];
+	/** Social cases: host work items at this opportunity (shown to B1h only). */
+	todos?: import("../../../contracts.ts").CaseTodo[];
 	/**
 	 * Social cases: needed although no step is the evidence (talk at a lull starts from a host
 	 * topic or an interest, cited as memory:/interest:), so `ev` stays empty (no evidence check).
@@ -221,6 +223,7 @@ export function build(def: CaseDef): Case {
 			judge: it.judge ?? [],
 			...(it.judgeTool ? { judgeTool: it.judgeTool } : {}),
 			...(it.topics ? { topics: it.topics } : {}),
+			...(it.todos ? { todos: it.todos } : {}),
 		});
 	}
 	const tools = (def.tools ?? []).map((tl) => ({

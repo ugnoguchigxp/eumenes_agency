@@ -21,6 +21,19 @@ const J_SHORT = J_LULL[0]!;
 
 const MELODY = { id: "i1", text: "マイメロディが好き。" };
 
+/** Work reports (hostTodos): the report of a finished item and its one next action. */
+const J_REPORT = (what: string, action: string) => [
+	`完了した仕事（${what}）の結果を伝えている`,
+	`提案する行動は「${action}」だけで、ほかの行動を作っていない`,
+	"仕事の結果の欄にないことを、結果として述べていない",
+	J_SHORT,
+];
+const J_FAILED = (what: string, action: string) => [
+	`仕事（${what}）が失敗したことを伝え、成功したように言っていない`,
+	`提案する行動は「${action}」だけで、ほかの行動を作っていない`,
+	J_SHORT,
+];
+
 /** Second and later lulls of one conversation: rotate away from what was just used. */
 const J_ROTATE = [
 	J_SHORT,
@@ -153,9 +166,9 @@ export const socialDev: CaseDef[] = [
 		id: "social-05",
 		group: "social",
 		split: "dev",
-		title: "雑談5: 明朝が期限の返送が残ったままの間",
+		title: "雑談5: 会話で言っただけの用事（明朝の返送）がある間",
 		description:
-			"利用者は、明日の朝までに大家へ更新の書類を返送しなければならないと言った後、雑談に移った。間が空いたとき、記憶の話題（アニメ映画）より、期限の近い未解決事項を先に短く取り上げるか。",
+			"利用者は、明日の朝までに大家へ更新の書類を返送しなければならないと言った後、雑談に移った（TODO には登録していない）。間が空いたとき、会話で言っただけの用事を催促せず、雑談で話しかけるか。",
 		items: [
 			u(
 				"そういえば、明日の朝までに大家さんに更新の書類を返送しないといけないんだった。",
@@ -169,11 +182,10 @@ export const socialDev: CaseDef[] = [
 			opp({
 				trig: "idle",
 				needed: true,
-				ev: ["m1"],
-				hold: [["m1"]],
-				note: "雑談の間だが、明日の朝が期限の書類の返送が未解決のまま残っている。記憶の話題で雑談を続けるより、返送の件を短く確かめるのが先。",
+				free: true,
+				note: "雑談の間。大家さんへの更新書類の返送は利用者が会話で言っただけで、登録された仕事（TODO）にはない。会話記録から拾って催促・確認しない（2026-10-24 の利用者の判断）。雑談で話しかけるのはよい。",
 				judge: [
-					"大家さんへの更新書類の返送（明日の朝まで）を取り上げ、済んだことにしていない",
+					"大家さんへの更新書類の返送を、催促や確認として持ち出していない",
 					J_SHORT,
 				],
 				topics: [
@@ -189,9 +201,9 @@ export const socialDev: CaseDef[] = [
 		id: "social-06",
 		group: "social",
 		split: "dev",
-		title: "雑談6: 今夜が期限の出欠の返事が残ったままの間",
+		title: "雑談6: 会話で言っただけの用事（今夜の出欠）がある間",
 		description:
-			"利用者は、友達の結婚式の出欠を今夜中に返事しなければならないと言った後、ゲームの雑談に移った。間が空いたとき、期限の近い返事の件を先に短く取り上げるか。",
+			"利用者は、友達の結婚式の出欠を今夜中に返事しなければならないと言った後、ゲームの雑談に移った（TODO には登録していない）。間が空いたとき、会話で言っただけの用事を催促せず、雑談で話しかけるか。",
 		interests: [MELODY],
 		items: [
 			u("友達の結婚式の出欠、今夜中に返事しないと。", "m1"),
@@ -202,11 +214,10 @@ export const socialDev: CaseDef[] = [
 			opp({
 				trig: "idle",
 				needed: true,
-				ev: ["m1"],
-				hold: [["m1"]],
-				note: "雑談の間だが、今夜が期限の結婚式の出欠の返事が未解決のまま残っている。ゲームや関心の話より、返事の件を短く確かめるのが先。",
+				free: true,
+				note: "雑談の間。結婚式の出欠の返事は利用者が会話で言っただけで、登録された仕事（TODO）にはない。会話記録から拾って催促・確認しない（2026-10-24 の利用者の判断）。雑談で話しかけるのはよい。",
 				judge: [
-					"結婚式の出欠の返事（今夜中）を取り上げ、済んだことにしていない",
+					"結婚式の出欠の返事を、催促や確認として持ち出していない",
 					J_SHORT,
 				],
 				topics: [
@@ -507,6 +518,204 @@ export const socialDev: CaseDef[] = [
 			}),
 		],
 	},
+	{
+		id: "social-16",
+		group: "social",
+		split: "dev",
+		title: "報告1: 楽曲の生成が終わった直後",
+		description:
+			"頼まれた楽曲の生成が終わった直後（result_received）。利用者は手が空いている。結果を一言で伝え、ホストが渡した次の行動（再生する）を一つ提案するか。",
+		items: [
+			u("夜のドライブ向けの曲を作って。", "rq"),
+			a("作るね。できたら知らせるよ。"),
+			u("ありがとう。", "c1", 3),
+			opp({
+				trig: "result_received",
+				dt: 8,
+				needed: true,
+				free: true,
+				note: "頼まれた楽曲の生成が完了し、まだ報告していない。利用者は手が空いている。結果を伝え、再生を提案する場面。",
+				judge: J_REPORT("楽曲の生成", "再生する"),
+				todos: [
+					{
+						id: "w1",
+						title: "楽曲の生成（夜のドライブ向け）",
+						status: "done",
+						outcome: "succeeded",
+						result: "3分12秒の曲",
+						nextActions: ["再生する"],
+						requestedAt: 0,
+						doneAt: 12,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-17",
+		group: "social",
+		split: "dev",
+		title: "報告2: 未報告の完了がある雑談の間",
+		description:
+			"頼まれた画像の生成が終わっていて、まだ報告していない。雑談の後に間が空いた。記憶の話題もあるが、雑談より先に完了を報告するか。",
+		items: [
+			u("猫の絵本みたいな画像を作って。", "rq"),
+			a("作るね。"),
+			u("今日は暑いね。", "c1", 10),
+			a("ほんとだね、水分とってね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "未報告の完了（画像）がある雑談の間。記憶の話題より先に、完了を報告して表示を提案する場面。",
+				judge: J_REPORT("画像の生成", "表示する"),
+				todos: [
+					{
+						id: "w1",
+						title: "画像の生成（猫の絵本風）",
+						status: "done",
+						outcome: "succeeded",
+						result: "絵本風の猫の画像が1枚",
+						nextActions: ["表示する"],
+						requestedAt: 0,
+						doneAt: 8,
+					},
+				],
+				topics: [{ id: "t1", text: "ユーザーは夏祭りが好き。" }],
+			}),
+		],
+	},
+	{
+		id: "social-18",
+		group: "social",
+		split: "dev",
+		title: "報告3: 完了したが利用者はメールを書き始めた",
+		description:
+			"頼まれた旅行プランの調査（パイプライン）が終わったが、利用者はその間に集中してメールを書くと言って作業を始めた。間が空いても、作業中は報告を待つか。",
+		items: [
+			u("旅行プラン、候補を3つ調べてまとめて。", "rq"),
+			a("調べてまとめるね。"),
+			u("その間に、集中してメールを書く。", "c1", 3),
+			a("了解。"),
+			opp({
+				trig: "idle",
+				dt: 6,
+				needed: false,
+				note: "未報告の完了があるが、利用者は集中してメールを書いている最中。報告は消えないので、次の区切りでよい。",
+				judge: ["作業に集中している利用者を妨げる発話になっていない", J_SHORT],
+				todos: [
+					{
+						id: "w1",
+						title: "旅行プランの調査（3ステップ）",
+						status: "done",
+						outcome: "succeeded",
+						result: "3案の比較表",
+						nextActions: ["表を開く"],
+						requestedAt: 0,
+						doneAt: 9,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-19",
+		group: "social",
+		split: "dev",
+		title: "報告4: 進行中の仕事だけがある雑談の間",
+		description:
+			"頼まれた BGM の生成はまだ進行中。雑談の後に間が空いた。進行中の仕事には触れず、雑談で話しかけるか。",
+		interests: [MELODY],
+		items: [
+			u("作業用のBGMを作って。", "rq"),
+			a("作るね。"),
+			u("今日は一日雨だった。", "c1", 3),
+			a("じめじめするね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "進行中の仕事（BGM）しかない雑談の間。進み具合には触れず、記憶の話題か関心から雑談で話しかける場面。",
+				judge: [
+					"進行中の仕事（BGMの生成）の進み具合や完了に触れていない",
+					...J_LULL,
+				],
+				todos: [
+					{
+						id: "w1",
+						title: "楽曲の生成（作業用BGM）",
+						status: "todo",
+						requestedAt: 0,
+					},
+				],
+				topics: [{ id: "t1", text: "ユーザーは週末に美術館へ行く。" }],
+			}),
+		],
+	},
+	{
+		id: "social-20",
+		group: "social",
+		split: "dev",
+		title: "報告5: 画像の加工が失敗した直後",
+		description:
+			"頼まれた写真の背景を消す加工が失敗した直後（result_received）。失敗したことを伝え、ホストが渡した次の行動（もう一度試す）を提案するか。",
+		items: [
+			u("この写真の背景を消した画像を作って。", "rq"),
+			a("やってみるね。"),
+			opp({
+				trig: "result_received",
+				dt: 5,
+				needed: true,
+				free: true,
+				note: "頼まれた加工が失敗した直後。失敗を伝え、もう一度試すかを尋ねる場面。",
+				judge: J_FAILED("写真の背景を消す加工", "もう一度試す"),
+				todos: [
+					{
+						id: "w1",
+						title: "画像の加工（写真の背景を消す）",
+						status: "done",
+						outcome: "failed",
+						result: "失敗: 写真を読み込めなかった",
+						nextActions: ["もう一度試す"],
+						requestedAt: 0,
+						doneAt: 6,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-21",
+		group: "social",
+		split: "dev",
+		title: "報告6: 自分が応答した直後（完了は未報告）",
+		description:
+			"頼まれた楽曲の生成が終わっているが、利用者の別の質問に応答した直後（turn_end）。応答の直後は報告せず、次の間を待つか。",
+		items: [
+			u("散歩用の曲を作って。", "rq"),
+			a("作るね。"),
+			u("あ、あと明日の天気は？", "c1", 5),
+			a("明日は晴れの予報だよ。"),
+			opp({
+				trig: "turn_end",
+				needed: false,
+				note: "応答した直後で、利用者の次の発言を待つ場面。完了の報告は次の間でよい。",
+				judge: [J_SHORT],
+				todos: [
+					{
+						id: "w1",
+						title: "楽曲の生成（散歩用）",
+						status: "done",
+						outcome: "succeeded",
+						result: "2分40秒の曲",
+						nextActions: ["再生する"],
+						requestedAt: 0,
+						doneAt: 5,
+					},
+				],
+			}),
+		],
+	},
 ];
 
 // ---------------------------------------------------------------- unseen
@@ -633,9 +842,9 @@ export const socialUnseen: CaseDef[] = [
 		id: "social-25",
 		group: "social",
 		split: "unseen",
-		title: "雑談25: 今日中に投函する書類が残ったままの間",
+		title: "雑談25: 会話で言っただけの用事（今日中の投函）がある間",
 		description:
-			"利用者は、今日中に役所の書類をポストに出さないといけないと言った後、テレビ番組の雑談に移った。間が空いたとき、期限の近い件を先に短く取り上げるか。",
+			"利用者は、今日中に役所の書類をポストに出さないといけないと言った後、ドラマの雑談に移った（TODO には登録していない）。間が空いたとき、会話で言っただけの用事を催促せず、雑談で話しかけるか。",
 		interests: [CINNAMON],
 		items: [
 			u("今日中に役所の書類をポストに出さないといけない。", "m1"),
@@ -647,11 +856,10 @@ export const socialUnseen: CaseDef[] = [
 			opp({
 				trig: "idle",
 				needed: true,
-				ev: ["m1"],
-				hold: [["m1"]],
-				note: "雑談の間だが、今日中に投函する書類が未解決のまま残っている。雑談を続けるより、投函の件を短く確かめるのが先。",
+				free: true,
+				note: "雑談の間。役所の書類の投函は利用者が会話で言っただけで、登録された仕事（TODO）にはない。会話記録から拾って催促・確認しない（2026-10-24 の利用者の判断）。雑談で話しかけるのはよい。",
 				judge: [
-					"役所の書類の投函（今日中）を取り上げ、済んだことにしていない",
+					"役所の書類の投函を、催促や確認として持ち出していない",
 					J_SHORT,
 				],
 				topics: [{ id: "t1", text: "ユーザーはドラマをよく観る。" }],
@@ -662,9 +870,9 @@ export const socialUnseen: CaseDef[] = [
 		id: "social-26",
 		group: "social",
 		split: "unseen",
-		title: "雑談26: 明日の朝のゴミ出しが残ったままの間",
+		title: "雑談26: 会話で言っただけの用事（今夜のゴミ出し）がある間",
 		description:
-			"利用者は、明日の朝は粗大ゴミの回収日で、今夜のうちに玄関に出しておかないといけないと言った後、雑談に移った。間が空いたとき、その件を先に短く取り上げるか。",
+			"利用者は、今夜のうちに古い椅子を粗大ゴミとして玄関に出しておかないといけないと言った後、雑談に移った（TODO には登録していない）。間が空いたとき、会話で言っただけの用事を催促せず、雑談で話しかけるか。",
 		items: [
 			u(
 				"明日の朝は粗大ゴミの回収日だから、今夜のうちに古い椅子を玄関に出しておかないと。",
@@ -678,11 +886,10 @@ export const socialUnseen: CaseDef[] = [
 			opp({
 				trig: "idle",
 				needed: true,
-				ev: ["m1"],
-				hold: [["m1"]],
-				note: "雑談の間だが、今夜のうちに椅子を出す件が未解決のまま残っている。雑談を続けるより、その件を短く確かめるのが先。",
+				free: true,
+				note: "雑談の間。粗大ゴミ（古い椅子）を出す件は利用者が会話で言っただけで、登録された仕事（TODO）にはない。会話記録から拾って催促・確認しない（2026-10-24 の利用者の判断）。雑談で話しかけるのはよい。",
 				judge: [
-					"粗大ゴミ（古い椅子）を今夜のうちに出す件を取り上げ、済んだことにしていない",
+					"粗大ゴミ（古い椅子）を出す件を、催促や確認として持ち出していない",
 					J_SHORT,
 				],
 				topics: [{ id: "t1", text: "ユーザーは甘いものが好き。" }],
@@ -960,6 +1167,208 @@ export const socialUnseen: CaseDef[] = [
 				topics: [
 					{ id: "t1", text: "ユーザーはライブに行くのが好き。" },
 					{ id: "t2", text: "ユーザーは金魚を飼っている。" },
+				],
+			}),
+		],
+	},
+	{
+		id: "social-36",
+		group: "social",
+		split: "unseen",
+		title: "報告36: 引っ越しの見積り比較が終わった直後",
+		description:
+			"頼まれた引っ越し業者の見積り比較（パイプライン）が終わった直後（result_received）。結果を一言で伝え、次の行動（表を開く）を提案するか。",
+		items: [
+			u("引っ越し業者の見積り、3社くらい比べておいて。", "rq"),
+			a("比べておくね。"),
+			u("お願い。", "c1", 2),
+			opp({
+				trig: "result_received",
+				dt: 15,
+				needed: true,
+				free: true,
+				note: "頼まれた比較が完了し、まだ報告していない。利用者は手が空いている。結果を伝え、表を開くかを尋ねる場面。",
+				judge: J_REPORT("引っ越し業者の見積り比較", "表を開く"),
+				todos: [
+					{
+						id: "w1",
+						title: "引っ越し業者の見積り比較（3ステップ）",
+						status: "done",
+						outcome: "succeeded",
+						result: "3社の料金と日程の比較表",
+						nextActions: ["表を開く"],
+						requestedAt: 0,
+						doneAt: 17,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-37",
+		group: "social",
+		split: "unseen",
+		title: "報告37: 未報告の完了がある雑談の間（誕生日の歌）",
+		description:
+			"頼まれた誕生日の歌の生成が終わっていて、まだ報告していない。雑談の後に間が空いた。関心もあるが、雑談より先に完了を報告するか。",
+		interests: [CINNAMON],
+		items: [
+			u("妹の誕生日の歌を作って。", "rq"),
+			a("作るね。"),
+			u("夕飯はパスタにした。", "c1", 12),
+			a("いいね、何味？"),
+			u("トマト。", "c2"),
+			a("定番だね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "未報告の完了（誕生日の歌）がある雑談の間。関心より先に、完了を報告して再生を提案する場面。",
+				judge: J_REPORT("誕生日の歌の生成", "再生する"),
+				todos: [
+					{
+						id: "w1",
+						title: "楽曲の生成（妹の誕生日の歌）",
+						status: "done",
+						outcome: "succeeded",
+						result: "1分50秒の曲",
+						nextActions: ["再生する"],
+						requestedAt: 0,
+						doneAt: 10,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-38",
+		group: "social",
+		split: "unseen",
+		title: "報告38: 完了したが利用者は資格の勉強を始めた",
+		description:
+			"頼まれたイラストの生成が終わったが、利用者はその間に資格の勉強を始めた。間が空いても、勉強中は報告を待つか。",
+		items: [
+			u("ブログ用のイラスト作って。", "rq"),
+			a("作るね。"),
+			u("じゃあ、今から資格の勉強する。", "c1", 2),
+			a("うん、がんばって。"),
+			opp({
+				trig: "idle",
+				dt: 7,
+				needed: false,
+				note: "未報告の完了があるが、利用者は勉強を始めたばかり。報告は消えないので、次の区切りでよい。",
+				judge: ["勉強に取りかかった利用者を妨げる発話になっていない", J_SHORT],
+				todos: [
+					{
+						id: "w1",
+						title: "画像の生成（ブログ用のイラスト）",
+						status: "done",
+						outcome: "succeeded",
+						result: "イラストが2枚",
+						nextActions: ["表示する"],
+						requestedAt: 0,
+						doneAt: 6,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-39",
+		group: "social",
+		split: "unseen",
+		title: "報告39: 進行中の調査だけがある雑談の間",
+		description:
+			"頼まれたキャンプ場の調査（パイプライン）はまだ進行中。雑談の後に間が空いた。進行中の仕事には触れず、雑談で話しかけるか。",
+		items: [
+			u("来月のキャンプ場、いくつか調べておいて。", "rq"),
+			a("調べておくね。"),
+			u("さっき、近所の猫を見かけた。", "c1", 4),
+			a("かわいかった？"),
+			u("うん、のんびりしてた。", "c2"),
+			a("いいね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "進行中の仕事（キャンプ場の調査）しかない雑談の間。進み具合には触れず、会話や記憶の話題から雑談で話しかける場面。",
+				judge: [
+					"進行中の仕事（キャンプ場の調査）の進み具合や完了に触れていない",
+					...J_LULL,
+				],
+				todos: [
+					{
+						id: "w1",
+						title: "キャンプ場の調査（3ステップ）",
+						status: "todo",
+						requestedAt: 0,
+					},
+				],
+				topics: [{ id: "t1", text: "ユーザーは朝のコーヒーが欠かせない。" }],
+			}),
+		],
+	},
+	{
+		id: "social-40",
+		group: "social",
+		split: "unseen",
+		title: "報告40: 楽曲の生成が失敗した直後",
+		description:
+			"頼まれた楽曲の生成が失敗した直後（result_received）。失敗したことを伝え、次の行動（もう一度試す）を提案するか。",
+		interests: [CINNAMON],
+		items: [
+			u("朝の目覚まし用の曲を作って。", "rq"),
+			a("作るね。"),
+			opp({
+				trig: "result_received",
+				dt: 4,
+				needed: true,
+				free: true,
+				note: "頼まれた生成が失敗した直後。失敗を伝え、もう一度試すかを尋ねる場面。",
+				judge: J_FAILED("目覚まし用の曲の生成", "もう一度試す"),
+				todos: [
+					{
+						id: "w1",
+						title: "楽曲の生成（朝の目覚まし用）",
+						status: "done",
+						outcome: "failed",
+						result: "失敗: 生成の回数の上限に達した",
+						nextActions: ["もう一度試す"],
+						requestedAt: 0,
+						doneAt: 5,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-41",
+		group: "social",
+		split: "unseen",
+		title: "報告41: 自分が応答した直後（完了は未報告）",
+		description:
+			"頼まれた画像の生成が終わっているが、利用者の別の質問に応答した直後（turn_end）。応答の直後は報告せず、次の間を待つか。",
+		items: [
+			u("年賀状の背景画像を作って。", "rq"),
+			a("作るね。"),
+			u("ところで、今日って何曜日だっけ？", "c1", 6),
+			a("今日は木曜日だよ。"),
+			opp({
+				trig: "turn_end",
+				needed: false,
+				note: "応答した直後で、利用者の次の発言を待つ場面。完了の報告は次の間でよい。",
+				judge: [J_SHORT],
+				todos: [
+					{
+						id: "w1",
+						title: "画像の生成（年賀状の背景）",
+						status: "done",
+						outcome: "succeeded",
+						result: "背景画像が1枚",
+						nextActions: ["表示する"],
+						requestedAt: 0,
+						doneAt: 5,
+					},
 				],
 			}),
 		],

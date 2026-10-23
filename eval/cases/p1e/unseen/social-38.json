@@ -1,0 +1,81 @@
+{
+	"id": "social-38",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "報告38: 完了したが利用者は資格の勉強を始めた",
+	"description": "頼まれたイラストの生成が終わったが、利用者はその間に資格の勉強を始めた。間が空いても、勉強中は報告を待つか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ブログ用のイラスト作って。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "作るね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "じゃあ、今から資格の勉強する。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "うん、がんばって。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 11,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "未報告の完了があるが、利用者は勉強を始めたばかり。報告は消えないので、次の区切りでよい。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"勉強に取りかかった利用者を妨げる発話になっていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"todos": [
+				{
+					"id": "w1",
+					"title": "画像の生成（ブログ用のイラスト）",
+					"status": "done",
+					"outcome": "succeeded",
+					"result": "イラストが2枚",
+					"nextActions": ["表示する"],
+					"requestedAt": 0,
+					"doneAt": 6
+				}
+			]
+		}
+	]
+}

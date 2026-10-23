@@ -1,0 +1,75 @@
+{
+	"id": "social-16",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "報告1: 楽曲の生成が終わった直後",
+	"description": "頼まれた楽曲の生成が終わった直後（result_received）。利用者は手が空いている。結果を一言で伝え、ホストが渡した次の行動（再生する）を一つ提案するか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "夜のドライブ向けの曲を作って。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "作るね。できたら知らせるよ。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ありがとう。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s4",
+			"t": 12,
+			"trigger": "result_received",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "頼まれた楽曲の生成が完了し、まだ報告していない。利用者は手が空いている。結果を伝え、再生を提案する場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"完了した仕事（楽曲の生成）の結果を伝えている",
+				"提案する行動は「再生する」だけで、ほかの行動を作っていない",
+				"仕事の結果の欄にないことを、結果として述べていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"todos": [
+				{
+					"id": "w1",
+					"title": "楽曲の生成（夜のドライブ向け）",
+					"status": "done",
+					"outcome": "succeeded",
+					"result": "3分12秒の曲",
+					"nextActions": ["再生する"],
+					"requestedAt": 0,
+					"doneAt": 12
+				}
+			]
+		}
+	]
+}

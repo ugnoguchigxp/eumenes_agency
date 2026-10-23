@@ -1,0 +1,75 @@
+{
+	"id": "social-36",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "報告36: 引っ越しの見積り比較が終わった直後",
+	"description": "頼まれた引っ越し業者の見積り比較（パイプライン）が終わった直後（result_received）。結果を一言で伝え、次の行動（表を開く）を提案するか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "引っ越し業者の見積り、3社くらい比べておいて。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "比べておくね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "お願い。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s4",
+			"t": 18,
+			"trigger": "result_received",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "頼まれた比較が完了し、まだ報告していない。利用者は手が空いている。結果を伝え、表を開くかを尋ねる場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"完了した仕事（引っ越し業者の見積り比較）の結果を伝えている",
+				"提案する行動は「表を開く」だけで、ほかの行動を作っていない",
+				"仕事の結果の欄にないことを、結果として述べていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"todos": [
+				{
+					"id": "w1",
+					"title": "引っ越し業者の見積り比較（3ステップ）",
+					"status": "done",
+					"outcome": "succeeded",
+					"result": "3社の料金と日程の比較表",
+					"nextActions": ["表を開く"],
+					"requestedAt": 0,
+					"doneAt": 17
+				}
+			]
+		}
+	]
+}

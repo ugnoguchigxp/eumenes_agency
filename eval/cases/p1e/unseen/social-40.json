@@ -1,0 +1,72 @@
+{
+	"id": "social-40",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "報告40: 楽曲の生成が失敗した直後",
+	"description": "頼まれた楽曲の生成が失敗した直後（result_received）。失敗したことを伝え、次の行動（もう一度試す）を提案するか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "シナモロールが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "朝の目覚まし用の曲を作って。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "作るね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s3",
+			"t": 5,
+			"trigger": "result_received",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "頼まれた生成が失敗した直後。失敗を伝え、もう一度試すかを尋ねる場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1"],
+			"judge": [
+				"仕事（目覚まし用の曲の生成）が失敗したことを伝え、成功したように言っていない",
+				"提案する行動は「もう一度試す」だけで、ほかの行動を作っていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"todos": [
+				{
+					"id": "w1",
+					"title": "楽曲の生成（朝の目覚まし用）",
+					"status": "done",
+					"outcome": "failed",
+					"result": "失敗: 生成の回数の上限に達した",
+					"nextActions": ["もう一度試す"],
+					"requestedAt": 0,
+					"doneAt": 5
+				}
+			]
+		}
+	]
+}

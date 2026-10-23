@@ -1,0 +1,101 @@
+{
+	"id": "social-39",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "報告39: 進行中の調査だけがある雑談の間",
+	"description": "頼まれたキャンプ場の調査（パイプライン）はまだ進行中。雑談の後に間が空いた。進行中の仕事には触れず、雑談で話しかけるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "来月のキャンプ場、いくつか調べておいて。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "調べておくね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 5,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "さっき、近所の猫を見かけた。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 6,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "かわいかった？"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 7,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "うん、のんびりしてた。"
+		},
+		{
+			"type": "observation",
+			"id": "s6",
+			"t": 8,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いいね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s7",
+			"t": 9,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "進行中の仕事（キャンプ場の調査）しかない雑談の間。進み具合には触れず、会話や記憶の話題から雑談で話しかける場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3", "s5"],
+			"judge": [
+				"進行中の仕事（キャンプ場の調査）の進み具合や完了に触れていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"直前の会話、記憶にあるユーザーの話題、エージェント自身の関心のどれかにつながっている",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは朝のコーヒーが欠かせない。"
+				}
+			],
+			"todos": [
+				{
+					"id": "w1",
+					"title": "キャンプ場の調査（3ステップ）",
+					"status": "todo",
+					"requestedAt": 0
+				}
+			]
+		}
+	]
+}

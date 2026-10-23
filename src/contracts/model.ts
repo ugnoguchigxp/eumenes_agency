@@ -47,11 +47,32 @@ export interface Opportunity {
 	 * evidence when presented. Used with deps.hostTopics; absent in eval.
 	 */
 	readonly topics?: readonly HostTopic[];
+	/**
+	 * Host-tracked work the user asked for (e.g. a song generation, a pipeline): open (`todo`)
+	 * and finished-but-unreported (`done`) items. Shown to select with refs `todo:<id>`; the host
+	 * archives a done item once an utterance citing it is delivered. Used with deps.hostTodos.
+	 */
+	readonly todos?: readonly HostTodo[];
 }
 
 export interface HostTopic {
 	readonly id: string;
 	readonly text: string;
+}
+
+export interface HostTodo {
+	readonly id: string;
+	/** One line, e.g. 「楽曲の生成（夜のドライブ向け）」. */
+	readonly title: string;
+	readonly status: "todo" | "done";
+	/** For done: how it ended. */
+	readonly outcome?: "succeeded" | "partial" | "failed";
+	/** For done: one-line result from the host (never invented by the agent). */
+	readonly result?: string;
+	/** For done: actions the host can carry out next (e.g. 「再生する」); only these are offered. */
+	readonly nextActions?: readonly string[];
+	readonly requestedAt: number;
+	readonly doneAt?: number;
 }
 
 export interface ToolCapability {

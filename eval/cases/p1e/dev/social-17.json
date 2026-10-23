@@ -1,0 +1,89 @@
+{
+	"id": "social-17",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "報告2: 未報告の完了がある雑談の間",
+	"description": "頼まれた画像の生成が終わっていて、まだ報告していない。雑談の後に間が空いた。記憶の話題もあるが、雑談より先に完了を報告するか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "猫の絵本みたいな画像を作って。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "作るね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 11,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日は暑いね。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 12,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ほんとだね、水分とってね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 13,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "未報告の完了（画像）がある雑談の間。記憶の話題より先に、完了を報告して表示を提案する場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"完了した仕事（画像の生成）の結果を伝えている",
+				"提案する行動は「表示する」だけで、ほかの行動を作っていない",
+				"仕事の結果の欄にないことを、結果として述べていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは夏祭りが好き。"
+				}
+			],
+			"todos": [
+				{
+					"id": "w1",
+					"title": "画像の生成（猫の絵本風）",
+					"status": "done",
+					"outcome": "succeeded",
+					"result": "絵本風の猫の画像が1枚",
+					"nextActions": ["表示する"],
+					"requestedAt": 0,
+					"doneAt": 8
+				}
+			]
+		}
+	]
+}

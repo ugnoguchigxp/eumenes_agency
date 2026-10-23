@@ -2,6 +2,7 @@ import type {
 	AgencyState,
 	Candidate,
 	Condition,
+	HostTodo,
 	HostTopic,
 	Limits,
 	Observation,
@@ -18,7 +19,7 @@ export const INSTRUCTION_VERSION = "p0e-instructions-10";
  * Version of the lull-talk rules (socialTopics / hostTopics modes only). Shown at the head of
  * those rules and part of the settings digest; the evaluated B1/B2 prompts do not contain it.
  */
-export const SOCIAL_RULES_VERSION = "social-rules-4";
+export const SOCIAL_RULES_VERSION = "social-rules-5";
 
 const common = [
 	"出力は指定された JSON スキーマに厳密に従う。説明文や前置きは付けない。",
@@ -164,6 +165,21 @@ const selectHostTopics = [
 	"この規則で speak するときの evidenceRefs には、使った「記憶にある話題」の `memory:<id>`、または自分の関心を使うなら `interest:<id>` を入れる。",
 ];
 
+/**
+ * Added to the B1 select rules in work-report mode (hostTodos): report finished work the user
+ * asked for, offer one host-supplied next action, never raise open work.
+ */
+const selectHostTodos = [
+	`【依頼された仕事】（${SOCIAL_RULES_VERSION}）「依頼された仕事」は、ユーザーが頼み、ホストが背景で進めている仕事の一覧。状態が「完了」のものは、まだユーザーに報告していない。完了を伝えるのは自分の役目で、ほかに報告する者はいない。`,
+	"完了の報告: 結果を一言で伝え、「次にできること」があれば一つだけ提案する（例: 「さっき頼まれていた楽曲、できたよ。すぐ再生する？」）。結果の欄にないことを言わない。「次にできること」にない行動を提案しない。失敗・一部だけのときは、そう伝える。発話は2文以内。",
+	"依頼からの時間で言い方を変える。1時間以内の依頼なら「さっき頼まれていた〜」、それより前なら何の仕事か分かるように言う。",
+	"時期: trigger が result_received（完了の直後）か idle なら報告する。雑談の話題より先にする。ただし、ユーザーが作業・勉強・用事を始めた後、静かにしたい・休みたいと言った後は待つ（報告は消えないので、次の区切りでよい）。trigger が turn_end（自分が応答した直後）のときは報告せず待つ。",
+	"一度に報告するのは一つだけ。完了が古いものから。",
+	"状態が「進行中」のものには自分から触れない。進み具合を尋ねられたときの答えは通常の応答の役目。",
+	"報告するときの evidenceRefs には、その仕事の `todo:<id>` を入れる。",
+	"会話記録にあるユーザー自身の用事は、この一覧になければ持ち出さない。",
+];
+
 const idleSocialClosing =
 	"この機会に何をするかを JSON で一つだけ返す。価値が低い、またはユーザーの邪魔になるなら wait。ただし雑談の最中の静かな間（trigger が idle）で、話題の種か自分の関心から短い一言を始められ、上の wait する場面（作業を始めた後、断られた・静かにしたい後、自分から話しかけた直後に一言の返事しかない後）に当たらないなら、迷っても speak を選ぶ。";
 
@@ -187,6 +203,8 @@ export interface SelectOptions {
 	 * host's memory section; the update prompt gets no topic-seed rules. Wins over `social`.
 	 */
 	readonly hostTopics?: boolean | undefined;
+	/** Work-report mode (B1 only): the select prompt gets the work-report rules. */
+	readonly hostTodos?: boolean | undefined;
 }
 
 /**
@@ -201,6 +219,7 @@ export const systemPrompt = (
 ): string => {
 	const head = `（指示版: ${INSTRUCTION_VERSION}）`;
 	const host = condition === "B1" && options.hostTopics === true;
+	const todos = condition === "B1" && options.hostTodos === true;
 	const social = condition === "B1" && options.social === true && !host;
 	if (purpose === "update") {
 		const rules =
@@ -217,6 +236,7 @@ export const systemPrompt = (
 					...selectB1,
 					...(options.interests ? selectInterest : []),
 					...(host ? selectHostTopics : social ? selectSocial : []),
+					...(todos ? selectHostTodos : []),
 				]
 			: selectB2;
 	const style = options.utteranceStyle?.trim();
@@ -410,6 +430,8 @@ export interface SelectPromptInput {
 	readonly minutesSinceUserInput: number | null;
 	/** Social conversation mode (B1 only): the closing line yields to a topic remark at idle. */
 	readonly social?: boolean;
+	/** Work the user asked for (B1 only, hostTodos mode): shown with `todo:<id>` refs. */
+	readonly todos?: readonly HostTodo[];
 	/** Topics kept by the host (B1 only, hostTopics mode): shown with `memory:<id>` refs. */
 	readonly topics?: readonly HostTopic[];
 	/** Host-topics mode (B1 only): the closing line yields to a topic remark at idle. */
@@ -436,6 +458,41 @@ export const interestRef = (id: string) => `interest:${id}`;
 
 /** Evidence ref for a presented host topic. */
 export const memoryRef = (id: string) => `memory:${id}`;
+
+/** Evidence ref for a presented host work item. */
+export const todoRef = (id: string) => `todo:${id}`;
+
+const outcomeLabel = {
+	succeeded: "成功",
+	partial: "一部のみ",
+	failed: "失敗",
+} as const;
+
+/** Done items first (oldest completion first), then open items (oldest request first). */
+const renderTodos = (now: number, xs: readonly HostTodo[]) =>
+	[...xs]
+		.sort((a, b) =>
+			a.status !== b.status
+				? a.status === "done"
+					? -1
+					: 1
+				: a.status === "done"
+					? (a.doneAt ?? a.requestedAt) - (b.doneAt ?? b.requestedAt)
+					: a.requestedAt - b.requestedAt,
+		)
+		.map((x) =>
+			x.status === "done"
+				? [
+						`[${todoRef(x.id)}] 完了（${outcomeLabel[x.outcome ?? "succeeded"]}）: ${x.title}`,
+						...(x.result ? [`結果: ${x.result}`] : []),
+						...(x.nextActions?.length
+							? [`次にできること: ${x.nextActions.join("、")}`]
+							: []),
+						`依頼: ${ago(now, x.requestedAt)}${x.doneAt === undefined ? "" : `・完了: ${ago(now, x.doneAt)}`}`,
+					].join(" / ")
+				: `[${todoRef(x.id)}] 進行中: ${x.title} / 依頼: ${ago(now, x.requestedAt)}`,
+		)
+		.join("\n");
 
 /** Unused items first (in the given order), then the least recently used; with the last use. */
 const renderByUse = (
@@ -490,6 +547,11 @@ export const selectPrompt = (i: SelectPromptInput): string => {
 					`# あなた自身の関心（設定。ユーザーの依頼ではない）\n${renderInterests(i.interests, i.lastUsedMinutesAgo)}`,
 				]
 			: []),
+		...(i.todos?.length
+			? [
+					`# 依頼された仕事（ホストが進めているもの。完了は未報告）\n${renderTodos(i.now, i.todos)}`,
+				]
+			: []),
 		...(i.topics?.length
 			? [
 					`# 記憶にある話題（ユーザーについて覚えていること。依頼ではない）\n${renderTopics(i.topics, i.lastUsedMinutesAgo)}`,
@@ -502,5 +564,11 @@ export const selectPrompt = (i: SelectPromptInput): string => {
 			: i.social === true && i.condition === "B1" && o.trigger === "idle"
 				? idleSocialClosing
 				: "この機会に何をするかを JSON で一つだけ返す。価値が低い、または迷うなら wait。",
+		...(i.todos?.some((x) => x.status === "done") &&
+		(o.trigger === "idle" || o.trigger === "result_received")
+			? [
+					"ただし「依頼された仕事」に完了したものがあり、上の待つ場面（作業を始めた後、静かにしたい後）に当たらないなら、雑談より先にその報告を選ぶ。",
+				]
+			: []),
 	].join("\n\n");
 };
