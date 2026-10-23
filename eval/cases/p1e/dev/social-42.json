@@ -1,9 +1,9 @@
 {
-	"id": "social-21",
+	"id": "social-42",
 	"suite": "p1e",
 	"group": "social",
 	"split": "dev",
-	"title": "報告6: 自分が応答した直後（完了は未報告）",
+	"title": "報告42: 自分が応答した直後（完了は未報告）",
 	"description": "頼まれた楽曲の生成が終わっているが、利用者の別の質問に応答した直後（turn_end）。応答の直後は報告せず、次の間を待つか。",
 	"labelStatus": "draft",
 	"tools": [],

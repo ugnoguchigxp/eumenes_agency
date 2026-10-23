@@ -58,7 +58,9 @@ function buildAll(): Record<"dev" | "unseen", Map<string, unknown>> {
 		["unseen", unseenDefs],
 	] as const) {
 		for (const d of defs) {
-			if (out[split].has(d.id)) throw new Error(`duplicate id ${d.id}`);
+			// Ids are unique across splits too: judge and agreement look a case up in both.
+			if (out.dev.has(d.id) || out.unseen.has(d.id))
+				throw new Error(`duplicate id ${d.id}`);
 			if (d.split !== split) throw new Error(`${d.id}: split mismatch`);
 			out[split].set(d.id, build(d));
 		}
