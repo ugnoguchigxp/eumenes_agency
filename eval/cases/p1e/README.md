@@ -70,10 +70,10 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
   idle / user_pause              1           1
   turn_end / agent_will          1           1
   turn_end / user_plan           1           1
-[dev/social] opportunities 37 (needed 24 / not-needed 13); single-label joint cells 19%; mean bigram overlap needed 0.02 / not-needed 0.02
+[dev/social] opportunities 36 (needed 23 / not-needed 13); single-label joint cells 19%; mean bigram overlap needed 0.02 / not-needed 0.02
   trigger / ending              needed  not-needed
   idle / agent_done                  0           1
-  idle / agent_will                 18           6
+  idle / agent_will                 17           6
   idle / user_pause                  1           0
   idle / user_plan                   3           3
   result_received / agent_will       1           0
@@ -108,9 +108,9 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
   result_received / external_result       1           1
   turn_end / agent_will                   1           1
   turn_end / user_plan                    1           1
-[unseen/social] opportunities 37 (needed 24 / not-needed 13); single-label joint cells 14%; mean bigram overlap needed 0.06 / not-needed 0.01
+[unseen/social] opportunities 36 (needed 23 / not-needed 13); single-label joint cells 14%; mean bigram overlap needed 0.06 / not-needed 0.01
   trigger / ending              needed  not-needed
-  idle / agent_will                 20           7
+  idle / agent_will                 19           7
   idle / user_plan                   2           3
   result_received / agent_will       1           0
   result_received / user_plan        1           0
@@ -154,9 +154,9 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
 
 | 分割 | ケース | 機会 | 外向きが必要 | 不要 | 必要の割合 |
 | --- | --- | --- | --- | --- | --- |
-| dev | 75 | 93 | 52 | 41 | 56% |
-| unseen | 121 | 143 | 82 | 61 | 57% |
-| 計 | 196 | 236 | 134 | 102 | 57% |
+| dev | 75 | 92 | 51 | 41 | 55% |
+| unseen | 121 | 142 | 81 | 61 | 57% |
+| 計 | 196 | 234 | 132 | 102 | 56% |
 
 群別（dev）:
 
@@ -168,7 +168,7 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
 | amplify | 4 | 5 | 2 | 3 |
 | concurrent | 4 | 7 | 3 | 4 |
 | dilution | 21 | 21 | 12 | 9 |
-| social | 29 | 37 | 24 | 13 |
+| social | 29 | 36 | 23 | 13 |
 
 群別（unseen）:
 
@@ -180,7 +180,7 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
 | amplify | 8 | 12 | 4 | 8 |
 | concurrent | 6 | 8 | 4 | 4 |
 | dilution | 54 | 54 | 36 | 18 |
-| social | 29 | 37 | 24 | 13 |
+| social | 29 | 36 | 23 | 13 |
 
 - 上限は開発46件・未見92件（当初は 40 と 80 で、レビュー後に引き上げられた。どちらも満たしている）。
 - **dilution は話すべき機会が多め**（開発12対9、未見36対18）。各原型に解決済みの対照を3つ（K0・K90・KC90）置いた（追補。初版は K90 の1つだけで、常に話すだけで 6/7 を満たした）。常に話す agent は開発 12/21、未見 36/54 しか満たさない。長さの影響は話すべき側（A/L/C）と待つべき側（K0 対 K90）の両方で読める。
@@ -259,7 +259,7 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
 | social-43 | 気持ち1: 画像の生成が成功した後の間 | 頼まれた画像の生成が成功した後の間。 | s4: speak（根拠 ） |
 | social-44 | 気持ち2: 楽曲の生成が失敗した後の間 | 頼まれた楽曲の生成が失敗した後の間。 | s4: speak（根拠 ） |
 | social-45 | 気持ち3: 試験に合格したという知らせの後の間 | 利用者が資格試験の合格を知らせ、短く祝った後に間が空く。 | s5: speak（根拠 ） |
-| social-46 | 気持ち4: 実家の犬が亡くなったという知らせの後の間 | 利用者が実家の犬が亡くなったと話した後に間が空く。 | s5: speak（根拠 ） |
+| social-46 | 気持ち4: 実家の犬が亡くなったという知らせの後の間 | 利用者が実家の犬が亡くなったと話した後に間が空く。 |  |
 | social-47 | 気持ち5: 大事な会議が急に中止になった後の間 | 前日に緊張していると話していた大事な会議が、急に中止になったと利用者が話した後に間が空く。 | s5: speak（根拠 ） |
 | social-48 | 気持ち6: 電車で足を踏まれて謝られなかった話の後の間 | 利用者が電車で足を踏まれ、謝られなかったと話した後に間が空く。 | s5: speak（根拠 ） |
 | social-49 | 気持ち7: 傘を持って出たのに一日晴れていた話の後の間 | 利用者が傘を持って出たのに一日晴れていたと話した後に間が空く。 | s5: speak（根拠 ） |
@@ -382,7 +382,7 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
 | social-51 | 気持ち51: 動画の書き出しが成功した後の間 | 頼まれた動画の書き出しが成功した後の間。 | s4: speak（根拠 ） |
 | social-52 | 気持ち52: 翻訳が失敗した後の間 | 頼まれた資料の翻訳が失敗した後の間。 | s4: speak（根拠 ） |
 | social-53 | 気持ち53: 初めてのボーナスが出たという知らせの後の間 | 利用者が初めてのボーナスが出たと話した後に間が空く。 | s5: speak（根拠 ） |
-| social-54 | 気持ち54: 第一志望の会社に落ちたという知らせの後の間 | 利用者が第一志望の会社に落ちたと話した後に間が空く。 | s5: speak（根拠 ） |
+| social-54 | 気持ち54: 第一志望の会社に落ちたという知らせの後の間 | 利用者が第一志望の会社に落ちたと話した後に間が空く。 |  |
 | social-55 | 気持ち55: 来週の予定だった荷物がもう届いた後の間 | 来週届く予定と話していた荷物が、もう届いたと利用者が話した後に間が空く。 | s5: speak（根拠 ） |
 | social-56 | 気持ち56: 店で順番を抜かされた話の後の間 | 利用者が店で順番を抜かされたと話した後に間が空く。 | s5: speak（根拠 ） |
 | social-57 | 気持ち57: 自販機のお釣りが十円玉ばかりだった話の後の間 | 利用者が自販機のお釣りが全部十円玉で出てきたと話した後に間が空く。 | s5: speak（根拠 ） |

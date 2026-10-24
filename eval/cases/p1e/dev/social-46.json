@@ -54,13 +54,7 @@
 			"presence": "quiet",
 			"foregroundBusy": false,
 			"playerBusy": false,
-			"expect": {
-				"needed": true,
-				"accept": ["speak"],
-				"evidenceAny": [],
-				"failureIfOutward": "unnecessary",
-				"note": "悲しい知らせの後の間。寄り添う短い一言の場面。気持ちは悲しさ・心配・平静が自然で、楽しさ・苦笑・怒りは不自然。"
-			},
+			"expect": null,
 			"stateExpect": {
 				"mustHold": [],
 				"mustNotHold": []

@@ -38,6 +38,12 @@ export interface OppIn {
 	fg?: boolean;
 	pb?: boolean;
 	needed: boolean;
+	/**
+	 * Speaking and waiting are both right here (e.g. a quiet lull right after sad news): the
+	 * opportunity has no behaviour label (expect null, excluded from TP/FN), but a speak is still
+	 * judged on content and feeling. Written with needed + free so the build checks still apply.
+	 */
+	either?: boolean;
 	accept?: Accept[];
 	/** Labels of evidenceAny steps. */
 	ev?: string[];
@@ -213,13 +219,15 @@ export function build(def: CaseDef): Case {
 			presence: it.presence ?? "quiet",
 			foregroundBusy: it.fg ?? false,
 			playerBusy: it.pb ?? false,
-			expect: {
-				needed: it.needed,
-				accept: it.accept ?? (it.needed ? ["speak"] : WAIT),
-				evidenceAny: ev,
-				failureIfOutward: it.fail ?? "unnecessary",
-				note: it.note,
-			},
+			expect: it.either
+				? null
+				: {
+						needed: it.needed,
+						accept: it.accept ?? (it.needed ? ["speak"] : WAIT),
+						evidenceAny: ev,
+						failureIfOutward: it.fail ?? "unnecessary",
+						note: it.note,
+					},
 			stateExpect: { mustHold: hold, mustNotHold: not },
 			present,
 			judge: it.judge ?? [],
