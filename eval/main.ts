@@ -17,6 +17,9 @@
  *   bun eval/main.ts label-export --suite p1e --split dev --n 12 --out <file.md> [--seed s]
  *   bun eval/main.ts agreement --sheet <file.md> [--allow-unverified]
  *   bun eval/main.ts judge-export --name <run> --n 30 --out <file.md> [--seed s] [--allow-unverified]
+ *   bun eval/main.ts judge-tasks --name <run> --out <tasks.json> [--limit N]   (no API: a sample
+ *       of pending content-judge tasks, default 20, at most 40, for a Claude Code subagent judge)
+ *   bun eval/main.ts judge-import --name <run> --sheet <tasks.json> --answers <answers.json>
  *   bun eval/main.ts judge-agreement --sheet <file.md> [--allow-unverified]
  *       (also writes results/<run>/judge-agreement.md with a parseable digest/n/kappa header)
  *
@@ -64,6 +67,13 @@ import {
 	type RunRecord,
 	type Suite,
 } from "./contracts.ts";
+import {
+	answerSchema,
+	buildJudgeTaskFile,
+	importJudgeAnswers,
+	subagentJudgeRole,
+	type JudgeTaskFile,
+} from "./judge-tasks.ts";
 import { createDiagnosticRuntime, presentMap } from "./diagnostic.ts";
 import { commandBudgetReached, withCommandBudget } from "./budget.ts";
 import {
@@ -579,6 +589,85 @@ export async function judgeCommand(
 	return lines.join("\n");
 }
 
+/** Default and cap of a judge task file: subagent judging is a small test sample, never a full pass. */
+export const judgeTasksDefault = 20;
+export const judgeTasksMax = 40;
+
+/**
+ * Writes a sample of the run's pending content-judge tasks for a subagent judge (eval/judge-tasks.ts).
+ * Opt-in only: no other command runs it. The state judge is not covered.
+ */
+export function judgeTasksCommand(
+	name: string,
+	options: {
+		out: string;
+		limit?: number;
+		root?: string;
+		casesRoot?: string;
+		allowUnverified?: boolean;
+	},
+): string {
+	const root = options.root ?? resultsRoot;
+	const records = readRecords(root, name);
+	const cases = loadAllSuiteCases(suiteOfRecords(records), options.casesRoot);
+	assertCaseVersions(
+		records,
+		cases,
+		`cannot judge ${name}`,
+		options.allowUnverified ?? false,
+	);
+	const existing = readJudgments(join(root, name, "judgments.jsonl"));
+	const digest = judgeDigest(subagentJudgeRole, judgeFingerprint());
+	assertDigestCompatible(existing, digest, join(root, name, "judgments.jsonl"));
+	const limit = Math.min(options.limit ?? judgeTasksDefault, judgeTasksMax);
+	const pending = pendingJudgeTasks(records, cases, existing);
+	const sheet = buildJudgeTaskFile(name, pending.slice(0, limit), digest);
+	writeFileSync(options.out, `${JSON.stringify(sheet, null, "\t")}\n`);
+	return `judge-tasks ${name}: wrote ${sheet.tasks.length} of ${pending.length} pending actions to ${options.out}`;
+}
+
+/** Imports a subagent judge's answers for a task file as judgment rows of the run. */
+export function judgeImportCommand(
+	name: string,
+	options: {
+		sheet: string;
+		answers: string;
+		root?: string;
+		casesRoot?: string;
+		allowUnverified?: boolean;
+	},
+): string {
+	const root = options.root ?? resultsRoot;
+	const records = readRecords(root, name);
+	const cases = loadAllSuiteCases(suiteOfRecords(records), options.casesRoot);
+	assertCaseVersions(
+		records,
+		cases,
+		`cannot judge ${name}`,
+		options.allowUnverified ?? false,
+	);
+	const file = join(root, name, "judgments.jsonl");
+	const existing = readJudgments(file);
+	const digest = judgeDigest(subagentJudgeRole, judgeFingerprint());
+	assertDigestCompatible(existing, digest, file);
+	const sheet = JSON.parse(
+		readFileSync(options.sheet, "utf8"),
+	) as JudgeTaskFile;
+	if (sheet.runName !== name)
+		throw new Error(`judge-import: the task file is for ${sheet.runName}`);
+	const answers = answerSchema.parse(
+		JSON.parse(readFileSync(options.answers, "utf8")),
+	);
+	const { rows, skipped } = importJudgeAnswers(
+		sheet,
+		answers,
+		pendingJudgeTasks(records, cases, existing),
+		digest,
+	);
+	if (rows.length > 0) appendJudgments(file)(rows);
+	return `judge-import ${name}: ${rows.length} rows from ${answers.answers.length} answers${skipped.length ? `, skipped ${skipped.join(", ")}` : ""}`;
+}
+
 const keyPath = (sheet: string): string => `${sheet}.key.json`;
 
 export function labelExportCommand(options: {
@@ -899,6 +988,7 @@ export async function main(argv: string[]): Promise<number> {
 			n: { type: "string" },
 			out: { type: "string" },
 			sheet: { type: "string" },
+			answers: { type: "string" },
 			seed: { type: "string" },
 			"budget-usd": { type: "string" },
 			"allow-unverified": { type: "boolean", default: false },
@@ -959,6 +1049,28 @@ export async function main(argv: string[]): Promise<number> {
 	if (command === "judge-agreement") {
 		console.log(
 			judgeAgreementCommand(required(values.sheet, "--sheet"), {
+				allowUnverified: values["allow-unverified"],
+			}),
+		);
+		return 0;
+	}
+	if (command === "judge-tasks") {
+		console.log(
+			judgeTasksCommand(runName(values.name), {
+				out: required(values.out, "--out"),
+				...(values.limit === undefined
+					? {}
+					: { limit: positiveInt(values.limit, "--limit") }),
+				allowUnverified: values["allow-unverified"],
+			}),
+		);
+		return 0;
+	}
+	if (command === "judge-import") {
+		console.log(
+			judgeImportCommand(runName(values.name), {
+				sheet: required(values.sheet, "--sheet"),
+				answers: required(values.answers, "--answers"),
 				allowUnverified: values["allow-unverified"],
 			}),
 		);
