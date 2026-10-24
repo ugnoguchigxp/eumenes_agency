@@ -121,4 +121,45 @@ describe("hostTodos (work reports)", () => {
 			reportedTodoIds(["o1", "todo:a", "todo:a", "memory:t1", "todo:"]),
 		).toEqual(["a"]);
 	});
+
+	test("an errand is shown only inside its reminder window, first and with its deadline", async () => {
+		const errand: HostTodo = {
+			id: "e1",
+			kind: "errand",
+			title: "大家さんへ更新書類を返送",
+			status: "todo",
+			requestedAt: 0,
+			remindFrom: 5 * MIN,
+			dueAt: 40 * MIN,
+		};
+		// the opportunity is at 10 min: inside [5, 40)
+		const inside = await run({
+			hostTodos: true,
+			todos: [song, errand],
+			trigger: "idle",
+		});
+		const p = inside.select?.prompt ?? "";
+		expect(p).toContain(
+			"[todo:e1] 用事: 大家さんへ更新書類を返送 / 期限: 30分後",
+		);
+		expect(p.indexOf("[todo:e1]")).toBeLessThan(p.indexOf("[todo:w1]"));
+		// before the window, and once the deadline passed: not shown, and alone it opens no select
+		for (const shifted of [
+			{ ...errand, remindFrom: 20 * MIN },
+			{ ...errand, dueAt: 10 * MIN },
+		]) {
+			const out = await run({
+				hostTodos: true,
+				todos: [shifted],
+				trigger: "idle",
+			});
+			expect(out.select).toBeUndefined();
+		}
+		const alone = await run({
+			hostTodos: true,
+			todos: [errand],
+			trigger: "idle",
+		});
+		expect(alone.select?.prompt).toContain("[todo:e1]");
+	});
 });
