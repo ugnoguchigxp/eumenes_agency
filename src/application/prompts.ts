@@ -22,7 +22,7 @@ export const INSTRUCTION_VERSION = "p0e-instructions-10";
  */
 export const SOCIAL_RULES_VERSION = "social-rules-6";
 /** Version of the utterance-emotion rules (utteranceEmotion mode only). */
-export const EMOTION_RULES_VERSION = "emotion-rules-1";
+export const EMOTION_RULES_VERSION = "emotion-rules-2";
 
 const common = [
 	"出力は指定された JSON スキーマに厳密に従う。説明文や前置きは付けない。",
@@ -190,6 +190,7 @@ const selectEmotion = [
 	"その状況でふつうの人が自然に感じる気持ちを、一つだけ選ぶ。混ざっていれば主なほう。迷ったら🙂。",
 	"気持ちはいつも軽く表す。発話の中で気持ちを説明しない（「嬉しいです」と言わない）。言葉で表すなら「おっ」「あー」くらいの一言まで。",
 	"😮は、メモ・予定・前の話と違うことが起きたときだけ。😕は、相手の言葉の意味が取れない・依頼が矛盾するときだけ。",
+	"頼まれた仕事の失敗を伝えるときは🙏（申し訳ない）。😟は、ユーザーの体調・けが・困りごとを気づかうときだけ。残念な知らせや期待はずれへの共感は😢（軽く）、受け流してよい小さな出来事は🙂か😏。",
 	"😏・😒・😠は人に向けない。😏はついていない状況や自分の失敗に、😠はユーザーが受けた理不尽への共感に使う。ユーザーが悲しんでいる・深刻なときは😄・😏・😠を選ばない。",
 	"話すかどうかは気持ちで決めない。自分の気持ちを理由に話しかけたり、引き止めたり、気をつかわせたりしない。",
 ];

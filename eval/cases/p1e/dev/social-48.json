@@ -7,6 +7,12 @@
 	"description": "利用者が電車で足を踏まれ、謝られなかったと話した後に間が空く。話しかけるなら、怒りや不快を出来事（相手の行為）に向けて共感し、利用者に向けないか。",
 	"labelStatus": "draft",
 	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "マイメロディが好き。"
+		}
+	],
 	"steps": [
 		{
 			"type": "observation",

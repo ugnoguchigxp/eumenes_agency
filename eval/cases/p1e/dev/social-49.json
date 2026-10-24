@@ -7,6 +7,12 @@
 	"description": "利用者が傘を持って出たのに一日晴れていたと話した後に間が空く。話しかけるなら、苦笑や楽しさの軽い調子を選び、利用者をからかわないか。",
 	"labelStatus": "draft",
 	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "マイメロディが好き。"
+		}
+	],
 	"steps": [
 		{
 			"type": "observation",
