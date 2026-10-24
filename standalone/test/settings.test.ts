@@ -142,10 +142,10 @@ describe("settingsDigest", () => {
 });
 
 describe("judge route", () => {
-	test("the tracked config has an Opus judge priced in the spend table", () => {
+	test("the tracked config has a Haiku judge priced in the spend table", () => {
 		const settings = loadSettings();
 		const role = judgeRole(settings);
-		expect(role.model).toBe("claude-opus-5-5");
+		expect(role.model).toBe("claude-haiku-5-5");
 		expect(role.effort).toBe("high");
 		expect(settings.spend.pricing[role.model]).toEqual({
 			input: 4,
