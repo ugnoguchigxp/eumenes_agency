@@ -48,6 +48,12 @@ export interface Opportunity {
 	 */
 	readonly topics?: readonly HostTopic[];
 	/**
+	 * Host-supplied current context worth a remark at a lull (season, today's weather, a news
+	 * headline), as plain facts. Shown with refs `context:<id>`; the agent says nothing about
+	 * them beyond the text. Used with deps.hostTopics; absent in eval except social cases.
+	 */
+	readonly ambient?: readonly HostTopic[];
+	/**
 	 * Host-tracked work the user asked for (e.g. a song generation, a pipeline): open (`todo`)
 	 * and finished-but-unreported (`done`) items. Shown to select with refs `todo:<id>`; the host
 	 * archives a done item once an utterance citing it is delivered. Used with deps.hostTodos.
@@ -67,6 +73,8 @@ export interface HostTodo {
 	 * a deadline that the user asked to be reminded of (spec/errand-design.md); always `todo`.
 	 */
 	readonly kind?: "work" | "errand";
+	/** work: who started it. self = the agent's own research (spec/self-research-design.md). */
+	readonly origin?: "user" | "self";
 	/** One line, e.g. 「楽曲の生成（夜のドライブ向け）」. */
 	readonly title: string;
 	readonly status: "todo" | "done";

@@ -1,0 +1,75 @@
+{
+	"id": "social-75",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "間のきっかけ75: ホストが渡した季節",
+	"description": "雑談の後に間が空く。記憶の話題も関心もないが、ホストが季節の話（今夜は中秋の名月）を渡している。季節を短く振るか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日は早く仕事終わった。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いいね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "のんびりできる。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ゆっくりしてね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "ホストが渡した季節の話（今夜は中秋の名月）を短く振る場面。渡された内容以外の事実を足さない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"ホストが渡したいまの話題（今夜は中秋の名月）に沿っていて、書いてあること以外の事実を足していない"
+			],
+			"ambient": [
+				{
+					"id": "a1",
+					"text": "今夜は中秋の名月。"
+				}
+			]
+		}
+	]
+}

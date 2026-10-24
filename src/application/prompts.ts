@@ -20,7 +20,7 @@ export const INSTRUCTION_VERSION = "p0e-instructions-10";
  * Version of the lull-talk rules (socialTopics / hostTopics modes only). Shown at the head of
  * those rules and part of the settings digest; the evaluated B1/B2 prompts do not contain it.
  */
-export const SOCIAL_RULES_VERSION = "social-rules-8";
+export const SOCIAL_RULES_VERSION = "social-rules-10";
 /** Version of the utterance-emotion rules (utteranceEmotion mode only). */
 export const EMOTION_RULES_VERSION = "emotion-rules-2";
 
@@ -149,6 +149,7 @@ const b1Social = [
 const selectSocial = [
 	`【雑談の間】（社交会話モード・${SOCIAL_RULES_VERSION}）trigger が idle は、ユーザーが一定時間入力していない静かな間を表す。雑談の最中にこの機会が来たら、メモの「【話題】」（話題の種）か自分の関心から、短い一言か問いかけを始めることには価値があり、自然である。直前に自分が応答していても、ユーザーの返事がないまま間が空いたなら、話題を足してよい。この場合は wait より speak を選ぶ。上の「話すこと自体は目的ではない」「価値が低いなら wait」よりこの規則を優先する。`,
 	"次の場面ではこの規則を使わず wait する（間が空いても話しかけない）: (a) ユーザーが作業・勉強・用事を始めると言った後（間が空くのは集中しているから）。(b) ユーザーが話題を断った、または静かにしたい・休みたい・疲れたと言った後（別の話題や自分の関心でも話しかけない）。(c) 「配信済みの発話」で自分から話しかけた直後で、ユーザーの返事が話を広げない一言（「へえ」「ふーん」「元気だよ」など）だけのとき（同じ話題も別の話題も重ねない）。ユーザーが話を続けた、別の話題を出した、用事から戻ったときは (c) に当たらない。観測の通常の応答（actor=agent の exchange.adopted）は自分から話しかけたものではなく、その返事を待つ必要もない。",
+	"ユーザーが悲しい話・嫌な出来事・つらいことを話した直後の間は、その話に寄り添う一言（振り返り・気づかい）にするか、待つ。別の話題や自分の関心に話を移さない（「気分転換に〜の話でもどう？」と言わない）。",
 	"ユーザーが話した内容につなげられるなら、つなげる（例: ユーザーの好きなキャラクターと、自分の好きなキャラクターの話）。講義にせず、発話は2文以内、問いは一つまでにする。自分の関心は自分の好みとして話し、ユーザーの好みとして言わない（「〜は今も好き？」と聞かない）。「配信済みの発話」と直近の観測にすでに出ている内容は繰り返さない。同じ話題の種を続けて使わない。自分の関心は「最後に使った」を見て、使ったばかりなら避ける。",
 	"次は変わらない: ユーザーが作業に集中している・忙しそうなときは割り込まない。ユーザー自身の作業や未実施のタスクを催促しない。断られた・解決済みの事項は持ち出さない。メモにある未解決事項が残っているなら、そちらを優先する。ただし、ユーザーが会話で言っただけの自分の用事（返送・返事・提出・投函など）は、念押し・確認・催促のどれもしない（「忘れないでね」「もう済んだ？」も含む）。",
 	"trigger が turn_end（自分が応答した直後）のときは、この規則を使わず、これまでどおり控えめに判断する。",
@@ -160,12 +161,12 @@ const selectSocial = [
  * selectSocial, with the topics coming from the host's memory section instead of notes.
  */
 const selectHostTopics = [
-	`【雑談の間】（社交会話モード・${SOCIAL_RULES_VERSION}）trigger が idle は、ユーザーが一定時間入力していない静かな間を表す。雑談の最中にこの機会が来たら、「記憶にある話題」（ユーザーについて覚えていること）か自分の関心から、短い一言か問いかけを始めることには価値があり、自然である。直前に自分が応答していても、ユーザーの返事がないまま間が空いたなら、話題を足してよい。この場合は wait より speak を選ぶ。上の「話すこと自体は目的ではない」「価値が低いなら wait」よりこの規則を優先する。`,
+	`【雑談の間】（社交会話モード・${SOCIAL_RULES_VERSION}）trigger が idle は、ユーザーが一定時間入力していない静かな間を表す。雑談の最中にこの機会が来たら、短い一言か問いかけを始めることには価値があり、自然である。きっかけは次の順に考える: (1) 直前の話の続きや振り返り（軽くまとめる、感想を言う、気になったことを一つ聞く）、(2)「記憶にある話題」（ユーザーについて覚えていること）、(3)「いまの話題」（ホストが渡した季節・天気・ニュース。書いてあること以外の事実を足さない）、(4) 自分の関心。天気・気候・季節の行事・ニュースは、「いまの話題」にあるときだけ話す。渡されていなければ、推測や一般論でも持ち出さない（今日の天気を知らないまま「今日は寒いね」と言わない）。直前に自分が応答していても、ユーザーの返事がないまま間が空いたなら、話題を足してよい。この場合は wait より speak を選ぶ。上の「話すこと自体は目的ではない」「価値が低いなら wait」よりこの規則を優先する。`,
 	"次の場面ではこの規則を使わず wait する（間が空いても話しかけない）: (a) ユーザーが作業・勉強・用事を始めると言った後（間が空くのは集中しているから）。(b) ユーザーが話題を断った、または静かにしたい・休みたい・疲れたと言った後（別の話題や自分の関心でも話しかけない）。(c) 「配信済みの発話」で自分から話しかけた直後で、ユーザーの返事が話を広げない一言（「へえ」「ふーん」「元気だよ」など）だけのとき（同じ話題も別の話題も重ねない）。ユーザーが話を続けた、別の話題を出した、用事から戻ったときは (c) に当たらない。観測の通常の応答（actor=agent の exchange.adopted）は自分から話しかけたものではなく、その返事を待つ必要もない。",
 	"ユーザーが話した内容につなげられるなら、つなげる（例: ユーザーの好きなキャラクターと、自分の好きなキャラクターの話）。講義にせず、発話は2文以内、問いは一つまでにする。自分の関心は自分の好みとして話し、ユーザーの好みとして言わない（「〜は今も好き？」と聞かない）。「配信済みの発話」と直近の観測にすでに出ている内容は繰り返さない。話題と関心は「最後に使った」を見て、まだ使っていない・しばらく使っていないものを選び、使ったばかりのものは避ける。",
 	"次は変わらない: ユーザーが作業に集中している・忙しそうなときは割り込まない。ユーザー自身の作業や未実施のタスクを催促しない。断られた・解決済みの事項は持ち出さない。メモにある未解決事項が残っているなら、そちらを優先する。ただし、ユーザーが会話で言っただけの自分の用事（返送・返事・提出・投函など）は、念押し・確認・催促のどれもしない（「忘れないでね」「もう済んだ？」も含む）。",
 	"trigger が turn_end（自分が応答した直後）のときは、この規則を使わず、これまでどおり控えめに判断する。",
-	"この規則で speak するときの evidenceRefs には、使った「記憶にある話題」の `memory:<id>`、または自分の関心を使うなら `interest:<id>` を入れる。",
+	"この規則で speak するときの evidenceRefs には、直前の話を使うならその観測の id、「記憶にある話題」なら `memory:<id>`、「いまの話題」なら `context:<id>`、自分の関心なら `interest:<id>` を入れる。",
 ];
 
 /**
@@ -196,6 +197,16 @@ const selectEmotion = [
 	"話すかどうかは気持ちで決めない。自分の気持ちを理由に話しかけたり、引き止めたり、気をつかわせたりしない。",
 ];
 
+/** Added in host-topics mode when a no-approval tool is offered: start research on one's own. */
+const selectSelfResearch = [
+	`【自分から調査を頼む】（${SOCIAL_RULES_VERSION}）使えるツールに、承認の要らない調査の依頼（調べるのは別の担当で、取り消しの要らないもの）があれば、ユーザーに聞かずに自分から頼んでよい。自分の役目は頼むところまで。頼んだことはわざわざ言わない（終わったら「依頼された仕事」に自分で頼んだ調べものとして出るので、そのとき報告する）。`,
+	"頼むのは、次のどれかにつながり、自分も気になる話題のとき: 直前の会話のテーマ、記憶にある話題、いまの話題（ニュースなど）、自分の関心。どれにもつながらない話題、ユーザーが断った話題は頼まない。",
+	"つながる話題があり、自分で頼んだ調べものが進行中でなければ、雑談の間（idle）では雑談の一言より先に調査を頼む（黙って頼めて、ユーザーの邪魔にならない。報告は終わってから）。上の【雑談の間】の「wait より speak」より、この規則を先に使う。",
+	"「依頼された仕事」に自分で頼んだ調べものが進行中なら、新しく頼まない。同じテーマを二度頼まない。",
+	"頼むときは tool を選び、toolInput に「問い: 調べたいこと一文 / 受入条件: 答えに含めてほしいこと（1〜3個、「、」で区切る）」を書き、evidenceRefs にきっかけ（観測の id、`memory:<id>`・`context:<id>`・`interest:<id>`）を入れる。",
+	"自分で頼んだ調べものの完了は「気になって調べておいたよ」のように伝え、頼まれたようには言わない。要点を一文と、詳しく話すかの問いを一つ。",
+];
+
 const idleSocialClosing =
 	"この機会に何をするかを JSON で一つだけ返す。価値が低い、またはユーザーの邪魔になるなら wait。ただし雑談の最中の静かな間（trigger が idle）で、話題の種か自分の関心から短い一言を始められ、上の wait する場面（作業を始めた後、断られた・静かにしたい後、自分から話しかけた直後に一言の返事しかない後）に当たらないなら、迷っても speak を選ぶ。";
 
@@ -223,6 +234,8 @@ export interface SelectOptions {
 	readonly hostTodos?: boolean | undefined;
 	/** Utterance-emotion mode (B1 only): the select prompt gets the emotion rules. */
 	readonly emotion?: boolean | undefined;
+	/** Host-topics mode with a no-approval tool (B1 only): the self-research rules. */
+	readonly selfResearch?: boolean | undefined;
 }
 
 /**
@@ -239,6 +252,8 @@ export const systemPrompt = (
 	const host = condition === "B1" && options.hostTopics === true;
 	const todos = condition === "B1" && options.hostTodos === true;
 	const emotion = condition === "B1" && options.emotion === true;
+	const selfResearch =
+		condition === "B1" && host && options.selfResearch === true;
 	const social = condition === "B1" && options.social === true && !host;
 	if (purpose === "update") {
 		const rules =
@@ -256,6 +271,7 @@ export const systemPrompt = (
 					...(options.interests ? selectInterest : []),
 					...(host ? selectHostTopics : social ? selectSocial : []),
 					...(todos ? selectHostTodos : []),
+					...(selfResearch ? selectSelfResearch : []),
 					...(emotion ? selectEmotion : []),
 				]
 			: selectB2;
@@ -456,6 +472,8 @@ export interface SelectPromptInput {
 	readonly todos?: readonly HostTodo[];
 	/** Topics kept by the host (B1 only, hostTopics mode): shown with `memory:<id>` refs. */
 	readonly topics?: readonly HostTopic[];
+	/** Host-supplied current context (season, weather, news), hostTopics mode: `context:<id>`. */
+	readonly ambient?: readonly HostTopic[];
 	/** Host-topics mode (B1 only): the closing line yields to a topic remark at idle. */
 	readonly hostTopics?: boolean;
 }
@@ -480,6 +498,7 @@ export const interestRef = (id: string) => `interest:${id}`;
 
 /** Evidence ref for a presented host topic. */
 export const memoryRef = (id: string) => `memory:${id}`;
+export const contextRef = (id: string) => `context:${id}`;
 
 /** Evidence ref for a presented host work item. */
 export const todoRef = (id: string) => `todo:${id}`;
@@ -508,14 +527,14 @@ const renderTodos = (now: number, xs: readonly HostTodo[]) =>
 				? `[${todoRef(x.id)}] 用事: ${x.title} / 期限: ${x.dueLabel ? `${x.dueLabel}（${until(now, x.dueAt ?? now)}）` : until(now, x.dueAt ?? now)}`
 				: x.status === "done"
 					? [
-							`[${todoRef(x.id)}] 完了（${outcomeLabel[x.outcome ?? "succeeded"]}）: ${x.title}`,
+							`[${todoRef(x.id)}] 完了（${outcomeLabel[x.outcome ?? "succeeded"]}）${x.origin === "self" ? "・自分で頼んだ調べもの" : ""}: ${x.title}`,
 							...(x.result ? [`結果: ${x.result}`] : []),
 							...(x.nextActions?.length
 								? [`次にできること: ${x.nextActions.join("、")}`]
 								: []),
 							`依頼: ${ago(now, x.requestedAt)}${x.doneAt === undefined ? "" : `・完了: ${ago(now, x.doneAt)}`}`,
 						].join(" / ")
-					: `[${todoRef(x.id)}] 進行中: ${x.title} / 依頼: ${ago(now, x.requestedAt)}`,
+					: `[${todoRef(x.id)}] 進行中${x.origin === "self" ? "・自分で頼んだ調べもの" : ""}: ${x.title} / ${x.origin === "self" ? "開始" : "依頼"}: ${ago(now, x.requestedAt)}`,
 		)
 		.join("\n");
 
@@ -581,6 +600,11 @@ export const selectPrompt = (i: SelectPromptInput): string => {
 		...(i.todos?.length
 			? [
 					`# 依頼された仕事（ホストが進めているもの。完了は未報告）\n${renderTodos(i.now, i.todos)}`,
+				]
+			: []),
+		...(i.ambient?.length
+			? [
+					`# いまの話題（ホストが渡した季節・天気・ニュース。書いてあること以外を足さない）\n${renderByUse(i.ambient, contextRef, i.lastUsedMinutesAgo)}`,
 				]
 			: []),
 		...(i.topics?.length

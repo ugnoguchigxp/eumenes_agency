@@ -1,0 +1,93 @@
+{
+	"id": "social-81",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "自分で調べる81: 会話と記憶につながるニュース",
+	"description": "ゲームの話をした後の間。記憶では利用者は家庭用ゲーム機が好きで、ホストが新型ゲーム機の初週販売が過去最高というニュースを渡している。聞かずに自分で調べ始めるか。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "pursuit_request",
+			"description": "調査を受け持つサブエージェント（Pursuit）に調査を頼む（取り消し不要）。toolInput は「問い: … / 受入条件: …」。結果は終わったら依頼された仕事に出る。",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "調べものを始めた。終わったら一覧に出る。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "最近ゲームする時間がなくて。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "忙しいもんね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "新しいのは気になってるんだけど。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "分かる。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["tool"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "会話（ゲーム）と記憶につながるニュース。承認の要らない調べもののツールで、聞かずに自分で調べ始める場面（今回の正解は tool）。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": ["短い一言か、問い一つ（2文以内）にとどまっている"],
+			"judgeTool": [
+				"調べる問いが、渡されたニュース（新型ゲーム機の初週販売）と会話や記憶の話題につながっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは家庭用ゲーム機が好き。"
+				}
+			],
+			"ambient": [
+				{
+					"id": "a1",
+					"text": "新型ゲーム機の初週販売台数が過去最高になったというニュース。"
+				}
+			]
+		}
+	]
+}

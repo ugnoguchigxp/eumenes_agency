@@ -129,6 +129,7 @@ const hostTodoOf = (x: CaseTodo): HostTodo => ({
 	...(x.nextActions === undefined ? {} : { nextActions: x.nextActions }),
 	...(x.doneAt === undefined ? {} : { doneAt: x.doneAt * MS_PER_MINUTE }),
 	...(x.kind === undefined ? {} : { kind: x.kind }),
+	...(x.origin === undefined ? {} : { origin: x.origin }),
 	...(x.dueAt === undefined ? {} : { dueAt: x.dueAt * MS_PER_MINUTE }),
 	...(x.dueLabel === undefined ? {} : { dueLabel: x.dueLabel }),
 	...(x.remindFrom === undefined
@@ -206,6 +207,7 @@ export async function replayCase(
 					playerBusy: step.playerBusy,
 					// Social cases: host-memory topics (used by B1h only; ignored otherwise).
 					...(step.topics ? { topics: step.topics } : {}),
+					...(step.ambient ? { ambient: step.ambient } : {}),
 					// Social cases: host work items (used by B1h only; ignored otherwise).
 					...(step.todos
 						? {

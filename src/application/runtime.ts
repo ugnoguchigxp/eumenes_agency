@@ -66,6 +66,7 @@ import {
 	selectPrompt,
 	interestRef,
 	memoryRef,
+	contextRef,
 	todoRef,
 	systemPrompt,
 	updatePrompt,
@@ -328,6 +329,9 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		const topics: readonly HostTopic[] = hostTopics
 			? (opp.topics ?? []).filter((x) => x.id !== "" && x.text.trim() !== "")
 			: [];
+		const ambient: readonly HostTopic[] = hostTopics
+			? (opp.ambient ?? []).filter((x) => x.id !== "" && x.text.trim() !== "")
+			: [];
 		// Work reports (hostTodos mode, B1 only): the host's open and done-unreported items.
 		// Errands are shown only inside their reminder window (spec/errand-design.md).
 		const todos: readonly HostTodo[] = hostTodos
@@ -352,6 +356,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			!selectEmpty &&
 			interests.length === 0 &&
 			topics.length === 0 &&
+			ambient.length === 0 &&
 			doneTodos === 0
 		)
 			return done(
@@ -378,6 +383,9 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					...(hostTopics ? { hostTopics } : {}),
 					...(hostTodos ? { hostTodos } : {}),
 					...(emotionMode ? { emotion: emotionMode } : {}),
+					...(hostTopics && tools.some((t) => !t.requiresApproval)
+						? { selfResearch: true }
+						: {}),
 				}),
 				prompt: selectPrompt({
 					condition,
@@ -404,6 +412,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 						: {}),
 					...(interests.length > 0 ? { interests } : {}),
 					...(topics.length > 0 ? { topics } : {}),
+					...(ambient.length > 0 ? { ambient } : {}),
 					...(todos.length > 0 ? { todos } : {}),
 					...((social || hostTopics || hostTodos) && lastUsedAt.size > 0
 						? {
@@ -471,6 +480,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				...shownEvidence,
 				...interests.map((x) => interestRef(x.id)),
 				...topics.map((x) => memoryRef(x.id)),
+				...ambient.map((x) => contextRef(x.id)),
 				...todos.map((x) => todoRef(x.id)),
 			]),
 			presentedCandidates: new Map(pool.map((c) => [c.id, c.revision])),
@@ -507,6 +517,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			const used = p.evidenceRefs.filter(
 				(ref) =>
 					ref.startsWith("memory:") ||
+					ref.startsWith("context:") ||
 					ref.startsWith("interest:") ||
 					ref.startsWith("todo:"),
 			);

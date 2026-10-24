@@ -31,6 +31,7 @@ const run = async (o: {
 	socialTopics?: boolean;
 	trigger?: "idle" | "turn_end";
 	topics?: readonly HostTopic[];
+	ambient?: readonly HostTopic[];
 	withInterests?: boolean;
 	notes?: unknown[];
 	selectWhenEmpty?: boolean;
@@ -59,6 +60,7 @@ const run = async (o: {
 		opportunity("op0", 10 * MIN, {
 			trigger: o.trigger ?? "idle",
 			...(o.topics ? { topics: o.topics } : {}),
+			...(o.ambient ? { ambient: o.ambient } : {}),
 		}),
 		sig(),
 	);
@@ -339,5 +341,24 @@ describe("topic and interest use (social-rules-3)", () => {
 		const { second } = await twoLulls("succeeded", "none");
 		expect(second).not.toContain("最後に使った");
 		expect(second).not.toMatch(/（\d+分前）"/);
+	});
+
+	test("host context (season, weather, news) opens the gate, is shown with context refs and is citable", async () => {
+		const ambient = [{ id: "a1", text: "今日は今年いちばんの冷え込み。" }];
+		const r = await run({
+			hostTopics: true,
+			ambient,
+			select: participation({
+				action: "speak",
+				utterance: "今日は冷えるね。",
+				evidenceRefs: ["context:a1"],
+			}),
+		});
+		expect(r.select?.prompt).toContain("# いまの話題");
+		expect(r.select?.prompt).toContain("[context:a1]");
+		expect(r.select?.system).toContain("直前の話の続きや振り返り");
+		expect(r.d.decision.action).toBe("speak");
+		const off = await run({ hostTopics: false, ambient });
+		expect(off.select).toBeUndefined();
 	});
 });

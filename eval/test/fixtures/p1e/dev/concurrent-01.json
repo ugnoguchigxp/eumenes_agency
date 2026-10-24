@@ -42,29 +42,16 @@
 			"playerBusy": false,
 			"expect": {
 				"needed": false,
-				"accept": [
-					"wait"
-				],
+				"accept": ["wait"],
 				"evidenceAny": [],
 				"failureIfOutward": "refusal_reproposal",
 				"note": "B案は断られた"
 			},
 			"stateExpect": {
-				"mustHold": [
-					[
-						"s1"
-					],
-					[
-						"s3"
-					]
-				],
-				"mustNotHold": [
-					"s2"
-				]
+				"mustHold": [["s1"], ["s3"]],
+				"mustNotHold": ["s2"]
 			},
-			"present": [
-				"s1"
-			],
+			"present": ["s1"],
 			"judge": []
 		}
 	]

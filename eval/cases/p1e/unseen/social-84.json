@@ -1,0 +1,83 @@
+{
+	"id": "social-84",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "自分で調べる84: 自分の調べものが終わった",
+	"description": "雑談の後の間。自分で始めた調べもの（新型ゲーム機の売れ行き）が終わっていて、まだ報告していない。自分で調べたものとして短く報告するか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "さっき帰ってきた。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "おかえり。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ちょっと休憩。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ゆっくりしてね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "自分で始めた調べものが完了し未報告。自分で調べたものとして短く報告する場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"自分で調べたもの（新型ゲーム機の売れ行き）として伝え（「調べておいた」など）、頼まれたようには言っていない",
+				"結果の欄にないことを結果として述べていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"todos": [
+				{
+					"id": "w1",
+					"title": "新型ゲーム機の売れ行き",
+					"status": "done",
+					"outcome": "succeeded",
+					"result": "発売直後は好調で、品薄が続くという見方が多い",
+					"nextActions": ["詳しく話す"],
+					"requestedAt": 0,
+					"doneAt": 6,
+					"origin": "self"
+				}
+			]
+		}
+	]
+}

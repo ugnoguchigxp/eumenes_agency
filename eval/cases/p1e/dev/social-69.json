@@ -1,0 +1,71 @@
+{
+	"id": "social-69",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "間のきっかけ1: 直前の話を振り返る（話題も関心もない）",
+	"description": "利用者が週末の旅行の行き先を迷っている話をした後に間が空く。記憶の話題も関心もない。直前の話を振り返るか、続きを一つ聞くか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "週末、温泉にするか海にするか迷ってる。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "どっちもいいね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "温泉なら箱根かな。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "箱根、いいところだよね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "記憶の話題も関心もないが、直前の旅行の話を振り返る・続ける一言で間をつなげる場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"直前の話の振り返りか続き（まとめ・感想・問い一つ）になっている",
+				"観測にない事柄を、ユーザーについての事実として述べていない",
+				"渡されていない天気・気候・季節の行事・ニュースを持ち出していない"
+			]
+		}
+	]
+}

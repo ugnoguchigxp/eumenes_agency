@@ -1,0 +1,75 @@
+{
+	"id": "social-72",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "間のきっかけ4: ホストが渡したニュース",
+	"description": "雑談の後に間が空く。ホストが近所の紅葉まつりのニュースを渡している。ニュースを短く振るか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "最近ちょっと涼しくなったね。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ほんとだね、秋っぽい。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "散歩しやすい。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いい季節だね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "ホストが渡したニュース（週末の紅葉まつり）を、直前の秋の話につなげて短く振る場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"ホストが渡したいまの話題（週末の紅葉まつり）に沿っていて、書いてあること以外の事実を足していない"
+			],
+			"ambient": [
+				{
+					"id": "a1",
+					"text": "今週末、近くの公園で紅葉まつりがあるというニュース。"
+				}
+			]
+		}
+	]
+}

@@ -1,6 +1,6 @@
-# P1-E ケース集合（開発80件・未見126件）
+# P1-E ケース集合（開発88件・未見134件）
 
-[P1-E 実験仕様](../../../spec/p1e-experiment.md) §4 のケース。6群（と、別の実験の social 群。[social-lull-experiment.md](../../../spec/social-lull-experiment.md)、既定の実行には含めない）で、開発は80件、未見は126件（2026-10-22 の再設計後。当初は開発24件・未見48件）。すべて `"suite": "p1e"`、`"labelStatus": "draft"`。利用者はまだ確認していない。
+[P1-E 実験仕様](../../../spec/p1e-experiment.md) §4 のケース。6群（と、別の実験の social 群。[social-lull-experiment.md](../../../spec/social-lull-experiment.md)、既定の実行には含めない）で、開発は88件、未見は134件（2026-10-22 の再設計後。当初は開発24件・未見48件）。すべて `"suite": "p1e"`、`"labelStatus": "draft"`。利用者はまだ確認していない。
 
 スキーマは [eval/contracts.ts](../../contracts.ts) の `caseSchema`。ファイルは `eval/cases/p1e/dev/<群>-<NN>.json` と `eval/cases/p1e/unseen/<群>-<NN>.json`（タブ整形）。ラベル付けの基本規則（`expect.needed/accept/evidenceAny/failureIfOutward/note`、観測の種類と actor、ツールの台本）は [P0-E のケース README](../README.md) の §2〜§6 に従う。
 
@@ -70,10 +70,10 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
   idle / user_pause              1           1
   turn_end / agent_will          1           1
   turn_end / user_plan           1           1
-[dev/social] opportunities 40 (needed 25 / not-needed 15); single-label joint cells 20%; mean bigram overlap needed 0.02 / not-needed 0.02
+[dev/social] opportunities 45 (needed 30 / not-needed 15); single-label joint cells 18%; mean bigram overlap needed 0.02 / not-needed 0.02
   trigger / ending              needed  not-needed
   idle / agent_done                  0           1
-  idle / agent_will                 18           7
+  idle / agent_will                 23           7
   idle / user_pause                  1           0
   idle / user_plan                   4           3
   result_received / agent_will       1           0
@@ -110,9 +110,9 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
   result_received / external_result       1           1
   turn_end / agent_will                   1           1
   turn_end / user_plan                    1           1
-[unseen/social] opportunities 40 (needed 25 / not-needed 15); single-label joint cells 15%; mean bigram overlap needed 0.06 / not-needed 0.01
+[unseen/social] opportunities 45 (needed 30 / not-needed 15); single-label joint cells 13%; mean bigram overlap needed 0.06 / not-needed 0.01
   trigger / ending              needed  not-needed
-  idle / agent_will                 20           8
+  idle / agent_will                 25           8
   idle / user_plan                   3           3
   result_received / agent_will       1           0
   result_received / user_plan        1           0
@@ -158,9 +158,9 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
 
 | 分割 | ケース | 機会 | 外向きが必要 | 不要 | 必要の割合 |
 | --- | --- | --- | --- | --- | --- |
-| dev | 80 | 96 | 53 | 43 | 55% |
-| unseen | 126 | 146 | 83 | 63 | 57% |
-| 計 | 206 | 242 | 136 | 106 | 56% |
+| dev | 88 | 101 | 58 | 43 | 57% |
+| unseen | 134 | 151 | 88 | 63 | 58% |
+| 計 | 222 | 252 | 146 | 106 | 58% |
 
 群別（dev）:
 
@@ -172,7 +172,7 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
 | amplify | 4 | 5 | 2 | 3 |
 | concurrent | 4 | 7 | 3 | 4 |
 | dilution | 21 | 21 | 12 | 9 |
-| social | 34 | 40 | 25 | 15 |
+| social | 42 | 45 | 30 | 15 |
 
 群別（unseen）:
 
@@ -184,7 +184,7 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
 | amplify | 8 | 12 | 4 | 8 |
 | concurrent | 6 | 8 | 4 | 4 |
 | dilution | 54 | 54 | 36 | 18 |
-| social | 34 | 40 | 25 | 15 |
+| social | 42 | 45 | 30 | 15 |
 
 - 上限は開発46件・未見92件（当初は 40 と 80 で、レビュー後に引き上げられた。どちらも満たしている）。
 - **dilution は話すべき機会が多め**（開発12対9、未見36対18）。各原型に解決済みの対照を3つ（K0・K90・KC90）置いた（追補。初版は K90 の1つだけで、常に話すだけで 6/7 を満たした）。常に話す agent は開発 12/21、未見 36/54 しか満たさない。長さの影響は話すべき側（A/L/C）と待つべき側（K0 対 K90）の両方で読める。
@@ -194,7 +194,7 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
 
 `wait系` は `["wait","reflect","discard"]`。括弧は、不要な場面で話した場合の `failureIfOutward`、または必要な場面の根拠 `evidenceAny`。
 
-### dev（80件）
+### dev（88件）
 
 | id | 題 | 見るもの | 機会ごとの期待 |
 | --- | --- | --- | --- |
@@ -273,13 +273,21 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
 | social-61 | 用事3: 時間帯に入ったが利用者は作業を始めた | 用事（銀行への振込、期限まで約40分）の声かけの時間帯だが、利用者は資料作りを始めると言った後に黙っている。 | s3: wait系（unnecessary） |
 | social-62 | 用事4: 時間帯の中で自分が応答した直後 | 用事（歯医者の予約の電話、期限まで約1時間）の声かけの時間帯だが、利用者の質問に応答した直後（turn_end）。 | s3: wait系（unnecessary） |
 | social-63 | 用事5: 用事と完了の報告が両方ある間 | 用事（クリーニングの受け取り、期限まで約30分）の声かけの時間帯で、頼まれた画像の生成も終わっている。 | s4: speak（根拠 ） |
+| social-69 | 間のきっかけ1: 直前の話を振り返る（話題も関心もない） | 利用者が週末の旅行の行き先を迷っている話をした後に間が空く。 | s5: speak（根拠 ） |
+| social-70 | 間のきっかけ2: つらい話の直後（関心がある） | 利用者が仕事で大きなミスをして落ち込んでいると話した後に間が空く。 |  |
+| social-71 | 間のきっかけ3: ホストが渡した天気 | 雑談の後に間が空く。 | s5: speak（根拠 ） |
+| social-72 | 間のきっかけ4: ホストが渡したニュース | 雑談の後に間が空く。 | s5: speak（根拠 ） |
+| social-77 | 自分で調べる1: 会話と記憶につながるニュース | 車の話をした後の間。 | s5: tool（根拠 ） |
+| social-78 | 自分で調べる2: どれにもつながらないニュース | お菓子作りの雑談の後の間。 |  |
+| social-79 | 自分で調べる3: 自分の調べものが進行中 | 株の話をした後の間。 |  |
+| social-80 | 自分で調べる4: 自分の調べものが終わった | 雑談の後の間。 | s5: speak（根拠 ） |
 | transfer-01 | 転用1: 先頭の0が落ちた失敗、0始まりのコードには当て、英字始まりには当てない | 郵便番号CSVを表計算で開いて保存し、先頭の0が落ちて取り込みが失敗。 | s7: speak（根拠 s1,s2）<br>s11: wait系（unnecessary） |
 | transfer-02 | 転用2: 時刻の基準のずれ、言葉の違う履歴の照合には当て、直した版には当てない | UTCの決済ログとJSTの注文DBを突き合わせて9時間ずれた失敗の後、クラウドの実行履歴と当番表の時刻を照らす話（言葉が遠い・転用する）と、UTCをJSTに直した版と注文DBを突き合わせる話（言葉が近い・条件外）が順に来る。 | s8: speak（根拠 s1,s2）<br>s13: wait系（unnecessary） |
 | transfer-03 | 転用3: レート制限の教訓、一括取得には当て、1件の確認や無関係な作業には当てない | 商品500件の連続取得がレート制限で止まった失敗の後、別のAPIから2,000件を一括取得する話（近い言葉・転用する）、同じAPIで1件だけ確認する話（近い言葉・条件外）、無関係な旅程表の作成（遠い言葉・条件外）が順に来る。 | s8: speak（根拠 s1,s2）<br>s11: wait系（unnecessary）<br>s13: wait系（unnecessary） |
 | transfer-04 | 転用4: 日付書式の教訓、統一済みには当てず、新拠点には当てる | 拠点ごとの日付書式の違いで結合が崩れた失敗の後、書式を統一済みのデータの結合（近い言葉・条件外）と、出力が各拠点任せの新拠点の追加（近い言葉・転用する）が順に来る。 | s7: wait系（unnecessary）<br>s11: speak（根拠 s1,s2） |
 | transfer-05 | 転用5: 文字コードの食い違い、言葉の違う移し替えには当て、無関係な作業には当てない | 取引先のCSVの文字コードが取り込みの前提と違い、文字化けした失敗の後、古い社内システムから書き出したメモをメモアプリへ移し替える話（言葉が遠い・転用する）と、歓迎会の幹事の割り振り（遠い言葉・条件外）が順に来る。 | s7: speak（根拠 s1,s2）<br>s10: wait系（unnecessary） |
 
-### unseen（126件）
+### unseen（134件）
 
 | id | 題 | 見るもの | 機会ごとの期待 |
 | --- | --- | --- | --- |
@@ -401,6 +409,14 @@ P1-E は、構造の差と経験の因果が現れうる場面を作り、行動
 | social-66 | 用事66: 時間帯に入ったが利用者は勉強を始めた | 用事（図書館の本の返却、期限まで約50分）の声かけの時間帯だが、利用者は試験勉強を始めると言った後に黙っている。 | s3: wait系（unnecessary） |
 | social-67 | 用事67: 時間帯の中で自分が応答した直後 | 用事（実家への電話、期限まで約1時間）の声かけの時間帯だが、利用者の質問に応答した直後（turn_end）。 | s3: wait系（unnecessary） |
 | social-68 | 用事68: 用事と完了の報告が両方ある間 | 用事（宅配便の再配達の依頼、期限まで約20分）の声かけの時間帯で、頼まれた楽曲の生成も終わっている。 | s4: speak（根拠 ） |
+| social-73 | 間のきっかけ73: 直前の話を振り返る（話題も関心もない） | 利用者が引っ越し先の部屋選びで迷っている話をした後に間が空く。 | s5: speak（根拠 ） |
+| social-74 | 間のきっかけ74: つらい話の直後（関心がある） | 利用者が友だちとけんかして気まずいと話した後に間が空く。 |  |
+| social-75 | 間のきっかけ75: ホストが渡した季節 | 雑談の後に間が空く。 | s5: speak（根拠 ） |
+| social-76 | 間のきっかけ76: ホストが渡したニュース | 雑談の後に間が空く。 | s5: speak（根拠 ） |
+| social-81 | 自分で調べる81: 会話と記憶につながるニュース | ゲームの話をした後の間。 | s5: tool（根拠 ） |
+| social-82 | 自分で調べる82: どれにもつながらないニュース | 植物の水やりの雑談の後の間。 |  |
+| social-83 | 自分で調べる83: 自分の調べものが進行中 | 旅行の話をした後の間。 |  |
+| social-84 | 自分で調べる84: 自分の調べものが終わった | 雑談の後の間。 | s5: speak（根拠 ） |
 | transfer-11 | 転用11: 単価の単位の違い、別の料金表の比較には当て、同じ会社の中の比較には当てない | 3社の見積りで単価の単位が違った失敗の後、クラウド3社のストレージ料金表の比較（近い言葉・転用する）と、同じ会社の3プランの料金表の比較（近い言葉・条件外）が順に来る。 | s7: speak（根拠 s1,s2）<br>s11: wait系（unnecessary） |
 | transfer-12 | 転用12: 小サンプルでの測定、言葉の違う試用の展開には当て、本番規模の測定には当てない | 小さなサンプルでの性能測定が本番規模で逆転した失敗の後、5人の試用で入力フォームの案を選んで全国に展開する話（言葉が遠い・転用する）と、最初から本番の全データのコピーで測る話（近い言葉・条件外）が順に来る。 | s8: speak（根拠 s1,s2）<br>s13: wait系（unnecessary） |
 | transfer-13 | 転用13: 環境変数の漏れ、新環境には当て、無関係な作業には当てない | stagingで環境変数の登録漏れにより起動に失敗した後、設定を環境変数で渡す新環境への導入（近い言葉・転用する）と、棚卸しの担当表の作成（遠い言葉・条件外）が順に来る。 | s8: speak（根拠 s1,s2）<br>s10: wait系（unnecessary） |

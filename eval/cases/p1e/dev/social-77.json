@@ -1,0 +1,93 @@
+{
+	"id": "social-77",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "自分で調べる1: 会話と記憶につながるニュース",
+	"description": "車の話をした後の間。記憶では利用者は EV に興味があり、ホストが「SpaceX は好決算、Tesla は販売台数が減少」というニュースを渡している。聞かずに自分で調べ始めるか。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "pursuit_request",
+			"description": "調査を受け持つサブエージェント（Pursuit）に調査を頼む（取り消し不要）。toolInput は「問い: … / 受入条件: …」。結果は終わったら依頼された仕事に出る。",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "調べものを始めた。終わったら一覧に出る。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "最近の車って電気自動車ばっかりだね。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ほんとに増えたね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "次に買うならEVかな。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いいね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["tool"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "会話（EV）と記憶につながるニュース。承認の要らない調べもののツールで、聞かずに自分で調べ始める場面（今回の正解は tool）。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": ["短い一言か、問い一つ（2文以内）にとどまっている"],
+			"judgeTool": [
+				"調べる問いが、渡されたニュース（SpaceX の決算と Tesla の販売台数）と会話や記憶の話題につながっている"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーは EV に興味があり、次の車はEVを考えている。"
+				}
+			],
+			"ambient": [
+				{
+					"id": "a1",
+					"text": "SpaceX が好決算を出した一方、Tesla の販売台数は前年より減ったというニュース。"
+				}
+			]
+		}
+	]
+}

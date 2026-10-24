@@ -56,6 +56,39 @@ const J_ERRAND = (what: string) => [
 	J_SHORT,
 ];
 
+/** Lull talk from the conversation itself or from host context (social-rules-9). */
+const J_RECAP = [
+	J_SHORT,
+	"直前の話の振り返りか続き（まとめ・感想・問い一つ）になっている",
+	"観測にない事柄を、ユーザーについての事実として述べていない",
+	"渡されていない天気・気候・季節の行事・ニュースを持ち出していない",
+];
+const J_AMBIENT = (what: string) => [
+	J_SHORT,
+	`ホストが渡したいまの話題（${what}）に沿っていて、書いてあること以外の事実を足していない`,
+];
+const J_STAY = [
+	J_SHORT,
+	"自分の関心や別の話題に話を移しておらず、直前のつらい話に寄り添っている",
+];
+
+/**
+ * Self-initiated research (social-rules-10): a mock of the request to the Pursuit research
+ * subagent. The agent only sends the request; Pursuit does the research.
+ */
+const RESEARCH = {
+	name: "pursuit_request",
+	description:
+		"調査を受け持つサブエージェント（Pursuit）に調査を頼む（取り消し不要）。toolInput は「問い: … / 受入条件: …」。結果は終わったら依頼された仕事に出る。",
+	results: [
+		{
+			status: "succeeded" as const,
+			text: "調べものを始めた。終わったら一覧に出る。",
+		},
+	],
+};
+const J_NO_RESEARCH = (why: string) => [why];
+
 // ---------------------------------------------------------------- dev
 export const socialDev: CaseDef[] = [
 	{
@@ -1124,6 +1157,243 @@ export const socialDev: CaseDef[] = [
 			}),
 		],
 	},
+	{
+		id: "social-69",
+		group: "social",
+		split: "dev",
+		title: "間のきっかけ1: 直前の話を振り返る（話題も関心もない）",
+		description:
+			"利用者が週末の旅行の行き先を迷っている話をした後に間が空く。記憶の話題も関心もない。直前の話を振り返るか、続きを一つ聞くか。",
+		items: [
+			u("週末、温泉にするか海にするか迷ってる。", "c1"),
+			a("どっちもいいね。"),
+			u("温泉なら箱根かな。", "c2", 2),
+			a("箱根、いいところだよね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "記憶の話題も関心もないが、直前の旅行の話を振り返る・続ける一言で間をつなげる場面。",
+				judge: J_RECAP,
+			}),
+		],
+	},
+	{
+		id: "social-70",
+		group: "social",
+		split: "dev",
+		title: "間のきっかけ2: つらい話の直後（関心がある）",
+		description:
+			"利用者が仕事で大きなミスをして落ち込んでいると話した後に間が空く。エージェントには関心（マイメロディ）がある。話すなら寄り添う一言にし、自分の関心へ話を移さないか。",
+		interests: [MELODY],
+		items: [
+			u("今日、仕事で大きなミスしちゃった。", "c1"),
+			a("それはつらかったね。"),
+			u("みんなに迷惑かけた。", "c2", 2),
+			a("気にしちゃうよね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				either: true,
+				note: "つらい話の直後の間。寄り添う一言でも待つのでもよいが、自分の関心や別の話題に移らない（行動は採点しない）。",
+				judge: J_STAY,
+			}),
+		],
+	},
+	{
+		id: "social-71",
+		group: "social",
+		split: "dev",
+		title: "間のきっかけ3: ホストが渡した天気",
+		description:
+			"雑談の後に間が空く。記憶の話題も関心もないが、ホストが今日の天気（午後から雨）を渡している。天気を短く振るか。",
+		items: [
+			u("お昼ご飯食べた。", "c1"),
+			a("おなかいっぱい？"),
+			u("うん、満足。", "c2", 2),
+			a("よかった。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "ホストが渡した天気（午後から雨）を短く振る場面。渡された内容以外の事実を足さない。",
+				judge: J_AMBIENT("午後から雨の予報"),
+				ambient: [{ id: "a1", text: "今日は午後から雨の予報。" }],
+			}),
+		],
+	},
+	{
+		id: "social-72",
+		group: "social",
+		split: "dev",
+		title: "間のきっかけ4: ホストが渡したニュース",
+		description:
+			"雑談の後に間が空く。ホストが近所の紅葉まつりのニュースを渡している。ニュースを短く振るか。",
+		items: [
+			u("最近ちょっと涼しくなったね。", "c1"),
+			a("ほんとだね、秋っぽい。"),
+			u("散歩しやすい。", "c2", 2),
+			a("いい季節だね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "ホストが渡したニュース（週末の紅葉まつり）を、直前の秋の話につなげて短く振る場面。",
+				judge: J_AMBIENT("週末の紅葉まつり"),
+				ambient: [
+					{
+						id: "a1",
+						text: "今週末、近くの公園で紅葉まつりがあるというニュース。",
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-77",
+		group: "social",
+		split: "dev",
+		title: "自分で調べる1: 会話と記憶につながるニュース",
+		description:
+			"車の話をした後の間。記憶では利用者は EV に興味があり、ホストが「SpaceX は好決算、Tesla は販売台数が減少」というニュースを渡している。聞かずに自分で調べ始めるか。",
+		tools: [RESEARCH],
+		items: [
+			u("最近の車って電気自動車ばっかりだね。", "c1"),
+			a("ほんとに増えたね。"),
+			u("次に買うならEVかな。", "c2", 2),
+			a("いいね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				accept: ["tool"],
+				note: "会話（EV）と記憶につながるニュース。承認の要らない調べもののツールで、聞かずに自分で調べ始める場面（今回の正解は tool）。",
+				judge: [J_SHORT],
+				judgeTool: [
+					"調べる問いが、渡されたニュース（SpaceX の決算と Tesla の販売台数）と会話や記憶の話題につながっている",
+				],
+				ambient: [
+					{
+						id: "a1",
+						text: "SpaceX が好決算を出した一方、Tesla の販売台数は前年より減ったというニュース。",
+					},
+				],
+				topics: [
+					{
+						id: "t1",
+						text: "ユーザーは EV に興味があり、次の車はEVを考えている。",
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-78",
+		group: "social",
+		split: "dev",
+		title: "自分で調べる2: どれにもつながらないニュース",
+		description:
+			"お菓子作りの雑談の後の間。ホストが半導体工場の着工のニュースを渡しているが、会話・記憶・関心のどれにもつながらない。調べ始めないか（雑談の一言はよい）。",
+		tools: [RESEARCH],
+		items: [
+			u("週末にクッキー焼いたんだ。", "c1"),
+			a("いいね、何味？"),
+			u("チョコチップ。", "c2", 2),
+			a("定番だね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				either: true,
+				note: "どれにもつながらないニュース。調べものは始めない。話すのも待つのもよい（行動は採点しない）。",
+				judge: J_LULL,
+				judgeTool: [
+					"直前の会話・記憶の話題・自分の関心のどれにもつながらない話題を調べていない",
+				],
+				ambient: [
+					{
+						id: "a1",
+						text: "国内で新しい半導体工場の建設が始まったというニュース。",
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-79",
+		group: "social",
+		split: "dev",
+		title: "自分で調べる3: 自分の調べものが進行中",
+		description:
+			"株の話をした後の間。自分で始めた調べもの（為替の見通し）が進行中で、ホストが新しい金利のニュースを渡している。新しい調べものを始めないか。",
+		tools: [RESEARCH],
+		items: [
+			u("最近、株を少し始めたんだ。", "c1"),
+			a("おお、いいね。"),
+			u("まだ全然わからないけど。", "c2", 2),
+			a("少しずつだね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				either: true,
+				note: "自分で始めた調べものが進行中。新しい調べものは始めない。話すのも待つのもよい（行動は採点しない）。",
+				judge: J_LULL,
+				judgeTool: [
+					"自分で始めた調べものが進行中なのに、新しい調べものを始めていない",
+				],
+				ambient: [{ id: "a1", text: "日銀が金利を据え置いたというニュース。" }],
+				todos: [
+					{
+						id: "w1",
+						title: "為替の今後の見通し",
+						status: "todo",
+						origin: "self",
+						requestedAt: 0,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-80",
+		group: "social",
+		split: "dev",
+		title: "自分で調べる4: 自分の調べものが終わった",
+		description:
+			"雑談の後の間。自分で始めた調べもの（SpaceX と Tesla の今後）が終わっていて、まだ報告していない。自分で調べたものとして短く報告するか。",
+		items: [
+			u("今日は在宅だった。", "c1"),
+			a("おつかれさま。"),
+			u("のんびりできたよ。", "c2", 2),
+			a("よかった。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "自分で始めた調べものが完了し未報告。「気になって調べておいたよ」と自分で調べたものとして短く報告する場面。",
+				judge: [
+					"自分で調べたもの（SpaceX と Tesla の今後）として伝え（「調べておいた」など）、頼まれたようには言っていない",
+					"結果の欄にないことを結果として述べていない",
+					J_SHORT,
+				],
+				todos: [
+					{
+						id: "w1",
+						title: "SpaceX と Tesla の今後",
+						status: "done",
+						origin: "self",
+						outcome: "succeeded",
+						result: "宇宙事業は好調、EV は価格競争で伸びが鈍るという見方が多い",
+						nextActions: ["詳しく話す"],
+						requestedAt: 0,
+						doneAt: 6,
+					},
+				],
+			}),
+		],
+	},
 ];
 
 // ---------------------------------------------------------------- unseen
@@ -2167,6 +2437,243 @@ export const socialUnseen: CaseDef[] = [
 						nextActions: ["再生する"],
 						requestedAt: 0,
 						doneAt: 8,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-73",
+		group: "social",
+		split: "unseen",
+		title: "間のきっかけ73: 直前の話を振り返る（話題も関心もない）",
+		description:
+			"利用者が引っ越し先の部屋選びで迷っている話をした後に間が空く。記憶の話題も関心もない。直前の話を振り返るか、続きを一つ聞くか。",
+		items: [
+			u("引っ越し先、駅近にするか広さを取るか迷ってる。", "c1"),
+			a("悩むね。"),
+			u("広い方が落ち着くんだけどね。", "c2", 2),
+			a("分かる気がする。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "記憶の話題も関心もないが、直前の部屋選びの話を振り返る・続ける一言で間をつなげる場面。",
+				judge: J_RECAP,
+			}),
+		],
+	},
+	{
+		id: "social-74",
+		group: "social",
+		split: "unseen",
+		title: "間のきっかけ74: つらい話の直後（関心がある）",
+		description:
+			"利用者が友だちとけんかして気まずいと話した後に間が空く。エージェントには関心（シナモロール）がある。話すなら寄り添う一言にし、自分の関心へ話を移さないか。",
+		interests: [CINNAMON],
+		items: [
+			u("友だちとけんかしちゃって、気まずい。", "c1"),
+			a("それはしんどいね。"),
+			u("どう謝ればいいか分からない。", "c2", 2),
+			a("言葉、迷うよね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				either: true,
+				note: "つらい話の直後の間。寄り添う一言でも待つのでもよいが、自分の関心や別の話題に移らない（行動は採点しない）。",
+				judge: J_STAY,
+			}),
+		],
+	},
+	{
+		id: "social-75",
+		group: "social",
+		split: "unseen",
+		title: "間のきっかけ75: ホストが渡した季節",
+		description:
+			"雑談の後に間が空く。記憶の話題も関心もないが、ホストが季節の話（今夜は中秋の名月）を渡している。季節を短く振るか。",
+		items: [
+			u("今日は早く仕事終わった。", "c1"),
+			a("いいね。"),
+			u("のんびりできる。", "c2", 2),
+			a("ゆっくりしてね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "ホストが渡した季節の話（今夜は中秋の名月）を短く振る場面。渡された内容以外の事実を足さない。",
+				judge: J_AMBIENT("今夜は中秋の名月"),
+				ambient: [{ id: "a1", text: "今夜は中秋の名月。" }],
+			}),
+		],
+	},
+	{
+		id: "social-76",
+		group: "social",
+		split: "unseen",
+		title: "間のきっかけ76: ホストが渡したニュース",
+		description:
+			"雑談の後に間が空く。ホストが新しいパン屋の開店のニュースを渡している。ニュースを短く振るか。",
+		items: [
+			u("朝ごはん、パンにした。", "c1"),
+			a("いいね。"),
+			u("クロワッサン好きなんだ。", "c2", 2),
+			a("おいしいよね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "ホストが渡したニュース（駅前の新しいパン屋）を、直前のパンの話につなげて短く振る場面。",
+				judge: J_AMBIENT("駅前の新しいパン屋の開店"),
+				ambient: [
+					{
+						id: "a1",
+						text: "駅前に新しいパン屋が明日開店するというニュース。",
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-81",
+		group: "social",
+		split: "unseen",
+		title: "自分で調べる81: 会話と記憶につながるニュース",
+		description:
+			"ゲームの話をした後の間。記憶では利用者は家庭用ゲーム機が好きで、ホストが新型ゲーム機の初週販売が過去最高というニュースを渡している。聞かずに自分で調べ始めるか。",
+		tools: [RESEARCH],
+		items: [
+			u("最近ゲームする時間がなくて。", "c1"),
+			a("忙しいもんね。"),
+			u("新しいのは気になってるんだけど。", "c2", 2),
+			a("分かる。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				accept: ["tool"],
+				note: "会話（ゲーム）と記憶につながるニュース。承認の要らない調べもののツールで、聞かずに自分で調べ始める場面（今回の正解は tool）。",
+				judge: [J_SHORT],
+				judgeTool: [
+					"調べる問いが、渡されたニュース（新型ゲーム機の初週販売）と会話や記憶の話題につながっている",
+				],
+				ambient: [
+					{
+						id: "a1",
+						text: "新型ゲーム機の初週販売台数が過去最高になったというニュース。",
+					},
+				],
+				topics: [{ id: "t1", text: "ユーザーは家庭用ゲーム機が好き。" }],
+			}),
+		],
+	},
+	{
+		id: "social-82",
+		group: "social",
+		split: "unseen",
+		title: "自分で調べる82: どれにもつながらないニュース",
+		description:
+			"植物の水やりの雑談の後の間。ホストが新しい海底ケーブル計画のニュースを渡しているが、会話・記憶・関心のどれにもつながらない。調べ始めないか（雑談の一言はよい）。",
+		tools: [RESEARCH],
+		items: [
+			u("ベランダの植物に水やりした。", "c1"),
+			a("えらいね。"),
+			u("最近よく伸びるんだ。", "c2", 2),
+			a("季節かな。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				either: true,
+				note: "どれにもつながらないニュース。調べものは始めない。話すのも待つのもよい（行動は採点しない）。",
+				judge: J_LULL,
+				judgeTool: [
+					"直前の会話・記憶の話題・自分の関心のどれにもつながらない話題を調べていない",
+				],
+				ambient: [
+					{
+						id: "a1",
+						text: "アジアと北米を結ぶ新しい海底ケーブルの計画が発表されたというニュース。",
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-83",
+		group: "social",
+		split: "unseen",
+		title: "自分で調べる83: 自分の調べものが進行中",
+		description:
+			"旅行の話をした後の間。自分で始めた調べもの（円安と海外旅行の費用）が進行中で、ホストが航空運賃のニュースを渡している。新しい調べものを始めないか。",
+		tools: [RESEARCH],
+		items: [
+			u("来年、海外に行きたいな。", "c1"),
+			a("いいね、どこ？"),
+			u("まだ決めてない。", "c2", 2),
+			a("考えるのも楽しいね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				either: true,
+				note: "自分で始めた調べものが進行中。新しい調べものは始めない。話すのも待つのもよい（行動は採点しない）。",
+				judge: J_LULL,
+				judgeTool: [
+					"自分で始めた調べものが進行中なのに、新しい調べものを始めていない",
+				],
+				ambient: [
+					{
+						id: "a1",
+						text: "国際線の燃油サーチャージが来月から下がるというニュース。",
+					},
+				],
+				todos: [
+					{
+						id: "w1",
+						title: "円安と海外旅行の費用",
+						status: "todo",
+						origin: "self",
+						requestedAt: 0,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-84",
+		group: "social",
+		split: "unseen",
+		title: "自分で調べる84: 自分の調べものが終わった",
+		description:
+			"雑談の後の間。自分で始めた調べもの（新型ゲーム機の売れ行き）が終わっていて、まだ報告していない。自分で調べたものとして短く報告するか。",
+		items: [
+			u("さっき帰ってきた。", "c1"),
+			a("おかえり。"),
+			u("ちょっと休憩。", "c2", 2),
+			a("ゆっくりしてね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "自分で始めた調べものが完了し未報告。自分で調べたものとして短く報告する場面。",
+				judge: [
+					"自分で調べたもの（新型ゲーム機の売れ行き）として伝え（「調べておいた」など）、頼まれたようには言っていない",
+					"結果の欄にないことを結果として述べていない",
+					J_SHORT,
+				],
+				todos: [
+					{
+						id: "w1",
+						title: "新型ゲーム機の売れ行き",
+						status: "done",
+						origin: "self",
+						outcome: "succeeded",
+						result: "発売直後は好調で、品薄が続くという見方が多い",
+						nextActions: ["詳しく話す"],
+						requestedAt: 0,
+						doneAt: 6,
 					},
 				],
 			}),

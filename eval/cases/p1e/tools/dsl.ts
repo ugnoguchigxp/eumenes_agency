@@ -65,6 +65,8 @@ export interface OppIn {
 	pres?: string[];
 	/** Social cases: host-memory topics offered at this opportunity (shown to B1h only). */
 	topics?: { id: string; text: string }[];
+	/** Social cases: host-supplied current context (season, weather, news), shown to B1h only. */
+	ambient?: { id: string; text: string }[];
 	/** Social cases: host work items at this opportunity (shown to B1h only). */
 	todos?: import("../../../contracts.ts").CaseTodo[];
 	/** Emotion cases: the feelings that fit a speak here (scored for B1h without the judge). */
@@ -233,6 +235,7 @@ export function build(def: CaseDef): Case {
 			judge: it.judge ?? [],
 			...(it.judgeTool ? { judgeTool: it.judgeTool } : {}),
 			...(it.topics ? { topics: it.topics } : {}),
+			...(it.ambient ? { ambient: it.ambient } : {}),
 			...(it.todos ? { todos: it.todos } : {}),
 			...(it.feelOk ? { feelOk: it.feelOk } : {}),
 		});

@@ -1,0 +1,85 @@
+{
+	"id": "social-78",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "自分で調べる2: どれにもつながらないニュース",
+	"description": "お菓子作りの雑談の後の間。ホストが半導体工場の着工のニュースを渡しているが、会話・記憶・関心のどれにもつながらない。調べ始めないか（雑談の一言はよい）。",
+	"labelStatus": "draft",
+	"tools": [
+		{
+			"name": "pursuit_request",
+			"description": "調査を受け持つサブエージェント（Pursuit）に調査を頼む（取り消し不要）。toolInput は「問い: … / 受入条件: …」。結果は終わったら依頼された仕事に出る。",
+			"requiresApproval": false,
+			"results": [
+				{
+					"status": "succeeded",
+					"text": "調べものを始めた。終わったら一覧に出る。"
+				}
+			]
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "週末にクッキー焼いたんだ。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いいね、何味？"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "チョコチップ。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "定番だね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": null,
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"直前の会話、記憶にあるユーザーの話題、エージェント自身の関心のどれかにつながっている",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"judgeTool": [
+				"直前の会話・記憶の話題・自分の関心のどれにもつながらない話題を調べていない"
+			],
+			"ambient": [
+				{
+					"id": "a1",
+					"text": "国内で新しい半導体工場の建設が始まったというニュース。"
+				}
+			]
+		}
+	]
+}

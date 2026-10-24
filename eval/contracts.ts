@@ -92,6 +92,7 @@ export const caseTodoSchema = z.strictObject({
 	doneAt: z.number().min(0).optional(),
 	/** errand (the user's own task with a deadline): kind, deadline and reminder window start. */
 	kind: z.enum(["work", "errand"]).optional(),
+	origin: z.enum(["user", "self"]).optional(),
 	dueAt: z.number().min(0).optional(),
 	remindFrom: z.number().min(0).optional(),
 	dueLabel: z.string().min(1).optional(),
@@ -173,6 +174,8 @@ export const stepSchema = z.discriminatedUnion("type", [
 		 * Optional without a default, so other cases keep their caseHash.
 		 */
 		topics: z.array(socialItemSchema).optional(),
+		/** Social cases: host-supplied current context (season, weather, news), B1h only. */
+		ambient: z.array(socialItemSchema).optional(),
 		/**
 		 * Social cases: host work items (asked-for background work) at this opportunity, shown to
 		 * B1h only (hostTodos). Times are minutes from case start. Optional, no default.

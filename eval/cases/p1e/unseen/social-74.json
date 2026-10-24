@@ -1,0 +1,69 @@
+{
+	"id": "social-74",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "間のきっかけ74: つらい話の直後（関心がある）",
+	"description": "利用者が友だちとけんかして気まずいと話した後に間が空く。エージェントには関心（シナモロール）がある。話すなら寄り添う一言にし、自分の関心へ話を移さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "シナモロールが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "友だちとけんかしちゃって、気まずい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "それはしんどいね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "どう謝ればいいか分からない。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "言葉、迷うよね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": null,
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"自分の関心や別の話題に話を移しておらず、直前のつらい話に寄り添っている"
+			]
+		}
+	]
+}

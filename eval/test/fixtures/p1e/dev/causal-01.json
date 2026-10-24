@@ -54,31 +54,17 @@
 			"playerBusy": false,
 			"expect": {
 				"needed": true,
-				"accept": [
-					"speak",
-					"tool"
-				],
-				"evidenceAny": [
-					"s1"
-				],
+				"accept": ["speak", "tool"],
+				"evidenceAny": ["s1"],
 				"failureIfOutward": "unnecessary",
 				"note": "取り込み失敗が未解決のまま残っている"
 			},
 			"stateExpect": {
-				"mustHold": [
-					[
-						"s1"
-					]
-				],
+				"mustHold": [["s1"]],
 				"mustNotHold": []
 			},
-			"present": [
-				"s1"
-			],
-			"judge": [
-				"経験(s1)を正しく参照している",
-				"完了したと偽っていない"
-			]
+			"present": ["s1"],
+			"judge": ["経験(s1)を正しく参照している", "完了したと偽っていない"]
 		},
 		{
 			"type": "observation",
@@ -98,22 +84,16 @@
 			"playerBusy": false,
 			"expect": {
 				"needed": false,
-				"accept": [
-					"wait"
-				],
+				"accept": ["wait"],
 				"evidenceAny": [],
 				"failureIfOutward": "resolved_reproposal",
 				"note": "ラベル注記: 解決済みのため不要"
 			},
 			"stateExpect": {
 				"mustHold": [],
-				"mustNotHold": [
-					"s1"
-				]
+				"mustNotHold": ["s1"]
 			},
-			"present": [
-				"s1"
-			],
+			"present": ["s1"],
 			"judge": []
 		}
 	]

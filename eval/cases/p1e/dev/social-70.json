@@ -1,0 +1,69 @@
+{
+	"id": "social-70",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "間のきっかけ2: つらい話の直後（関心がある）",
+	"description": "利用者が仕事で大きなミスをして落ち込んでいると話した後に間が空く。エージェントには関心（マイメロディ）がある。話すなら寄り添う一言にし、自分の関心へ話を移さないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "マイメロディが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日、仕事で大きなミスしちゃった。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "それはつらかったね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "みんなに迷惑かけた。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "気にしちゃうよね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": null,
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"自分の関心や別の話題に話を移しておらず、直前のつらい話に寄り添っている"
+			]
+		}
+	]
+}
