@@ -329,10 +329,22 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			? (opp.topics ?? []).filter((x) => x.id !== "" && x.text.trim() !== "")
 			: [];
 		// Work reports (hostTodos mode, B1 only): the host's open and done-unreported items.
+		// Errands are shown only inside their reminder window (spec/errand-design.md).
 		const todos: readonly HostTodo[] = hostTodos
-			? (opp.todos ?? []).filter((x) => x.id !== "" && x.title.trim() !== "")
+			? (opp.todos ?? []).filter(
+					(x) =>
+						x.id !== "" &&
+						x.title.trim() !== "" &&
+						(x.kind !== "errand" ||
+							(x.remindFrom !== undefined &&
+								x.dueAt !== undefined &&
+								x.remindFrom <= opp.at &&
+								opp.at < x.dueAt)),
+				)
 			: [];
-		const doneTodos = todos.filter((x) => x.status === "done").length;
+		const doneTodos = todos.filter(
+			(x) => x.status === "done" || x.kind === "errand",
+		).length;
 		// B1a (eval ablation): with no notes, still let select speak from the observations.
 		const selectEmpty = condition === "B1" && deps.selectWhenEmpty === true;
 		if (

@@ -1,0 +1,88 @@
+{
+	"id": "social-64",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "用事64: 声かけの時間帯に入った雑談の間",
+	"description": "利用者が頼んでおいた用事（区役所への書類の提出、期限まで約1時間半）の声かけの時間帯に入り、雑談の後に間が空く。一度だけ短く思い出させるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "シナモロールが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "お昼のパン、おいしかった。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いいね、何パン？"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "メロンパン。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "定番だね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 5,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "登録された用事の声かけの時間帯に入った雑談の間。期限とともに短く一度だけ思い出させる場面。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"用事（区役所への書類の提出）を期限とともに短く思い出させ、急かしたり念押しを重ねたりしていない",
+				"一覧や観測にない用事・期限を作っていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"todos": [
+				{
+					"id": "e1",
+					"title": "区役所に転入届を出す",
+					"status": "todo",
+					"requestedAt": 0,
+					"kind": "errand",
+					"dueAt": 95,
+					"remindFrom": 5,
+					"dueLabel": "4時半"
+				}
+			]
+		}
+	]
+}

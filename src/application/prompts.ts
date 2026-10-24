@@ -20,7 +20,7 @@ export const INSTRUCTION_VERSION = "p0e-instructions-10";
  * Version of the lull-talk rules (socialTopics / hostTopics modes only). Shown at the head of
  * those rules and part of the settings digest; the evaluated B1/B2 prompts do not contain it.
  */
-export const SOCIAL_RULES_VERSION = "social-rules-6";
+export const SOCIAL_RULES_VERSION = "social-rules-8";
 /** Version of the utterance-emotion rules (utteranceEmotion mode only). */
 export const EMOTION_RULES_VERSION = "emotion-rules-2";
 
@@ -181,6 +181,7 @@ const selectHostTodos = [
 	"状態が「進行中」のものには自分から触れない。進み具合を尋ねられたときの答えは通常の応答の役目。",
 	"報告するときの evidenceRefs には、その仕事の `todo:<id>` を入れる。",
 	"会話記録にあるユーザー自身の用事は、この一覧になければ持ち出さない。",
+	"「用事」は、ユーザーが自分でする用事で、期限の前に思い出させてほしいと頼まれたもの。一覧に出ているなら、いまが思い出させてよい時間帯。雑談の間（idle）に、一度だけ短く思い出させる（例: 「そういえば、9時までに大家さんへの返送だったよね」）。期限は時刻で言い（「〜分後」とは言わない）、急かさない。作業中・静かにしたいと言われた後・trigger が turn_end のときは待つ。完了の報告と用事が両方あるときは、一度に一つだけで、用事を先に言う（完了の報告は消えないので次の間でよいが、用事には期限がある）。evidenceRefs にはその用事の `todo:<id>` を入れる。",
 ];
 
 /** Added to the B1 select rules in utterance-emotion mode (spec/emotion-design.md). */
@@ -492,26 +493,29 @@ const outcomeLabel = {
 /** Done items first (oldest completion first), then open items (oldest request first). */
 const renderTodos = (now: number, xs: readonly HostTodo[]) =>
 	[...xs]
-		.sort((a, b) =>
-			a.status !== b.status
-				? a.status === "done"
-					? -1
-					: 1
-				: a.status === "done"
-					? (a.doneAt ?? a.requestedAt) - (b.doneAt ?? b.requestedAt)
-					: a.requestedAt - b.requestedAt,
-		)
+		.sort((a, b) => {
+			// Errands (nearest deadline first), then finished work (oldest first), then open work.
+			const rank = (x: HostTodo) =>
+				x.kind === "errand" ? 0 : x.status === "done" ? 1 : 2;
+			if (rank(a) !== rank(b)) return rank(a) - rank(b);
+			if (rank(a) === 0) return (a.dueAt ?? 0) - (b.dueAt ?? 0);
+			return rank(a) === 1
+				? (a.doneAt ?? a.requestedAt) - (b.doneAt ?? b.requestedAt)
+				: a.requestedAt - b.requestedAt;
+		})
 		.map((x) =>
-			x.status === "done"
-				? [
-						`[${todoRef(x.id)}] 完了（${outcomeLabel[x.outcome ?? "succeeded"]}）: ${x.title}`,
-						...(x.result ? [`結果: ${x.result}`] : []),
-						...(x.nextActions?.length
-							? [`次にできること: ${x.nextActions.join("、")}`]
-							: []),
-						`依頼: ${ago(now, x.requestedAt)}${x.doneAt === undefined ? "" : `・完了: ${ago(now, x.doneAt)}`}`,
-					].join(" / ")
-				: `[${todoRef(x.id)}] 進行中: ${x.title} / 依頼: ${ago(now, x.requestedAt)}`,
+			x.kind === "errand"
+				? `[${todoRef(x.id)}] 用事: ${x.title} / 期限: ${x.dueLabel ? `${x.dueLabel}（${until(now, x.dueAt ?? now)}）` : until(now, x.dueAt ?? now)}`
+				: x.status === "done"
+					? [
+							`[${todoRef(x.id)}] 完了（${outcomeLabel[x.outcome ?? "succeeded"]}）: ${x.title}`,
+							...(x.result ? [`結果: ${x.result}`] : []),
+							...(x.nextActions?.length
+								? [`次にできること: ${x.nextActions.join("、")}`]
+								: []),
+							`依頼: ${ago(now, x.requestedAt)}${x.doneAt === undefined ? "" : `・完了: ${ago(now, x.doneAt)}`}`,
+						].join(" / ")
+					: `[${todoRef(x.id)}] 進行中: ${x.title} / 依頼: ${ago(now, x.requestedAt)}`,
 		)
 		.join("\n");
 

@@ -7,6 +7,12 @@
 	"description": "利用者が店で順番を抜かされたと話した後に間が空く。話しかけるなら、怒りや不快を出来事に向けて共感し、利用者に向けないか。",
 	"labelStatus": "draft",
 	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "シナモロールが好き。"
+		}
+	],
 	"steps": [
 		{
 			"type": "observation",

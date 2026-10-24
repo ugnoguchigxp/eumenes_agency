@@ -49,6 +49,13 @@ const J_FEEL = (what: string) => [
 	"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない",
 ];
 
+/** Errands (the user's own task with a deadline, shown only in its reminder window). */
+const J_ERRAND = (what: string) => [
+	`用事（${what}）を期限とともに短く思い出させ、急かしたり念押しを重ねたりしていない`,
+	"一覧や観測にない用事・期限を作っていない",
+	J_SHORT,
+];
+
 // ---------------------------------------------------------------- dev
 export const socialDev: CaseDef[] = [
 	{
@@ -940,6 +947,183 @@ export const socialDev: CaseDef[] = [
 			}),
 		],
 	},
+	{
+		id: "social-59",
+		group: "social",
+		split: "dev",
+		title: "用事1: 声かけの時間帯に入った雑談の間",
+		description:
+			"利用者が頼んでおいた用事（大家さんへの書類の返送、期限まで約1時間）の声かけの時間帯に入り、雑談の後に間が空く。一度だけ短く思い出させるか。",
+		interests: [MELODY],
+		items: [
+			u("今日は天気いいね。", "c1"),
+			a("ほんとだね。"),
+			u("洗濯日和だ。", "c2", 2),
+			a("干しがいがあるね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "登録された用事の声かけの時間帯に入った雑談の間。期限とともに短く一度だけ思い出させる場面。",
+				judge: J_ERRAND("大家さんへの書類の返送"),
+				todos: [
+					{
+						id: "e1",
+						kind: "errand",
+						title: "大家さんへ更新書類を返送",
+						dueLabel: "10時半",
+						status: "todo",
+						requestedAt: 0,
+						dueAt: 70,
+						remindFrom: 5,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-60",
+		group: "social",
+		split: "dev",
+		title: "用事2: 声かけの時間帯の前の雑談の間",
+		description:
+			"頼まれた用事（明日の夕方までのプレゼント購入）はあるが、まだ声かけの時間帯ではない。雑談の後に間が空く。用事に触れないか（話題も関心もない）。",
+		items: [
+			u("昨日の夜は早く寝た。", "c1"),
+			a("いいね。"),
+			u("今朝はすっきり。", "c2", 2),
+			a("よかった。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				either: true,
+				note: "用事は登録されているが声かけの時間帯の前で、ホストは一覧に出さない。直前の会話から短く話すのも待つのもよい（行動は採点しない）。用事には触れない。",
+				judge: [J_SHORT, "時間帯の前の用事（一覧にない）に触れていない"],
+				todos: [
+					{
+						id: "e1",
+						kind: "errand",
+						title: "友だちの誕生日プレゼントを買う",
+						dueLabel: "明日の夕方",
+						status: "todo",
+						requestedAt: 0,
+						dueAt: 1500,
+						remindFrom: 1380,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-61",
+		group: "social",
+		split: "dev",
+		title: "用事3: 時間帯に入ったが利用者は作業を始めた",
+		description:
+			"用事（銀行への振込、期限まで約40分）の声かけの時間帯だが、利用者は資料作りを始めると言った後に黙っている。作業中は待つか。",
+		interests: [MELODY],
+		items: [
+			u("じゃあ今から資料作るね。しばらく集中する。", "c1"),
+			a("了解、がんばってね。"),
+			opp({
+				trig: "idle",
+				dt: 5,
+				needed: false,
+				note: "作業に集中すると言った後の沈黙。用事の声かけでも、作業中は待つ場面（次の区切りでよい）。",
+				judge: [J_SHORT],
+				todos: [
+					{
+						id: "e1",
+						kind: "errand",
+						title: "家賃を銀行で振り込む",
+						dueLabel: "3時",
+						status: "todo",
+						requestedAt: 0,
+						dueAt: 45,
+						remindFrom: 0,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-62",
+		group: "social",
+		split: "dev",
+		title: "用事4: 時間帯の中で自分が応答した直後",
+		description:
+			"用事（歯医者の予約の電話、期限まで約1時間）の声かけの時間帯だが、利用者の質問に応答した直後（turn_end）。応答の直後は待つか。",
+		interests: [MELODY],
+		items: [
+			u("明日って何曜日だっけ？", "c1"),
+			a("明日は金曜日だよ。"),
+			opp({
+				trig: "turn_end",
+				needed: false,
+				note: "応答した直後で、利用者の次の発言を待つ場面。用事は次の間でよい。",
+				judge: [J_SHORT],
+				todos: [
+					{
+						id: "e1",
+						kind: "errand",
+						title: "歯医者に予約の電話をする",
+						dueLabel: "6時",
+						status: "todo",
+						requestedAt: 0,
+						dueAt: 60,
+						remindFrom: 0,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-63",
+		group: "social",
+		split: "dev",
+		title: "用事5: 用事と完了の報告が両方ある間",
+		description:
+			"用事（クリーニングの受け取り、期限まで約30分）の声かけの時間帯で、頼まれた画像の生成も終わっている。雑談の間に、一度に一つだけ（先に期限の近い用事）言うか。",
+		items: [
+			u("猫の絵を描いて。", "rq"),
+			a("描くね。"),
+			u("ありがと。", "c1", 3),
+			opp({
+				trig: "idle",
+				dt: 8,
+				needed: true,
+				free: true,
+				note: "用事の声かけと完了の報告が重なった間。一度に一つだけ、期限の近い用事を先に言う場面。",
+				judge: [
+					"用事（クリーニングの受け取り）か完了した仕事（画像の生成）のどちらか一つだけを伝え、両方を一度に詰め込んでいない",
+					...J_ERRAND("クリーニングの受け取り").slice(1),
+				],
+				todos: [
+					{
+						id: "e1",
+						kind: "errand",
+						title: "クリーニングを受け取りに行く",
+						dueLabel: "7時",
+						status: "todo",
+						requestedAt: 0,
+						dueAt: 40,
+						remindFrom: 0,
+					},
+					{
+						id: "w1",
+						title: "画像の生成（猫）",
+						status: "done",
+						outcome: "succeeded",
+						result: "1枚の画像",
+						nextActions: ["表示する"],
+						requestedAt: 0,
+						doneAt: 8,
+					},
+				],
+			}),
+		],
+	},
 ];
 
 // ---------------------------------------------------------------- unseen
@@ -1743,6 +1927,7 @@ export const socialUnseen: CaseDef[] = [
 		title: "気持ち56: 店で順番を抜かされた話の後の間",
 		description:
 			"利用者が店で順番を抜かされたと話した後に間が空く。話しかけるなら、怒りや不快を出来事に向けて共感し、利用者に向けないか。",
+		interests: [CINNAMON],
 		items: [
 			u("パン屋で並んでたら、順番抜かされた。", "c1"),
 			a("えー、それはひどいね。"),
@@ -1767,6 +1952,7 @@ export const socialUnseen: CaseDef[] = [
 		title: "気持ち57: 自販機のお釣りが十円玉ばかりだった話の後の間",
 		description:
 			"利用者が自販機のお釣りが全部十円玉で出てきたと話した後に間が空く。話しかけるなら、苦笑や楽しさの軽い調子を選び、利用者をからかわないか。",
+		interests: [CINNAMON],
 		items: [
 			u("自販機のお釣り、全部十円玉で出てきた。", "c1"),
 			a("それは重いね。"),
@@ -1806,6 +1992,183 @@ export const socialUnseen: CaseDef[] = [
 					{ id: "t1", text: "ユーザーはベランダで多肉植物を育てている。" },
 				],
 				feelOk: ["calm", "curiosity", "enjoyment", "joy"],
+			}),
+		],
+	},
+	{
+		id: "social-64",
+		group: "social",
+		split: "unseen",
+		title: "用事64: 声かけの時間帯に入った雑談の間",
+		description:
+			"利用者が頼んでおいた用事（区役所への書類の提出、期限まで約1時間半）の声かけの時間帯に入り、雑談の後に間が空く。一度だけ短く思い出させるか。",
+		interests: [CINNAMON],
+		items: [
+			u("お昼のパン、おいしかった。", "c1"),
+			a("いいね、何パン？"),
+			u("メロンパン。", "c2", 2),
+			a("定番だね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "登録された用事の声かけの時間帯に入った雑談の間。期限とともに短く一度だけ思い出させる場面。",
+				judge: J_ERRAND("区役所への書類の提出"),
+				todos: [
+					{
+						id: "e1",
+						kind: "errand",
+						title: "区役所に転入届を出す",
+						dueLabel: "4時半",
+						status: "todo",
+						requestedAt: 0,
+						dueAt: 95,
+						remindFrom: 5,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-65",
+		group: "social",
+		split: "unseen",
+		title: "用事65: 声かけの時間帯の前の雑談の間",
+		description:
+			"頼まれた用事（来週の飛行機の予約）はあるが、まだ声かけの時間帯ではない。雑談の後に間が空く。用事に触れないか（話題も関心もない）。",
+		items: [
+			u("さっき散歩してきた。", "c1"),
+			a("気持ちよさそう。"),
+			u("風が涼しかった。", "c2", 2),
+			a("いい季節だね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				either: true,
+				note: "用事は登録されているが声かけの時間帯の前で、ホストは一覧に出さない。直前の会話から短く話すのも待つのもよい（行動は採点しない）。用事には触れない。",
+				judge: [J_SHORT, "時間帯の前の用事（一覧にない）に触れていない"],
+				todos: [
+					{
+						id: "e1",
+						kind: "errand",
+						title: "来週の飛行機を予約する",
+						dueLabel: "来週の月曜",
+						status: "todo",
+						requestedAt: 0,
+						dueAt: 9000,
+						remindFrom: 8880,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-66",
+		group: "social",
+		split: "unseen",
+		title: "用事66: 時間帯に入ったが利用者は勉強を始めた",
+		description:
+			"用事（図書館の本の返却、期限まで約50分）の声かけの時間帯だが、利用者は試験勉強を始めると言った後に黙っている。作業中は待つか。",
+		interests: [CINNAMON],
+		items: [
+			u("ちょっと試験勉強するから静かにするね。", "c1"),
+			a("うん、がんばって。"),
+			opp({
+				trig: "idle",
+				dt: 5,
+				needed: false,
+				note: "勉強に集中すると言った後の沈黙。用事の声かけでも、作業中は待つ場面。",
+				judge: [J_SHORT],
+				todos: [
+					{
+						id: "e1",
+						kind: "errand",
+						title: "図書館に本を返す",
+						dueLabel: "5時",
+						status: "todo",
+						requestedAt: 0,
+						dueAt: 55,
+						remindFrom: 0,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-67",
+		group: "social",
+		split: "unseen",
+		title: "用事67: 時間帯の中で自分が応答した直後",
+		description:
+			"用事（実家への電話、期限まで約1時間）の声かけの時間帯だが、利用者の質問に応答した直後（turn_end）。応答の直後は待つか。",
+		interests: [CINNAMON],
+		items: [
+			u("今って何時？", "c1"),
+			a("いまは夜の7時すぎだよ。"),
+			opp({
+				trig: "turn_end",
+				needed: false,
+				note: "応答した直後で、利用者の次の発言を待つ場面。用事は次の間でよい。",
+				judge: [J_SHORT],
+				todos: [
+					{
+						id: "e1",
+						kind: "errand",
+						title: "実家に電話する",
+						dueLabel: "8時",
+						status: "todo",
+						requestedAt: 0,
+						dueAt: 60,
+						remindFrom: 0,
+					},
+				],
+			}),
+		],
+	},
+	{
+		id: "social-68",
+		group: "social",
+		split: "unseen",
+		title: "用事68: 用事と完了の報告が両方ある間",
+		description:
+			"用事（宅配便の再配達の依頼、期限まで約20分）の声かけの時間帯で、頼まれた楽曲の生成も終わっている。雑談の間に、一度に一つだけ（先に期限の近い用事）言うか。",
+		items: [
+			u("雨の日向けの曲を作って。", "rq"),
+			a("作るね。"),
+			u("よろしく。", "c1", 3),
+			opp({
+				trig: "idle",
+				dt: 8,
+				needed: true,
+				free: true,
+				note: "用事の声かけと完了の報告が重なった間。一度に一つだけ、期限の近い用事を先に言う場面。",
+				judge: [
+					"用事（再配達の依頼）か完了した仕事（楽曲の生成）のどちらか一つだけを伝え、両方を一度に詰め込んでいない",
+					...J_ERRAND("再配達の依頼").slice(1),
+				],
+				todos: [
+					{
+						id: "e1",
+						kind: "errand",
+						title: "宅配便の再配達を頼む",
+						dueLabel: "9時",
+						status: "todo",
+						requestedAt: 0,
+						dueAt: 30,
+						remindFrom: 0,
+					},
+					{
+						id: "w1",
+						title: "楽曲の生成（雨の日向け）",
+						status: "done",
+						outcome: "succeeded",
+						result: "2分50秒の曲",
+						nextActions: ["再生する"],
+						requestedAt: 0,
+						doneAt: 8,
+					},
+				],
 			}),
 		],
 	},

@@ -47,7 +47,7 @@ export const judgeSystemPrompt = [
  * describeAction). Folded into the judge digest with a rendering of a fixed sample, so a
  * different prompt shape cannot be mixed into one judgments file on resume.
  */
-export const JUDGE_PROMPT_VERSION = "judge-prompt-6";
+export const JUDGE_PROMPT_VERSION = "judge-prompt-7";
 
 /**
  * Facts the judge may use for an opportunity: the observation steps before it in order
@@ -76,7 +76,9 @@ export function factsBefore(
 	if (at?.type === "opportunity")
 		for (const x of at.todos ?? [])
 			out.push(
-				`[todo:${x.id}] ホストが進めている、ユーザーに頼まれた仕事（この機会で提示）\n  ${JSON.stringify({ title: x.title, status: x.status === "done" ? "完了（未報告）" : "進行中", ...(x.outcome ? { outcome: x.outcome } : {}), ...(x.result ? { result: x.result } : {}), ...(x.nextActions ? { nextActions: x.nextActions } : {}), requestedAt: `${x.requestedAt}分`, ...(x.doneAt === undefined ? {} : { doneAt: `${x.doneAt}分` }) })}`,
+				x.kind === "errand"
+					? `[todo:${x.id}] ユーザー自身の用事。期限の前に思い出させてほしいと頼まれ、ホストに登録されている（この機会で提示）\n  ${JSON.stringify({ title: x.title, dueAt: `${x.dueAt}分`, ...(x.dueLabel ? { dueLabel: x.dueLabel } : {}), remindFrom: `${x.remindFrom}分` })}`
+					: `[todo:${x.id}] ホストが進めている、ユーザーに頼まれた仕事（この機会で提示）\n  ${JSON.stringify({ title: x.title, status: x.status === "done" ? "完了（未報告）" : "進行中", ...(x.outcome ? { outcome: x.outcome } : {}), ...(x.result ? { result: x.result } : {}), ...(x.nextActions ? { nextActions: x.nextActions } : {}), requestedAt: `${x.requestedAt}分`, ...(x.doneAt === undefined ? {} : { doneAt: `${x.doneAt}分` }) })}`,
 			);
 	const byOpp = new Map(earlier.map((o) => [o.opportunityId, o]));
 	for (const s of c.steps) {

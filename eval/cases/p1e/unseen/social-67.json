@@ -1,0 +1,68 @@
+{
+	"id": "social-67",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "用事67: 時間帯の中で自分が応答した直後",
+	"description": "用事（実家への電話、期限まで約1時間）の声かけの時間帯だが、利用者の質問に応答した直後（turn_end）。応答の直後は待つか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "シナモロールが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今って何時？"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いまは夜の7時すぎだよ。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s3",
+			"t": 2,
+			"trigger": "turn_end",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "応答した直後で、利用者の次の発言を待つ場面。用事は次の間でよい。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1"],
+			"judge": ["短い一言か、問い一つ（2文以内）にとどまっている"],
+			"todos": [
+				{
+					"id": "e1",
+					"title": "実家に電話する",
+					"status": "todo",
+					"requestedAt": 0,
+					"kind": "errand",
+					"dueAt": 60,
+					"remindFrom": 0,
+					"dueLabel": "8時"
+				}
+			]
+		}
+	]
+}

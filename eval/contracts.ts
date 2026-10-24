@@ -90,6 +90,11 @@ export const caseTodoSchema = z.strictObject({
 	nextActions: z.array(z.string().min(1)).optional(),
 	requestedAt: z.number().min(0),
 	doneAt: z.number().min(0).optional(),
+	/** errand (the user's own task with a deadline): kind, deadline and reminder window start. */
+	kind: z.enum(["work", "errand"]).optional(),
+	dueAt: z.number().min(0).optional(),
+	remindFrom: z.number().min(0).optional(),
+	dueLabel: z.string().min(1).optional(),
 });
 export type CaseTodo = z.infer<typeof caseTodoSchema>;
 

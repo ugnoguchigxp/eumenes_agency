@@ -128,6 +128,12 @@ const hostTodoOf = (x: CaseTodo): HostTodo => ({
 	...(x.result === undefined ? {} : { result: x.result }),
 	...(x.nextActions === undefined ? {} : { nextActions: x.nextActions }),
 	...(x.doneAt === undefined ? {} : { doneAt: x.doneAt * MS_PER_MINUTE }),
+	...(x.kind === undefined ? {} : { kind: x.kind }),
+	...(x.dueAt === undefined ? {} : { dueAt: x.dueAt * MS_PER_MINUTE }),
+	...(x.dueLabel === undefined ? {} : { dueLabel: x.dueLabel }),
+	...(x.remindFrom === undefined
+		? {}
+		: { remindFrom: x.remindFrom * MS_PER_MINUTE }),
 });
 
 export async function replayCase(

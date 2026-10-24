@@ -62,6 +62,11 @@ export interface HostTopic {
 
 export interface HostTodo {
 	readonly id: string;
+	/**
+	 * work (default): background work the host does for the user. errand: the user's own task with
+	 * a deadline that the user asked to be reminded of (spec/errand-design.md); always `todo`.
+	 */
+	readonly kind?: "work" | "errand";
 	/** One line, e.g. 「楽曲の生成（夜のドライブ向け）」. */
 	readonly title: string;
 	readonly status: "todo" | "done";
@@ -73,6 +78,15 @@ export interface HostTodo {
 	readonly nextActions?: readonly string[];
 	readonly requestedAt: number;
 	readonly doneAt?: number;
+	/** errand: the deadline. */
+	readonly dueAt?: number;
+	/**
+	 * errand: from when a reminder fits (the host's reminder window, e.g. two hours before the
+	 * deadline). Outside [remindFrom, dueAt) the errand is not shown to select.
+	 */
+	readonly remindFrom?: number;
+	/** errand: the deadline as the user would say it, formatted by the host (e.g. 「10時半」). */
+	readonly dueLabel?: string;
 }
 
 export interface ToolCapability {

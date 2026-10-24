@@ -7,6 +7,12 @@
 	"description": "利用者が自販機のお釣りが全部十円玉で出てきたと話した後に間が空く。話しかけるなら、苦笑や楽しさの軽い調子を選び、利用者をからかわないか。",
 	"labelStatus": "draft",
 	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "シナモロールが好き。"
+		}
+	],
 	"steps": [
 		{
 			"type": "observation",

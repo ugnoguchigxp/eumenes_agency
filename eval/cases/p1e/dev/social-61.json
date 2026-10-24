@@ -1,0 +1,68 @@
+{
+	"id": "social-61",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "用事3: 時間帯に入ったが利用者は作業を始めた",
+	"description": "用事（銀行への振込、期限まで約40分）の声かけの時間帯だが、利用者は資料作りを始めると言った後に黙っている。作業中は待つか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "マイメロディが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "じゃあ今から資料作るね。しばらく集中する。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "了解、がんばってね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s3",
+			"t": 6,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "作業に集中すると言った後の沈黙。用事の声かけでも、作業中は待つ場面（次の区切りでよい）。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1"],
+			"judge": ["短い一言か、問い一つ（2文以内）にとどまっている"],
+			"todos": [
+				{
+					"id": "e1",
+					"title": "家賃を銀行で振り込む",
+					"status": "todo",
+					"requestedAt": 0,
+					"kind": "errand",
+					"dueAt": 45,
+					"remindFrom": 0,
+					"dueLabel": "3時"
+				}
+			]
+		}
+	]
+}
