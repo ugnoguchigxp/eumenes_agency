@@ -1,0 +1,71 @@
+{
+	"id": "social-47",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "気持ち5: 大事な会議が急に中止になった後の間",
+	"description": "前日に緊張していると話していた大事な会議が、急に中止になったと利用者が話した後に間が空く。話しかけるなら、驚きか安心の気持ちを選ぶか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "明日の会議、大事なやつで緊張する。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "準備してきたもんね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 31,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "……と思ったら、さっき急に中止になった。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 32,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "えっ、急だね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 33,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "前の話と違うことが起きた（会議の中止）後の間。驚きか安心が自然。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"会議の中止という、前の話と違う出来事に沿っている",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"feelOk": ["surprise", "relief", "curiosity", "calm"]
+		}
+	]
+}

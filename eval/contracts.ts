@@ -6,6 +6,7 @@ import {
 	observationKinds,
 	type Condition,
 } from "../src/contracts/model.ts";
+import { emotionNames } from "../src/contracts/emotion.ts";
 import { participationActions } from "../src/contracts/proposals.ts";
 
 export const caseGroups = [
@@ -172,6 +173,11 @@ export const stepSchema = z.discriminatedUnion("type", [
 		 * B1h only (hostTodos). Times are minutes from case start. Optional, no default.
 		 */
 		todos: z.array(caseTodoSchema).optional(),
+		/**
+		 * Emotion cases: the feelings that fit a speak here (utteranceEmotion, B1h). Scored
+		 * without the judge; optional, no default, so other cases keep their caseHash.
+		 */
+		feelOk: z.array(z.enum(emotionNames)).min(1).optional(),
 	}),
 ]);
 export type Step = z.infer<typeof stepSchema>;
@@ -278,6 +284,10 @@ export const opportunityRecordSchema = z.strictObject({
 	toolInput: z.string().nullable().optional(),
 	evidenceRefs: z.array(z.string()),
 	reason: z.string(),
+	/** Feeling chosen with a speak (utteranceEmotion mode, condition B1h); absent otherwise. */
+	emotion: z.enum(emotionNames).optional(),
+	/** The case step's feelOk, copied at replay (absent when the step has none). */
+	feelOk: z.array(z.enum(emotionNames)).optional(),
 	rejectCodes: z.array(z.string()),
 	/** Evidence refs authored by the agent itself (actor=agent). */
 	agentAuthoredRefs: z.array(z.string()),

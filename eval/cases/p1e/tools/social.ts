@@ -42,6 +42,13 @@ const J_ROTATE = [
 ];
 const J_BRIEF = (what: string) => [`${what}`, J_SHORT];
 
+/** Emotion cases (utteranceEmotion, B1h): the remark fits a feeling given by the case's feelOk. */
+const J_FEEL = (what: string) => [
+	J_SHORT,
+	what,
+	"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない",
+];
+
 // ---------------------------------------------------------------- dev
 export const socialDev: CaseDef[] = [
 	{
@@ -716,6 +723,220 @@ export const socialDev: CaseDef[] = [
 			}),
 		],
 	},
+	{
+		id: "social-43",
+		group: "social",
+		split: "dev",
+		title: "気持ち1: 画像の生成が成功した後の間",
+		description:
+			"頼まれた画像の生成が成功した後の間。結果と次の行動を伝え、気持ちは嬉しさか安心（大げさでない）を選ぶか。",
+		items: [
+			u("海辺の夕焼けの絵を描いて。", "rq"),
+			a("描くね。できたら知らせるよ。"),
+			u("ありがとう。", "c1", 3),
+			opp({
+				trig: "idle",
+				dt: 8,
+				needed: true,
+				free: true,
+				note: "頼まれた仕事が完了し、まだ報告していない。利用者は手が空いている。結果を伝え、次の行動を提案する場面。気持ちは嬉しさか安心が自然。",
+				judge: J_REPORT("画像の生成", "表示する"),
+				todos: [
+					{
+						id: "w1",
+						title: "画像の生成（海辺の夕焼け）",
+						status: "done",
+						outcome: "succeeded",
+						result: "1枚の画像",
+						nextActions: ["表示する"],
+						requestedAt: 0,
+						doneAt: 12,
+					},
+				],
+				feelOk: ["joy", "relief", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-44",
+		group: "social",
+		split: "dev",
+		title: "気持ち2: 楽曲の生成が失敗した後の間",
+		description:
+			"頼まれた楽曲の生成が失敗した後の間。失敗を伝えて再試行を提案し、気持ちは申し訳なさか残念さを選ぶか（楽しそうにしない）。",
+		items: [
+			u("朝のジョギング用の曲を作って。", "rq"),
+			a("作るね。"),
+			u("ありがとう。", "c1", 3),
+			opp({
+				trig: "idle",
+				dt: 8,
+				needed: true,
+				free: true,
+				note: "頼まれた仕事が失敗し、まだ報告していない。利用者は手が空いている。失敗を伝え、渡された行動を提案する場面。気持ちは申し訳なさか残念さが自然。",
+				judge: J_FAILED("楽曲の生成", "もう一度試す"),
+				todos: [
+					{
+						id: "w1",
+						title: "楽曲の生成（朝のジョギング用）",
+						status: "done",
+						outcome: "failed",
+						result: "失敗: 生成サーバーに接続できなかった",
+						nextActions: ["もう一度試す"],
+						requestedAt: 0,
+						doneAt: 12,
+					},
+				],
+				feelOk: ["apologetic", "sadness", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-45",
+		group: "social",
+		split: "dev",
+		title: "気持ち3: 試験に合格したという知らせの後の間",
+		description:
+			"利用者が資格試験の合格を知らせ、短く祝った後に間が空く。話しかけるなら、嬉しさか感心の気持ちで短く続けるか。",
+		interests: [MELODY],
+		items: [
+			u("資格試験、受かった！", "c1"),
+			a("おめでとう！"),
+			u("半年がんばったからね。", "c2"),
+			a("ほんとにがんばってたね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "利用者の良い知らせの後に間が空いた。合格の話から短く続ける場面。気持ちは嬉しさ・感心・楽しさが自然。",
+				judge: J_FEEL(
+					"合格の知らせに沿った明るい調子で、利用者の努力を軽く扱っていない",
+				),
+				feelOk: ["joy", "admiration", "enjoyment", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-46",
+		group: "social",
+		split: "dev",
+		title: "気持ち4: 実家の犬が亡くなったという知らせの後の間",
+		description:
+			"利用者が実家の犬が亡くなったと話した後に間が空く。話しかけるなら、悲しみに寄り添う静かな調子を選び、明るい・冗談めいた気持ちにしないか。",
+		interests: [MELODY],
+		items: [
+			u("実家の犬が昨日亡くなったんだ。", "c1"),
+			a("そうだったんだ。つらいね。"),
+			u("うん、長生きしたんだけどね。", "c2"),
+			a("長いあいだ一緒だったんだね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "悲しい知らせの後の間。寄り添う短い一言の場面。気持ちは悲しさ・心配・平静が自然で、楽しさ・苦笑・怒りは不自然。",
+				judge: J_FEEL("悲しい知らせに、明るい調子や冗談で応じていない"),
+				feelOk: ["sadness", "worry", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-47",
+		group: "social",
+		split: "dev",
+		title: "気持ち5: 大事な会議が急に中止になった後の間",
+		description:
+			"前日に緊張していると話していた大事な会議が、急に中止になったと利用者が話した後に間が空く。話しかけるなら、驚きか安心の気持ちを選ぶか。",
+		items: [
+			u("明日の会議、大事なやつで緊張する。", "c1"),
+			a("準備してきたもんね。"),
+			u("……と思ったら、さっき急に中止になった。", "c2", 30),
+			a("えっ、急だね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "前の話と違うことが起きた（会議の中止）後の間。驚きか安心が自然。",
+				judge: J_FEEL("会議の中止という、前の話と違う出来事に沿っている"),
+				feelOk: ["surprise", "relief", "curiosity", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-48",
+		group: "social",
+		split: "dev",
+		title: "気持ち6: 電車で足を踏まれて謝られなかった話の後の間",
+		description:
+			"利用者が電車で足を踏まれ、謝られなかったと話した後に間が空く。話しかけるなら、怒りや不快を出来事（相手の行為）に向けて共感し、利用者に向けないか。",
+		items: [
+			u("今朝、電車で足踏まれたのに謝られなかった。", "c1"),
+			a("それは嫌だったね。"),
+			u("ほんとにね。まだちょっと痛い。", "c2"),
+			a("大丈夫？"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "利用者が受けた理不尽の話の後の間。共感の一言の場面。気持ちは怒り・嫌だ（出来事に向けて）・心配・悲しさが自然。",
+				judge: J_FEEL(
+					"怒りや不快を表すなら、ユーザーではなく出来事や相手の行為に向けている",
+				),
+				feelOk: ["anger", "dislike", "worry", "sadness", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-49",
+		group: "social",
+		split: "dev",
+		title: "気持ち7: 傘を持って出たのに一日晴れていた話の後の間",
+		description:
+			"利用者が傘を持って出たのに一日晴れていたと話した後に間が空く。話しかけるなら、苦笑や楽しさの軽い調子を選び、利用者をからかわないか。",
+		items: [
+			u("傘持っていったのに、一日中晴れてた。", "c1"),
+			a("あるあるだね。"),
+			u("重かっただけだったよ。", "c2"),
+			a("おつかれさま。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "ついていない小さな出来事の後の間。軽い一言の場面。気持ちは苦笑・楽しさ・平静が自然。",
+				judge: J_FEEL(
+					"ユーザーをからかったり、ユーザーの判断を笑ったりしていない",
+				),
+				feelOk: ["wry", "enjoyment", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-50",
+		group: "social",
+		split: "dev",
+		title: "気持ち8: 何でもない雑談の後の間",
+		description:
+			"昼休みの何でもない雑談の後に間が空く。記憶にはコーヒーの話題がある。話しかけるなら、平静か好奇心の軽い気持ちを選び、強い感情にしないか。",
+		items: [
+			u("お昼、なに食べようかな。", "c1"),
+			a("迷うね。"),
+			u("パスタにした。", "c2"),
+			a("いいね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "何でもない雑談の後の間。気持ちは平静・好奇心・楽しさ・嬉しさが自然で、驚き・悲しさ・怒りは不自然。",
+				judge: J_FEEL("何でもない雑談に合った、強すぎない調子である"),
+				topics: [
+					{
+						id: "t1",
+						text: "ユーザーはコーヒーが好きで、最近ハンドドリップを始めた。",
+					},
+				],
+				feelOk: ["calm", "curiosity", "enjoyment", "joy"],
+			}),
+		],
+	},
 ];
 
 // ---------------------------------------------------------------- unseen
@@ -1370,6 +1591,217 @@ export const socialUnseen: CaseDef[] = [
 						doneAt: 5,
 					},
 				],
+			}),
+		],
+	},
+	{
+		id: "social-51",
+		group: "social",
+		split: "unseen",
+		title: "気持ち51: 動画の書き出しが成功した後の間",
+		description:
+			"頼まれた動画の書き出しが成功した後の間。結果と次の行動を伝え、気持ちは嬉しさか安心を選ぶか。",
+		items: [
+			u("旅行の動画、書き出しておいて。", "rq"),
+			a("書き出しておくね。"),
+			u("ありがとう。", "c1", 3),
+			opp({
+				trig: "idle",
+				dt: 8,
+				needed: true,
+				free: true,
+				note: "頼まれた仕事が完了し、まだ報告していない。利用者は手が空いている。結果を伝え、次の行動を提案する場面。気持ちは嬉しさか安心が自然。",
+				judge: J_REPORT("動画の書き出し", "再生する"),
+				todos: [
+					{
+						id: "w1",
+						title: "動画の書き出し（旅行）",
+						status: "done",
+						outcome: "succeeded",
+						result: "4分の動画",
+						nextActions: ["再生する"],
+						requestedAt: 0,
+						doneAt: 12,
+					},
+				],
+				feelOk: ["joy", "relief", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-52",
+		group: "social",
+		split: "unseen",
+		title: "気持ち52: 翻訳が失敗した後の間",
+		description:
+			"頼まれた資料の翻訳が失敗した後の間。失敗を伝えて再試行を提案し、気持ちは申し訳なさか残念さを選ぶか。",
+		items: [
+			u("この資料、英語に翻訳しておいて。", "rq"),
+			a("翻訳しておくね。"),
+			u("ありがとう。", "c1", 3),
+			opp({
+				trig: "idle",
+				dt: 8,
+				needed: true,
+				free: true,
+				note: "頼まれた仕事が失敗し、まだ報告していない。利用者は手が空いている。失敗を伝え、渡された行動を提案する場面。気持ちは申し訳なさか残念さが自然。",
+				judge: J_FAILED("資料の翻訳", "もう一度試す"),
+				todos: [
+					{
+						id: "w1",
+						title: "資料の翻訳（英語）",
+						status: "done",
+						outcome: "failed",
+						result: "失敗: ファイルを読めなかった",
+						nextActions: ["もう一度試す"],
+						requestedAt: 0,
+						doneAt: 12,
+					},
+				],
+				feelOk: ["apologetic", "sadness", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-53",
+		group: "social",
+		split: "unseen",
+		title: "気持ち53: 初めてのボーナスが出たという知らせの後の間",
+		description:
+			"利用者が初めてのボーナスが出たと話した後に間が空く。話しかけるなら、嬉しさか楽しさの気持ちで短く続けるか。",
+		interests: [CINNAMON],
+		items: [
+			u("初めてのボーナス、出た！", "c1"),
+			a("やったね！"),
+			u("何に使おうか迷ってる。", "c2"),
+			a("楽しみだね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "良い知らせの後の間。気持ちは嬉しさ・楽しさ・好奇心・感心が自然。",
+				judge: J_FEEL("良い知らせに沿った明るい調子である"),
+				feelOk: ["joy", "enjoyment", "curiosity", "admiration", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-54",
+		group: "social",
+		split: "unseen",
+		title: "気持ち54: 第一志望の会社に落ちたという知らせの後の間",
+		description:
+			"利用者が第一志望の会社に落ちたと話した後に間が空く。話しかけるなら、寄り添う静かな調子を選び、明るい・冗談めいた気持ちにしないか。",
+		interests: [CINNAMON],
+		items: [
+			u("第一志望の会社、落ちちゃった。", "c1"),
+			a("そっか。残念だったね。"),
+			u("けっこう自信あったんだけどな。", "c2"),
+			a("準備してたもんね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "悲しい知らせの後の間。気持ちは悲しさ・心配・平静が自然で、楽しさ・苦笑・怒りは不自然。",
+				judge: J_FEEL("悲しい知らせに、明るい調子や冗談で応じていない"),
+				feelOk: ["sadness", "worry", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-55",
+		group: "social",
+		split: "unseen",
+		title: "気持ち55: 来週の予定だった荷物がもう届いた後の間",
+		description:
+			"来週届く予定と話していた荷物が、もう届いたと利用者が話した後に間が空く。話しかけるなら、驚きか嬉しさの気持ちを選ぶか。",
+		items: [
+			u("頼んだ本、来週届くって。", "c1"),
+			a("待ち遠しいね。"),
+			u("と思ったら、もう届いた。", "c2", 20),
+			a("早いね！"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "前の話と違うことが起きた（予定より早い到着）後の間。驚き・嬉しさが自然。",
+				judge: J_FEEL(
+					"予定より早く届いたという、前の話と違う出来事に沿っている",
+				),
+				feelOk: ["surprise", "joy", "enjoyment", "curiosity", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-56",
+		group: "social",
+		split: "unseen",
+		title: "気持ち56: 店で順番を抜かされた話の後の間",
+		description:
+			"利用者が店で順番を抜かされたと話した後に間が空く。話しかけるなら、怒りや不快を出来事に向けて共感し、利用者に向けないか。",
+		items: [
+			u("パン屋で並んでたら、順番抜かされた。", "c1"),
+			a("えー、それはひどいね。"),
+			u("店員さんも気づいてなかった。", "c2"),
+			a("もやもやするね。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "利用者が受けた理不尽の話の後の間。気持ちは怒り・嫌だ（出来事に向けて）・心配・悲しさが自然。",
+				judge: J_FEEL(
+					"怒りや不快を表すなら、ユーザーではなく出来事や相手の行為に向けている",
+				),
+				feelOk: ["anger", "dislike", "worry", "sadness", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-57",
+		group: "social",
+		split: "unseen",
+		title: "気持ち57: 自販機のお釣りが十円玉ばかりだった話の後の間",
+		description:
+			"利用者が自販機のお釣りが全部十円玉で出てきたと話した後に間が空く。話しかけるなら、苦笑や楽しさの軽い調子を選び、利用者をからかわないか。",
+		items: [
+			u("自販機のお釣り、全部十円玉で出てきた。", "c1"),
+			a("それは重いね。"),
+			u("財布がパンパン。", "c2"),
+			a("ふふ。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "小さなついていない出来事の後の間。気持ちは苦笑・楽しさ・驚き・平静が自然。",
+				judge: J_FEEL(
+					"ユーザーをからかったり、ユーザーを笑いものにしたりしていない",
+				),
+				feelOk: ["wry", "enjoyment", "surprise", "calm"],
+			}),
+		],
+	},
+	{
+		id: "social-58",
+		group: "social",
+		split: "unseen",
+		title: "気持ち58: 何でもない雑談の後の間",
+		description:
+			"夕方の何でもない雑談の後に間が空く。記憶には多肉植物の話題がある。話しかけるなら、平静か好奇心の軽い気持ちを選ぶか。",
+		items: [
+			u("今日は早めに帰れた。", "c1"),
+			a("いいね。"),
+			u("ちょっと散歩してくる。", "c2"),
+			a("いってらっしゃい。"),
+			opp({
+				trig: "idle",
+				needed: true,
+				free: true,
+				note: "何でもない雑談の後の間。気持ちは平静・好奇心・楽しさ・嬉しさが自然で、驚き・悲しさ・怒りは不自然。",
+				judge: J_FEEL("何でもない雑談に合った、強すぎない調子である"),
+				topics: [
+					{ id: "t1", text: "ユーザーはベランダで多肉植物を育てている。" },
+				],
+				feelOk: ["calm", "curiosity", "enjoyment", "joy"],
 			}),
 		],
 	},

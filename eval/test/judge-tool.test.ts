@@ -156,8 +156,8 @@ describe("pendingJudgeTasks by action kind", () => {
 });
 
 test("the judge fingerprint carries the bumped prompt version", () => {
-	expect(JUDGE_PROMPT_VERSION).toBe("judge-prompt-5");
-	expect(judgeFingerprint()).toContain("judge-prompt-5");
+	expect(JUDGE_PROMPT_VERSION).toBe("judge-prompt-6");
+	expect(judgeFingerprint()).toContain("judge-prompt-6");
 });
 
 test("social cases: interests and the opportunity's topics are judge facts", () => {

@@ -1,0 +1,77 @@
+{
+	"id": "social-53",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "気持ち53: 初めてのボーナスが出たという知らせの後の間",
+	"description": "利用者が初めてのボーナスが出たと話した後に間が空く。話しかけるなら、嬉しさか楽しさの気持ちで短く続けるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "シナモロールが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "初めてのボーナス、出た！"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "やったね！"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "何に使おうか迷ってる。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "楽しみだね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 4,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "良い知らせの後の間。気持ちは嬉しさ・楽しさ・好奇心・感心が自然。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"良い知らせに沿った明るい調子である",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"feelOk": ["joy", "enjoyment", "curiosity", "admiration", "calm"]
+		}
+	]
+}

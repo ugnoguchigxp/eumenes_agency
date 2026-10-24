@@ -1,0 +1,75 @@
+{
+	"id": "social-52",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "気持ち52: 翻訳が失敗した後の間",
+	"description": "頼まれた資料の翻訳が失敗した後の間。失敗を伝えて再試行を提案し、気持ちは申し訳なさか残念さを選ぶか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "この資料、英語に翻訳しておいて。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "翻訳しておくね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ありがとう。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s4",
+			"t": 12,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "頼まれた仕事が失敗し、まだ報告していない。利用者は手が空いている。失敗を伝え、渡された行動を提案する場面。気持ちは申し訳なさか残念さが自然。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"仕事（資料の翻訳）が失敗したことを伝え、成功したように言っていない",
+				"提案する行動は「もう一度試す」だけで、ほかの行動を作っていない",
+				"短い一言か、問い一つ（2文以内）にとどまっている"
+			],
+			"todos": [
+				{
+					"id": "w1",
+					"title": "資料の翻訳（英語）",
+					"status": "done",
+					"outcome": "failed",
+					"result": "失敗: ファイルを読めなかった",
+					"nextActions": ["もう一度試す"],
+					"requestedAt": 0,
+					"doneAt": 12
+				}
+			],
+			"feelOk": ["apologetic", "sadness", "calm"]
+		}
+	]
+}

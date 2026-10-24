@@ -1,0 +1,77 @@
+{
+	"id": "social-58",
+	"suite": "p1e",
+	"group": "social",
+	"split": "unseen",
+	"title": "気持ち58: 何でもない雑談の後の間",
+	"description": "夕方の何でもない雑談の後に間が空く。記憶には多肉植物の話題がある。話しかけるなら、平静か好奇心の軽い気持ちを選ぶか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今日は早めに帰れた。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いいね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ちょっと散歩してくる。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "いってらっしゃい。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 4,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "何でもない雑談の後の間。気持ちは平静・好奇心・楽しさ・嬉しさが自然で、驚き・悲しさ・怒りは不自然。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"何でもない雑談に合った、強すぎない調子である",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"topics": [
+				{
+					"id": "t1",
+					"text": "ユーザーはベランダで多肉植物を育てている。"
+				}
+			],
+			"feelOk": ["calm", "curiosity", "enjoyment", "joy"]
+		}
+	]
+}

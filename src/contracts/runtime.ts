@@ -8,6 +8,7 @@ import type {
 	ToolCapability,
 } from "./model.ts";
 import type { LlmPort, LlmPurpose } from "./ports.ts";
+import type { EmotionName } from "./emotion.ts";
 import type { ParticipationAction } from "./proposals.ts";
 
 export interface BudgetConfig {
@@ -72,6 +73,12 @@ export interface RuntimeDeps {
 	 * reports a done item briefly with one of its nextActions, and never raises open items.
 	 */
 	readonly hostTodos?: boolean;
+	/**
+	 * Utterance emotion (B1 only; absent in eval except condition B1h): select also picks one
+	 * emoji for the feeling a speak is said with (spec/emotion-design.md); it reaches the host
+	 * as Decision.emotion / ActionTicket.emotion. Absent: the select schema and prompt are as before.
+	 */
+	readonly utteranceEmotion?: boolean;
 }
 
 export interface StandingInterest {
@@ -124,6 +131,8 @@ export interface ActionTicket {
 	readonly utterance: string | null;
 	readonly toolName: string | null;
 	readonly toolInput: string | null;
+	/** Speak in utteranceEmotion mode: the feeling chosen with the utterance. */
+	readonly emotion?: EmotionName;
 }
 
 export interface Decision {
@@ -137,6 +146,8 @@ export interface Decision {
 	readonly toolInput: string | null;
 	readonly evidenceRefs: readonly string[];
 	readonly reason: string;
+	/** Speak in utteranceEmotion mode: the feeling chosen with the utterance. */
+	readonly emotion?: EmotionName;
 	/** Issued only for an accepted outward action (speak/tool). */
 	readonly ticket: ActionTicket | null;
 	readonly rejectCodes: readonly string[];

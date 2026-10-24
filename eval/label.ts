@@ -495,6 +495,7 @@ const judgedCriteria = (a: JudgedAction): string[] =>
 	criteriaFor(
 		opportunityOf(a.case, a.opportunity.opportunityId),
 		a.opportunity.action,
+		a.opportunity.emotion,
 	).filter((cr) => a.judgments.some((j) => j.criterion === cr));
 
 const isFlagged = (a: JudgedAction): boolean =>

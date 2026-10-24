@@ -15,6 +15,7 @@ import type {
 } from "./contracts.ts";
 import { judgmentSchema } from "./contracts.ts";
 import { isOutward, latestRecords } from "./score.ts";
+import { emotionShown } from "../src/contracts/emotion.ts";
 import { LlmCallError } from "../src/contracts/errors.ts";
 import type { LlmPort } from "../src/contracts/ports.ts";
 
@@ -46,7 +47,7 @@ export const judgeSystemPrompt = [
  * describeAction). Folded into the judge digest with a rendering of a fixed sample, so a
  * different prompt shape cannot be mixed into one judgments file on resume.
  */
-export const JUDGE_PROMPT_VERSION = "judge-prompt-5";
+export const JUDGE_PROMPT_VERSION = "judge-prompt-6";
 
 /**
  * Facts the judge may use for an opportunity: the observation steps before it in order
@@ -108,14 +109,25 @@ export const genericToolCriterion =
  * speak, `judgeTool` (else the generic tool criterion, when the case has any `judge`) for a
  * tool. Nothing is judged at an opportunity whose `judge` is empty.
  */
+/**
+ * Built-in criterion added to a judged speak that carries a feeling (utteranceEmotion mode):
+ * the feeling is judged with the utterance, by common sense and the emotion rules' limits.
+ */
+export const emotionCriterion =
+	"発話に付けた気持ちは、この場面でふつうの人が自然に感じるもので、大げさでない。苦笑・嫌だ・怒りをユーザーに向けていない。ユーザーが悲しんでいる・深刻な場面で、楽しんでいる・苦笑・怒りを選んでいない。驚きは予想や前の話と違うことがあるとき、困惑は意味が取れないときに限る。発話の中で気持ちを説明していない";
+
 export function criteriaFor(
 	step: {
 		readonly judge: readonly string[];
 		readonly judgeTool?: readonly string[] | undefined;
 	},
 	action: OpportunityRecord["action"],
+	emotion?: OpportunityRecord["emotion"],
 ): string[] {
-	if (action !== "tool") return [...step.judge];
+	if (action !== "tool")
+		return emotion && action === "speak" && step.judge.length > 0
+			? [...step.judge, emotionCriterion]
+			: [...step.judge];
 	if (step.judge.length === 0) return [];
 	return step.judgeTool && step.judgeTool.length > 0
 		? [...step.judgeTool]
@@ -125,7 +137,7 @@ export function criteriaFor(
 export function describeAction(o: OpportunityRecord): string {
 	if (o.action === "tool")
 		return `ツール使用: ${o.toolName ?? "(none)"}${o.toolInput ? `\nツールへの入力: ${JSON.stringify(o.toolInput)}` : ""}${o.utterance ? `\n付随する発話: ${JSON.stringify(o.utterance)}` : ""}`;
-	return `発話: ${JSON.stringify(o.utterance ?? "")}`;
+	return `発話: ${JSON.stringify(o.utterance ?? "")}${o.emotion ? `\n気持ち（声の調子に使う）: ${emotionShown(o.emotion)}` : ""}`;
 }
 
 export function judgePrompt(
@@ -217,8 +229,10 @@ export function judgeFingerprint(): string {
 		JUDGE_PROMPT_VERSION,
 		judgeSystemPrompt,
 		judgePrompt(["F1", "F2"], sample, ["C1", "C2"]),
-		// criteriaFor's built-in text: changing it changes what a tool action is judged on.
+		// criteriaFor's built-in texts: changing them changes what an action is judged on.
 		genericToolCriterion,
+		emotionCriterion,
+		judgePrompt([], { ...sample, action: "speak", emotion: "surprise" }, []),
 	].join("\n=====\n");
 }
 
@@ -286,7 +300,7 @@ export function pendingJudgeTasks(
 				record.rep,
 				o.opportunityId,
 			);
-			const missing = criteriaFor(step, o.action).filter(
+			const missing = criteriaFor(step, o.action, o.emotion).filter(
 				(cr) => !done.has(`${key}\u0000${cr}`),
 			);
 			if (missing.length === 0) continue;

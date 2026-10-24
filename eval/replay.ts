@@ -261,6 +261,8 @@ export async function replayCase(
 				toolInput: decision.toolInput,
 				evidenceRefs: [...decision.evidenceRefs],
 				reason: decision.reason,
+				...(decision.emotion ? { emotion: decision.emotion } : {}),
+				...(step.feelOk ? { feelOk: step.feelOk } : {}),
 				// "call:<code>" marks infra failures of this opportunity's own model calls.
 				rejectCodes: [
 					...decision.rejectCodes,

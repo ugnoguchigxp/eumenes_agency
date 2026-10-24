@@ -1,0 +1,77 @@
+{
+	"id": "social-45",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "気持ち3: 試験に合格したという知らせの後の間",
+	"description": "利用者が資格試験の合格を知らせ、短く祝った後に間が空く。話しかけるなら、嬉しさか感心の気持ちで短く続けるか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"interests": [
+		{
+			"id": "i1",
+			"text": "マイメロディが好き。"
+		}
+	],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "資格試験、受かった！"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "おめでとう！"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "半年がんばったからね。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "ほんとにがんばってたね。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 4,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者の良い知らせの後に間が空いた。合格の話から短く続ける場面。気持ちは嬉しさ・感心・楽しさが自然。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"合格の知らせに沿った明るい調子で、利用者の努力を軽く扱っていない",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"feelOk": ["joy", "admiration", "enjoyment", "calm"]
+		}
+	]
+}

@@ -4,6 +4,7 @@
  * Optional fields are `nullable` (always present) to keep the schema strict.
  */
 import { z } from "zod";
+import { emotionEmojis } from "./emotion.ts";
 
 const ref = z.string().min(1).max(64);
 const refs = z.array(ref).max(12);
@@ -203,6 +204,11 @@ export const participationSchema = z.strictObject({
 	reason: text(300),
 });
 export type ParticipationProposal = z.infer<typeof participationSchema>;
+
+/** Utterance-emotion mode: the same choice plus one emoji for the feeling of a speak (else null). */
+export const participationEmotionSchema = participationSchema.extend({
+	emotion: z.enum(emotionEmojis).nullable(),
+});
 
 // ---------------------------------------------------------------------------
 // Wire shape. Structured-output grammars reject large unions, so the model fills

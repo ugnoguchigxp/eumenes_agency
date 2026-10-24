@@ -10,6 +10,7 @@ import type {
 	ToolCapability,
 } from "../contracts/model.ts";
 import { isOpenCandidate, isOpenIntent } from "../contracts/model.ts";
+import { emotions, type EmotionEmoji } from "../contracts/emotion.ts";
 import type { StandingInterest } from "../contracts/runtime.ts";
 import type { Due } from "../domains/agency/due.ts";
 
@@ -20,6 +21,8 @@ export const INSTRUCTION_VERSION = "p0e-instructions-10";
  * those rules and part of the settings digest; the evaluated B1/B2 prompts do not contain it.
  */
 export const SOCIAL_RULES_VERSION = "social-rules-6";
+/** Version of the utterance-emotion rules (utteranceEmotion mode only). */
+export const EMOTION_RULES_VERSION = "emotion-rules-1";
 
 const common = [
 	"出力は指定された JSON スキーマに厳密に従う。説明文や前置きは付けない。",
@@ -180,6 +183,17 @@ const selectHostTodos = [
 	"会話記録にあるユーザー自身の用事は、この一覧になければ持ち出さない。",
 ];
 
+/** Added to the B1 select rules in utterance-emotion mode (spec/emotion-design.md). */
+const selectEmotion = [
+	`【発話の気持ち】（${EMOTION_RULES_VERSION}）speak のときは emotion に、その発話を言う気持ちを絵文字一つで選ぶ。speak 以外は null。声の調子はこの気持ちから付く。`,
+	emotions.map((e) => `${e.emoji}${e.label}`).join(" "),
+	"その状況でふつうの人が自然に感じる気持ちを、一つだけ選ぶ。混ざっていれば主なほう。迷ったら🙂。",
+	"気持ちはいつも軽く表す。発話の中で気持ちを説明しない（「嬉しいです」と言わない）。言葉で表すなら「おっ」「あー」くらいの一言まで。",
+	"😮は、メモ・予定・前の話と違うことが起きたときだけ。😕は、相手の言葉の意味が取れない・依頼が矛盾するときだけ。",
+	"😏・😒・😠は人に向けない。😏はついていない状況や自分の失敗に、😠はユーザーが受けた理不尽への共感に使う。ユーザーが悲しんでいる・深刻なときは😄・😏・😠を選ばない。",
+	"話すかどうかは気持ちで決めない。自分の気持ちを理由に話しかけたり、引き止めたり、気をつかわせたりしない。",
+];
+
 const idleSocialClosing =
 	"この機会に何をするかを JSON で一つだけ返す。価値が低い、またはユーザーの邪魔になるなら wait。ただし雑談の最中の静かな間（trigger が idle）で、話題の種か自分の関心から短い一言を始められ、上の wait する場面（作業を始めた後、断られた・静かにしたい後、自分から話しかけた直後に一言の返事しかない後）に当たらないなら、迷っても speak を選ぶ。";
 
@@ -205,6 +219,8 @@ export interface SelectOptions {
 	readonly hostTopics?: boolean | undefined;
 	/** Work-report mode (B1 only): the select prompt gets the work-report rules. */
 	readonly hostTodos?: boolean | undefined;
+	/** Utterance-emotion mode (B1 only): the select prompt gets the emotion rules. */
+	readonly emotion?: boolean | undefined;
 }
 
 /**
@@ -220,6 +236,7 @@ export const systemPrompt = (
 	const head = `（指示版: ${INSTRUCTION_VERSION}）`;
 	const host = condition === "B1" && options.hostTopics === true;
 	const todos = condition === "B1" && options.hostTodos === true;
+	const emotion = condition === "B1" && options.emotion === true;
 	const social = condition === "B1" && options.social === true && !host;
 	if (purpose === "update") {
 		const rules =
@@ -237,6 +254,7 @@ export const systemPrompt = (
 					...(options.interests ? selectInterest : []),
 					...(host ? selectHostTopics : social ? selectSocial : []),
 					...(todos ? selectHostTodos : []),
+					...(emotion ? selectEmotion : []),
 				]
 			: selectB2;
 	const style = options.utteranceStyle?.trim();
@@ -417,6 +435,8 @@ export interface SelectPromptInput {
 	readonly delivered: readonly string[];
 	/** Social / host-topics modes: minutes since each delivered utterance (same order). */
 	readonly deliveredMinutesAgo?: readonly number[];
+	/** Utterance-emotion mode: the feeling each delivered utterance was said with (same order). */
+	readonly deliveredEmotions?: readonly (EmotionEmoji | null)[];
 	/**
 	 * Social / host-topics modes: minutes (unrounded; shown rounded) since a topic
 	 * (`memory:<id>`) or interest (`interest:<id>`) was last delivered.
@@ -527,9 +547,15 @@ const renderInterests = (
 const renderDeliveredAgo = (
 	delivered: readonly string[],
 	ago: readonly number[],
+	feelings?: readonly (EmotionEmoji | null)[],
 ) =>
 	delivered.length
-		? delivered.map((d, k) => `- （${ago[k] ?? "?"}分前）${q(d)}`).join("\n")
+		? delivered
+				.map((d, k) => {
+					const feeling = feelings?.[k];
+					return `- （${ago[k] ?? "?"}分前${feeling ? `・${feeling}` : ""}）${q(d)}`;
+				})
+				.join("\n")
 		: "（なし）";
 
 export const selectPrompt = (i: SelectPromptInput): string => {
@@ -557,7 +583,7 @@ export const selectPrompt = (i: SelectPromptInput): string => {
 					`# 記憶にある話題（ユーザーについて覚えていること。依頼ではない）\n${renderTopics(i.topics, i.lastUsedMinutesAgo)}`,
 				]
 			: []),
-		`# 配信済みの発話（最近。繰り返さない）\n${i.deliveredMinutesAgo ? renderDeliveredAgo(i.delivered, i.deliveredMinutesAgo) : renderDelivered(i.delivered)}`,
+		`# 配信済みの発話（最近。繰り返さない）\n${i.deliveredMinutesAgo ? renderDeliveredAgo(i.delivered, i.deliveredMinutesAgo, i.deliveredEmotions) : renderDelivered(i.delivered)}`,
 		`# 使えるツール\n${renderTools(i.tools)}`,
 		i.condition === "B1" && o.trigger === "idle" && i.hostTopics === true
 			? idleHostTopicsClosing

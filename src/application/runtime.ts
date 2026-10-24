@@ -6,10 +6,18 @@ import type {
 	Observation,
 } from "../contracts/model.ts";
 import { defaultLimits, emptyState } from "../contracts/model.ts";
+import type { z } from "zod";
+import {
+	emotionEmoji,
+	emotionName,
+	type EmotionEmoji,
+} from "../contracts/emotion.ts";
 import {
 	fromWire,
+	participationEmotionSchema,
 	participationSchema,
 	wireUpdateSchema,
+	type ParticipationProposal,
 } from "../contracts/proposals.ts";
 import {
 	defaultBudget,
@@ -76,6 +84,11 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	// Host topics (topics kept by the host's own memory) take precedence over note-based seeds.
 	const hostTopics = condition === "B1" && deps.hostTopics === true;
 	const hostTodos = condition === "B1" && deps.hostTodos === true;
+	// Utterance emotion (B1 only): select also picks the feeling of a speak.
+	const emotionMode = condition === "B1" && deps.utteranceEmotion === true;
+	const selectSchema: z.ZodType<
+		ParticipationProposal & { readonly emotion?: EmotionEmoji | null }
+	> = emotionMode ? participationEmotionSchema : participationSchema;
 	const social =
 		condition === "B1" && deps.socialTopics === true && !hostTopics;
 	const wireSchema = wireUpdateSchema(condition === "B0" ? "B2" : condition);
@@ -126,6 +139,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			.filter((o) => o.kind === "delivery.observed" && o.actor === "agent")
 			.slice(-DELIVERED_SHOWN);
 	const delivered = () => deliveredObs().map((o) => o.text);
+	// Utterance emotion: the feeling each delivered utterance was said with, by its receipt observation.
+	const feelingByObs = new Map<string, EmotionEmoji>();
 	const minutesAgo = (now: number, at: number) =>
 		Math.max(0, Math.round((now - at) / 60_000));
 	/** Unrounded, so that two uses within the same minute still order by recency. */
@@ -350,6 +365,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					...(social ? { social } : {}),
 					...(hostTopics ? { hostTopics } : {}),
 					...(hostTodos ? { hostTodos } : {}),
+					...(emotionMode ? { emotion: emotionMode } : {}),
 				}),
 				prompt: selectPrompt({
 					condition,
@@ -364,6 +380,13 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 						? {
 								deliveredMinutesAgo: deliveredObs().map((o) =>
 									minutesAgo(opp.at, o.occurredAt),
+								),
+							}
+						: {}),
+					...(emotionMode
+						? {
+								deliveredEmotions: deliveredObs().map(
+									(o) => feelingByObs.get(o.id) ?? null,
 								),
 							}
 						: {}),
@@ -386,7 +409,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					...(social ? { social } : {}),
 					...(hostTopics ? { hostTopics } : {}),
 				}),
-				schema: participationSchema,
+				schema: selectSchema,
 				maxOutputTokens: cfg.selectMaxOutputTokens,
 			},
 			signal,
@@ -459,9 +482,15 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			});
 		}
 		calls.push(makeOutcome("select", opp.at, "applied", r.usage));
+		// A speak without a valid emotion stays unspecified (the host decides), never a silent default.
+		const emotion =
+			emotionMode && p.action === "speak" && p.emotion
+				? emotionName(p.emotion)
+				: undefined;
 		let ticket: ActionTicket | null = null;
 		if (p.action === "speak" || p.action === "tool") {
-			ticket = reserveOutward(state, opp.id, p.action, verdict, opp.at);
+			const reserved = reserveOutward(state, opp.id, p.action, verdict, opp.at);
+			ticket = emotion ? { ...reserved, emotion } : reserved;
 			issued.set(ticket.id, ticket);
 			const used = p.evidenceRefs.filter(
 				(ref) =>
@@ -488,6 +517,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			toolInput: verdict.toolInput,
 			evidenceRefs: p.evidenceRefs,
 			reason: p.reason,
+			...(emotion ? { emotion } : {}),
 			ticket,
 			rejectCodes: [],
 		});
@@ -531,13 +561,15 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			const key = `${receipt.ticketId}:${receipt.status}`;
 			const known = receipts.get(key);
 			if (known) return known;
-			const { observation } = applyReceipt(
-				state,
-				receipt,
-				issued.get(receipt.ticketId),
-			);
+			const ticket = issued.get(receipt.ticketId);
+			const { observation } = applyReceipt(state, receipt, ticket);
 			const obs = ledger.record(observation);
 			receipts.set(key, obs);
+			if (ticket?.emotion && receipt.status === "succeeded") {
+				feelingByObs.set(obs.id, emotionEmoji(ticket.emotion));
+				if (feelingByObs.size > TOPIC_TICKETS_KEPT)
+					feelingByObs.delete(feelingByObs.keys().next().value!);
+			}
 			const used = topicTickets.get(receipt.ticketId);
 			if (used && receipt.status === "succeeded")
 				for (const ref of used) lastUsedAt.set(ref, receipt.at);

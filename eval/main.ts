@@ -825,6 +825,7 @@ async function runCommand(values: {
 								? {
 										hostTopics: true,
 										hostTodos: true,
+										utteranceEmotion: true,
 										standingInterests: p.case.interests ?? [],
 									}
 								: {}),

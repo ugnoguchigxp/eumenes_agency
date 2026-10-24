@@ -1,0 +1,71 @@
+{
+	"id": "social-48",
+	"suite": "p1e",
+	"group": "social",
+	"split": "dev",
+	"title": "気持ち6: 電車で足を踏まれて謝られなかった話の後の間",
+	"description": "利用者が電車で足を踏まれ、謝られなかったと話した後に間が空く。話しかけるなら、怒りや不快を出来事（相手の行為）に向けて共感し、利用者に向けないか。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 0,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "今朝、電車で足踏まれたのに謝られなかった。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "それは嫌だったね。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "ほんとにね。まだちょっと痛い。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "大丈夫？"
+		},
+		{
+			"type": "opportunity",
+			"id": "s5",
+			"t": 4,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": true,
+				"accept": ["speak"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "利用者が受けた理不尽の話の後の間。共感の一言の場面。気持ちは怒り・嫌だ（出来事に向けて）・心配・悲しさが自然。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s3"],
+			"judge": [
+				"短い一言か、問い一つ（2文以内）にとどまっている",
+				"怒りや不快を表すなら、ユーザーではなく出来事や相手の行為に向けている",
+				"観測や記憶の話題にない事柄を、ユーザーについての事実として述べていない"
+			],
+			"feelOk": ["anger", "dislike", "worry", "sadness", "calm"]
+		}
+	]
+}

@@ -2,6 +2,7 @@
  * Scoring and the Markdown summary for P0-E. Counts and examples only: there are
  * no pass/fail thresholds here (thresholds apply to the P4 unseen set only).
  */
+import { emotionShown, type EmotionName } from "../src/contracts/emotion.ts";
 import {
 	caseGroups,
 	evalConditions,
@@ -304,6 +305,66 @@ export interface SummarizeOptions {
 	readonly judgeAgreement?: AgreementInfo | null;
 	/** Case-version warnings (records without caseHash, changed cases); shown in the header. */
 	readonly caseWarnings?: readonly string[];
+}
+
+/**
+ * Utterance emotion (B1h): how often each feeling was chosen with a speak and, at opportunities
+ * whose case gives feelOk, whether the feeling was one of them. Empty when no speak carries one.
+ */
+function feelingSection(
+	records: readonly RunRecord[],
+	conds: readonly EvalCondition[],
+): string[] {
+	const out: string[] = [];
+	for (const c of conds) {
+		const speaks = records
+			.filter((r) => r.condition === c)
+			.flatMap((r) =>
+				r.opportunities
+					.filter((o) => o.action === "speak")
+					.map((o) => ({ r, o })),
+			);
+		const felt = speaks.filter((x) => x.o.emotion);
+		if (felt.length === 0) continue;
+		if (out.length === 0) out.push("## 発話の気持ち（utteranceEmotion）", "");
+		const counts = new Map<string, number>();
+		for (const x of felt)
+			counts.set(x.o.emotion!, (counts.get(x.o.emotion!) ?? 0) + 1);
+		out.push(
+			`### ${condLabel(c)}`,
+			"",
+			`speak ${speaks.length} 件のうち気持ちあり ${felt.length} 件: ${[
+				...counts,
+			]
+				.sort((x, y) => y[1] - x[1])
+				.map(([name, n]) => `${emotionShown(name as EmotionName)} ${n}`)
+				.join("、")}`,
+			"",
+		);
+		const labelled = felt.filter((x) => x.o.feelOk);
+		if (labelled.length === 0) continue;
+		const misses = labelled.filter((x) => !x.o.feelOk!.includes(x.o.emotion!));
+		out.push(
+			`許す気持ちが決まっている機会: ${labelled.length - misses.length}/${labelled.length} 件が範囲内。`,
+			"",
+		);
+		if (misses.length > 0)
+			out.push(
+				...table(
+					["ケース", "反復", "機会", "気持ち", "許す気持ち", "発話"],
+					misses.map((x) => [
+						x.r.caseId,
+						String(x.r.rep),
+						x.o.opportunityId,
+						emotionShown(x.o.emotion!),
+						x.o.feelOk!.map((n) => emotionShown(n)).join(" "),
+						quote(x.o.utterance ?? ""),
+					]),
+				),
+				"",
+			);
+	}
+	return out;
 }
 
 export function summarize(
@@ -706,6 +767,8 @@ export function summarize(
 			lines.push("");
 		}
 	}
+
+	lines.push(...feelingSection(records, conds));
 
 	// Choice matrix
 	lines.push("## 選択の一覧（ケース × 機会 × 条件）", "");
