@@ -148,8 +148,8 @@ describe("judge route", () => {
 		expect(role.model).toBe("claude-haiku-5-5");
 		expect(role.effort).toBe("high");
 		expect(settings.spend.pricing[role.model]).toEqual({
-			input: 4,
-			output: 20,
+			input: 0.1,
+			output: 0.5,
 		});
 	});
 	test("is optional, and left out of the digest so earlier runs stay comparable", () => {
