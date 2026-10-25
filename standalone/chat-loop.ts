@@ -15,7 +15,6 @@ import {
 	defaultIdleSec,
 	defaultMaxUnanswered,
 	maxIdleSec,
-	spokenReplyStyle,
 } from "../src/index.ts";
 import { defaultInterestText, maxInterestChars } from "./persona.ts";
 
@@ -50,6 +49,8 @@ export interface CliArgs {
 	readonly tts: boolean;
 	/** Persona interest texts (default: one; empty with --no-interest). */
 	readonly interests: readonly string[];
+	/** Emotion emoji on replies and proactive utterances. Default on. */
+	readonly emotion: boolean;
 	/** Social conversation mode (topic seeds, speak at a lull). Default on; B1/B1a only. */
 	readonly social: boolean;
 	/** Hide the one-line `[判断]` print of each background decision (the log keeps them). */
@@ -76,9 +77,6 @@ const nonNegative = (
 	return value;
 };
 
-/** Spoken-style rules for the main reply (--tts): the shared text of src. */
-export const ttsReplyStyle = spokenReplyStyle;
-
 export function parseCliArgs(argv: readonly string[]): CliArgs {
 	let condition: CliCondition = defaultCliCondition;
 	let off = false;
@@ -87,6 +85,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 	let log: LogChoice = { kind: "default" };
 	let tts = true;
 	let social = true;
+	let emotion = true;
 	let quietWhy = false;
 	const interests: string[] = [];
 	let noInterest = false;
@@ -105,6 +104,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 		else if (arg === "--no-tts") tts = false;
 		else if (arg === "--social") social = true;
 		else if (arg === "--no-social") social = false;
+		else if (arg === "--emotion") emotion = true;
+		else if (arg === "--no-emotion") emotion = false;
 		else if (arg === "--quiet-why") quietWhy = true;
 		else if (arg === "--condition") {
 			const value = argv[++i];
@@ -133,6 +134,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 		maxUnanswered,
 		log,
 		tts,
+		emotion,
 		social,
 		quietWhy,
 		interests: noInterest
@@ -212,10 +214,9 @@ export function createConversation() {
 		messages(): Turn[] {
 			return [...turns];
 		},
-		/** Extra system text telling the model what it said before the user spoke. */
-		systemAddendum(): string {
-			if (opening.length === 0) return "";
-			return `\n\n<先に話しかけた内容 label="利用者が発言する前に、あなたが自分から話しかけた言葉">\n${opening.join("\n")}\n</先に話しかけた内容>`;
+		/** What the AI said on its own before the user spoke (for respondSystem). */
+		opening(): string[] {
+			return [...opening];
 		},
 	};
 }

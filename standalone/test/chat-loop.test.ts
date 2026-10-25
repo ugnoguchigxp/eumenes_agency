@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { maxIdleSec, ttsUtteranceStyle } from "../../src/index.ts";
+import {
+	maxIdleSec,
+	respondSystem,
+	spokenReplyStyle,
+	ttsUtteranceStyle,
+} from "../../src/index.ts";
 import {
 	createChatLog,
 	createConversation,
@@ -12,12 +17,10 @@ import {
 	parseCliArgs,
 	printAbove,
 	resolveCondition,
-	ttsReplyStyle,
 } from "../chat-loop.ts";
 import {
 	defaultInterestText,
 	maxInterestChars,
-	personaPrompt,
 	toStandingInterests,
 } from "../persona.ts";
 
@@ -30,6 +33,7 @@ describe("parseCliArgs / resolveCondition", () => {
 			maxUnanswered: 1,
 			log: { kind: "default" },
 			tts: true,
+			emotion: true,
 			social: true,
 			quietWhy: false,
 			interests: [defaultInterestText],
@@ -66,6 +70,12 @@ describe("parseCliArgs / resolveCondition", () => {
 		expect(parseCliArgs(["--social", "--no-social"]).social).toBe(false);
 		expect(parseCliArgs([]).quietWhy).toBe(false);
 		expect(parseCliArgs(["--quiet-why"]).quietWhy).toBe(true);
+	});
+
+	test("--emotion / --no-emotion (default on, last one wins)", () => {
+		expect(parseCliArgs([]).emotion).toBe(true);
+		expect(parseCliArgs(["--no-emotion"]).emotion).toBe(false);
+		expect(parseCliArgs(["--no-emotion", "--emotion"]).emotion).toBe(true);
 	});
 
 	test("--tts / --no-tts (default on, last one wins)", () => {
@@ -146,16 +156,16 @@ describe("createConversation", () => {
 		const c = createConversation();
 		c.addAssistant("先に話します");
 		expect(c.messages()).toEqual([]);
-		expect(c.systemAddendum()).toContain("先に話します");
+		expect(c.opening()).toEqual(["先に話します"]);
 		c.addUser("はい");
 		c.addAssistant("了解");
 		expect(c.messages()[0]?.role).toBe("user");
 		expect(c.messages().map((t) => t.role)).toEqual(["user", "assistant"]);
 	});
 
-	test("no addendum without an opener; rollback removes only a trailing user turn", () => {
+	test("no opening without an opener; rollback removes only a trailing user turn", () => {
 		const c = createConversation();
-		expect(c.systemAddendum()).toBe("");
+		expect(c.opening()).toEqual([]);
 		c.addUser("a");
 		c.rollbackUser();
 		expect(c.messages()).toEqual([]);
@@ -326,7 +336,7 @@ describe("printAbove", () => {
 
 describe("tts styles", () => {
 	test("spoken-style rules are present", () => {
-		for (const style of [ttsReplyStyle, ttsUtteranceStyle]) {
+		for (const style of [spokenReplyStyle, ttsUtteranceStyle]) {
 			expect(style).toContain("話し言葉");
 			expect(style).toContain("Markdown");
 			expect(style).toContain("URL");
@@ -341,8 +351,9 @@ describe("persona", () => {
 			{ id: "i1", text: "a" },
 			{ id: "i2", text: "b" },
 		]);
-		expect(personaPrompt([])).toBe("");
-		const prompt = personaPrompt([defaultInterestText]);
+		const prompt = respondSystem({
+			interests: toStandingInterests([defaultInterestText]),
+		});
 		expect(prompt).toContain(defaultInterestText);
 		expect(prompt).toContain("聞かれたら");
 		expect(prompt).toContain("寄せたり");

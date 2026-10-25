@@ -12,6 +12,7 @@ import {
 	obsInput,
 	opportunity,
 	participation,
+	toWire,
 } from "./helpers.ts";
 
 const sig = () => new AbortController().signal;
@@ -50,7 +51,13 @@ const run = async (o: {
 	rt.observe(
 		obsInput("o1", "user.report", "user", 0, "夜のドライブ向けの曲を作って"),
 	);
-	llm.push("update", b1Proposal([]));
+	// hostTodos asks the update for reportedTodos too.
+	llm.push(
+		"update",
+		o.hostTodos
+			? { ...toWire(b1Proposal([])), reportedTodos: [] }
+			: b1Proposal([]),
+	);
 	llm.push("select", o.select ?? participation());
 	const d = await rt.decide(
 		opportunity("op0", 10 * MIN, {
@@ -161,5 +168,184 @@ describe("hostTodos (work reports)", () => {
 			trigger: "idle",
 		});
 		expect(alone.select?.prompt).toContain("[todo:e1]");
+	});
+});
+
+const waiting: HostTodo = {
+	id: "w3",
+	title: "ロゴ画像の生成",
+	status: "waiting",
+	question: "背景は白と黒のどちらにしますか？",
+	requestedAt: 2 * MIN,
+};
+
+describe("hostTodos: a waiting item (the sub-agent asked a question)", () => {
+	test("is rendered before done items with its question and opens the gate", async () => {
+		const r = await run({
+			hostTodos: true,
+			todos: [image, song, waiting],
+			trigger: "result_received",
+		});
+		const p = r.select?.prompt ?? "";
+		expect(p).toContain(
+			"[todo:w3] 質問待ち: ロゴ画像の生成 / 質問: 背景は白と黒のどちらにしますか？ / 依頼: 8分前",
+		);
+		expect(p.indexOf("[todo:w3]")).toBeLessThan(p.indexOf("[todo:w1]"));
+		expect(p).toContain("その質問を選ぶ");
+		expect(r.select?.system).toContain("【仕事の質問】");
+		const alone = await run({ hostTodos: true, todos: [waiting] });
+		expect(alone.select).toBeDefined();
+	});
+
+	test("prompts are unchanged while no waiting item is present", async () => {
+		const r = await run({ hostTodos: true, todos: [image, song] });
+		expect(r.select?.system).not.toContain("【仕事の質問】");
+		expect(r.select?.prompt).not.toContain("質問待ち");
+		expect(r.select?.prompt).not.toContain("その質問を選ぶ");
+	});
+
+	test("a waiting item without a question is not shown", async () => {
+		const { question: _q, ...noQuestion } = waiting;
+		const r = await run({ hostTodos: true, todos: [noQuestion] });
+		expect(r.select).toBeUndefined();
+	});
+
+	test("citing it is accepted by the validation (the host never archives it)", async () => {
+		const r = await run({
+			hostTodos: true,
+			todos: [waiting],
+			select: participation({
+				action: "speak",
+				utterance: "ロゴの背景、白と黒のどっちがいい？",
+				evidenceRefs: ["todo:w3"],
+			}),
+		});
+		expect(r.d.decision.action).toBe("speak");
+		expect(reportedTodoIds(r.d.decision.evidenceRefs)).toEqual(["w3"]);
+	});
+});
+
+describe("hostTodos: reconciling a normal reply with a finished item", () => {
+	const reportRun = async (o: {
+		todos: readonly HostTodo[];
+		reports: unknown[];
+		observe?: boolean;
+		hostTodos?: boolean;
+	}) => {
+		const llm = fakeLlm();
+		const rt = createAgencyRuntime({
+			condition: "B1",
+			llm,
+			tools: [],
+			budget: { ...defaultBudget, minIntervalMs: 0 },
+			limits: { ...defaultLimits, outboundIntervalMs: 0 },
+			...(o.hostTodos === false
+				? {}
+				: { hostTodos: true, todos: () => o.todos }),
+		});
+		rt.observe(obsInput("u1", "user.report", "user", 8 * MIN, "曲はどう？"));
+		if (o.observe !== false)
+			rt.observe(
+				obsInput(
+					"r1",
+					"exchange.adopted",
+					"agent",
+					10 * MIN,
+					"曲、できているよ。",
+				),
+			);
+		llm.push("update", {
+			...toWire(b1Proposal([])),
+			reportedTodos: o.reports,
+		});
+		const outcomes = await rt.runBackground(11 * MIN, sig());
+		return { rt, llm, outcomes };
+	};
+
+	test("a shown done item conveyed by an agent reply is reported once, then drained", async () => {
+		const { rt, llm, outcomes } = await reportRun({
+			todos: [song, image],
+			reports: [{ todoId: "w1", observationRef: "r1" }],
+		});
+		expect(outcomes.at(-1)?.code).not.toMatch(/^rejected/);
+		const req = llm.requests.find((r) => r.purpose === "update");
+		expect(req?.system).toContain("【仕事の報告の照合】");
+		expect(req?.prompt).toContain("# 依頼された仕事");
+		expect(req?.prompt).toContain("[todo:w1] 完了（成功）");
+		expect(rt.takeReportedTodos()).toEqual([
+			{ todoId: "w1", observationId: "r1" },
+		]);
+		expect(rt.takeReportedTodos()).toEqual([]);
+	});
+
+	test("the todo: prefix is accepted", async () => {
+		const { rt } = await reportRun({
+			todos: [song],
+			reports: [{ todoId: "todo:w1", observationRef: "r1" }],
+		});
+		expect(rt.takeReportedTodos()).toEqual([
+			{ todoId: "w1", observationId: "r1" },
+		]);
+	});
+
+	test("refs that were not shown, unfinished items, unknown or non-agent observations are dropped", async () => {
+		const { rt } = await reportRun({
+			todos: [song, image, waiting],
+			reports: [
+				{ todoId: "w9", observationRef: "r1" }, // not shown
+				{ todoId: "w2", observationRef: "r1" }, // still running
+				{ todoId: "w3", observationRef: "r1" }, // waiting for the user
+				{ todoId: "w1", observationRef: "r9" }, // no such observation
+				{ todoId: "w1", observationRef: "u1" }, // a user observation
+			],
+		});
+		expect(rt.takeReportedTodos()).toEqual([]);
+	});
+
+	test("a reply from before the item was done does not report it", async () => {
+		const { rt } = await reportRun({
+			todos: [{ ...song, doneAt: 10 * MIN + 1 }],
+			reports: [{ todoId: "w1", observationRef: "r1" }],
+		});
+		expect(rt.takeReportedTodos()).toEqual([]);
+	});
+
+	test("errands are not reportable", async () => {
+		const errand: HostTodo = {
+			id: "e1",
+			kind: "errand",
+			title: "返送",
+			status: "done",
+			requestedAt: 0,
+			doneAt: 0,
+		};
+		const { rt, llm } = await reportRun({
+			todos: [errand],
+			reports: [{ todoId: "e1", observationRef: "r1" }],
+		});
+		expect(rt.takeReportedTodos()).toEqual([]);
+		expect(llm.requests[0]?.prompt).not.toContain("todo:e1");
+	});
+
+	test("outside hostTodos mode the schema, prompt and reports are as before", async () => {
+		const llm = fakeLlm();
+		const rt = createAgencyRuntime({
+			condition: "B1",
+			llm,
+			tools: [],
+			budget: { ...defaultBudget, minIntervalMs: 0 },
+			todos: () => [song],
+		});
+		rt.observe(obsInput("u1", "user.report", "user", 0, "曲を作って"));
+		llm.push("update", b1Proposal([]));
+		await rt.runBackground(11 * MIN, sig());
+		const req = llm.requests[0];
+		expect(req?.prompt).not.toContain("依頼された仕事");
+		expect(req?.system).toBe(systemPrompt("update", "B1"));
+		expect(rt.takeReportedTodos()).toEqual([]);
+		expect(systemPrompt("update", "B1", { hostTodos: true })).toContain(
+			"reportedTodos",
+		);
+		expect(systemPrompt("update", "B1")).not.toContain("reportedTodos");
 	});
 });

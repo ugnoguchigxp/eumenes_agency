@@ -113,3 +113,12 @@ social-05・06（未見 25・26）は、最後の型として正解を「持ち�
 - §7-1（期限のある利用者の用事も TODO に載せる）: 進める。設計は別文書。
 - §7-3（反応がなければ一度だけ言い直す）: やらない。報告したら archived のまま、二度は言わない。
 - P1-E 本体の測定の続き（dev-5・未見）と P2-E 閉ループ会話: やらない。
+
+## 10. 通常の返答・質問待ち・報告の照合（2026-10-25、会話エージェントの置き換え）
+
+設計の正本は Eumenes の `spec/agency-conversation-agent-design-2026-10-25.md`（§2・§4・§6・§11.2）。ここでは agency 側の契約だけを記す。
+
+- **通常の返答:** agency は背景の `update`・`decide` に加えて、利用者の発言への返答も行う。`respondSystem(options)`（system の文）と `runRespond(input)`（返答の1回、ツールの呼出しを含む）を公開する。ツールの定義と実行はホストが `ToolPort` で渡し、Provider の選択はホストの `ReplyPort` が持つ。試験用に、Eumenes と同じ名前（`find_toolchain`・`delegate`・`work`・`memory`）の mock `createMockToolPort()` を置く。
+- **`HostTodo.status` に `waiting` を追加**（`question` は一行、waiting のときだけ）。担当が利用者に質問して止まっている仕事。select は完了の報告より先に、その質問を一文で伝える（質問は仕事を止め、報告は止めない）。evidenceRefs に `todo:<id>` を入れる。ホストは waiting を `archived` にしない（利用者の答えは後の通常の返答が `work` の `answer` で担当へ渡す）。質問待ちが一つもないときの select の指示文・機会の提示は変わらない（質問の規則は質問待ちがあるときだけ system に付く）。質問のない waiting は提示しない。
+- **報告の照合:** hostTodos では、背景の `update` が提示された仕事の一覧（`RuntimeDeps.todos` の取得関数）を見て、通常の返答（actor agent・`exchange.adopted`）が完了した仕事の結果を伝えたと判断したら、`reportedTodos: [{ todoId, observationRef }]` で返す。候補の `reconciliations` は B1 にないので、別の配列にした。ホストの検査: 提示した仕事で、状態が `done`（進行中・質問待ちは対象外）、観測が存在し、提示した agent の `exchange.adopted` で、仕事の完了（`doneAt`）以後のもの。満たさないものは黙って捨てる（update 全体は却下しない）。用事（errand）は対象外。`AgencyRuntime.takeReportedTodos()` が `{ todoId, observationId }[]` を返して空にする。ホストは、その観測の発話が最後まで届いたときに `archived` にする。
+- 評価のプロンプトは変わらない: 新しい指示・スキーマは hostTodos モードだけ。版は `INSTRUCTION_VERSION` = `p0e-instructions-11`、`HOST_RULES_VERSION` = `host-rules-5`。

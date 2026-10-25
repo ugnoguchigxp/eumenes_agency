@@ -1,6 +1,7 @@
 import type {
 	AgencyState,
 	Condition,
+	HostTodo,
 	Limits,
 	Observation,
 	ObservationInput,
@@ -74,6 +75,12 @@ export interface RuntimeDeps {
 	 */
 	readonly hostTodos?: boolean;
 	/**
+	 * hostTodos mode only: the host's current work items, read at each update call. The update
+	 * sees them and may report which done item a normal reply conveyed (see
+	 * `AgencyRuntime.takeReportedTodos`). Absent: the update prompt and schema are as before.
+	 */
+	readonly todos?: () => readonly HostTodo[];
+	/**
 	 * Utterance emotion (B1 only; absent in eval except condition B1h): select also picks one
 	 * emoji for the feeling a speak is said with (spec/emotion-design.md); it reaches the host
 	 * as Decision.emotion / ActionTicket.emotion. Absent: the select schema and prompt are as before.
@@ -90,7 +97,7 @@ export interface StandingInterest {
 export const RECENT_OBSERVATION_WINDOW = 30;
 
 /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
-export const HOST_RULES_VERSION = "host-rules-4";
+export const HOST_RULES_VERSION = "host-rules-5";
 
 /** One background model call (or a host decision not to make one). */
 export interface CallOutcome {
@@ -200,6 +207,13 @@ export interface AgencyRuntime {
 	recordResult(receipt: ActionReceipt): Observation;
 	/** New input / speech start / settings change: interrupts reserved tickets. */
 	invalidate(reason: string, now: number): void;
+	/**
+	 * hostTodos mode: drains the work reports the update settled since the last call. Each is a
+	 * done item (`todoId`) that a normal reply (`observationId`, an agent exchange.adopted
+	 * observation) conveyed. The host archives the item once that reply's utterance was
+	 * delivered in full. Always empty outside hostTodos mode.
+	 */
+	takeReportedTodos(): { todoId: string; observationId: string }[];
 	setEnabled(enabled: boolean): void;
 	projection(maxItems: number): AgencyProjection;
 	snapshot(): {

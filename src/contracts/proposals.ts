@@ -121,6 +121,13 @@ export const reconciliation = z.strictObject({
 	observationRef: ref,
 });
 
+/** hostTodos mode: a normal response already conveyed this finished work item. */
+export const reportedTodo = z.strictObject({
+	todoId: ref,
+	observationRef: ref,
+});
+export type ReportedTodo = z.infer<typeof reportedTodo>;
+
 const proposalBase = {
 	/** Short structured rationale; stored, not logged by default. */
 	summary: text(600),
@@ -309,14 +316,26 @@ const wireSchemas = {
 	F: wireUpdate(wireOpNames.F, 12, 4),
 };
 
+/** B1 in hostTodos mode: the same update plus the work items a normal reply conveyed. */
+const wireB1Todos = wireSchemas.B1.extend({
+	reportedTodos: z.array(reportedTodo).max(4),
+});
+
 export type WireOp = z.infer<ReturnType<typeof wireOpShape<WireOpName>>>;
 export type WireUpdate = Omit<z.infer<(typeof wireSchemas)["F"]>, "ops"> & {
 	ops: WireOp[];
+	/** Present only in the hostTodos update schema. */
+	reportedTodos?: ReportedTodo[];
 };
 
+/** `hostTodos`: B1 only, adds the reportedTodos array; every other schema is unchanged. */
 export const wireUpdateSchema = (
 	condition: "B1" | "B2" | "F",
-): z.ZodType<WireUpdate> => wireSchemas[condition] as z.ZodType<WireUpdate>;
+	options: { readonly hostTodos?: boolean } = {},
+): z.ZodType<WireUpdate> =>
+	(condition === "B1" && options.hostTodos === true
+		? wireB1Todos
+		: wireSchemas[condition]) as z.ZodType<WireUpdate>;
 
 /**
  * Placeholder for a missing intent.update reason; settle stores it as lastReason. Only for

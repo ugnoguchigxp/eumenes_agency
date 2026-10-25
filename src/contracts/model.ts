@@ -54,8 +54,8 @@ export interface Opportunity {
 	 */
 	readonly ambient?: readonly HostTopic[];
 	/**
-	 * Host-tracked work the user asked for (e.g. a song generation, a pipeline): open (`todo`)
-	 * and finished-but-unreported (`done`) items. Shown to select with refs `todo:<id>`; the host
+	 * Host-tracked work the user asked for (e.g. a song generation, a pipeline): open (`todo`),
+	 * waiting-for-the-user (`waiting`) and finished-but-unreported (`done`) items. Shown to select with refs `todo:<id>`; the host
 	 * archives a done item once an utterance citing it is delivered. Used with deps.hostTodos.
 	 */
 	readonly todos?: readonly HostTodo[];
@@ -77,7 +77,13 @@ export interface HostTodo {
 	readonly origin?: "user" | "self";
 	/** One line, e.g. 「楽曲の生成（夜のドライブ向け）」. */
 	readonly title: string;
-	readonly status: "todo" | "done";
+	/**
+	 * todo: in progress. waiting: the sub-agent asked the user a question (`question`) and the
+	 * work is blocked until it is answered. done: finished (see outcome/result).
+	 */
+	readonly status: "todo" | "waiting" | "done";
+	/** For waiting: the sub-agent's question, one line (never invented by the agent). */
+	readonly question?: string;
 	/** For done: how it ended. */
 	readonly outcome?: "succeeded" | "partial" | "failed";
 	/** For done: one-line result from the host (never invented by the agent). */

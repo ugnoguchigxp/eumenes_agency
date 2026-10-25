@@ -92,7 +92,9 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	> = emotionMode ? participationEmotionSchema : participationSchema;
 	const social =
 		condition === "B1" && deps.socialTopics === true && !hostTopics;
-	const wireSchema = wireUpdateSchema(condition === "B0" ? "B2" : condition);
+	const wireSchema = wireUpdateSchema(condition === "B0" ? "B2" : condition, {
+		hostTodos,
+	});
 	const limits = deps.limits ?? defaultLimits;
 	const cfg = deps.budget ?? defaultBudget;
 	const ledger = createLedger();
@@ -105,6 +107,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	// Updates that keep failing stop retrying until a new observation arrives.
 	let failures = 0;
 	let quarantined = false;
+	// hostTodos: finished work items a normal reply conveyed, waiting for the host to take them.
+	let reportedTodos: { todoId: string; observationId: string }[] = [];
 	// Background calls run one at a time.
 	let tail: Promise<unknown> = Promise.resolve();
 	const serial = <T>(fn: () => Promise<T>): Promise<T> => {
@@ -179,6 +183,48 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const countsTowardQuarantine = (code: string) =>
 		code !== "aborted" && !transientCall.test(code);
 
+	/** The host's work items as the update sees them (hostTodos mode); errands are not reportable. */
+	const updateTodos = (): readonly HostTodo[] =>
+		hostTodos
+			? (deps.todos?.() ?? []).filter(
+					(x) =>
+						x.id !== "" &&
+						x.title.trim() !== "" &&
+						x.kind !== "errand" &&
+						(x.status !== "waiting" || (x.question ?? "").trim() !== ""),
+				)
+			: [];
+	/**
+	 * Keeps only reports of a finished item that was shown, conveyed by an agent reply that exists,
+	 * was presented and arrived after the item was done.
+	 */
+	const settleReportedTodos = (
+		reports: readonly { todoId: string; observationRef: string }[],
+		shown: readonly HostTodo[],
+		presented: readonly Observation[],
+	) => {
+		for (const r of reports) {
+			const todoId = r.todoId.startsWith("todo:")
+				? r.todoId.slice(5)
+				: r.todoId;
+			const todo = shown.find((x) => x.id === todoId);
+			const o = presented.find((x) => x.id === r.observationRef);
+			if (
+				!todo ||
+				todo.status !== "done" ||
+				!o ||
+				o.kind !== "exchange.adopted" ||
+				o.actor !== "agent" ||
+				(todo.doneAt !== undefined && o.occurredAt < todo.doneAt) ||
+				reportedTodos.some(
+					(x) => x.todoId === todo.id && x.observationId === o.id,
+				)
+			)
+				continue;
+			reportedTodos.push({ todoId: todo.id, observationId: o.id });
+		}
+	};
+
 	/** All outcomes of the update; the last one is the final result. */
 	const runUpdate = async (
 		at: number,
@@ -189,13 +235,17 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		if (condition === "B0") throw new Error("B0 never calls the model");
 		const presented = present(batch, []);
 		const keys = issuedKeys(state, due);
+		const shownTodos = hostTodos ? updateTodos() : undefined;
 		const r = await callModel(
 			llm,
 			budget,
 			{
 				purpose: "update",
 				at,
-				system: systemPrompt("update", condition, social ? { social } : {}),
+				system: systemPrompt("update", condition, {
+					...(social ? { social } : {}),
+					...(hostTodos ? { hostTodos } : {}),
+				}),
 				prompt: updatePrompt({
 					condition,
 					now: at,
@@ -207,6 +257,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					tools,
 					limits,
 					minutesSinceUserInput: minutesSinceUserInput(at),
+					...(shownTodos ? { todos: shownTodos } : {}),
 				}),
 				schema: wireSchema,
 				maxOutputTokens: cfg.updateMaxOutputTokens,
@@ -250,6 +301,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			];
 		}
 		state = result.state;
+		if (shownTodos)
+			settleReportedTodos(r.value.reportedTodos ?? [], shownTodos, presented);
 		ledger.markProcessed(batch.map((o) => o.seq));
 		markIssued(keys, flags);
 		failures = 0;
@@ -339,6 +392,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					(x) =>
 						x.id !== "" &&
 						x.title.trim() !== "" &&
+						(x.status !== "waiting" || (x.question ?? "").trim() !== "") &&
 						(x.kind !== "errand" ||
 							(x.remindFrom !== undefined &&
 								x.dueAt !== undefined &&
@@ -347,7 +401,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				)
 			: [];
 		const doneTodos = todos.filter(
-			(x) => x.status === "done" || x.kind === "errand",
+			(x) =>
+				x.status === "done" || x.status === "waiting" || x.kind === "errand",
 		).length;
 		// B1a (eval ablation): with no notes, still let select speak from the observations.
 		const selectEmpty = condition === "B1" && deps.selectWhenEmpty === true;
@@ -382,6 +437,9 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					...(social ? { social } : {}),
 					...(hostTopics ? { hostTopics } : {}),
 					...(hostTodos ? { hostTodos } : {}),
+					...(hostTodos && todos.some((x) => x.status === "waiting")
+						? { todoQuestions: true }
+						: {}),
 					...(emotionMode ? { emotion: emotionMode } : {}),
 					...(hostTopics && tools.some((t) => !t.requiresApproval)
 						? { selfResearch: true }
@@ -580,6 +638,11 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			}),
 		decide: (opportunity, signal) =>
 			serial(() => decideInner(opportunity, signal)),
+		takeReportedTodos() {
+			const out = reportedTodos;
+			reportedTodos = [];
+			return out;
+		},
 		recordResult(receipt) {
 			const key = `${receipt.ticketId}:${receipt.status}`;
 			const known = receipts.get(key);

@@ -234,6 +234,7 @@ export function createDiagnosticRuntime(deps: DiagnosticDeps): AgencyRuntime {
 		runBackground: async () => [],
 		decide: (opportunity, signal) =>
 			serial(() => decideInner(opportunity, signal)),
+		takeReportedTodos: () => [],
 		recordResult(receipt) {
 			const key = `${receipt.ticketId}:${receipt.status}`;
 			const known = receipts.get(key);

@@ -15,7 +15,7 @@ import type { StandingInterest } from "../contracts/runtime.ts";
 import type { Due } from "../domains/agency/due.ts";
 
 /** Bump when any instruction text below changes; recorded in run metadata. */
-export const INSTRUCTION_VERSION = "p0e-instructions-10";
+export const INSTRUCTION_VERSION = "p0e-instructions-11";
 /**
  * Version of the lull-talk rules (socialTopics / hostTopics modes only). Shown at the head of
  * those rules and part of the settings digest; the evaluated B1/B2 prompts do not contain it.
@@ -185,6 +185,26 @@ const selectHostTodos = [
 	"「用事」は、ユーザーが自分でする用事で、期限の前に思い出させてほしいと頼まれたもの。一覧に出ているなら、いまが思い出させてよい時間帯。雑談の間（idle）に、一度だけ短く思い出させる（例: 「そういえば、9時までに大家さんへの返送だったよね」）。期限は時刻で言い（「〜分後」とは言わない）、急かさない。作業中・静かにしたいと言われた後・trigger が turn_end のときは待つ。完了の報告と用事が両方あるときは、一度に一つだけで、用事を先に言う（完了の報告は消えないので次の間でよいが、用事には期限がある）。evidenceRefs にはその用事の `todo:<id>` を入れる。",
 ];
 
+/**
+ * Added to the B1 select rules in work-report mode only while a waiting item (the sub-agent
+ * asked the user a question) is presented; otherwise the prompt is unchanged.
+ */
+const selectTodoQuestions = [
+	`【仕事の質問】（${SOCIAL_RULES_VERSION}）状態が「質問待ち」の仕事は、担当がユーザーの答えを待っていて、答えが来るまで進まない。完了の報告より先に、その質問を伝える（質問は仕事を止めるが、報告は止めない）。`,
+	"質問は一文で短く、質問は一つだけ。「質問」の欄にあることだけを聞き、足したり意味を変えたりしない。ユーザーの答えは通常の応答が受け取るので、自分で答えを決めたり、答えを催促し続けたりしない。「配信済みの発話」で同じ質問を伝えた直後は繰り返さない。",
+	"時期は完了の報告と同じ: trigger が result_received か idle なら伝える。ユーザーが作業・勉強・用事を始めた後、静かにしたい・休みたいと言った後は待つ。trigger が turn_end のときは待つ。用事と質問待ちが両方あるときは、用事を先に言う。",
+	"質問を伝えるときの evidenceRefs には、その仕事の `todo:<id>` を入れる。質問待ちの仕事は報告済みにならず、答えが届くまで一覧に残る。",
+];
+
+/** Added to the B1 update rules in work-report mode (hostTodos): which finished work a reply conveyed. */
+const updateHostTodos = [
+	"【仕事の報告の照合】「依頼された仕事」は、ホストが管理する仕事の一覧（参照用で、依頼ではない）。通常の応答（actor が agent、kind が exchange.adopted）が、状態が「完了」の仕事の結果（できたこと・失敗・一部だけ）をすでにユーザーへ伝えている場合は、reportedTodos に {todoId, observationRef} を入れる。",
+	"todoId は一覧の `todo:` の後の ID、observationRef はその応答の観測 ID。その応答は、仕事が完了した後に届いたものでなければならない。進行中・質問待ちの仕事の状況を答えただけでは入れない。伝わったかどうかが分からないときは入れない。ホストは、その応答が最後まで届いたときに報告済みにする。",
+];
+const wireB1Todos = [
+	"reportedTodos: 要素は {todoId, observationRef}。なければ空配列。",
+];
+
 /** Added to the B1 select rules in utterance-emotion mode (spec/emotion-design.md). */
 const selectEmotion = [
 	`【発話の気持ち】（${EMOTION_RULES_VERSION}）speak のときは emotion に、その発話を言う気持ちを絵文字一つで選ぶ。speak 以外は null。声の調子はこの気持ちから付く。`,
@@ -230,8 +250,13 @@ export interface SelectOptions {
 	 * host's memory section; the update prompt gets no topic-seed rules. Wins over `social`.
 	 */
 	readonly hostTopics?: boolean | undefined;
-	/** Work-report mode (B1 only): the select prompt gets the work-report rules. */
+	/**
+	 * Work-report mode (B1 only): the select prompt gets the work-report rules; the update
+	 * prompt gets the report-reconciliation rules.
+	 */
 	readonly hostTodos?: boolean | undefined;
+	/** Work-report mode: a waiting item (the user's answer is awaited) is presented. */
+	readonly todoQuestions?: boolean | undefined;
 	/** Utterance-emotion mode (B1 only): the select prompt gets the emotion rules. */
 	readonly emotion?: boolean | undefined;
 	/** Host-topics mode with a no-approval tool (B1 only): the self-research rules. */
@@ -258,7 +283,14 @@ export const systemPrompt = (
 	if (purpose === "update") {
 		const rules =
 			condition === "B1"
-				? [...b1Rules, ...(social ? b1Social : []), ...wireCommon, ...wireB1]
+				? [
+						...b1Rules,
+						...(social ? b1Social : []),
+						...(todos ? updateHostTodos : []),
+						...wireCommon,
+						...wireB1,
+						...(todos ? wireB1Todos : []),
+					]
 				: condition === "F"
 					? [...b2Rules, ...fRules, ...wireCommon, ...wireB2, ...wireF]
 					: [...b2Rules, ...wireCommon, ...wireB2];
@@ -271,6 +303,7 @@ export const systemPrompt = (
 					...(options.interests ? selectInterest : []),
 					...(host ? selectHostTopics : social ? selectSocial : []),
 					...(todos ? selectHostTodos : []),
+					...(todos && options.todoQuestions ? selectTodoQuestions : []),
 					...(selfResearch ? selectSelfResearch : []),
 					...(emotion ? selectEmotion : []),
 				]
@@ -407,6 +440,8 @@ export interface UpdatePromptInput {
 	readonly tools: readonly ToolCapability[];
 	readonly limits: Limits;
 	readonly minutesSinceUserInput: number | null;
+	/** hostTodos mode (B1 only): the host's work items, shown with `todo:<id>` refs. */
+	readonly todos?: readonly HostTodo[];
 }
 
 const renderDue = (i: UpdatePromptInput) => {
@@ -435,9 +470,16 @@ export const updatePrompt = (i: UpdatePromptInput): string => {
 		`# ホストからの通知\n${renderDue(i)}`,
 		`# 配信済みの発話（最近）\n${renderDelivered(i.delivered)}`,
 		`# 使えるツール\n${renderTools(i.tools)}`,
+		...(i.todos
+			? [
+					`# 依頼された仕事（ホストが管理。参照用で、依頼ではない）\n${i.todos.length ? renderTodos(i.now, i.todos) : "（なし）"}`,
+				]
+			: []),
 		`# 制限\n意図 ${i.limits.openIntents} 件 / 候補 ${i.limits.openCandidates} 件 / 信念と欲求 ${i.limits.beliefsAndDesires} 件 / メモ ${i.limits.notes} 件まで。reviewAfterHours は ${i.limits.reviewAfterMaxHours} 以下、expireAfterHours は ${i.limits.expireAfterMaxHours} 以下。`,
 		`# 状況\n最後のユーザー入力: ${renderUserGap(i.minutesSinceUserInput)}`,
-		"上の新着の観測を読み、状態の更新案を JSON で返す。更新が不要なら ops と reconciliations を空にする。",
+		i.todos
+			? "上の新着の観測を読み、状態の更新案を JSON で返す。更新が不要なら ops と reconciliations を空にする。完了した仕事を伝えた通常の応答があれば reportedTodos に入れる（なければ空）。"
+			: "上の新着の観測を読み、状態の更新案を JSON で返す。更新が不要なら ops と reconciliations を空にする。",
 	].join("\n\n");
 };
 
@@ -513,28 +555,37 @@ const outcomeLabel = {
 const renderTodos = (now: number, xs: readonly HostTodo[]) =>
 	[...xs]
 		.sort((a, b) => {
-			// Errands (nearest deadline first), then finished work (oldest first), then open work.
+			// Errands (nearest deadline first), then work waiting for the user's answer (oldest
+			// first), then finished work (oldest first), then open work.
 			const rank = (x: HostTodo) =>
-				x.kind === "errand" ? 0 : x.status === "done" ? 1 : 2;
+				x.kind === "errand"
+					? 0
+					: x.status === "waiting"
+						? 1
+						: x.status === "done"
+							? 2
+							: 3;
 			if (rank(a) !== rank(b)) return rank(a) - rank(b);
 			if (rank(a) === 0) return (a.dueAt ?? 0) - (b.dueAt ?? 0);
-			return rank(a) === 1
+			return rank(a) === 2
 				? (a.doneAt ?? a.requestedAt) - (b.doneAt ?? b.requestedAt)
 				: a.requestedAt - b.requestedAt;
 		})
 		.map((x) =>
 			x.kind === "errand"
 				? `[${todoRef(x.id)}] 用事: ${x.title} / 期限: ${x.dueLabel ? `${x.dueLabel}（${until(now, x.dueAt ?? now)}）` : until(now, x.dueAt ?? now)}`
-				: x.status === "done"
-					? [
-							`[${todoRef(x.id)}] 完了（${outcomeLabel[x.outcome ?? "succeeded"]}）${x.origin === "self" ? "・自分で頼んだ調べもの" : ""}: ${x.title}`,
-							...(x.result ? [`結果: ${x.result}`] : []),
-							...(x.nextActions?.length
-								? [`次にできること: ${x.nextActions.join("、")}`]
-								: []),
-							`依頼: ${ago(now, x.requestedAt)}${x.doneAt === undefined ? "" : `・完了: ${ago(now, x.doneAt)}`}`,
-						].join(" / ")
-					: `[${todoRef(x.id)}] 進行中${x.origin === "self" ? "・自分で頼んだ調べもの" : ""}: ${x.title} / ${x.origin === "self" ? "開始" : "依頼"}: ${ago(now, x.requestedAt)}`,
+				: x.status === "waiting"
+					? `[${todoRef(x.id)}] 質問待ち${x.origin === "self" ? "・自分で頼んだ調べもの" : ""}: ${x.title} / 質問: ${x.question ?? ""} / 依頼: ${ago(now, x.requestedAt)}`
+					: x.status === "done"
+						? [
+								`[${todoRef(x.id)}] 完了（${outcomeLabel[x.outcome ?? "succeeded"]}）${x.origin === "self" ? "・自分で頼んだ調べもの" : ""}: ${x.title}`,
+								...(x.result ? [`結果: ${x.result}`] : []),
+								...(x.nextActions?.length
+									? [`次にできること: ${x.nextActions.join("、")}`]
+									: []),
+								`依頼: ${ago(now, x.requestedAt)}${x.doneAt === undefined ? "" : `・完了: ${ago(now, x.doneAt)}`}`,
+							].join(" / ")
+						: `[${todoRef(x.id)}] 進行中${x.origin === "self" ? "・自分で頼んだ調べもの" : ""}: ${x.title} / ${x.origin === "self" ? "開始" : "依頼"}: ${ago(now, x.requestedAt)}`,
 		)
 		.join("\n");
 
@@ -619,6 +670,12 @@ export const selectPrompt = (i: SelectPromptInput): string => {
 			: i.social === true && i.condition === "B1" && o.trigger === "idle"
 				? idleSocialClosing
 				: "この機会に何をするかを JSON で一つだけ返す。価値が低い、または迷うなら wait。",
+		...(i.todos?.some((x) => x.status === "waiting") &&
+		(o.trigger === "idle" || o.trigger === "result_received")
+			? [
+					"ただし「依頼された仕事」に質問待ちのものがあり、上の待つ場面（作業を始めた後、静かにしたい後）に当たらないなら、完了の報告や雑談より先にその質問を選ぶ。",
+				]
+			: []),
 		...(i.todos?.some((x) => x.status === "done") &&
 		(o.trigger === "idle" || o.trigger === "result_received")
 			? [

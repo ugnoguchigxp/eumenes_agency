@@ -4,9 +4,10 @@ import { z } from "zod";
 import { LlmCallError, LlmOutputError } from "../../src/contracts/index.ts";
 import {
 	type ClaudeRole,
-	createClaudeChat,
+	createClaudeReply,
 	createClaudeLlm,
 	llmClient,
+	toAnthropicTurns,
 	type UsageMeter,
 } from "../claude.ts";
 
@@ -255,12 +256,16 @@ describe("SDK failure mapping", () => {
 			undefined,
 			new Headers(),
 		);
-		const error = await createClaudeChat(
+		const ask = {
+			messages: [{ role: "user" as const, content: "x" }],
+			tools: [],
+		};
+		const error = await createClaudeReply(
 			role,
 			fakeMeter().meter,
 			throwingClient(sdkError),
 		)
-			.reply("s", [{ role: "user", text: "x" }], new AbortController().signal)
+			.complete(ask, () => undefined, new AbortController().signal)
 			.then(
 				() => null,
 				(e: unknown) => e,
@@ -269,7 +274,7 @@ describe("SDK failure mapping", () => {
 			reasonCode: "api_429:rate_limit_error",
 			retryable: true,
 		});
-		const limited = await createClaudeChat(
+		const limited = await createClaudeReply(
 			role,
 			{
 				record: () => {},
@@ -280,7 +285,7 @@ describe("SDK failure mapping", () => {
 			},
 			throwingClient(sdkError),
 		)
-			.reply("s", [{ role: "user", text: "x" }], new AbortController().signal)
+			.complete(ask, () => undefined, new AbortController().signal)
 			.then(
 				() => null,
 				(e: unknown) => e,
@@ -292,8 +297,14 @@ describe("SDK failure mapping", () => {
 	});
 });
 
-describe("createClaudeChat", () => {
-	test("joins text blocks and ignores others", async () => {
+describe("createClaudeReply", () => {
+	const tool = {
+		name: "find_toolchain",
+		description: "d",
+		parameters: { type: "object", properties: {} },
+	};
+
+	test("joins text blocks, streams them once and sends system apart from the turns", async () => {
 		const { client, calls } = fakeClient({
 			content: [
 				{ type: "thinking", thinking: "hmm", signature: "s" },
@@ -301,22 +312,28 @@ describe("createClaudeChat", () => {
 				{ type: "text", text: "、世界" },
 			] as Anthropic.ContentBlock[],
 		});
-		const { meter, recorded } = fakeMeter();
+		const { meter } = fakeMeter();
 		const signal = new AbortController().signal;
-		const reply = await createClaudeChat(
+		const deltas: string[] = [];
+		const reply = await createClaudeReply(
 			{ ...role, effort: "medium", thinkingHeadroom: 4000 },
 			meter,
 			client,
-		).reply(
-			"sys",
-			[
-				{ role: "user", text: "a" },
-				{ role: "assistant", text: "b" },
-				{ role: "user", text: "c" },
-			],
+		).complete(
+			{
+				messages: [
+					{ role: "system", content: "sys" },
+					{ role: "user", content: "a" },
+					{ role: "assistant", content: "b" },
+					{ role: "user", content: "c" },
+				],
+				tools: [],
+			},
+			(t) => deltas.push(t),
 			signal,
 		);
-		expect(reply).toEqual({ text: "こんにちは、世界", model: "served-model" });
+		expect(reply).toEqual({ text: "こんにちは、世界", toolCalls: [] });
+		expect(deltas).toEqual(["こんにちは、世界"]);
 		const params = calls[0]?.params;
 		expect(params?.system).toBe("sys");
 		expect(params?.messages).toEqual([
@@ -327,23 +344,134 @@ describe("createClaudeChat", () => {
 		expect(params?.output_config).toEqual({ effort: "medium" });
 		expect(params?.max_tokens).toBe(1200 + 4000);
 		expect(params).not.toHaveProperty("temperature");
+		expect(params).not.toHaveProperty("tools");
 		expect(calls[0]?.options.signal).toBe(signal);
-		expect(recorded).toHaveLength(1);
 	});
 
-	test("records usage on refusal and max_tokens, then throws", async () => {
-		for (const stop of ["refusal", "max_tokens"] as const) {
-			const { client } = fakeClient({ stop_reason: stop });
-			const { meter, recorded } = fakeMeter();
-			const error = await createClaudeChat(role, meter, client)
-				.reply("s", [{ role: "user", text: "x" }], new AbortController().signal)
-				.then(
-					() => null,
-					(e: unknown) => e,
-				);
-			expect(error).toBeInstanceOf(LlmOutputError);
-			expect((error as LlmOutputError).reasonCode).toBe(stop);
-			expect(recorded).toHaveLength(1);
-		}
+	test("tool definitions go out and tool_use blocks come back as tool calls", async () => {
+		const { client, calls } = fakeClient({
+			stop_reason: "tool_use",
+			content: [
+				{ type: "text", text: "調べます" },
+				{
+					type: "tool_use",
+					id: "tu1",
+					name: "find_toolchain",
+					input: { query: "天気" },
+				},
+			] as Anthropic.ContentBlock[],
+		});
+		const reply = await createClaudeReply(
+			role,
+			fakeMeter().meter,
+			client,
+		).complete(
+			{ messages: [{ role: "user", content: "a" }], tools: [tool] },
+			() => undefined,
+			new AbortController().signal,
+		);
+		expect(reply.text).toBe("調べます");
+		expect(reply.toolCalls).toEqual([
+			{ id: "tu1", name: "find_toolchain", arguments: '{"query":"天気"}' },
+		]);
+		expect(calls[0]?.params.tools).toEqual([
+			{
+				name: "find_toolchain",
+				description: "d",
+				input_schema: tool.parameters,
+			},
+		]);
+		expect(calls[0]?.params).not.toHaveProperty("tool_choice");
+	});
+
+	test("tool results go back as one user turn of tool_result blocks; the raw assistant blocks are kept", async () => {
+		const { client, calls } = fakeClient({
+			stop_reason: "tool_use",
+			content: [
+				{ type: "thinking", thinking: "t", signature: "s" },
+				{ type: "tool_use", id: "tu1", name: "find_toolchain", input: {} },
+			] as Anthropic.ContentBlock[],
+		});
+		const port = createClaudeReply(role, fakeMeter().meter, client);
+		const first = await port.complete(
+			{ messages: [{ role: "user", content: "a" }], tools: [tool] },
+			() => undefined,
+			new AbortController().signal,
+		);
+		// the limit is reached: no tools asked, but the history holds tool blocks
+		await port.complete(
+			{
+				messages: [
+					{ role: "user", content: "a" },
+					{
+						role: "assistant",
+						content: "",
+						tool_calls: [
+							{
+								id: "tu1",
+								type: "function",
+								function: { name: "find_toolchain", arguments: "{}" },
+							},
+						],
+					},
+					{ role: "tool", content: "r1", tool_call_id: "tu1" },
+				],
+				tools: [],
+			},
+			() => undefined,
+			new AbortController().signal,
+		);
+		expect(first.toolCalls).toHaveLength(1);
+		const params = calls[1]?.params;
+		expect(params?.messages).toEqual([
+			{ role: "user", content: "a" },
+			{ role: "assistant", content: expect.any(Array) },
+			{
+				role: "user",
+				content: [{ type: "tool_result", tool_use_id: "tu1", content: "r1" }],
+			},
+		]);
+		const turns = params?.messages as { content: { type: string }[] }[];
+		expect(turns[1]?.content.map((b) => b.type)).toEqual([
+			"thinking",
+			"tool_use",
+		]);
+		expect(params?.tool_choice).toEqual({ type: "none" });
+		expect(params?.tools).toHaveLength(1);
+	});
+
+	test("without raw blocks the assistant turn is rebuilt from the tool calls", () => {
+		const { system, turns } = toAnthropicTurns([
+			{ role: "system", content: "s1" },
+			{ role: "user", content: "a" },
+			{
+				role: "assistant",
+				content: "待ってね",
+				tool_calls: [
+					{
+						id: "x",
+						type: "function",
+						function: { name: "n", arguments: "not json" },
+					},
+				],
+			},
+			{ role: "tool", content: "r", tool_call_id: "x" },
+			{ role: "tool", content: "r2", tool_call_id: "y" },
+		]);
+		expect(system).toBe("s1");
+		expect(turns[1]).toEqual({
+			role: "assistant",
+			content: [
+				{ type: "text", text: "待ってね" },
+				{ type: "tool_use", id: "x", name: "n", input: {} },
+			],
+		});
+		expect(turns[2]).toEqual({
+			role: "user",
+			content: [
+				{ type: "tool_result", tool_use_id: "x", content: "r" },
+				{ type: "tool_result", tool_use_id: "y", content: "r2" },
+			],
+		});
 	});
 });

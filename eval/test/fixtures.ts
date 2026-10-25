@@ -161,6 +161,9 @@ export class StubRuntime implements AgencyRuntime {
 			this.script.decisions[op.id] ?? decision({ opportunityId: op.id });
 		return { decision: d, calls: [outcome("applied", "select")] };
 	}
+	takeReportedTodos(): { todoId: string; observationId: string }[] {
+		return [];
+	}
 	recordResult(receipt: ActionReceipt): Observation {
 		this.log.push(`receipt:${receipt.ticketId}`);
 		this.receipts.push(receipt);

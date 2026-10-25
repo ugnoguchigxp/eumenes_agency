@@ -87,7 +87,6 @@ const RESEARCH = {
 		},
 	],
 };
-const J_NO_RESEARCH = (why: string) => [why];
 
 // ---------------------------------------------------------------- dev
 export const socialDev: CaseDef[] = [

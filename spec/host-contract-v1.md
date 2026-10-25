@@ -146,3 +146,15 @@ TTLは候補の実行可能期間、reviewAfterは意図を再検討する時点
 9. foreground競合や予算切れでは待機と欠落を区別する。再開は次の有効な機会か明示操作とし、常時pollingはしない。静かな機会が来ない間の自発性は保証しない。負荷試験で実用上再開できなければ、容量を増やす前に集約と実行頻度の設計を見直す。
 
 長期履歴の保持期間・上限・圧縮手順は実験設定として版管理する。一般ログと異なり、評価に必要な合成入力・出力は専用の評価データとして保存できる。実会話を保存する場合は利用者の許可範囲、保持期間、削除対象を先に定め、forgetをmanifest・派生評価資料にも伝播する。
+
+## 10. 通常の返答（2026-10-25 追記）
+
+agency は自発発話に加えて、利用者の発言への返答も受け持つ（Eumenes の `spec/agency-conversation-agent-design-2026-10-25.md`）。公開名は次のとおり。詳細と仕事（TODO）の照合は [todo-design.md §10](todo-design.md)。
+
+| 公開名 | 内容 |
+| --- | --- |
+| `respondSystem(options)` | 返答の system の文。`interests`（`StandingInterest[]`）・`spoken`・`emotion`・`projection`（`AgencyProjection`）・`opening`（先に話しかけた内容）。ツールの定義は含まない |
+| `runRespond(input)` | 返答の1回。`ReplyPort.complete` を呼び、tool 呼出しを `ToolPort.call` で順に実行して続ける。上限（既定4回）の後はツールなしで最後の呼出し。`end: true` で終わる。感情が有効なら先頭の絵文字をストリームから除いて返す。戻り値 `{ text, emotion?, ended, calls }` |
+| `ReplyPort` / `ToolPort` / `ToolDefinition` / `ReplyMessage` | ホストが渡す口（OpenAI の chat 形式）。Provider の選択は package の外 |
+| `createMockToolPort()` | 試験・CLI 用。Eumenes と同名の `find_toolchain`・`delegate`・`work`・`memory`、TODO を `HostTodo[]` で公開し、`complete`・`ask`・`archive` で試験から動かす |
+| `AgencyRuntime.takeReportedTodos()` / `RuntimeDeps.todos` | 通常の返答が伝えた完了済みの仕事の照合（hostTodos のみ） |

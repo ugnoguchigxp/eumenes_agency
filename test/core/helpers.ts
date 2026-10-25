@@ -340,6 +340,8 @@ export const toWire = (p: UpdateProposal): Json => ({
 	focusRefs: p.focusRefs,
 	ops: (p.ops as unknown as Json[]).map(toWireOp),
 	reconciliations: "reconciliations" in p ? p.reconciliations : [],
+	// hostTodos updates carry the work items a reply conveyed; kept as given.
+	...("reportedTodos" in p ? { reportedTodos: p.reportedTodos } : {}),
 });
 
 /** Typed proposals (no `hours` key on any op) are converted; wire-shaped values pass through. */

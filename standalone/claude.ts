@@ -1,12 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import {
-	type ChatPort,
 	LlmCallError,
 	LlmOutputError,
 	type LlmPort,
 	type LlmRequest,
 	type LlmResult,
+	type ReplyMessage,
+	type ReplyPort,
+	type ToolDefinition,
 } from "../src/contracts/index.ts";
 
 export interface ClaudeRole {
@@ -147,14 +149,103 @@ export function createClaudeLlm(
 	};
 }
 
-/** Free-text reply for the CLI main conversation. */
-export function createClaudeChat(
+/** system messages joined; user / assistant / tool messages as Messages API turns. */
+export function toAnthropicTurns(
+	messages: readonly ReplyMessage[],
+	/** The raw content blocks of an assistant turn by its first tool call id (keeps thinking blocks). */
+	raw: ReadonlyMap<string, Anthropic.ContentBlock[]> = new Map(),
+): { system: string; turns: Anthropic.MessageParam[] } {
+	const system = messages
+		.filter((m) => m.role === "system")
+		.map((m) => m.content)
+		.join("\n\n");
+	const turns: Anthropic.MessageParam[] = [];
+	for (const m of messages) {
+		if (m.role === "user") turns.push({ role: "user", content: m.content });
+		else if (m.role === "assistant") {
+			const first = m.tool_calls?.[0];
+			if (first === undefined) {
+				if (m.content !== "")
+					turns.push({ role: "assistant", content: m.content });
+				continue;
+			}
+			const kept = raw.get(first.id);
+			turns.push({
+				role: "assistant",
+				content: kept ?? [
+					...(m.content === ""
+						? []
+						: [{ type: "text" as const, text: m.content }]),
+					...(m.tool_calls ?? []).map((c) => ({
+						type: "tool_use" as const,
+						id: c.id,
+						name: c.function.name,
+						input: parseInput(c.function.arguments),
+					})),
+				],
+			});
+		} else if (m.role === "tool") {
+			const block = {
+				type: "tool_result" as const,
+				tool_use_id: m.tool_call_id ?? "",
+				content: m.content,
+			};
+			const last = turns[turns.length - 1];
+			if (
+				last?.role === "user" &&
+				Array.isArray(last.content) &&
+				last.content.every((b) => b.type === "tool_result")
+			)
+				last.content.push(block);
+			else turns.push({ role: "user", content: [block] });
+		}
+	}
+	return { system, turns };
+}
+
+function parseInput(argumentsJson: string): Record<string, unknown> {
+	try {
+		const parsed: unknown = JSON.parse(argumentsJson);
+		return typeof parsed === "object" &&
+			parsed !== null &&
+			!Array.isArray(parsed)
+			? (parsed as Record<string, unknown>)
+			: {};
+	} catch {
+		return {};
+	}
+}
+
+const anthropicTools = (tools: readonly ToolDefinition[]): Anthropic.Tool[] =>
+	tools.map((t) => ({
+		name: t.name,
+		description: t.description,
+		input_schema: t.parameters as Anthropic.Tool.InputSchema,
+	}));
+
+/**
+ * Normal reply for the CLI conversation, with tools. One non-streaming request per call: the
+ * whole text arrives as a single delta. The Messages API requires tool definitions whenever the
+ * history holds tool blocks, so when the loop asks for no tools (limit reached) the last known
+ * definitions are sent with `tool_choice: none`.
+ */
+export function createClaudeReply(
 	role: ClaudeRole,
 	meter: UsageMeter,
 	client: Anthropic = chatClient(),
-): ChatPort {
+): ReplyPort {
+	const raw = new Map<string, Anthropic.ContentBlock[]>();
+	let known: readonly ToolDefinition[] = [];
 	return {
-		async reply(system, turns, signal) {
+		async complete(request, onDelta, signal) {
+			if (request.tools.length > 0) known = request.tools;
+			const { system, turns } = toAnthropicTurns(request.messages, raw);
+			const sendTools =
+				request.tools.length > 0
+					? request.tools
+					: turnsUseTools(turns)
+						? known
+						: [];
 			const response = await guarded(meter, signal, () =>
 				client.messages.create(
 					{
@@ -164,13 +255,39 @@ export function createClaudeChat(
 							chatAnswerTokens + role.thinkingHeadroom,
 						),
 						system,
-						messages: turns.map((t) => ({ role: t.role, content: t.text })),
+						messages: turns,
+						...(sendTools.length > 0
+							? {
+									tools: anthropicTools(sendTools),
+									...(request.tools.length === 0
+										? { tool_choice: { type: "none" as const } }
+										: {}),
+								}
+							: {}),
 						output_config: { effort: role.effort },
 					},
 					{ signal },
 				),
 			);
-			return settle(response, meter);
+			const { text } = settle(response, meter);
+			const toolCalls = response.content
+				.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use")
+				.map((b) => ({
+					id: b.id,
+					name: b.name,
+					arguments: JSON.stringify(b.input),
+				}));
+			if (toolCalls[0] !== undefined)
+				raw.set(toolCalls[0].id, response.content);
+			if (text !== "") onDelta(text);
+			return { text, toolCalls };
 		},
 	};
 }
+
+const turnsUseTools = (turns: readonly Anthropic.MessageParam[]): boolean =>
+	turns.some(
+		(t) =>
+			Array.isArray(t.content) &&
+			t.content.some((b) => b.type === "tool_use" || b.type === "tool_result"),
+	);
