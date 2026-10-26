@@ -17,7 +17,13 @@ const allItems = (state: AgencyState): Map<string, ProjectionItem> => {
 	for (const b of state.beliefs.filter(
 		(x) => x.status === "active" || x.status === "disputed",
 	))
-		m.set(b.id, { id: b.id, kind: "belief", text: clip(b.content) });
+		m.set(b.id, {
+			id: b.id,
+			kind: "belief",
+			text: clip(b.content),
+			confidence: b.confidence,
+			evidence: b.evidence,
+		});
 	for (const d of state.desires.filter(
 		(x) => x.status === "open" || x.status === "held",
 	))

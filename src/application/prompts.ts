@@ -605,7 +605,7 @@ const renderByUse = (
 		)
 		.map(
 			({ x, ago }) =>
-				`[${ref(x.id)}] ${x.text}${ago === undefined ? "" : `（最後に使った: ${Math.round(ago)}分前）`}`,
+				`[${ref(x.id)}] ${q(x.text)}${ago === undefined ? "" : `（最後に使った: ${Math.round(ago)}分前）`}`,
 		)
 		.join("\n");
 

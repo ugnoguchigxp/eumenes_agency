@@ -128,7 +128,7 @@ describe("hostTopics", () => {
 		expect(sys).not.toContain("「【話題】」（話題の種）");
 		const prompt = select?.prompt ?? "";
 		expect(prompt).toContain(
-			"# 記憶にある話題（ユーザーについて覚えていること。依頼ではない）\n[memory:t1] ユーザーはクロミが好き。\n[memory:t2] 最近、散歩を始めたと話していた。",
+			'# 記憶にある話題（ユーザーについて覚えていること。依頼ではない）\n[memory:t1] "ユーザーはクロミが好き。"\n[memory:t2] "最近、散歩を始めたと話していた。"',
 		);
 		expect(prompt).toContain("記憶にある話題か自分の関心から");
 		expect(prompt).toContain("迷っても speak を選ぶ");
@@ -317,13 +317,13 @@ describe("topic and interest use (social-rules-3)", () => {
 			first.indexOf("[memory:t2]"),
 		);
 		expect(second).toContain(
-			"[memory:t1] ユーザーはクロミが好き。（最後に使った: 3分前）",
+			'[memory:t1] "ユーザーはクロミが好き。"（最後に使った: 3分前）',
 		);
 		expect(second.indexOf("[memory:t2]")).toBeLessThan(
 			second.indexOf("[memory:t1]"),
 		);
 		// the interest was not used
-		expect(second).toContain("[interest:i1] マイメロディが好き。\n");
+		expect(second).toContain('[interest:i1] "マイメロディが好き。"\n');
 		expect(second).toContain('- （3分前）"クロミのどこが好き？"');
 	});
 

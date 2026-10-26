@@ -172,6 +172,10 @@ export interface ProjectionItem {
 	readonly id: string;
 	readonly kind: "intent" | "candidate" | "note" | "belief" | "desire";
 	readonly text: string;
+	/** Beliefs and desires: the settled confidence. */
+	readonly confidence?: "low" | "medium" | "high";
+	/** Observation ids the item rests on (provenance), when the item records them. */
+	readonly evidence?: readonly string[];
 }
 
 export interface AgencyProjection {

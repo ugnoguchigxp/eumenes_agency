@@ -942,7 +942,7 @@ describe("prompts", () => {
 			expect(d.decision.source).toBe("llm");
 			const req = selectReq(llm);
 			expect(req?.prompt).toContain(
-				"# あなた自身の関心（設定。ユーザーの依頼ではない）\n[interest:i1] マイメロディが好き。",
+				'# あなた自身の関心（設定。ユーザーの依頼ではない）\n[interest:i1] "マイメロディが好き。"',
 			);
 			expect(req?.system).toContain("【自分の関心】");
 		});

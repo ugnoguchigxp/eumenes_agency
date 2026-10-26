@@ -34,6 +34,24 @@ const hasIndependent = (
 		);
 	});
 
+/**
+ * High confidence needs corroboration beyond a single tool result: a tool's output can carry
+ * injected text (memory poisoning), so tool-only support needs two separate tool results.
+ * Any qualifying non-tool observation (e.g. a user report) suffices on its own.
+ */
+const supportsHigh = (
+	ctx: SettleCtx,
+	refs: readonly string[],
+	counted: readonly string[],
+	floor: number,
+) => {
+	const fresh = [...new Set(refs)].filter((r) =>
+		hasIndependent(ctx, [r], counted, floor),
+	);
+	const tool = fresh.filter((r) => ctx.obs.get(r)?.actor === "tool");
+	return fresh.length > tool.length || tool.length >= 2;
+};
+
 export const applyBeliefAdd = (ctx: SettleCtx, op: Of<"belief.add">) => {
 	const id = ctx.local.get(op.localId);
 	if (id === undefined) return;
@@ -42,7 +60,7 @@ export const applyBeliefAdd = (ctx: SettleCtx, op: Of<"belief.add">) => {
 	// came with the batch being interpreted, not an old observation that was already processed.
 	if (
 		op.confidence === "high" &&
-		!hasIndependent(ctx, op.evidenceRefs, [], ctx.batchStartSeq - 1)
+		!supportsHigh(ctx, op.evidenceRefs, [], ctx.batchStartSeq - 1)
 	) {
 		reject(ctx, "missing_evidence");
 		ok = false;
@@ -81,6 +99,12 @@ export const applyBeliefUpdate = (ctx: SettleCtx, op: Of<"belief.update">) => {
 	if (op.confidence !== null && rank[op.confidence] > rank[b.confidence]) {
 		if (!hasIndependent(ctx, op.evidenceRefs, b.evidence, b.createdSeq ?? 0)) {
 			reject(ctx, "self_reinforcement");
+			ok = false;
+		} else if (
+			op.confidence === "high" &&
+			!supportsHigh(ctx, op.evidenceRefs, b.evidence, b.createdSeq ?? 0)
+		) {
+			reject(ctx, "missing_evidence");
 			ok = false;
 		}
 	}
