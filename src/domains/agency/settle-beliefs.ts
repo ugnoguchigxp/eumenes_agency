@@ -65,6 +65,25 @@ export const applyBeliefAdd = (ctx: SettleCtx, op: Of<"belief.add">) => {
 		reject(ctx, "missing_evidence");
 		ok = false;
 	}
+	// Self-output that a retracted belief rested on cannot ground a new belief by itself: the
+	// user corrected it, so re-creating needs independent evidence (e.g. a new user report).
+	if (
+		ok &&
+		op.evidenceRefs.some((r) => {
+			const o = ctx.obs.get(r);
+			return (
+				o !== undefined &&
+				!isIndependent(ctx, o) &&
+				ctx.next.beliefs.some(
+					(b) => b.status === "retracted" && b.evidence.includes(r),
+				)
+			);
+		}) &&
+		!hasIndependent(ctx, op.evidenceRefs, [], 0)
+	) {
+		reject(ctx, "self_reinforcement");
+		ok = false;
+	}
 	if (!ok) {
 		ctx.failed.add(op.localId);
 		return;

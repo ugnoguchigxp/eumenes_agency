@@ -161,15 +161,11 @@ describe("correction of a self-grounded belief", () => {
 		expect(p.items.find((i) => i.id === id)?.evidence).toEqual(["o1", "o2"]);
 	});
 
-	// GAP: nothing links a new belief.add to an earlier retraction. After the user's correction
-	// the agent can re-create the same belief from its own earlier utterance o1 at medium/low,
-	// because applyBeliefAdd checks independence only for high
-	// (src/domains/agency/settle-beliefs.ts:55-67) and has no check against retracted beliefs
-	// citing the same evidence. Production code unchanged by request; enable when fixed.
-	test.skip("GAP (3): the agent cannot re-assert the retracted belief from its own earlier output", () => {
+	// Regression: settle-beliefs.ts applyBeliefAdd rejects re-creation from retracted self-output.
+	test("(3): the agent cannot re-assert the retracted belief from its own earlier output", () => {
 		const { s } = corrected();
 		const r = settleF(s, [add(CLAIM, "medium", ["o1"])], [said, fix]);
-		expect(r.kind).toBe("rejected");
+		expect(codesOf(r)).toContain("self_reinforcement");
 	});
 
 	test("(3) re-assertion at high confidence from its own output is rejected", () => {
@@ -180,6 +176,43 @@ describe("correction of a self-grounded belief", () => {
 			[said, fix],
 		);
 		expect(codesOf(r)).toContain("missing_evidence");
+	});
+
+	test("(3) a new user observation lets the agent create a genuinely new belief", () => {
+		const { s } = corrected();
+		const u = obs(3, "user.report", "user", "最近また走り始めたよ");
+		const n = stateOf(
+			settleF(
+				s,
+				[add("ユーザーは最近走り始めた", "medium", ["o1", "o3"])],
+				[said, fix, u],
+				[u],
+			),
+		);
+		expect(n.beliefs.filter((b) => b.status === "active")).toHaveLength(1);
+		// the user's correction itself (independent) can ground a new belief too
+		const m = stateOf(
+			settleF(
+				s,
+				[add("ユーザーは散歩している", "medium", ["o2"])],
+				[said, fix],
+			),
+		);
+		expect(m.beliefs.some((b) => b.status === "active")).toBe(true);
+	});
+
+	test("(3) self-output not tied to a retraction still grounds medium/low beliefs (V4)", () => {
+		const { s } = corrected();
+		const other = obs(
+			4,
+			"delivery.observed",
+			"agent",
+			"週末は山に行くんですね",
+		);
+		expect(
+			settleF(s, [add("週末は山に行く", "low", ["o4"])], [said, fix, other])
+				.kind,
+		).not.toBe("rejected");
 	});
 
 	test("(4) the correction is recorded as evidence with its provenance", () => {
