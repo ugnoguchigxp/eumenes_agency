@@ -675,7 +675,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		setEnabled(value) {
 			enabled = value;
 		},
-		projection: (maxItems) => buildProjection(condition, state, maxItems),
+		projection: (maxItems) =>
+			buildProjection(condition, state, maxItems, ledger.all()),
 		snapshot: () => ({
 			state: structuredClone(state),
 			observations: ledger.all(),

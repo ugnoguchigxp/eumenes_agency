@@ -158,3 +158,24 @@ agency は自発発話に加えて、利用者の発言への返答も受け持�
 | `ReplyPort` / `ToolPort` / `ToolDefinition` / `ReplyMessage` | ホストが渡す口（OpenAI の chat 形式）。Provider の選択は package の外 |
 | `createMockToolPort()` | 試験・CLI 用。Eumenes と同名の `find_toolchain`・`delegate`・`work`・`memory`、TODO を `HostTodo[]` で公開し、`complete`・`ask`・`archive` で試験から動かす |
 | `AgencyRuntime.takeReportedTodos()` / `RuntimeDeps.todos` | 通常の返答が伝えた完了済みの仕事の照合（hostTodos のみ） |
+
+## 11. 記憶汚染への対策（2026-10-27 追記）
+
+信念の確定（`settle-beliefs.ts`）と、資料の描画（`quote.ts`・`prompts.ts`・`respond-system.ts`・`projection.ts`）の規則。
+
+| 規則 | 内容 | 却下コード |
+| --- | --- | --- |
+| high の根拠 | 新規作成と high のまま active な信念の本文書き換えには今回の処理対象バッチ内の独立した観測が要る（後続の参考観測は含めない）。agent 以外かつツール以外の観測1件、または別々のツール呼出しの結果2件。同じ `causationId` の結果は1件と数え、`causationId` のない結果だけでは別々の呼出しの裏付けとしない（観測にツール名・クエリがないため、同じクエリの別呼出しは区別しない） | `missing_evidence` |
+| 訂正後の作り直し | retracted / disputed / superseded の信念が根拠にした自分の出力（agent・配信記録）は、今回の新着の独立した観測（その信念の根拠に入っていないもの）を一緒に挙げない限り、信念の新規作成・active な信念の本文書き換えの根拠にできない。全操作を適用した確定前の状態と更新前・更新途中の訂正記録を使い、再利用される根拠を持つ信念ごとに検証する（操作順で回避できない）。他の信念の訂正にも同じ新着の観測を使ったことだけで、その観測を除外しない | `retracted_evidence_reuse` |
+| 同じ内容の繰り返し | 同一内容・言い換えの判断はLLMに委ねる。更新用プロンプトに取り消した・置き換えた信念（最終更新の `updatedSeq` 順に最近5件。旧スナップショットは `createdSeq`、同順は保存順の末尾を優先）を示し、後の自分の発言や言い換えだけを根拠に作り直さないよう指示する。文字列の正規化・記号除去による同一性の判定はしない | プロンプトで指示 |
+| disputed の再有効化 | disputed → active には、今回の処理対象バッチ内の独立した観測（その信念の根拠に入っていないもの）が要る | `disputed_reactivation` |
+
+自分の出力だけを根拠にした medium / low の信念は、これまでどおり作れる（V4 の方針。誤りは会話での訂正で正す）。
+
+描画: 観測・メモ・信念・記憶の話題・周辺情報・関心・仕事の題名／質問／結果／次の操作・用事の期限表示・ツールの説明・参照資料とそのメタデータ・先に話しかけた内容など、外から来た本文はすべて `quote()` を通す。JSON の文字列にし、改行、`<`、`>`、U+2028、U+2029 をエスケープする。本文で見出し・行・タグ（`</参照資料>` など）を偽装できない。
+
+`ProjectionItem` は、信念について省略可能な `status`（状態）・`confidence`（確信度）・`evidence`（根拠の観測 id）・`provenance`（出所の内訳。例 `user×1, self×1`）を持つ。返答の参照資料には `確信度=medium / 根拠: o1, o2（user×1, self×1）` のようにデータとして出す。`buildProjection(condition, state, maxItems, observations?)` は、観測が渡されたときだけ `provenance` を付ける（runtime は ledger の全観測を渡す）。
+
+返答には `status` も渡し、`disputed` は疑義のある記録として扱うよう指示する。ツール結果の観測には `causationId` をデータとして表示し、LLMも確定処理と同じ呼出しの区別を使えるようにする。
+
+既存信念を `disputed` / `retracted` / `superseded` に訂正する操作は、追加した本文書き換えの検証で妨げない。

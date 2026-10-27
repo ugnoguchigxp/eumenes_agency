@@ -1,5 +1,6 @@
 import type {
 	AgencyState,
+	BeliefStatus,
 	Condition,
 	HostTodo,
 	Limits,
@@ -174,8 +175,12 @@ export interface ProjectionItem {
 	readonly text: string;
 	/** Beliefs and desires: the settled confidence. */
 	readonly confidence?: "low" | "medium" | "high";
+	/** Belief status, so disputed records remain distinguishable from active ones. */
+	readonly status?: BeliefStatus;
 	/** Observation ids the item rests on (provenance), when the item records them. */
 	readonly evidence?: readonly string[];
+	/** Source breakdown of `evidence`, e.g. `user×1, self×1` (when observations were available). */
+	readonly provenance?: string;
 }
 
 export interface AgencyProjection {

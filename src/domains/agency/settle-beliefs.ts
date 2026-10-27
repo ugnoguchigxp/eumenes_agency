@@ -1,4 +1,4 @@
-import type { Confidence } from "../../contracts/model.ts";
+import type { Belief, Confidence } from "../../contracts/model.ts";
 import type { FUpdate } from "../../contracts/proposals.ts";
 import { unique } from "./ids.ts";
 import {
@@ -34,6 +34,9 @@ const hasIndependent = (
 		);
 	});
 
+const freshRefs = (ctx: SettleCtx, refs: readonly string[]) =>
+	refs.filter((r) => ctx.batchIds.has(r));
+
 /**
  * High confidence needs corroboration beyond a single tool result: a tool's output can carry
  * injected text (memory poisoning), so tool-only support needs two separate tool results.
@@ -49,7 +52,51 @@ const supportsHigh = (
 		hasIndependent(ctx, [r], counted, floor),
 	);
 	const tool = fresh.filter((r) => ctx.obs.get(r)?.actor === "tool");
-	return fresh.length > tool.length || tool.length >= 2;
+	// Missing call identities cannot establish distinct calls. Separate identified calls with
+	// the same query cannot be told apart: observations carry no tool name or query.
+	const calls = new Set(
+		tool.flatMap((r) => {
+			const id = ctx.obs.get(r)?.causationId;
+			return id === undefined ? [] : [id];
+		}),
+	);
+	return fresh.length > tool.length || calls.size >= 2;
+};
+
+/** Validate the atomic result so a correction cannot be bypassed by placing an add first. */
+export const validateBeliefWrites = (
+	ctx: SettleCtx,
+	before: readonly Belief[],
+	rewritten: ReadonlySet<string>,
+) => {
+	const existing = new Set(before.map((b) => b.id));
+	for (const written of ctx.next.beliefs) {
+		// Corrective writes must remain possible; the extra guard applies to active rewrites.
+		if (
+			existing.has(written.id) &&
+			(!rewritten.has(written.id) || written.status !== "active")
+		)
+			continue;
+		if (written.status !== "active" && written.status !== "disputed") continue;
+		// Compare evidence per belief; a correction of another belief cannot consume fresh support.
+		if (
+			ctx.correctedBeliefs.some(
+				(b) =>
+					b.id !== written.id &&
+					written.evidence.some((r) => {
+						const o = ctx.obs.get(r);
+						return (
+							o !== undefined &&
+							!isIndependent(ctx, o) &&
+							b.evidence.includes(r)
+						);
+					}) &&
+					!hasIndependent(ctx, freshRefs(ctx, written.evidence), b.evidence, 0),
+			)
+		) {
+			reject(ctx, "retracted_evidence_reuse");
+		}
+	}
 };
 
 export const applyBeliefAdd = (ctx: SettleCtx, op: Of<"belief.add">) => {
@@ -60,28 +107,9 @@ export const applyBeliefAdd = (ctx: SettleCtx, op: Of<"belief.add">) => {
 	// came with the batch being interpreted, not an old observation that was already processed.
 	if (
 		op.confidence === "high" &&
-		!supportsHigh(ctx, op.evidenceRefs, [], ctx.batchStartSeq - 1)
+		!supportsHigh(ctx, freshRefs(ctx, op.evidenceRefs), [], 0)
 	) {
 		reject(ctx, "missing_evidence");
-		ok = false;
-	}
-	// Self-output that a retracted belief rested on cannot ground a new belief by itself: the
-	// user corrected it, so re-creating needs independent evidence (e.g. a new user report).
-	if (
-		ok &&
-		op.evidenceRefs.some((r) => {
-			const o = ctx.obs.get(r);
-			return (
-				o !== undefined &&
-				!isIndependent(ctx, o) &&
-				ctx.next.beliefs.some(
-					(b) => b.status === "retracted" && b.evidence.includes(r),
-				)
-			);
-		}) &&
-		!hasIndependent(ctx, op.evidenceRefs, [], 0)
-	) {
-		reject(ctx, "self_reinforcement");
 		ok = false;
 	}
 	if (!ok) {
@@ -115,6 +143,26 @@ export const applyBeliefUpdate = (ctx: SettleCtx, op: Of<"belief.update">) => {
 		return;
 	}
 	let ok = evidenceOk(ctx, op.evidenceRefs);
+	// A disputed belief returns to active only with new independent evidence from this batch.
+	if (
+		b.status === "disputed" &&
+		op.status === "active" &&
+		!hasIndependent(ctx, freshRefs(ctx, op.evidenceRefs), b.evidence, 0)
+	) {
+		reject(ctx, "disputed_reactivation");
+		ok = false;
+	}
+	// Writing a body while retaining high confidence must satisfy the same support rule as a
+	// new high-confidence belief; keeping its id or confidence must not bypass that rule.
+	if (
+		op.status === "active" &&
+		op.content !== null &&
+		(op.confidence ?? b.confidence) === "high" &&
+		!supportsHigh(ctx, freshRefs(ctx, op.evidenceRefs), b.evidence, 0)
+	) {
+		reject(ctx, "missing_evidence");
+		ok = false;
+	}
 	if (op.confidence !== null && rank[op.confidence] > rank[b.confidence]) {
 		if (!hasIndependent(ctx, op.evidenceRefs, b.evidence, b.createdSeq ?? 0)) {
 			reject(ctx, "self_reinforcement");
@@ -132,7 +180,9 @@ export const applyBeliefUpdate = (ctx: SettleCtx, op: Of<"belief.update">) => {
 	if (op.content !== null) b.content = op.content;
 	if (op.confidence !== null) b.confidence = op.confidence;
 	b.evidence = unique([...b.evidence, ...op.evidenceRefs]);
+	b.updatedSeq = ctx.floorSeq;
 	b.revision += 1;
+	if (b.status !== "active") ctx.correctedBeliefs.push(structuredClone(b));
 	ctx.touched.add(b.id);
 };
 

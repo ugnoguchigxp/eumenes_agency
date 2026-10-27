@@ -1,12 +1,20 @@
-import type { AgencyState, Condition } from "../contracts/model.ts";
+import type {
+	AgencyState,
+	Condition,
+	Observation,
+} from "../contracts/model.ts";
 import { isOpenCandidate, isOpenIntent } from "../contracts/model.ts";
 import type { AgencyProjection, ProjectionItem } from "../contracts/runtime.ts";
+import { provenance } from "./quote.ts";
 
 const clip = (text: string, limit = 120) =>
 	text.length <= limit ? text : `${text.slice(0, limit - 1)}…`;
 
 /** Live items only: terminal intents, closed candidates and ended beliefs/desires are skipped. */
-const allItems = (state: AgencyState): Map<string, ProjectionItem> => {
+const allItems = (
+	state: AgencyState,
+	obs: ReadonlyMap<string, Observation> | undefined,
+): Map<string, ProjectionItem> => {
 	const m = new Map<string, ProjectionItem>();
 	for (const i of state.intents.filter(isOpenIntent))
 		m.set(i.id, { id: i.id, kind: "intent", text: clip(i.desiredState) });
@@ -22,7 +30,11 @@ const allItems = (state: AgencyState): Map<string, ProjectionItem> => {
 			kind: "belief",
 			text: clip(b.content),
 			confidence: b.confidence,
+			status: b.status,
 			evidence: b.evidence,
+			...(obs
+				? { provenance: provenance(b.evidence, (id) => obs.get(id)) }
+				: {}),
 		});
 	for (const d of state.desires.filter(
 		(x) => x.status === "open" || x.status === "held",
@@ -36,10 +48,14 @@ export const buildProjection = (
 	condition: Condition,
 	state: AgencyState,
 	maxItems: number,
+	observations?: readonly Observation[],
 ): AgencyProjection => {
 	const base = { stateRevision: state.revision };
 	if (condition === "B0") return { ...base, items: [], hidden: 0 };
-	const items = allItems(state);
+	const items = allItems(
+		state,
+		observations && new Map(observations.map((o) => [o.id, o])),
+	);
 	const openIds =
 		condition === "B1"
 			? state.notes.map((n) => n.id)

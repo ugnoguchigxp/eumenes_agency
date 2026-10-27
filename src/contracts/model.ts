@@ -215,6 +215,8 @@ export interface Belief {
 	status: BeliefStatus;
 	/** Highest seq of the processed batch that created it; absent (older snapshots) means no floor. */
 	readonly createdSeq?: number;
+	/** Highest seq of the batch that last updated it; older snapshots fall back to createdSeq. */
+	updatedSeq?: number;
 }
 
 export type DesireKind = "understand" | "finish" | "share";

@@ -33,7 +33,7 @@ describe("respondSystem", () => {
 			],
 		});
 		expect(text).toContain("好きなものがあり");
-		expect(text).toContain("- マイメロディが好き。");
+		expect(text).toContain('- "マイメロディが好き。"');
 		expect(text).toContain("寄せたり");
 		expect(respondSystem({ interests: [] })).toBe(respondSystem());
 	});

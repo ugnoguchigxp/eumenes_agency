@@ -85,9 +85,9 @@ describe("hostTodos (work reports)", () => {
 		expect(r.select?.system).toContain("【依頼された仕事】");
 		const p = r.select?.prompt ?? "";
 		expect(p).toContain(
-			"[todo:w1] 完了（成功）: 楽曲の生成（夜のドライブ向け） / 結果: 3分12秒の曲 / 次にできること: 再生する / 依頼: 10分前・完了: 1分前",
+			'[todo:w1] 完了（成功）: "楽曲の生成（夜のドライブ向け）" / 結果: "3分12秒の曲" / 次にできること: "再生する" / 依頼: 10分前・完了: 1分前',
 		);
-		expect(p).toContain("[todo:w2] 進行中: 画像の生成 / 依頼: 5分前");
+		expect(p).toContain('[todo:w2] 進行中: "画像の生成" / 依頼: 5分前');
 		// done first
 		expect(p.indexOf("[todo:w1]")).toBeLessThan(p.indexOf("[todo:w2]"));
 		expect(p).toContain("雑談より先にその報告を選ぶ");
@@ -147,7 +147,7 @@ describe("hostTodos (work reports)", () => {
 		});
 		const p = inside.select?.prompt ?? "";
 		expect(p).toContain(
-			"[todo:e1] 用事: 大家さんへ更新書類を返送 / 期限: 30分後",
+			'[todo:e1] 用事: "大家さんへ更新書類を返送" / 期限: 30分後',
 		);
 		expect(p.indexOf("[todo:e1]")).toBeLessThan(p.indexOf("[todo:w1]"));
 		// before the window, and once the deadline passed: not shown, and alone it opens no select
@@ -188,7 +188,7 @@ describe("hostTodos: a waiting item (the sub-agent asked a question)", () => {
 		});
 		const p = r.select?.prompt ?? "";
 		expect(p).toContain(
-			"[todo:w3] 質問待ち: ロゴ画像の生成 / 質問: 背景は白と黒のどちらにしますか？ / 依頼: 8分前",
+			'[todo:w3] 質問待ち: "ロゴ画像の生成" / 質問: "背景は白と黒のどちらにしますか？" / 依頼: 8分前',
 		);
 		expect(p.indexOf("[todo:w3]")).toBeLessThan(p.indexOf("[todo:w1]"));
 		expect(p).toContain("その質問を選ぶ");

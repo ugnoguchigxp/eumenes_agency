@@ -13,6 +13,7 @@ import {
 	applyBeliefUpdate,
 	applyDesireAdd,
 	applyDesireUpdate,
+	validateBeliefWrites,
 } from "./settle-beliefs.ts";
 import { assignLocal, reject, type SettleCtx } from "./settle-context.ts";
 import {
@@ -198,16 +199,13 @@ export const settleUpdate = (input: SettleInput): SettleResult => {
 			? batch.reduce((m, o) => Math.max(m, o.seq), 0)
 			: (input.cursor ??
 				input.presented.reduce((m, o) => Math.max(m, o.seq), 0));
-	const batchStartSeq =
-		batch.length > 0
-			? batch.reduce((m, o) => Math.min(m, o.seq), Number.MAX_SAFE_INTEGER)
-			: floorSeq + 1;
 	const ctx: SettleCtx = {
 		condition: input.condition,
 		next,
 		obs,
 		floorSeq,
-		batchStartSeq,
+		batchIds: new Set(batch.map((o) => o.id)),
+		correctedBeliefs: input.state.beliefs.filter((b) => b.status !== "active"),
 		tools: input.tools,
 		limits: input.limits,
 		now: input.now,
@@ -249,6 +247,15 @@ export const settleUpdate = (input: SettleInput): SettleResult => {
 		const op = ops[i];
 		if (op) dispatch(ctx, op);
 	}
+	validateBeliefWrites(
+		ctx,
+		input.state.beliefs,
+		new Set(
+			ops.flatMap((op) =>
+				op.op === "belief.update" && op.content !== null ? [op.id] : [],
+			),
+		),
+	);
 	if (reconcileAllowed)
 		for (const r of reconciliations) applyReconciliation(ctx, r);
 	checkCapacity(ctx, ops);

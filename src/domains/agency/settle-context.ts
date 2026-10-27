@@ -1,5 +1,6 @@
 import type {
 	AgencyState,
+	Belief,
 	Condition,
 	Limits,
 	Observation,
@@ -19,8 +20,10 @@ export interface SettleCtx {
 	 * only as context) do count as newer; observations in or before the batch never do.
 	 */
 	readonly floorSeq: number;
-	/** Lowest seq of the batch (floorSeq + 1 when the update has no batch). */
-	readonly batchStartSeq: number;
+	/** Exact observations this update interprets; later context is not part of the batch. */
+	readonly batchIds: ReadonlySet<string>;
+	/** Corrections from the input and snapshots of corrections applied during this proposal. */
+	readonly correctedBeliefs: Belief[];
 	readonly tools: readonly ToolCapability[];
 	readonly limits: Limits;
 	readonly now: number;

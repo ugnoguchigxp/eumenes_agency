@@ -165,7 +165,7 @@ describe("correction of a self-grounded belief", () => {
 	test("(3): the agent cannot re-assert the retracted belief from its own earlier output", () => {
 		const { s } = corrected();
 		const r = settleF(s, [add(CLAIM, "medium", ["o1"])], [said, fix]);
-		expect(codesOf(r)).toContain("self_reinforcement");
+		expect(codesOf(r)).toContain("retracted_evidence_reuse");
 	});
 
 	test("(3) re-assertion at high confidence from its own output is rejected", () => {
