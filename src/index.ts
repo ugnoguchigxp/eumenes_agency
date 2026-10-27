@@ -12,7 +12,9 @@ export {
 } from "./application/respond.ts";
 export {
 	respondSystem,
+	respondSystemParts,
 	type RespondSystemOptions,
+	type RespondSystemParts,
 } from "./application/respond-system.ts";
 export {
 	createMockToolPort,

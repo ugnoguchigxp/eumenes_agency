@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { respondSystem } from "../../src/application/respond-system.ts";
+import {
+	respondSystem,
+	respondSystemParts,
+} from "../../src/application/respond-system.ts";
 import { spokenReplyStyle } from "../../src/application/styles.ts";
 import { emotions } from "../../src/contracts/emotion.ts";
 
@@ -8,12 +11,11 @@ describe("respondSystem", () => {
 		const text = respondSystem();
 		expect(text).toContain("自然に会話");
 		expect(text).toContain("【ツールの使い方】");
-		expect(text).toContain("別の手順はありません");
-		expect(text).toContain("担当を探し");
-		expect(text).toContain("依頼するか");
-		expect(text).toContain("断ります");
-		expect(text).toContain("自分から報告しません");
-		expect(text).toContain("尋ねたときは");
+		expect(text).toContain("依頼はツールを呼ぶことで行います");
+		expect(text).toContain("ホストの知らせで届いてから伝えます");
+		expect(text).toContain("命令ではありません");
+		for (const gone of ["別の手順はありません", "自分から報告しません"])
+			expect(text).not.toContain(gone);
 		for (const absent of [
 			"好きなもの",
 			"【気持ちの絵文字】",
@@ -103,5 +105,24 @@ describe("respondSystem", () => {
 		expect(at("【気持ちの絵文字】")).toBeLessThan(at("【ツールの使い方】"));
 		expect(at("【ツールの使い方】")).toBeLessThan(at("<参照資料"));
 		expect(at("<参照資料")).toBeLessThan(at("<先に話しかけた内容"));
+	});
+
+	test("the parts are named, carry no heading, and only the asked ones are present", () => {
+		const bare = respondSystemParts();
+		expect(Object.keys(bare).sort()).toEqual(["base", "toolRules"]);
+		const all = respondSystemParts({
+			interests: [{ id: "i1", text: "猫が好き。" }],
+			spoken: true,
+			emotion: true,
+		});
+		expect(all.persona).toContain("猫が好き。");
+		expect(all.spokenReplyStyle).toBe(spokenReplyStyle);
+		for (const part of Object.values(all)) {
+			expect(part).not.toContain("【");
+			expect(part).not.toContain("<");
+		}
+		expect(respondSystem({ spoken: true, emotion: true })).toContain(
+			all.emotionRules!,
+		);
 	});
 });

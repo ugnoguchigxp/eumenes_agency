@@ -36,6 +36,7 @@ export const requiredExports = [
 	"spokenReplyStyle",
 	"runRespond",
 	"respondSystem",
+	"respondSystemParts",
 	"createMockToolPort",
 	"ttsUtteranceStyle",
 	"INSTRUCTION_VERSION",
