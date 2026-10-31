@@ -138,6 +138,9 @@ export const applyNoteAdd = (ctx: SettleCtx, op: Of<"note.add">) => {
 		if (reviewAfterHours === null) {
 			reject(ctx, "missing_review");
 			ok = false;
+		} else if (reviewAfterHours > ctx.limits.reviewAfterMaxHours) {
+			reject(ctx, "limit_exceeded");
+			ok = false;
 		} else reviewAt = ctx.now + hoursToMs(reviewAfterHours);
 		const resolved = resolveDerivedFrom(ctx, derivedFromRefs);
 		if (resolved === null) ok = false;
@@ -237,7 +240,12 @@ export const applyNoteUpdate = (ctx: SettleCtx, op: Of<"note.update">) => {
 	if (n.kind !== undefined && derivedFromRefs.length > 0) {
 		const resolved = resolveDerivedFrom(ctx, derivedFromRefs);
 		if (resolved === null) ok = false;
-		else derivedFrom = resolved;
+		// A note cannot derive from itself (an add cannot name itself either: the
+		// note does not exist yet when its refs are resolved).
+		else if (resolved.includes(n.id)) {
+			reject(ctx, "unresolved_ref");
+			ok = false;
+		} else derivedFrom = resolved;
 	}
 	let resolvedInterestRef: string | undefined;
 	if (n.kind !== undefined && interestRef !== null) {

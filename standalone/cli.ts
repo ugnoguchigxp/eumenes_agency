@@ -70,10 +70,10 @@ import {
 	createChatLog,
 	createConversation,
 	decisionEvent,
-	executeFixtureLogLookup,
-	fixtureLogLookupTool,
 	decisionLine,
 	defaultLogPath,
+	executeFixtureLogLookup,
+	fixtureLogLookupTool,
 	parseCliArgs,
 	printAbove,
 	resolveCondition,
@@ -149,11 +149,6 @@ async function main() {
 		restore = JSON.parse(
 			readFileSync(args.snapshotPath, "utf8"),
 		) as AgencySnapshot;
-		console.log(
-			dim(
-				`  [snapshot] ${args.snapshotPath} から復元しました（観測 ${restore.observations.length} 件）`,
-			),
-		);
 	}
 	const runtime = createAgencyRuntime(
 		{
@@ -176,6 +171,14 @@ async function main() {
 		},
 		restore,
 	);
+	// Logged only after createAgencyRuntime has validated the snapshot, so a
+	// malformed file fails with the core's "invalid snapshot: ..." message.
+	if (restore)
+		console.log(
+			dim(
+				`  [snapshot] ${args.snapshotPath} から復元しました（観測 ${runtime.snapshot().observations.length} 件）`,
+			),
+		);
 	if (args.off) runtime.setEnabled(false);
 	// Save after every state-changing turn / cycle / poll and on shutdown, via a
 	// temp file + rename so a crash mid-write never leaves a torn snapshot.
@@ -503,13 +506,14 @@ async function main() {
 			archiveReported();
 			saveSnapshot();
 		} catch {
-			// A failed poll is logged by the next successful one; never crash the loop.
+			// Record the failure itself (a later poll does not carry it); never crash the loop.
+			record({ type: "review_poll", auto: true, calls: 0, codes: ["error"] });
 		} finally {
 			if (background === controller) background = null;
 		}
 	};
 	const armPoll = (): void => {
-		if (args.pollMinutes <= 0 || closed) return;
+		if (args.pollMinutes <= 0 || closed || backgroundHalted) return;
 		pollTimer = setTimeout(() => {
 			void runPoll().then(armPoll);
 		}, args.pollMinutes * 60_000);

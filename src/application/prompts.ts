@@ -21,7 +21,7 @@ export const INSTRUCTION_VERSION = "p0e-instructions-13";
  * Version of the lull-talk rules (socialTopics / hostTopics modes only). Shown at the head of
  * those rules and part of the settings digest; the evaluated B1/B2 prompts do not contain it.
  */
-export const SOCIAL_RULES_VERSION = "social-rules-10";
+export const SOCIAL_RULES_VERSION = "social-rules-11";
 /** Version of the utterance-emotion rules (utteranceEmotion mode only). */
 export const EMOTION_RULES_VERSION = "emotion-rules-2";
 
@@ -208,7 +208,7 @@ const wireB1Todos = [
 	"reportedTodos: 要素は {todoId, observationRef}。なければ空配列。",
 ];
 
-export const TYPED_NOTES_RULES_VERSION = "typed-notes-1";
+export const TYPED_NOTES_RULES_VERSION = "typed-notes-2";
 
 /**
  * Added to the B1 update rules in typed-notes mode (spec/autonomous-interest-design.md §3,
@@ -220,9 +220,9 @@ const b1TypedNotes = [
 	"関心は、会話の経験から生まれ、時間とともに変わりうる「何に関心があるか」の記録。ユーザーについての関心でも、自分自身についての関心でもよい。状態（state: active / dormant / retired）と見直し（hours、最大168時間）を必ず設定する。",
 	"関心を作るときは origin を必ず書く。experienced = 実際の活動や経験から生まれた関心。inferred = 相手の言動から推論した関心。imagined = 想像上の憧れや空想。self_declared = 自分でそう宣言した好み。想像や宣言でしかないものを experienced と書かない。自分の発言は、関心が生まれるきっかけにはなっても、それだけで関心を裏付ける根拠にはならない。",
 	"関心を作るのは、同じ話題への繰り返しの関わりや、はっきりした経験が観測にあるときだけ。一度だけの言及や、その場限りの気まぐれでは関心にしない（通常のメモにも原則として残さない）。",
-	"問いは、まだ答えが出ていない疑問（kind=open_question）。関心に属する問いには intentRef にその関心メモの id を入れる。問いを resolved にできるのは、作成後に届いた agent 以外の観測が答えを示すときだけ。根拠なく resolved にしたり、未解決の問いを黙って消したりしない。",
+	"問いは、まだ答えが出ていない疑問（kind=open_question）。関心に属する問いには intentRef にその関心メモの id を入れる。問いを resolved にできるのは、最後にその問いを更新した時点より後に届いた agent 以外の観測が答えを示すときだけ（それより前の観測は、すでに検討済みとして扱われる）。根拠なく resolved にしたり、未解決の問いを黙って消したりしない。",
 	"既存の関心から派生する新しい関心には、derivedFromRefs に元の関心の id を入れる。同じ関心を重ねて作らず、既存のものを更新する。",
-	"ユーザーが興味を失った・やめたと示した関心は、消さずに dormant（休眠）か retired（引退）に更新し、その観測を根拠に加える。休眠した関心は、関連する新しい根拠が届いたときだけ active に戻す。見直しの機会が来ただけでは戻さない。",
+	"ユーザーが興味を失った・やめたと示した関心は、消さずに dormant（休眠）か retired（引退）に更新し、その観測を根拠に加える。休眠した関心は、最後に更新した時点より後に届いた、関連する新しい根拠があるときだけ active に戻す。見直しの機会が来ただけでは戻さない。",
 	"見直しは「次に思い出して評価する間隔」であって、過ぎたら自動で消えたり状態が変わったりするものではない。見直しの機会（review.due）には、関心を維持するか、見直しを先へ延ばすか、休眠・引退にするかを評価する。",
 ];
 
@@ -244,7 +244,7 @@ const selectSelfResearch = [
 	"頼むのは、次のどれかにつながり、自分も気になる話題のとき: 直前の会話のテーマ、記憶にある話題、いまの話題（ニュースなど）、自分の関心。どれにもつながらない話題、ユーザーが断った話題は頼まない。",
 	"つながる話題があり、自分で頼んだ調べものが進行中でなければ、雑談の間（idle）では雑談の一言より先に調査を頼む（黙って頼めて、ユーザーの邪魔にならない。報告は終わってから）。上の【雑談の間】の「wait より speak」より、この規則を先に使う。",
 	"「依頼された仕事」に自分で頼んだ調べものが進行中なら、新しく頼まない。同じテーマを二度頼まない。",
-	"頼むときは tool を選び、toolInput に「問い: 調べたいこと一文 / 受入条件: 答えに含めてほしいこと（1〜3個、「、」で区切る）」を書き、evidenceRefs にきっかけ（観測の id、`memory:<id>`・`context:<id>`・`interest:<id>`）を入れる。",
+	"頼むときは tool を選び、toolInput に「問い: 調べたいこと一文 / 受入条件: 答えに含めてほしいこと（1〜3個、「、」で区切る）」を書き、evidenceRefs にきっかけ（観測の id、`memory:<id>`・`context:<id>`・`interest:<id>`）を入れる。きっかけがメモ（関心・問い）そのもののときは、そのメモの id を前置きなしで入れる（メモの根拠に読み替えられる）。",
 	"自分で頼んだ調べものの完了は「気になって調べておいたよ」のように伝え、頼まれたようには言わない。要点を一文と、詳しく話すかの問いを一つ。",
 ];
 
@@ -402,8 +402,12 @@ const renderNotes = (now: number, state: AgencyState) =>
 					const base = `[${n.id} r${n.revision}] ${q(n.text)} / 根拠: ${n.evidence.join(",") || "なし"}`;
 					if (n.kind === undefined) return base;
 					// Typed notes (interest / question): the model acts on these fields, so
-					// they are shown with the same raw tokens the wire uses.
-					const parts = [`種別=${n.kind}`, `状態=${n.status}`];
+					// they are shown with the same raw tokens the wire uses (a question is
+					// "open_question" on the wire).
+					const parts = [
+						`種別=${n.kind === "question" ? "open_question" : n.kind}`,
+						`状態=${n.status}`,
+					];
 					if (n.origin !== undefined) parts.push(`起源=${n.origin}`);
 					if (n.reviewAt !== undefined)
 						parts.push(`見直し: ${until(now, n.reviewAt)}`);

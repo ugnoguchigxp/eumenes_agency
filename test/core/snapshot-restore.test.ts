@@ -194,5 +194,42 @@ describe("snapshot restore (S4)", () => {
 		expect(() => createAgencyRuntime(deps(fakeLlm()), badState)).toThrow(
 			/invalid snapshot/,
 		);
+		const missingArray = {
+			...snapshot,
+			state: { ...snapshot.state, beliefs: undefined },
+		} as unknown as AgencySnapshot;
+		expect(() => createAgencyRuntime(deps(fakeLlm()), missingArray)).toThrow(
+			/invalid snapshot/,
+		);
+		const missingRevision = {
+			...snapshot,
+			state: { ...snapshot.state, revision: undefined },
+		} as unknown as AgencySnapshot;
+		expect(() => createAgencyRuntime(deps(fakeLlm()), missingRevision)).toThrow(
+			/invalid snapshot/,
+		);
+		const dupIds: AgencySnapshot = {
+			...snapshot,
+			observations: [
+				...snapshot.observations,
+				{ ...snapshot.observations[0]!, seq: snapshot.observations.length + 1 },
+			],
+		};
+		expect(() => createAgencyRuntime(deps(fakeLlm()), dupIds)).toThrow(
+			/invalid snapshot/,
+		);
+	});
+
+	test("a snapshot from another condition is rejected; a legacy one without condition restores", async () => {
+		const { snapshot } = await buildOriginal();
+		const other: AgencySnapshot = { ...snapshot, condition: "B2" };
+		expect(() => createAgencyRuntime(deps(fakeLlm()), other)).toThrow(
+			/invalid snapshot: condition/,
+		);
+		const { condition: _dropped, ...legacy } = snapshot;
+		const rt = createAgencyRuntime(deps(fakeLlm()), legacy);
+		expect(rt.snapshot().observations.length).toBe(
+			snapshot.observations.length,
+		);
 	});
 });

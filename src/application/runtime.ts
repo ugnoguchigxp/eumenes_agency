@@ -164,6 +164,10 @@ export const createAgencyRuntime = (
 		// in-flight tickets and undrained hostTodos reports start fresh (see
 		// AgencySnapshot).
 		validateSnapshot(restore);
+		if (restore.condition !== undefined && restore.condition !== condition)
+			throw new TypeError(
+				`invalid snapshot: condition ${restore.condition} does not match ${condition}`,
+			);
 		state = structuredClone(restore.state);
 		for (const o of restore.observations) {
 			const { seq: _seq, ...input } = o;
@@ -192,8 +196,10 @@ export const createAgencyRuntime = (
 	const actionable = (upto: number): readonly Observation[] =>
 		quarantined ? [] : ledger.pending(upto);
 	// B1 has no due-driven wakes (its notes are re-presented at every opportunity) —
-	// except in typed-notes mode, where interest / question reviews are the one
-	// time-based signal B1 state can carry (design §3.3).
+	// except in typed-notes mode, which opts B1 into findDue wholesale (design §3.3).
+	// In practice only interest / question reviews can fire there: B1 state carries
+	// no intents or candidates, so the intent-review and capacity-pressure branches
+	// stay empty unless a snapshot taken under another condition was restored.
 	const dueNow = (now: number): Due =>
 		(condition === "B1" && !typedNotes) || quarantined
 			? NO_DUE
@@ -849,6 +855,7 @@ export const createAgencyRuntime = (
 			state: structuredClone(state),
 			observations: ledger.all(),
 			cursor: ledger.cursor(),
+			condition,
 		}),
 	};
 };

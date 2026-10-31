@@ -221,25 +221,33 @@ export interface AgencyProjection {
 }
 
 /**
- * Host-side agency for one scope. Synchronous methods are the single writer;
- * async methods call the model outside any write and settle afterwards.
- * Time is always passed in (no clock inside the core).
- */
-/**
  * A point-in-time copy of the runtime's durable state, as returned by
  * `AgencyRuntime.snapshot()` and accepted by `createAgencyRuntime(deps, restore)`.
  * Deliberately NOT included (host concerns, fresh after a restore): the rolling
  * call-budget window, due flags already issued (a review that produced no change
- * may fire once more after a restore), in-flight tickets, and hostTodos reports
- * not yet drained via `takeReportedTodos()` — drain those before snapshotting.
+ * may fire once more after a restore), in-flight tickets, hostTodos reports
+ * not yet drained via `takeReportedTodos()` — drain those before snapshotting —
+ * and the enabled/disabled state set via `setEnabled` (a restored runtime
+ * starts enabled; re-applying the host's switch is the host's job).
  */
 export interface AgencySnapshot {
 	readonly state: AgencyState;
 	readonly observations: readonly Observation[];
 	/** Highest observation seq fully processed at snapshot time. */
 	readonly cursor: number;
+	/**
+	 * Condition of the runtime that produced the snapshot. Restore rejects a
+	 * snapshot whose condition differs from the new runtime's. Absent in
+	 * snapshots written before this field existed (no check is possible then).
+	 */
+	readonly condition?: Condition;
 }
 
+/**
+ * Host-side agency for one scope. Synchronous methods are the single writer;
+ * async methods call the model outside any write and settle afterwards.
+ * Time is always passed in (no clock inside the core).
+ */
 export interface AgencyRuntime {
 	readonly condition: Condition;
 	/** Idempotent by id; same id with different content throws ObservationConflictError. */

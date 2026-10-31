@@ -294,7 +294,7 @@ describe("typed notes: add", () => {
 		expect(prompt).toContain("種別=interest");
 		expect(prompt).toContain("状態=active");
 		expect(prompt).toContain("起源=experienced");
-		expect(prompt).toContain("種別=question");
+		expect(prompt).toContain("種別=open_question");
 		expect(prompt).toContain("状態=open");
 		const interest = s.notes.find((n) => n.kind === "interest")!;
 		expect(prompt).toContain(`関心: ${interest.id}`);
@@ -417,6 +417,27 @@ describe("typed notes: update transitions", () => {
 		);
 		expect(r.kind).toBe("rejected");
 		expect(codesOf(r)).toContain("limit_exceeded");
+	});
+
+	test("creating a typed note beyond the host review limit is rejected", () => {
+		const r = run(
+			emptyState(),
+			b1Proposal([interestAdd("x", { reviewAfterHours: 48 })]),
+			{ limits: { ...defaultLimits, reviewAfterMaxHours: 24 } },
+		);
+		expect(r.kind).toBe("rejected");
+		expect(codesOf(r)).toContain("limit_exceeded");
+	});
+
+	test("a note cannot derive from itself via an update", () => {
+		const s = applied(run(emptyState(), b1Proposal([interestAdd("x")])));
+		const it = s.notes[0]!;
+		const r = run(
+			s,
+			b1Proposal([noteUpdateOp(it.id, 1, { derivedFromRefs: [it.id] })]),
+		);
+		expect(r.kind).toBe("rejected");
+		expect(codesOf(r)).toContain("unresolved_ref");
 	});
 
 	test("a plain note update carrying typed fields is rejected", () => {
@@ -548,6 +569,9 @@ describe("tts: silent self reports (§5.5)", () => {
 		expect(decisionTts(true, "tool", ["todo:w1"], todos)).toBe(true);
 		// No todo list to look origins up in: not a self-originated report.
 		expect(decisionTts(true, "speak", ["todo:w1"], [])).toBe(true);
+		// A cited todo that is in neither list cannot prove a self origin either
+		// (upstream validation rejects unknown refs; this pins the fail-open edge).
+		expect(decisionTts(true, "speak", ["todo:w9"], todos)).toBe(true);
 	});
 
 	const sig = () => new AbortController().signal;
