@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { z } from "zod";
+import { updatePrompt } from "../../src/application/prompts.ts";
 import { createAgencyRuntime } from "../../src/application/runtime.ts";
 import { decisionTts } from "../../src/application/todos.ts";
 import type {
@@ -265,6 +266,41 @@ describe("typed notes: add", () => {
 		expect(s3.notes.find((n) => n.kind === "question")?.interestRef).toBe(
 			interestId,
 		);
+	});
+
+	test("the update prompt shows typed note fields to the model", () => {
+		const s = applied(
+			run(
+				emptyState(),
+				b1Proposal([
+					interestAdd("i", { text: "フィルムカメラへの関心" }),
+					questionAdd("q", { text: "現像所の所要時間は？", interestRef: "i" }),
+					noteAddOp("m", { text: "通常メモ" }),
+				]),
+			),
+		);
+		const prompt = updatePrompt({
+			condition: "B1",
+			now: 1000,
+			observations: [o1],
+			freshIds: new Set(["o1"]),
+			state: s,
+			due: { reviewIntentIds: [], reviewNoteIds: [], pressure: [] },
+			delivered: [],
+			tools,
+			limits: defaultLimits,
+			minutesSinceUserInput: 1,
+		} as never);
+		expect(prompt).toContain("種別=interest");
+		expect(prompt).toContain("状態=active");
+		expect(prompt).toContain("起源=experienced");
+		expect(prompt).toContain("種別=question");
+		expect(prompt).toContain("状態=open");
+		const interest = s.notes.find((n) => n.kind === "interest")!;
+		expect(prompt).toContain(`関心: ${interest.id}`);
+		// A plain memo renders exactly as before (no typed suffix).
+		expect(prompt).toContain("通常メモ");
+		expect(prompt).not.toContain("通常メモ / 種別");
 	});
 
 	test("a question defaults to open and takes no origin", () => {

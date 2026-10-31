@@ -370,13 +370,23 @@ const renderCandidates = (now: number, state: AgencyState) => {
 		.join("\n");
 };
 
-const renderNotes = (state: AgencyState) =>
+const renderNotes = (now: number, state: AgencyState) =>
 	state.notes.length
 		? state.notes
-				.map(
-					(n) =>
-						`[${n.id} r${n.revision}] ${q(n.text)} / 根拠: ${n.evidence.join(",") || "なし"}`,
-				)
+				.map((n) => {
+					const base = `[${n.id} r${n.revision}] ${q(n.text)} / 根拠: ${n.evidence.join(",") || "なし"}`;
+					if (n.kind === undefined) return base;
+					// Typed notes (interest / question): the model acts on these fields, so
+					// they are shown with the same raw tokens the wire uses.
+					const parts = [`種別=${n.kind}`, `状態=${n.status}`];
+					if (n.origin !== undefined) parts.push(`起源=${n.origin}`);
+					if (n.reviewAt !== undefined)
+						parts.push(`見直し: ${until(now, n.reviewAt)}`);
+					if (n.derivedFrom?.length)
+						parts.push(`由来: ${n.derivedFrom.join(",")}`);
+					if (n.interestRef !== undefined) parts.push(`関心: ${n.interestRef}`);
+					return `${base} / ${parts.join(" / ")}`;
+				})
 				.join("\n")
 		: "（メモなし）";
 
@@ -433,7 +443,7 @@ const renderState = (
 	state: AgencyState,
 	observations: readonly Observation[] = [],
 ) => {
-	if (condition === "B1") return `メモ:\n${renderNotes(state)}`;
+	if (condition === "B1") return `メモ:\n${renderNotes(now, state)}`;
 	const base = `意図:\n${renderIntents(now, state)}\n\n候補:\n${renderCandidates(now, state)}`;
 	return condition === "F"
 		? `${base}\n\n信念と欲求:\n${renderBeliefsDesires(state, observations)}`
@@ -665,7 +675,7 @@ const renderDeliveredAgo = (
 export const selectPrompt = (i: SelectPromptInput): string => {
 	const items =
 		i.condition === "B1"
-			? `メモ:\n${renderNotes(i.state)}`
+			? `メモ:\n${renderNotes(i.now, i.state)}`
 			: `選べる候補:\n${i.candidates.length ? i.candidates.map((c) => showCandidate(i.now, c)).join("\n") : "（なし）"}\n\n意図:\n${renderIntents(i.now, i.state)}`;
 	const o = i.opportunity;
 	return [
