@@ -22,7 +22,13 @@ export interface AgencyOutputContract<T> {
 /** A bounded view of existing state, not a second state store. */
 export type ModelStateData = Pick<
 	AgencyState,
-	"revision" | "notes" | "intents" | "candidates" | "beliefs" | "desires"
+	| "revision"
+	| "notes"
+	| "intents"
+	| "candidates"
+	| "beliefs"
+	| "desires"
+	| "interests"
 >;
 
 interface ModelData {

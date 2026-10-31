@@ -2,7 +2,7 @@
 
 Eumenes が経験から関心・欲求・意図を持ち、発言や行動の機会を選ぶ仕組みを、本体と独立して検証するサブプロジェクト。名前は仮称。
 
-**2026-10-21 時点: P0-E（単一の未解決事項の再開・抑制）を実装・実行した。指示の改訂で再現率は大きく上がったが、B1/B2/F の差はケース集合で順位が入れ替わる程度だった（[検証結果](spec/results.md)）。次は経験との因果・前提変化・並行する事項を測る [P1-E](spec/p1e-experiment.md)、その後に閉ループ会話の P2-E。永続化・製品接続は未着手。**
+**2026-11-01 時点: 関心の形成・変化（条件F + `interestFormation`）、イベントによる断続的な起床、予算付きの委譲契約、ホスト提供SQLiteへの履歴保存、調査結果の会話利用を研究用プロトタイプとして実装した。マージ前レビューの6点を修正し、全体検証は709成功・失敗0件。[進捗・評価結果と限界](docs/agency-next-progress.md)を参照。Eumenes/Pursuit本体への接続と、独立した実モデルによる品質評価は未完了。**
 
 使い方: `bun run verify`（format / lint / 型 / 境界 / テスト）、`bun eval/main.ts validate [--suite p0e|p1e]`、`bun eval/main.ts run --name <run> [--suite p1e] [--conditions B1,B2,D] [--case <id>] [--reps 3] [--budget-usd n]`、`bun eval/main.ts score --name <run>`、`bun eval/main.ts judge --name <run> [--limit N] [--budget-usd n]`（内容と状態の判定器）、`bun eval/main.ts label-export --suite p1e --split dev --n 12 --out <file.md>` と `agreement --sheet <file.md>`（人手ラベルの一致率）、`judge-export --name <run> --n 30 --out <file.md>` と `judge-agreement --sheet <file.md>`（判定器の較正）、`bun eval/main.ts trace --name <run> --case <id> [--condition B2] [--rep 1] [--prompt]`（モデル呼び出しと最終状態の確認。`traces.jsonl` はローカルのみ）、`bun run agency [-- --condition B1a --idle-sec 40 --max-unanswered 1 --no-log]`（対話。黙っていると AI から話しかける。既定 B1a、会話記録は `data/chats/`）。設定は `config/experiment.json`、費用の記録は `data/spend.jsonl`。
 

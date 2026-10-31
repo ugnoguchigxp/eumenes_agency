@@ -19,6 +19,8 @@ export interface InterestSettleInput {
 	readonly interests: readonly Interest[];
 	readonly ops: readonly InterestOp[];
 	readonly obs: ReadonlyMap<string, ObsInfo>;
+	/** Metadata for older evidence outside the bounded model input. New refs still use obs. */
+	readonly history?: ReadonlyMap<string, ObsInfo>;
 	readonly limit: number;
 	readonly seq: number;
 	readonly newId: () => string;
@@ -46,9 +48,15 @@ export function independentRefs(
 	refs: readonly string[],
 	counted: readonly string[],
 	obs: ReadonlyMap<string, ObsInfo>,
+	history: ReadonlyMap<string, ObsInfo> = obs,
 ): string[] {
 	const out: string[] = [];
-	const calls = new Set<string>();
+	const calls = new Set(
+		counted.flatMap((r) => {
+			const o = history.get(r);
+			return o?.actor === "tool" ? [o.causationId ?? `?${r}`] : [];
+		}),
+	);
 	for (const r of new Set(refs)) {
 		const o = obs.get(r);
 		if (!o || o.actor === "agent" || counted.includes(r)) continue;
@@ -85,6 +93,8 @@ export function settleInterests(
 	const byId = new Map(list.map((i) => [i.id, i]));
 	const rejects: InterestReject[] = [];
 	const live = () => list.filter((i) => i.status !== "faded").length;
+	const independent = (refs: readonly string[], counted: readonly string[]) =>
+		independentRefs(refs, counted, input.obs, input.history);
 	input.ops.forEach((op, index) => {
 		const fail = (code: string) => rejects.push({ index, code });
 		const unknown = op.evidenceRefs.filter((r) => !input.obs.has(r));
@@ -96,17 +106,14 @@ export function settleInterests(
 			if (op.derivedFrom !== null) {
 				const parent = byId.get(op.derivedFrom);
 				if (!parent) return fail("unknown_parent");
-				if (
-					independentRefs(op.evidenceRefs, parent.evidence, input.obs)
-						.length === 0
-				)
+				if (independent(op.evidenceRefs, parent.evidence).length === 0)
 					return fail("derived_needs_independent");
 			}
 			if (op.evidenceRefs.length === 0) return fail("no_evidence");
 			// A user's interest must rest on something the user (or a tool) did, not on agent talk.
 			if (
 				op.origin === "user_relation" &&
-				independentRefs(op.evidenceRefs, [], input.obs).length === 0
+				independent(op.evidenceRefs, []).length === 0
 			)
 				return fail("relation_needs_user");
 			const it: Interest = {
@@ -132,9 +139,7 @@ export function settleInterests(
 		if (cur.revision !== op.expectedRevision) return fail("stale_revision");
 		if (op.topic !== null && op.topic !== cur.topic) {
 			if (cur.origin === "host_seed") return fail("host_seed_immutable");
-			if (
-				independentRefs(op.evidenceRefs, cur.evidence, input.obs).length === 0
-			)
+			if (independent(op.evidenceRefs, cur.evidence).length === 0)
 				return fail("topic_needs_independent");
 		}
 		if (op.status !== null && op.status !== cur.status) {
@@ -144,7 +149,7 @@ export function settleInterests(
 				return fail("host_seed_immutable");
 			if (
 				op.status === "active" &&
-				independentRefs(op.evidenceRefs, cur.evidence, input.obs).length === 0
+				independent(op.evidenceRefs, cur.evidence).length === 0
 			)
 				return fail("promotion_needs_independent");
 			if (op.status === "active" && live() > input.limit)

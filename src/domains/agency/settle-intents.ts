@@ -381,34 +381,3 @@ export const applyReconciliation = (
 	c.evidence = unique([...c.evidence, o.id]);
 	ctx.touched.add(c.id);
 };
-
-/**
- * P5-b: a repair proposal (or approval-gated change) that would change Agency's own limits,
- * grants, approvals, guards or context. The host never accepts these (plan §5.7-5).
- * Only applied to fault-tied or approval-gated candidates, so ordinary talk about a user's
- * budget is never checked. Deterministic and conservative: (1) a deny-list of constraint
- * fields/config names, (2) an object (approval, limit, guard, …) near a weakening verb in
- * either order, Japanese or English. Normalized first (NFKC, lowercase, no spaces). The
- * approval gate on change tools remains the last line of defense.
- */
-const constraintFields =
-	/(requiresapproval|approval_required|repairguard|activitylimits|wakeconfig|reporttts|dailylimit|faultquietms|work_stale_ms|outboundintervalms|minintervalms|systemcontext|limitsschema|budgetconfig|defaultlimits|defaultbudget|grants?\b|\blimits\b)/;
-const constraintObjects =
-	"(承認|許可|確認|審査|レビュー|上限|制限|限度|予算|権限|安全|制約|ガード|ゲート|クールダウン|冷却|回数制限|日上限|approval|permission|limit|quota|budget|guard|gate|cooldown|constraint|safety|sandbox|allowlist|denylist)";
-const weakening =
-	"(不要|なし|無し|なく|無く|外|はず|撤廃|廃止|無効|オフ|切|緩|ゆる|増|上げ|引き上|拡大|広げ|付与|スキップ|省略|飛ば|バイパス|回避|迂回|無視|解除|取り除|削除|消|bypass|skip|disable|remove|raise|increase|relax|lift|loosen|ignore|turnoff|drop|override|without|unlimited|grant)";
-const nearA = new RegExp(`${constraintObjects}.{0,12}${weakening}`);
-const nearB = new RegExp(`${weakening}.{0,12}${constraintObjects}`);
-const ownScope =
-	/(自分|自身|agency|エージェント|自己)の?(権限|上限|制約|設定|予算)/;
-export const targetsOwnConstraints = (text: string): boolean => {
-	const raw = text.normalize("NFKC").toLowerCase();
-	const t = raw.replace(/\s+/g, "");
-	return (
-		constraintFields.test(raw.replace(/\s+/g, " ")) ||
-		constraintFields.test(t) ||
-		nearA.test(t) ||
-		nearB.test(t) ||
-		ownScope.test(t)
-	);
-};

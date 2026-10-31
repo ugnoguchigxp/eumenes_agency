@@ -129,7 +129,8 @@ export interface RuntimeDeps {
 	readonly findings?: boolean;
 	/**
 	 * P5-b repair guard (default true): a candidate citing a fault.observed is a repair
-	 * proposal; one per fault code, and never one that targets Agency's own constraints.
+	 * proposal; one per referenced fault code. Target interpretation belongs to the host's
+	 * SystemContext; approval-required tools are always blocked before autonomous reservation.
 	 */
 	readonly repairGuard?: boolean;
 	/**

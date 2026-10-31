@@ -14,6 +14,9 @@ const stateData = (
 	select: boolean,
 ): ModelStateData => ({
 	revision: state.revision,
+	...(condition === "F" && state.interests !== undefined
+		? { interests: state.interests.filter((i) => i.status !== "faded") }
+		: {}),
 	notes: condition === "B1" ? state.notes : [],
 	intents:
 		condition === "B1"

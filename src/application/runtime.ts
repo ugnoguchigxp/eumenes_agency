@@ -65,6 +65,7 @@ import {
 	defaultWakeConfig,
 	wake as wakeCheck,
 	type WakeEvent,
+	type WakeResult,
 } from "../domains/agency/wake.ts";
 import { holdCandidate } from "../domains/agency/lifecycle.ts";
 import {
@@ -77,6 +78,7 @@ import { buildProjection } from "./projection.ts";
 import { agencyOutputContract } from "./output-contract.ts";
 import { updateModelData, selectModelData } from "./model-data.ts";
 import { RevisionTracker } from "./revisions.ts";
+import type { ItemRevision } from "../contracts/revisions.ts";
 import {
 	captureSystemContext,
 	resolveSystemContext,
@@ -182,10 +184,19 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		? new RevisionTracker(deps.revisions.scope)
 		: null;
 	if (revTracker && deps.restore) revTracker.prime(state, deps.restore.revs);
+	// Retain a failed batch verbatim so its provenance and revision numbers survive retry.
+	let pendingRevisions: readonly ItemRevision[] = [];
 	const flushRevisions = (callId: string, at: number) => {
 		if (!revTracker || !deps.revisions) return;
-		const rows = revTracker.diff(state, callId, at);
-		if (rows.length > 0) deps.revisions.append(rows);
+		const appendPending = () => {
+			if (pendingRevisions.length === 0) return;
+			deps.revisions!.append(pendingRevisions);
+			revTracker.commit(pendingRevisions);
+			pendingRevisions = [];
+		};
+		appendPending();
+		pendingRevisions = revTracker.diff(state, callId, at);
+		appendPending();
 	};
 	let enabled = true;
 	// Updates that keep failing stop retrying until a new observation arrives.
@@ -404,7 +415,6 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 						state,
 						new Map(presented.map((o) => [o.id, o])),
 						typed.proposal.ops,
-						tools,
 						faults,
 					).dropped.map((c) => `repair:${c}`);
 		const result = settleUpdate({
@@ -444,6 +454,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				interests: state.interests ?? [],
 				ops,
 				obs: new Map(presented.map((o) => [o.id, o])),
+				history: new Map(ledger.all().map((o) => [o.id, o])),
 				limit: INTEREST_LIMIT,
 				seq: ledger.cursor(),
 				newId: () => `k${state.nextId++}`,
@@ -564,6 +575,10 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 						(x) => x.id !== "" && x.text.trim() !== "",
 					)
 				: [];
+		const formedInterests =
+			condition === "F"
+				? (state.interests ?? []).filter((i) => i.status !== "faded")
+				: [];
 		// Host topics (hostTopics mode, B1 only): seeds supplied by the host for this opportunity.
 		const topics: readonly HostTopic[] = hostTopics
 			? (opp.topics ?? []).filter((x) => x.id !== "" && x.text.trim() !== "")
@@ -675,6 +690,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 						interests: interests.length > 0,
 						...(social ? { social } : {}),
 						...(hostTopics ? { hostTopics } : {}),
+						...(interestFormation ? { interestFormation } : {}),
 						...(hostTodos ? { hostTodos } : {}),
 						...(hostTodos && todos.some((x) => x.status === "waiting")
 							? { todoQuestions: true }
@@ -749,6 +765,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				...presented.map((o) => o.id),
 				...shownEvidence,
 				...interests.map((x) => interestRef(x.id)),
+				...formedInterests.map((x) => interestRef(x.id)),
 				...topics.map((x) => memoryRef(x.id)),
 				...ambient.map((x) => contextRef(x.id)),
 				...todos.map((x) => todoRef(x.id)),
@@ -917,6 +934,38 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		state.revision += 1;
 	};
 
+	/** A bounded update acknowledges only observations it actually processed. */
+	const commitProcessedWake = (r: WakeResult, now: number) => {
+		const pending = new Set(ledger.pending().map((o) => o.id));
+		const events = r.keys.events.filter((id) => !pending.has(id));
+		const processed = new Set(events);
+		const recalls = new Set(r.keys.recall);
+		const faultCodes = new Set(
+			events.flatMap((id) => {
+				const o = ledger.get(id);
+				return o?.kind === "fault.observed" && o.code ? [o.code] : [];
+			}),
+		);
+		commitWake(
+			{
+				...r,
+				keys: {
+					...r.keys,
+					events,
+					recall: r.keys.recall.filter((id) => processed.has(id)),
+					faults: r.keys.faults.filter((code) => faultCodes.has(code)),
+					autonomous: events.filter((id) => {
+						const o = ledger.get(id);
+						return recalls.has(id) || o?.kind === "external.event";
+					}).length,
+				},
+			},
+			wakeFlags,
+			now,
+			wakeCfg,
+		);
+	};
+
 	const api: AgencyRuntime = {
 		condition,
 		observe(input) {
@@ -1030,7 +1079,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 							? await runUpdate(now, signal, batch, dueNow(now))
 							: [];
 					const last = calls[calls.length - 1];
-					if (!last || isApplied(last)) commitWake(r, wakeFlags, now, wakeCfg);
+					if (!last || isApplied(last)) commitProcessedWake(r, now);
 					return { ...out, decision: null, calls };
 				}
 				wakeCount += 1;
@@ -1051,10 +1100,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					signal,
 					1,
 				);
-				if (
-					!res.calls.some((c) => !isApplied(c) && !c.code.startsWith("skipped"))
-				)
-					commitWake(r, wakeFlags, now, wakeCfg);
+				if (res.calls.every(isApplied)) commitProcessedWake(r, now);
 				return { ...out, ...res };
 			});
 		},

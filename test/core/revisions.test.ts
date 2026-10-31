@@ -9,7 +9,25 @@ import {
 	stateFromRevisions,
 } from "../../src/index.ts";
 
+const record = (
+	tracker: RevisionTracker,
+	state: ReturnType<typeof emptyState>,
+	at: number,
+) => {
+	const rows = tracker.diff(state, "x", at);
+	tracker.commit(rows);
+	return rows;
+};
+
 describe("P4-c revisions", () => {
+	test("preparing rows does not advance the durable baseline", () => {
+		const tracker = new RevisionTracker("s");
+		const state = emptyState();
+		const rows = tracker.diff(state, "update", 1);
+		expect(tracker.diff(state, "update", 1)).toEqual(rows);
+		tracker.commit(rows);
+		expect(tracker.diff(state, "update", 1)).toEqual([]);
+	});
 	test("H12 gates: restore 100%, interest change reconstructed, no duplicate rows, forgotten bodies gone", async () => {
 		const r = await runH12();
 		expect(r.after.stateMatch).toBe("4/4");
@@ -24,29 +42,29 @@ describe("P4-c revisions", () => {
 	test("tracker emits only changed items with per-item revisions", () => {
 		const t = new RevisionTracker("s");
 		const s = emptyState();
-		expect(t.diff(s, "x", 1).map((r) => r.itemKind)).toEqual(["agency"]);
-		expect(t.diff(s, "x", 2)).toEqual([]);
+		expect(record(t, s, 1).map((r) => r.itemKind)).toEqual(["agency"]);
+		expect(record(t, s, 2)).toEqual([]);
 		s.focus = ["a"];
-		expect(t.diff(s, "x", 3).map((r) => r.revision)).toEqual([2]);
+		expect(record(t, s, 3).map((r) => r.revision)).toEqual([2]);
 	});
 	test("a deleted item gets a tombstone row and is not resurrected on restore", () => {
 		const t = new RevisionTracker("s");
 		const s = emptyState();
 		s.notes.push({ id: "n1", evidenceRefs: [] } as never);
-		const rows = [...t.diff(s, "x", 1)];
+		const rows = [...record(t, s, 1)];
 		s.notes.splice(0, 1);
 		s.revision += 1;
-		const del = t.diff(s, "x", 2);
+		const del = record(t, s, 2);
 		expect(del.find((r) => r.itemId === "n1")?.revision).toBe(2);
 		rows.push(...del);
 		expect(stateFromRevisions(rows)!.state.notes).toEqual([]);
-		expect(t.diff(s, "x", 3)).toEqual([]);
+		expect(record(t, s, 3)).toEqual([]);
 	});
 	test("redact clears every row of an item that cited a forgotten id; restore drops it", () => {
 		const t = new RevisionTracker("s");
 		const s = emptyState();
 		s.notes.push({ id: "n1", evidenceRefs: ["o9"] } as never);
-		const rows = t.diff(s, "x", 1);
+		const rows = record(t, s, 1);
 		const red = redactRevisions(rows, new Set(["o9"]));
 		expect(red.find((r) => r.itemId === "n1")!.stateJson).toBe(REDACTED);
 		expect(stateFromRevisions(red)!.state.notes).toEqual([]);

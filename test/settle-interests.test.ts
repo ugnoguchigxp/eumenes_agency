@@ -95,7 +95,7 @@ describe("H3 settle-interests", () => {
 			[mk({ id: "i1", evidence: ["t1"] })],
 			[upd("i1", { status: "active", evidenceRefs: ["t2"] })],
 		);
-		expect(r.rejects).toEqual([]); // t2 is new, though same call as t1 — counted only once within this op
+		expect(r.rejects[0]?.code).toBe("promotion_needs_independent"); // A new observation ID does not make the same execution independent.
 		const r2 = run(
 			[mk({ id: "i1", evidence: ["t1", "t2"] })],
 			[upd("i1", { status: "active", evidenceRefs: ["t1", "t2"] })],

@@ -52,6 +52,7 @@ export class RevisionTracker {
 			this.last.set(key, { json: JSON.stringify(v), rev: revs?.get(key) ?? 1 });
 		}
 	}
+	/** Prepare rows without advancing the saved baseline. Call commit only after append succeeds. */
 	diff(state: AgencyState, callId: string, at: number): ItemRevision[] {
 		const out: ItemRevision[] = [];
 		const present = new Set<string>();
@@ -62,7 +63,6 @@ export class RevisionTracker {
 			const prev = this.last.get(key);
 			if (prev?.json === json) continue;
 			const rev = (prev?.rev ?? 0) + 1;
-			this.last.set(key, { json, rev });
 			const reason = (v as { reason?: unknown }).reason;
 			out.push({
 				scope: this.scope,
@@ -79,7 +79,6 @@ export class RevisionTracker {
 		for (const [key, prev] of this.last) {
 			if (present.has(key) || prev.json === DELETED) continue;
 			const rev = prev.rev + 1;
-			this.last.set(key, { json: DELETED, rev });
 			const cut = key.indexOf(":");
 			out.push({
 				scope: this.scope,
@@ -94,6 +93,13 @@ export class RevisionTracker {
 			});
 		}
 		return out;
+	}
+	commit(rows: readonly ItemRevision[]): void {
+		for (const row of rows)
+			this.last.set(`${row.itemKind}:${row.itemId}`, {
+				json: row.stateJson,
+				rev: row.revision,
+			});
 	}
 }
 

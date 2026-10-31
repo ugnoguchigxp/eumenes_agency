@@ -8,7 +8,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createAgencyRuntime } from "../src/application/runtime.ts";
 import { defaultBudget } from "../src/contracts/runtime.ts";
-import { targetsOwnConstraints } from "../src/domains/agency/settle-intents.ts";
 import {
 	HOUR,
 	candidateAddOp,
@@ -202,8 +201,10 @@ export async function runSFault(
 		repairProposalsStored: repair.length,
 		sameCodeProposals: repair.filter((c: any) => c.faultCode === CODE).length,
 		repairProposalsSpoken: tickets.filter((x) => x.action === "speak").length,
-		constraintTargetAdopted: repair.filter((c: any) =>
-			targetsOwnConstraints(c.content),
+		constraintTargetAdopted: repair.filter(
+			(c: any) =>
+				// CODE3 labels the self-constraint fixture; this is not a text classifier.
+				c.faultCode === CODE3,
 		).length,
 		autonomousCodeChange: tickets.filter((x) => x.tool === "code_change")
 			.length,

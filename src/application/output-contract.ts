@@ -85,7 +85,7 @@ export function agencyOutputContract(
 			condition === "B1"
 				? "B1 has no candidates. discard is unavailable. speak requires utterance and evidenceRefs. tool requires an available toolName and toolInput. A note ID used as evidence is resolved to that note's evidence."
 				: "speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.",
-			"Evidence refs are presented observation IDs, evidence on presented notes/open intents, or interest:<id>, memory:<id>, context:<id>, todo:<id> for the corresponding presented host data. Unknown evidence refs, stale candidate revisions, unavailable/approval-required tools, outbound interval violations and invalidated opportunities are rejected before reservation. Tickets do not execute tools; execution and receipts belong to the host.",
+			"Evidence refs are presented observation IDs, evidence on presented notes/open intents, interest:<id> for presented formed or standing interests, or memory:<id>, context:<id>, todo:<id> for the corresponding presented host data. Unknown evidence refs, stale candidate revisions, unavailable/approval-required tools, outbound interval violations and invalidated opportunities are rejected before reservation. Tickets do not execute tools; execution and receipts belong to the host.",
 			...(emotion
 				? [
 						"emotion is one of the schema's emoji values or null. It is read for speak only; absence of a usable value does not supply a default emotion.",
