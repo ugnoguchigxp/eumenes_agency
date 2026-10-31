@@ -544,3 +544,18 @@ dev-9 の 😟 の使いすぎを受けて、規則に「仕事の失敗の報�
 - 測定中の事故（測定側）: (1) 初回の選択回答がメモの引用に `memory:n2` と前置きを付け、unknown_ref で却下された。select でのメモ引用は id のまま（host-rules-4）が正しく、memory:/context:/interest: はホスト提供の話題用。brief を直して選択のみ再生成し、他は再利用した。なお selectSelfResearch の文面はメモの引用形式に触れていない（出力契約側には明記あり）。文面への一文追加は候補として記録するが、往復自体は brief の案内で成立するため今回は変更しない（保留）。(2) driver が LlmPort のメソッド名と decide の戻り値の形を取り違え、初期の試行でコールが記録されなかった。driver 側のみ修正し、製品コードには触れていない。
 - 限界: fixture の「調査結果」は固定文であり、実検索ではない。実ツール/Pursuit への接続はホスト側の仕事として残る。シナリオは運営者作・単回・強いモデルのみ（§7.5）。
 - 判定: 採用（関心→問い→自律調査→receipt→解決の往復が、承認不要ツールの範囲で standalone 最小実行まで通った）。成果物: `~/workspace/dev/agency-autonomy-run/s6/`（repo 外）。
+
+## コードレビューと修正（2026-11-01、work/autonomous-interest 全差分）
+
+- 方法: 本体・standalone・テストの全差分を自分で精読し、独立レビュアー（サブエージェント）にも同じ差分を読ませて二重に点検した。指摘は全件修正し、修正コミット自体も別の独立レビュアーが再点検した（高・中の指摘なし）。最終ゲート 649 件合格。
+- 修正した指摘:
+  1. note.add に reviewAfterMaxHours の limits チェックがなく、作成時だけ上限を超えた見直し間隔が通った（カスタム limits で再現）。update と同じ limit_exceeded チェックとテストを追加。
+  2. 型付きメモ規則の文面が settle の証拠ゲートと食い違っていた（「作成後に届いた観測」vs 実装の「最終更新より新しい観測」）。文面を実装に合わせて正確化し、TYPED_NOTES_RULES_VERSION を typed-notes-2 に上げた。再活性化の行も同様に正確化。
+  3. select の状態表示で種別が `question` と表示され、wire の `open_question` と食い違っていた（モデルが写すと通常メモ扱いで却下される温床）。表示を wire トークンに統一。
+  4. selectSelfResearch の evidenceRefs 説明にメモ引用形式（id のまま）が無かった（S6 で実際に却下が起きた件）。一文を追加し、SOCIAL_RULES_VERSION を social-rules-11 に上げた。
+  5. note.update で由来（derivedFrom）に自分自身や自分の子孫を指定でき、自己参照・循環が作れた。作成側では構造的に作れないため、更新側でまとめて却下するよう統一し、テストを追加。
+  6. snapshot に condition が記録されず、別 condition の runtime への復元が無検証だった。snapshot() が condition を含み、復元時に不一致を TypeError で却下する（旧形式の snapshot はチェックなしで復元可）。あわせて AgencySnapshot の「含めないもの」に setEnabled 状態を明記し、AgencyRuntime のドキュメントコメントの付け違いを修正。
+  7. standalone: 復元ログが検証前に観測数を参照していたため、検証後の出力に移動。runPoll は失敗した poll 自体を記録するよう直し（従来はコメントと実装が食い違い無言で消えた）、halt 後はポーリングタイマーを止め、失敗記録自体の失敗でもループが落ちないようガード。
+  8. テストの穴: validateSnapshot の未検証分岐（state 配列欠落・revision 欠落・観測 id 重複）、decisionTts の「引用した todo がどちらの一覧にも無い」境界を追加。
+- 文面変更後の再測定: プロンプト文面（typed-notes-2 / social-rules-11 / 種別表示）を変えたため、S6 の往復を新しい生成で測り直し、決定的チェック 8/8 が再び合格した（`~/workspace/dev/agency-autonomy-run/s6/` の回答は新文面版に入れ替え済み）。S2 は独自の指示文を使うハーネスのため文面変更の影響を受けず、S3/S5 の結論は settle ゲートと起床機構に依存し文面の2行の正確化では変わらないため、再測定は S6 で代表させた。
+- 残した判断: 質問の解決ゲートの床（最終更新の seq）は intent 完了と同じ既存パターンのため変更せず、文面側を合わせた。note.delete で interestRef / derivedFrom が宙に浮く参照は、履歴としての id 表示の範囲で許容する（従来の扱いと同じ）。
