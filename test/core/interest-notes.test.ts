@@ -173,6 +173,16 @@ describe("typed notes: add", () => {
 		expect(codesOf(r)).toContain("missing_review");
 	});
 
+	test("creating a typed note beyond the host review limit is rejected", () => {
+		const r = run(
+			emptyState(),
+			b1Proposal([interestAdd("x", { reviewAfterHours: 48 })]),
+			{ limits: { ...defaultLimits, reviewAfterMaxHours: 24 } },
+		);
+		expect(r.kind).toBe("rejected");
+		expect(codesOf(r)).toContain("limit_exceeded");
+	});
+
 	test("an interest cannot be created retired or resolved", () => {
 		const r = run(
 			emptyState(),
@@ -419,22 +429,32 @@ describe("typed notes: update transitions", () => {
 		expect(codesOf(r)).toContain("limit_exceeded");
 	});
 
-	test("creating a typed note beyond the host review limit is rejected", () => {
-		const r = run(
-			emptyState(),
-			b1Proposal([interestAdd("x", { reviewAfterHours: 48 })]),
-			{ limits: { ...defaultLimits, reviewAfterMaxHours: 24 } },
-		);
-		expect(r.kind).toBe("rejected");
-		expect(codesOf(r)).toContain("limit_exceeded");
-	});
-
 	test("a note cannot derive from itself via an update", () => {
 		const s = applied(run(emptyState(), b1Proposal([interestAdd("x")])));
 		const it = s.notes[0]!;
 		const r = run(
 			s,
 			b1Proposal([noteUpdateOp(it.id, 1, { derivedFromRefs: [it.id] })]),
+		);
+		expect(r.kind).toBe("rejected");
+		expect(codesOf(r)).toContain("unresolved_ref");
+	});
+
+	test("derivation cannot form a cycle via an update", () => {
+		const s = applied(
+			run(
+				emptyState(),
+				b1Proposal([
+					interestAdd("a"),
+					interestAdd("b", { derivedFromRefs: ["a"] }),
+				]),
+			),
+		);
+		const a = s.notes.find((n) => n.text === "関心")!;
+		const b = s.notes.find((n) => n.derivedFrom?.includes(a.id))!;
+		const r = run(
+			s,
+			b1Proposal([noteUpdateOp(a.id, 1, { derivedFromRefs: [b.id] })]),
 		);
 		expect(r.kind).toBe("rejected");
 		expect(codesOf(r)).toContain("unresolved_ref");

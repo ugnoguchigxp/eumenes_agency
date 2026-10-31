@@ -39,6 +39,25 @@ const resolveDerivedFrom = (
 	return out;
 };
 
+/** True when the note `fromId` derives from `targetId` through other notes' derivedFrom links. */
+const derivesTransitively = (
+	ctx: SettleCtx,
+	fromId: string,
+	targetId: string,
+): boolean => {
+	const seen = new Set<string>();
+	const stack = [fromId];
+	while (stack.length > 0) {
+		const cur = stack.pop()!;
+		if (cur === targetId) return true;
+		if (seen.has(cur)) continue;
+		seen.add(cur);
+		const note = ctx.next.notes.find((x) => x.id === cur);
+		if (note?.derivedFrom) stack.push(...note.derivedFrom);
+	}
+	return false;
+};
+
 /**
  * A question's interestRef must name a note of kind "interest": an existing one, or
  * one created earlier in this proposal (op ordering applies the interest first).
@@ -240,9 +259,13 @@ export const applyNoteUpdate = (ctx: SettleCtx, op: Of<"note.update">) => {
 	if (n.kind !== undefined && derivedFromRefs.length > 0) {
 		const resolved = resolveDerivedFrom(ctx, derivedFromRefs);
 		if (resolved === null) ok = false;
-		// A note cannot derive from itself (an add cannot name itself either: the
-		// note does not exist yet when its refs are resolved).
-		else if (resolved.includes(n.id)) {
+		// Derivation stays a forest: a note cannot derive from itself or from one
+		// of its own descendants. (An add cannot form a cycle at all: the new note
+		// has no descendants yet, and same-proposal refs must resolve to exist.)
+		else if (
+			resolved.includes(n.id) ||
+			resolved.some((r) => derivesTransitively(ctx, r, n.id))
+		) {
 			reject(ctx, "unresolved_ref");
 			ok = false;
 		} else derivedFrom = resolved;
