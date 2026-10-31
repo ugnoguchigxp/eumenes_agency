@@ -146,7 +146,7 @@ describe("correction of a self-grounded belief", () => {
 			observations: [fix],
 			freshIds: new Set(["o2"]),
 			state: s,
-			due: { reviewIntentIds: [], pressure: [] },
+			due: { reviewIntentIds: [], reviewNoteIds: [], pressure: [] },
 			delivered: [],
 			tools,
 			limits: defaultLimits,

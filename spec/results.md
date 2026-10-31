@@ -476,3 +476,15 @@ dev-9 の 😟 の使いすぎを受けて、規則に「仕事の失敗の報�
 - 別の判定役に同じシートを記入させた対照では、項目ごとの行動が可視範囲で全て一致し、項目 2 の誤りまで同じだった。判定役同士の一致は同系モデルゆえ独立した証拠にはならないが、誤りに系統性がある（根拠の薄い「役に立ちそうな確認行動」への偏り）ことは記録する。
 - 制約（S2 以降に適用）: 意味判定は決定的な軌跡採点を主とし、エージェント判定は補助に留める。根拠の有無は可能な限り機械的に確認する。期待ラベルが draft のままである点と、利用者本人の記入による人手アンカーが未実施である点は残る（シートは利用者がいつでも記入でき、その時点で較正をやり直せる）。
 - 成果物: `~/workspace/dev/agency-autonomy-run/s0/`（repo 外）。
+
+## 関心・問いのノート種別と tts S1（2026-11-01、autonomous-interest §10 S1、host-rules-7）
+
+設計書 §3.1 / §3.2 / §3.4 / §5.5 の契約と検証を実装。この段階は契約のみで、意味の効果は S2 で測る。
+
+- Note に種別フィールドを追加（kind: interest / question、status、origin、derivedFrom、interestRef、reviewAt、createdSeq / updatedSeq）。通常ノートは従来どおりで、種別フィールドの混入は reject（`note_kind_required`）。
+- settle 検証: interest は origin と review（上限は既存の reviewAfterMaxHours = 168 時間）が必須で、生成時は active / dormant のみ。question は open のみで生成でき、interestRef は kind=interest のノートだけを指せる。再活性化（dormant / retired → active）と問いの解決（open → resolved）は、そのノートより新しい独立証拠が無ければ reject（`completion_without_external_evidence`、intent 完了と同じ規則）。derivedFrom は実在するアイテムか同一提案内の localId に解決できなければ reject。
+- findDue が種別ノートの review も拾う（`Due.reviewNoteIds`）。発行は (id, reviewAt) ごとに 1 回で、reviewAt を延長すれば再び発火する。runtime は batch が空でも note の review が due なら update を呼ぶ（既存の `isDue` 経路）。
+- tts（§5.5）: `RuntimeDeps.silentSelfReports` と Decision / ActionTicket の `tts` を追加。値は `decisionTts`（application/todos.ts の純粋関数）が起源 × モードから機械的に決める。自己起源の todo を根拠にする speak の報告だけがモード ON で false、利用者起源が混ざれば true、モード OFF は全て true、未設定なら何も刻まない。起源の正本はその機会に提示された todo で、`deps.todos` はフォールバック。
+- HOST_RULES_VERSION を host-rules-6 → 7 に更新（settle 規則の変更）。
+- 試験: test/core/interest-notes.test.ts を新設（22 件）。全体ゲートは 609 → 631 件で全合格（0 fail）。既存試験の変更は Due リテラルの型追随と wire 往復リテラルの同期のみで、期待値の意味は変えていない。
+- 判定: 採用（この段階の合格条件 = 固定試験と全体ゲートを満たすこと）。関心形成の意味が成り立つかは S2 で測る。

@@ -139,7 +139,7 @@ describe("SystemContext contracts and configuration (partial)", () => {
 			observations: [{ ...user("o1", 0, poison), seq: 1 }],
 			freshIds: new Set(["o1"]),
 			state,
-			due: { reviewIntentIds: [], pressure: ["intents"] },
+			due: { reviewIntentIds: [], reviewNoteIds: [], pressure: ["intents"] },
 			delivered: [],
 			tools: [],
 			limits: defaultLimits,

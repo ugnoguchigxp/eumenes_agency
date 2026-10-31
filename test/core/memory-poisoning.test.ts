@@ -80,7 +80,7 @@ const basePromptInput = (observations: readonly Observation[]) => ({
 	observations,
 	freshIds: new Set(observations.map((o) => o.id)),
 	state: emptyState(),
-	due: { reviewIntentIds: [], pressure: [] },
+	due: { reviewIntentIds: [], reviewNoteIds: [], pressure: [] },
 	delivered: [],
 	tools,
 	limits: defaultLimits,

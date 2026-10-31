@@ -49,13 +49,28 @@ const desireUpdate = {
 	evidenceRefs: ["o3"],
 };
 const noteOps = [
-	{ op: "note.add", localId: "n", text: "メモ", evidenceRefs: ["o1"] },
+	{
+		op: "note.add",
+		localId: "n",
+		text: "メモ",
+		evidenceRefs: ["o1"],
+		kind: null,
+		status: null,
+		origin: null,
+		derivedFromRefs: [],
+		interestRef: null,
+		reviewAfterHours: null,
+	},
 	{
 		op: "note.update",
 		id: "n1",
 		expectedRevision: 1,
 		text: "改",
 		evidenceRefs: [],
+		status: null,
+		reviewAfterHours: null,
+		derivedFromRefs: [],
+		interestRef: null,
 	},
 	{ op: "note.delete", id: "n1", expectedRevision: 2 },
 ];

@@ -5,6 +5,8 @@ import { isOpenCandidate, isOpenIntent } from "../../contracts/model.ts";
 export interface Due {
 	/** review.due: open intents whose reviewAt has passed. */
 	readonly reviewIntentIds: readonly string[];
+	/** review.due: typed notes (interests / open questions) whose reviewAt has passed. */
+	readonly reviewNoteIds: readonly string[];
 	/** capacity.pressure: collections at or above the pressure ratio. */
 	readonly pressure: readonly ("intents" | "candidates")[];
 }
@@ -23,10 +25,12 @@ export const createDueFlags = (): DueFlags => ({
 const reviewKey = (id: string, reviewAt: number) => `${id}@${reviewAt}`;
 
 export const isDue = (d: Due) =>
-	d.reviewIntentIds.length > 0 || d.pressure.length > 0;
+	d.reviewIntentIds.length > 0 ||
+	d.reviewNoteIds.length > 0 ||
+	d.pressure.length > 0;
 
 /**
- * review.due fires once per (intent, reviewAt); capacity.pressure once per
+ * review.due fires once per (item, reviewAt); capacity.pressure once per
  * crossing, re-armed when the count falls below the threshold.
  */
 export const findDue = (
@@ -43,6 +47,18 @@ export const findDue = (
 				!flags.review.has(reviewKey(i.id, i.reviewAt)),
 		)
 		.map((i) => i.id);
+	const reviewNoteIds = state.notes
+		.filter(
+			(n) =>
+				n.kind !== undefined &&
+				(n.status === "active" ||
+					n.status === "dormant" ||
+					n.status === "open") &&
+				n.reviewAt !== undefined &&
+				n.reviewAt <= now &&
+				!flags.review.has(reviewKey(n.id, n.reviewAt)),
+		)
+		.map((n) => n.id);
 	const counts = {
 		intents: [state.intents.filter(isOpenIntent).length, limits.openIntents],
 		candidates: [
@@ -57,7 +73,7 @@ export const findDue = (
 			if (!flags.pressure.has(kind)) pressure.push(kind);
 		} else flags.pressure.delete(kind);
 	}
-	return { reviewIntentIds, pressure };
+	return { reviewIntentIds, reviewNoteIds, pressure };
 };
 
 /** Flag keys for the events a call carried; computed before the call changes the state. */
@@ -67,10 +83,16 @@ export interface IssuedKeys {
 }
 
 export const issuedKeys = (state: AgencyState, due: Due): IssuedKeys => ({
-	review: due.reviewIntentIds.flatMap((id) => {
-		const i = state.intents.find((x) => x.id === id);
-		return i ? [reviewKey(i.id, i.reviewAt)] : [];
-	}),
+	review: [
+		...due.reviewIntentIds.flatMap((id) => {
+			const i = state.intents.find((x) => x.id === id);
+			return i ? [reviewKey(i.id, i.reviewAt)] : [];
+		}),
+		...due.reviewNoteIds.flatMap((id) => {
+			const n = state.notes.find((x) => x.id === id);
+			return n && n.reviewAt !== undefined ? [reviewKey(n.id, n.reviewAt)] : [];
+		}),
+	],
 	pressure: [...due.pressure],
 });
 

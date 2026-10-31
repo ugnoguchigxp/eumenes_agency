@@ -290,6 +290,8 @@ const wireBlank = {
 	toolInput: null,
 	evidenceRefs: [],
 	beliefRefs: [],
+	origin: null,
+	derivedFromRefs: [],
 };
 
 /** Typed op -> flat wire op (the mirror of fromWire). */
@@ -315,7 +317,14 @@ export const toWireOp = (o: Json): Json => {
 		"kind",
 		"confidence",
 		"beliefRefs",
+		"origin",
+		"derivedFromRefs",
 	);
+	// A typed question note is "open_question" on the wire (kind "question" is a candidate kind).
+	if (o.op === "note.add" && o.kind === "question") w.kind = "open_question";
+	// A note's interestRef rides the wire's intentRef slot.
+	if ((o.op === "note.add" || o.op === "note.update") && "interestRef" in o)
+		w.intentRef = o.interestRef;
 	const map = (from: string, to: string) => {
 		if (from in o) w[to] = o[from];
 	};

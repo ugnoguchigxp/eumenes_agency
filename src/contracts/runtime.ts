@@ -101,6 +101,13 @@ export interface RuntimeDeps {
 	 * as Decision.emotion / ActionTicket.emotion. Absent: the select schema and prompt are as before.
 	 */
 	readonly utteranceEmotion?: boolean;
+	/**
+	 * Host delivery policy (spec/autonomous-interest-design.md §5.5): when true, reports of
+	 * self-originated work are delivered silently (text only). When set (true or false),
+	 * outward decisions carry an explicit Decision.tts / ActionTicket.tts; absent: no tts
+	 * field is stamped and the host applies its own default.
+	 */
+	readonly silentSelfReports?: boolean;
 }
 
 export interface StandingInterest {
@@ -112,7 +119,7 @@ export interface StandingInterest {
 export const RECENT_OBSERVATION_WINDOW = 30;
 
 /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
-export const HOST_RULES_VERSION = "host-rules-6";
+export const HOST_RULES_VERSION = "host-rules-7";
 
 /** One background model call (or a host decision not to make one). */
 export interface CallOutcome {
@@ -155,6 +162,8 @@ export interface ActionTicket {
 	readonly toolInput: string | null;
 	/** Speak in utteranceEmotion mode: the feeling chosen with the utterance. */
 	readonly emotion?: EmotionName;
+	/** Delivery attribute (§5.5): false delivers silently (text only). Absent: the host default. */
+	readonly tts?: boolean;
 }
 
 export interface Decision {
@@ -170,6 +179,8 @@ export interface Decision {
 	readonly reason: string;
 	/** Speak in utteranceEmotion mode: the feeling chosen with the utterance. */
 	readonly emotion?: EmotionName;
+	/** Delivery attribute (§5.5): same value as the ticket's. Absent: the host default. */
+	readonly tts?: boolean;
 	/** Issued only for an accepted outward action (speak/tool). */
 	readonly ticket: ActionTicket | null;
 	readonly rejectCodes: readonly string[];

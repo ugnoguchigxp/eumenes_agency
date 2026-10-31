@@ -95,6 +95,12 @@ const localRefsOf = (op: UpdateOp): string[] => {
 				: [op.intentRef, op.supersedes];
 		case "desire.add":
 			return op.beliefRefs;
+		case "note.add":
+		case "note.update":
+			return [
+				...(op.derivedFromRefs ?? []),
+				...(op.interestRef ? [op.interestRef] : []),
+			];
 		default:
 			return [];
 	}

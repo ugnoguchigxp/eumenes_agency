@@ -41,6 +41,7 @@ interface ModelData {
 export interface UpdateModelData extends ModelData {
 	readonly due: {
 		readonly reviewIntentIds: readonly string[];
+		readonly reviewNoteIds: readonly string[];
 		readonly pressure: readonly ("intents" | "candidates")[];
 	};
 }

@@ -16,6 +16,20 @@ export const noteAdd = z.strictObject({
 	localId: ref,
 	text: text(400),
 	evidenceRefs: refs,
+	/** Typed note (interest / open question); null is a plain memo. */
+	kind: z.enum(["interest", "question"]).nullable(),
+	status: z
+		.enum(["active", "dormant", "retired", "open", "resolved"])
+		.nullable(),
+	/** Interest only: how the interest arose. */
+	origin: z
+		.enum(["experienced", "inferred", "imagined", "self_declared"])
+		.nullable(),
+	derivedFromRefs: refs,
+	/** Question only: the interest (note id or localId) this question serves. */
+	interestRef: ref.nullable(),
+	/** Typed notes only: when to review the interest/question again. */
+	reviewAfterHours: z.int().min(1).max(168).nullable(),
 });
 export const noteUpdate = z.strictObject({
 	op: z.literal("note.update"),
@@ -23,6 +37,14 @@ export const noteUpdate = z.strictObject({
 	expectedRevision: z.int().min(1),
 	text: text(400),
 	evidenceRefs: refs,
+	/** Typed notes only: new status; null keeps the current one. */
+	status: z
+		.enum(["active", "dormant", "retired", "open", "resolved"])
+		.nullable(),
+	reviewAfterHours: z.int().min(1).max(168).nullable(),
+	derivedFromRefs: refs,
+	/** Question only: set/change the served interest; null keeps the current one. */
+	interestRef: ref.nullable(),
 });
 export const noteDelete = z.strictObject({
 	op: z.literal("note.delete"),
@@ -242,7 +264,7 @@ export type WireOpName =
 	| (typeof wireOpNames)["F"][number]
 	| (typeof wireOpNames)["B1"][number];
 
-/** `state` carries: initialState, intent transition, belief/desire status, or candidate close reason. */
+/** `state` carries: initialState, intent transition, belief/desire status, note status, or candidate close reason. */
 const wireStates = [
 	"proposed",
 	"adopted",
@@ -259,6 +281,9 @@ const wireStates = [
 	"dismissed",
 	"expired",
 	"fulfilled",
+	"dormant",
+	"retired",
+	"resolved",
 ] as const;
 const wireKinds = [
 	"question",
@@ -267,6 +292,8 @@ const wireKinds = [
 	"tool",
 	"understand",
 	"finish",
+	"interest",
+	"open_question",
 ] as const;
 
 const wireOpShape = <N extends string>(names: readonly [N, ...N[]]) =>
@@ -297,6 +324,11 @@ const wireOpShape = <N extends string>(names: readonly [N, ...N[]]) =>
 		toolInput: z.string().max(400).nullable(),
 		evidenceRefs: refs,
 		beliefRefs: refs,
+		/** Note origin (interest notes); null elsewhere. */
+		origin: z
+			.enum(["experienced", "inferred", "imagined", "self_declared"])
+			.nullable(),
+		derivedFromRefs: refs,
 	});
 
 const wireUpdate = <N extends string>(
@@ -361,6 +393,18 @@ const typedOp = (
 				localId: w.localId,
 				text: w.text,
 				evidenceRefs: w.evidenceRefs,
+				// The wire spells a question note "open_question" (kind "question" is a candidate kind).
+				kind:
+					w.kind === "interest"
+						? "interest"
+						: w.kind === "open_question"
+							? "question"
+							: null,
+				status: w.state,
+				origin: w.origin,
+				derivedFromRefs: w.derivedFromRefs,
+				interestRef: w.intentRef,
+				reviewAfterHours: w.hours,
 			};
 		case "note.update":
 			return {
@@ -369,6 +413,10 @@ const typedOp = (
 				expectedRevision: w.expectedRevision,
 				text: w.text,
 				evidenceRefs: w.evidenceRefs,
+				status: w.state,
+				reviewAfterHours: w.hours,
+				derivedFromRefs: w.derivedFromRefs,
+				interestRef: w.intentRef,
 			};
 		case "note.delete":
 			return { ...base, id: w.id, expectedRevision: w.expectedRevision };
@@ -492,7 +540,8 @@ export const fromWire = (
 	for (const w of wire.ops) {
 		for (const v of [w.id, w.localId, w.intentRef, w.supersedes, w.desireRef])
 			if (v !== null) used.add(v);
-		for (const v of [...w.evidenceRefs, ...w.beliefRefs]) used.add(v);
+		for (const v of [...w.evidenceRefs, ...w.beliefRefs, ...w.derivedFromRefs])
+			used.add(v);
 	}
 	const candidate = {
 		summary: wire.summary,

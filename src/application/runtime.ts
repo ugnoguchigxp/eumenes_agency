@@ -56,6 +56,7 @@ import {
 	skippedOutcome,
 } from "./model-call.ts";
 import { buildProjection } from "./projection.ts";
+import { decisionTts } from "./todos.ts";
 import { agencyOutputContract } from "./output-contract.ts";
 import { updateModelData, selectModelData } from "./model-data.ts";
 import {
@@ -80,7 +81,7 @@ const PENDING_CAP = 16;
 const DELIVERED_SHOWN = 5;
 /** Speak tickets whose topic/interest refs wait for a receipt (oldest dropped beyond this). */
 const TOPIC_TICKETS_KEPT = 64;
-const NO_DUE: Due = { reviewIntentIds: [], pressure: [] };
+const NO_DUE: Due = { reviewIntentIds: [], reviewNoteIds: [], pressure: [] };
 
 export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const { condition, llm, tools } = deps;
@@ -618,7 +619,19 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		let ticket: ActionTicket | null = null;
 		if (p.action === "speak" || p.action === "tool") {
 			const reserved = reserveOutward(state, opp.id, p.action, verdict, opp.at);
-			ticket = emotion ? { ...reserved, emotion } : reserved;
+			// Delivery policy (§5.5): mechanical, from the mode and the cited todos' origins.
+			// The todos presented at this opportunity are authoritative; deps.todos is a fallback.
+			const tts = decisionTts(
+				deps.silentSelfReports,
+				p.action,
+				p.evidenceRefs,
+				[...todos, ...(deps.todos?.() ?? [])],
+			);
+			ticket = {
+				...reserved,
+				...(emotion ? { emotion } : {}),
+				...(tts === undefined ? {} : { tts }),
+			};
 			issued.set(ticket.id, ticket);
 			const used = p.evidenceRefs.filter(
 				(ref) =>
@@ -647,6 +660,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			evidenceRefs: p.evidenceRefs,
 			reason: p.reason,
 			...(emotion ? { emotion } : {}),
+			...(ticket?.tts === undefined ? {} : { tts: ticket.tts }),
 			ticket,
 			rejectCodes: [],
 		});

@@ -236,11 +236,39 @@ export interface Desire {
 	readonly createdSeq?: number;
 }
 
+export type NoteKind = "interest" | "question";
+/** interest: active | dormant | retired. question: open | resolved | retired. */
+export type NoteStatus = "active" | "dormant" | "retired" | "open" | "resolved";
+export type NoteOrigin =
+	| "experienced"
+	| "inferred"
+	| "imagined"
+	| "self_declared";
+
 export interface Note {
 	readonly id: string;
 	revision: number;
 	text: string;
 	evidence: string[];
+	/** Typed notes only (interest / open question); absent is a plain memo. */
+	readonly kind?: NoteKind;
+	status?: NoteStatus;
+	/**
+	 * Interest only: how the interest arose. An imagined / self_declared interest never
+	 * grounds a belief or an intent on its own (the interest form of the independent
+	 * evidence rule).
+	 */
+	readonly origin?: NoteOrigin;
+	/** Ids of the items (notes / intents / beliefs / desires / candidates) this note derives from. */
+	derivedFrom?: string[];
+	/** Question only: the interest note this question serves. */
+	interestRef?: string;
+	/** Typed notes only: when the interest/question is next reviewed (epoch ms). */
+	reviewAt?: number;
+	/** Highest seq of the processed batch that created it; absent (older snapshots) means no floor. */
+	readonly createdSeq?: number;
+	/** Highest seq of the batch that last updated it; older snapshots fall back to createdSeq. */
+	updatedSeq?: number;
 }
 
 export interface AgencyState {
