@@ -38,8 +38,16 @@ describe("parseCliArgs / resolveCondition", () => {
 			quietWhy: false,
 			typedNotes: false,
 			pollMinutes: 0,
+			snapshotPath: null,
 			interests: [defaultInterestText],
 		});
+	});
+
+	test("--snapshot <path> (default null)", () => {
+		expect(parseCliArgs([]).snapshotPath).toBeNull();
+		expect(parseCliArgs(["--snapshot", "s.json"]).snapshotPath).toBe("s.json");
+		expect(() => parseCliArgs(["--snapshot"])).toThrow();
+		expect(() => parseCliArgs(["--snapshot", "--off"])).toThrow();
 	});
 
 	test("--typed-notes (default off) and --poll-minutes (default 0 = off)", () => {

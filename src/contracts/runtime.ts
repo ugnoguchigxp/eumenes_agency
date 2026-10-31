@@ -225,6 +225,21 @@ export interface AgencyProjection {
  * async methods call the model outside any write and settle afterwards.
  * Time is always passed in (no clock inside the core).
  */
+/**
+ * A point-in-time copy of the runtime's durable state, as returned by
+ * `AgencyRuntime.snapshot()` and accepted by `createAgencyRuntime(deps, restore)`.
+ * Deliberately NOT included (host concerns, fresh after a restore): the rolling
+ * call-budget window, due flags already issued (a review that produced no change
+ * may fire once more after a restore), in-flight tickets, and hostTodos reports
+ * not yet drained via `takeReportedTodos()` — drain those before snapshotting.
+ */
+export interface AgencySnapshot {
+	readonly state: AgencyState;
+	readonly observations: readonly Observation[];
+	/** Highest observation seq fully processed at snapshot time. */
+	readonly cursor: number;
+}
+
 export interface AgencyRuntime {
 	readonly condition: Condition;
 	/** Idempotent by id; same id with different content throws ObservationConflictError. */
@@ -257,9 +272,5 @@ export interface AgencyRuntime {
 	/** OFF fences old inference/tickets and hides projection; retained state returns on ON. */
 	setEnabled(enabled: boolean): void;
 	projection(maxItems: number): AgencyProjection;
-	snapshot(): {
-		readonly state: AgencyState;
-		readonly observations: readonly Observation[];
-		readonly cursor: number;
-	};
+	snapshot(): AgencySnapshot;
 }

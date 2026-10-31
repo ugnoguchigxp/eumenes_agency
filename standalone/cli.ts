@@ -38,10 +38,12 @@
  *   /ask <id> <question>        the TODO waits for your answer: a result_received opportunity opens
  * Commands: /idle  /state  /todos  /done  /ask  /off  /on  /quit
  */
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import {
 	type ActionTicket,
 	type AgencyRuntime,
+	type AgencySnapshot,
 	type CallOutcome,
 	emotionEmoji,
 	type HostTodo,
@@ -113,7 +115,12 @@ function describeState(
 		lines.push(`  intent ${i.id} [${i.state}] ${i.desiredState}`);
 	for (const c of candidates)
 		lines.push(`  candidate ${c.id} [${c.kind}/${c.state}] ${c.content}`);
-	for (const n of state.notes) lines.push(`  note ${n.id} ${n.text}`);
+	for (const n of state.notes)
+		lines.push(
+			n.kind
+				? `  ${n.kind} ${n.id} [${n.status ?? "?"}${n.origin ? `/${n.origin}` : ""}] ${n.text}${n.reviewAt ? ` / 見直し: ${new Date(n.reviewAt).toISOString()}` : ""}`
+				: `  note ${n.id} ${n.text}`,
+		);
 	for (const x of interests) lines.push(`  interest ${x.id} ${x.text}`);
 	for (const t of todos)
 		lines.push(
@@ -133,22 +140,50 @@ async function main() {
 	const standingInterests = toStandingInterests(args.interests);
 	// Social mode only exists for B1 (B1a included); B2/F ignore it.
 	const social = args.social && condition === "B1";
-	const runtime = createAgencyRuntime({
-		systemContext: "experimental",
-		condition,
-		llm,
-		tools: [],
-		budget: resolveBudget(settings),
-		...(selectWhenEmpty ? { selectWhenEmpty: true } : {}),
-		hostTodos: true,
-		todos: toolPort.todos,
-		...(args.typedNotes ? { typedNotes: true } : {}),
-		...(args.emotion ? { utteranceEmotion: true } : {}),
-		...(args.tts ? { utteranceStyle: ttsUtteranceStyle } : {}),
-		...(standingInterests.length > 0 ? { standingInterests } : {}),
-		...(social ? { socialTopics: true } : {}),
-	});
+	// Snapshot restore (design §3.4): a corrupt snapshot is fatal on purpose —
+	// silently starting fresh would discard the user's state without a trace.
+	let restore: AgencySnapshot | undefined;
+	if (args.snapshotPath && existsSync(args.snapshotPath)) {
+		restore = JSON.parse(
+			readFileSync(args.snapshotPath, "utf8"),
+		) as AgencySnapshot;
+		console.log(
+			dim(
+				`  [snapshot] ${args.snapshotPath} から復元しました（観測 ${restore.observations.length} 件）`,
+			),
+		);
+	}
+	const runtime = createAgencyRuntime(
+		{
+			systemContext: "experimental",
+			condition,
+			llm,
+			tools: [],
+			budget: resolveBudget(settings),
+			...(selectWhenEmpty ? { selectWhenEmpty: true } : {}),
+			hostTodos: true,
+			todos: toolPort.todos,
+			...(args.typedNotes ? { typedNotes: true } : {}),
+			...(args.emotion ? { utteranceEmotion: true } : {}),
+			...(args.tts ? { utteranceStyle: ttsUtteranceStyle } : {}),
+			...(standingInterests.length > 0 ? { standingInterests } : {}),
+			...(social ? { socialTopics: true } : {}),
+		},
+		restore,
+	);
 	if (args.off) runtime.setEnabled(false);
+	// Save after every state-changing turn / cycle / poll and on shutdown, via a
+	// temp file + rename so a crash mid-write never leaves a torn snapshot.
+	const saveSnapshot = (): void => {
+		if (!args.snapshotPath) return;
+		try {
+			const tmp = `${args.snapshotPath}.tmp`;
+			writeFileSync(tmp, JSON.stringify(runtime.snapshot()));
+			renameSync(tmp, args.snapshotPath);
+		} catch {
+			console.warn("[warn] snapshot write failed");
+		}
+	};
 	if (!process.env.ANTHROPIC_API_KEY)
 		console.warn("[warn] ANTHROPIC_API_KEY is not set");
 	const digest = settingsDigest(settings);
@@ -395,6 +430,7 @@ async function main() {
 		}
 		if (closed) return outcome;
 		if (outcome !== "aborted" && meter.spentUsd() !== spentBefore) printSpend();
+		saveSnapshot();
 		scheduler.rearm();
 		return outcome;
 	};
@@ -439,6 +475,7 @@ async function main() {
 			});
 			if (haltOnOutcomes(outcomes)) return;
 			archiveReported();
+			saveSnapshot();
 		} catch {
 			// A failed poll is logged by the next successful one; never crash the loop.
 		} finally {
@@ -470,6 +507,7 @@ async function main() {
 		scheduler.dispose();
 		if (pollTimer) clearTimeout(pollTimer);
 		abortBackground();
+		saveSnapshot();
 		chatAbort.abort();
 	};
 	// /quit, EOF and Ctrl-C all end in "close".
@@ -558,6 +596,7 @@ async function main() {
 			}
 		} finally {
 			planner.leave(Date.now());
+			saveSnapshot();
 			scheduler.rearm();
 		}
 	};

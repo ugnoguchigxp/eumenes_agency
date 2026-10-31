@@ -59,6 +59,8 @@ export interface CliArgs {
 	readonly typedNotes: boolean;
 	/** Low-frequency review polling in minutes (design §5.2). 0 = off. */
 	readonly pollMinutes: number;
+	/** Snapshot file for restore-on-start / save-on-change (design §3.4). Null = off. */
+	readonly snapshotPath: string | null;
 }
 
 const nonNegative = (
@@ -93,6 +95,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 	let quietWhy = false;
 	let typedNotes = false;
 	let pollMinutes = 0;
+	let snapshotPath: string | null = null;
 	const interests: string[] = [];
 	let noInterest = false;
 	for (let i = 0; i < argv.length; i++) {
@@ -117,7 +120,12 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 		else if (arg === "--no-typed-notes") typedNotes = false;
 		else if (arg === "--poll-minutes")
 			pollMinutes = nonNegative("--poll-minutes", argv[++i], false, 10080);
-		else if (arg === "--condition") {
+		else if (arg === "--snapshot") {
+			const value = argv[++i];
+			if (!value || value.startsWith("--"))
+				throw new Error("usage: --snapshot <path>");
+			snapshotPath = value;
+		} else if (arg === "--condition") {
 			const value = argv[++i];
 			const found = cliConditions.find((c) => c === value);
 			if (!found)
@@ -149,6 +157,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 		quietWhy,
 		typedNotes,
 		pollMinutes,
+		snapshotPath,
 		interests: noInterest
 			? []
 			: interests.length > 0

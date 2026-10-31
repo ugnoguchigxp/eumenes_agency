@@ -19,6 +19,7 @@ import {
 	type ActionTicket,
 	type StandingInterest,
 	type AgencyRuntime,
+	type AgencySnapshot,
 	type CallOutcome,
 	type Decision,
 	type RuntimeDeps,
@@ -83,7 +84,52 @@ const DELIVERED_SHOWN = 5;
 const TOPIC_TICKETS_KEPT = 64;
 const NO_DUE: Due = { reviewIntentIds: [], reviewNoteIds: [], pressure: [] };
 
-export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
+/**
+ * Structural validation for a snapshot handed back for restore. Item-level
+ * validity is not re-checked: snapshots are produced by settle, and a host
+ * loads files it wrote itself. What must hold for the rebuild to be faithful
+ * is the ledger's shape: observations in seq order (1..N, unique ids) and a
+ * cursor inside the processed prefix.
+ */
+const validateSnapshot = (s: AgencySnapshot): void => {
+	const bad = (why: string): never => {
+		throw new TypeError(`invalid snapshot: ${why}`);
+	};
+	if (typeof s !== "object" || s === null) bad("not an object");
+	const st: AgencyState = s.state;
+	if (typeof st !== "object" || st === null) bad("state missing");
+	for (const k of [
+		"intents",
+		"candidates",
+		"attempts",
+		"beliefs",
+		"desires",
+		"notes",
+		"focus",
+	] as const)
+		if (!Array.isArray(st[k])) bad(`state.${k} is not an array`);
+	if (typeof st.revision !== "number" || typeof st.nextId !== "number")
+		bad("state.revision / state.nextId missing");
+	if (!Array.isArray(s.observations)) bad("observations is not an array");
+	const ids = new Set<string>();
+	s.observations.forEach((o, i) => {
+		if (o.seq !== i + 1)
+			bad(`observation ${o.id} has seq ${o.seq}, expected ${i + 1}`);
+		if (ids.has(o.id)) bad(`duplicate observation id ${o.id}`);
+		ids.add(o.id);
+	});
+	if (
+		!Number.isInteger(s.cursor) ||
+		s.cursor < 0 ||
+		s.cursor > s.observations.length
+	)
+		bad("cursor outside the observation list");
+};
+
+export const createAgencyRuntime = (
+	deps: RuntimeDeps,
+	restore?: AgencySnapshot,
+): AgencyRuntime => {
 	const { condition, llm, tools } = deps;
 	const systemContext = captureSystemContext(deps.systemContext);
 	// Experimental social rules apply to B1 only; host-owned instructions are never extended.
@@ -110,6 +156,24 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const issued = new Map<string, ActionTicket>();
 	const receipts = new Map<string, Observation>();
 	let state: AgencyState = emptyState();
+	if (restore !== undefined) {
+		// Rebuild the ledger by re-recording the snapshot's observations in seq
+		// order (record assigns the same seqs back) and re-marking the processed
+		// prefix, so pending work, idempotence and conflict checks behave exactly
+		// as they did in the snapshotted runtime. Budget window, due flags,
+		// in-flight tickets and undrained hostTodos reports start fresh (see
+		// AgencySnapshot).
+		validateSnapshot(restore);
+		state = structuredClone(restore.state);
+		for (const o of restore.observations) {
+			const { seq: _seq, ...input } = o;
+			ledger.record(input);
+		}
+		if (restore.cursor > 0)
+			ledger.markProcessed(
+				restore.observations.slice(0, restore.cursor).map((o) => o.seq),
+			);
+	}
 	let enabled = true;
 	// Updates that keep failing stop retrying until a new observation arrives.
 	let failures = 0;
