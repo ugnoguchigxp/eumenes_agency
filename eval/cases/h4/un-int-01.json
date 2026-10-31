@@ -1,0 +1,27 @@
+{
+	"id": "un-int-01",
+	"split": "unseen",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "ボルダリングを始めた。次は5級を登りたい。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"actor": "user",
+			"text": "ジムで課題を3本落とした。指の力をつけたい。"
+		},
+		{
+			"actor": "agent",
+			"text": "応援しています。"
+		}
+	],
+	"expect": {
+		"topics": [["ボルダリング", "クライミング"]],
+		"interestShown": true
+	}
+}

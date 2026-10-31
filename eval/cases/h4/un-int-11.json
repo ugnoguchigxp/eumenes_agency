@@ -1,0 +1,27 @@
+{
+	"id": "un-int-11",
+	"split": "unseen",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "フィルムカメラで街を撮ってる。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"actor": "user",
+			"text": "現像も自分でやってみたい。"
+		},
+		{
+			"actor": "agent",
+			"text": "応援しています。"
+		}
+	],
+	"expect": {
+		"topics": [["フィルム", "カメラ", "写真"]],
+		"interestShown": true
+	}
+}

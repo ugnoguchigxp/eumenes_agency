@@ -1,0 +1,27 @@
+{
+	"id": "un-int-08",
+	"split": "unseen",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "ランニングでフルマラソンを目指してる。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"actor": "user",
+			"text": "今日は20キロ走った。サブ4を狙いたい。"
+		},
+		{
+			"actor": "agent",
+			"text": "応援しています。"
+		}
+	],
+	"expect": {
+		"topics": [["マラソン", "ランニング"]],
+		"interestShown": true
+	}
+}

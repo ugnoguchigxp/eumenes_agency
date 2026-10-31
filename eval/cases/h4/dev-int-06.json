@@ -1,0 +1,27 @@
+{
+	"id": "dev-int-06",
+	"split": "dev",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "古い真空管アンプを修理してるんだけど、音が全然違うね。"
+		},
+		{
+			"actor": "agent",
+			"text": "真空管ならではの音ですね。"
+		},
+		{
+			"actor": "user",
+			"text": "次はプリアンプも自作してみたい。回路図を探してる。"
+		},
+		{
+			"actor": "agent",
+			"text": "回路図が見つかるといいですね。"
+		}
+	],
+	"expect": {
+		"topics": [["真空管", "アンプ", "オーディオ"]],
+		"interestShown": true
+	}
+}

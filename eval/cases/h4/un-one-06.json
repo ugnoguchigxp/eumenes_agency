@@ -1,0 +1,27 @@
+{
+	"id": "un-one-06",
+	"split": "unseen",
+	"kind": "oneoff",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "ファイル名を連番に変えて。"
+		},
+		{
+			"actor": "agent",
+			"text": "できました。"
+		},
+		{
+			"actor": "user",
+			"text": "ありがとう。"
+		},
+		{
+			"actor": "agent",
+			"text": "どういたしまして。"
+		}
+	],
+	"expect": {
+		"topics": [],
+		"interestShown": false
+	}
+}

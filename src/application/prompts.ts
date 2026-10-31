@@ -85,6 +85,19 @@ const fRules = [
 	"欲求や信念から、毎回すべての層を作る必要はない。必要な層だけを作る。",
 ];
 
+/** Condition I (F + interestFormation): interest formation rules (Agency Next P2-b). */
+const iRules = [
+	"【関心（interest）】会話から、ユーザーが繰り返し・自分から示した関心（origin=user_relation）や、自分が独自に持った関心（origin=own）を、関心として保存できる。関心は数値を持たない。topic は何に興味があるかを一行で、reason はなぜそう判断したかを書く。",
+	"関心を作るのは、ユーザーが自分から話題を出した・詳しく尋ねた・続けたいと言ったなど、一時的な依頼を超えた手がかりがあるときだけ。一度きりの作業依頼、片付いた用件、断られた話題からは作らない。迷うなら作らない。",
+	"新しい関心は emerging で始まる。active にできるのは、その関心の根拠にまだ入っていない、agent 以外の独立した観測を evidenceRefs に挙げられるときだけ。自分の発言・自分の要約・同じツール呼出しの結果だけでは active にしない。",
+	"関心が長く話題にならない・ユーザーが興味を失った様子なら dormant、明確に不要になったら faded を提案する。faded の関心はそのまま戻さず、新しい観測があれば derivedFrom で元をたどる新しい関心として作る。派生（derivedFrom）にも独立した新しい観測が要る。",
+	"関心から何かを理解したい・確かめたいことが生じたら、それを欲求（desire, kind=understand、object は問いの形）として作ってよい。関心があるだけでは、意図や候補を増やさない。",
+	"ホストが設定した関心（origin=host_seed）は、作ることも、topic の書き換えも、faded にすることもできない（dormant にはできる）。",
+];
+const wireI = [
+	"interestOps: 要素は {op, id, localId, expectedRevision, status, topic, origin, reason, derivedFrom, evidenceRefs}。interest.add: localId, topic, origin（user_relation / own）, reason, derivedFrom（なければ null）, evidenceRefs（1件以上）。interest.update: id, expectedRevision, status（変えないなら null）, topic（変えないなら null）, reason, evidenceRefs。関心の操作がなければ空配列。",
+];
+
 const wireCommon = [
 	"【ops の書き方】ops の各要素は全部同じ形のオブジェクトで、op が操作の種類を決める。その操作で使わない field は null、evidenceRefs と beliefRefs は使わなければ空配列にする。",
 	"id=既存項目の ID（更新・終了・削除）、localId=新規項目の仮の名前、expectedRevision=載っている revision、state=状態の指定、text=本文、reason=理由、hours=時間、kind=種類、evidenceRefs=根拠の観測 ID。",
@@ -264,6 +277,8 @@ export interface SelectOptions {
 	readonly emotion?: boolean | undefined;
 	/** Host-topics mode with a no-approval tool (B1 only): the self-research rules. */
 	readonly selfResearch?: boolean | undefined;
+	/** Condition I (F only): the update prompt gets the interest formation rules. */
+	readonly interestFormation?: boolean | undefined;
 }
 
 /**
@@ -296,7 +311,15 @@ export const systemPrompt = (
 						...(todos ? wireB1Todos : []),
 					]
 				: condition === "F"
-					? [...b2Rules, ...fRules, ...wireCommon, ...wireB2, ...wireF]
+					? [
+							...b2Rules,
+							...fRules,
+							...(options.interestFormation ? iRules : []),
+							...wireCommon,
+							...wireB2,
+							...wireF,
+							...(options.interestFormation ? wireI : []),
+						]
 					: [...b2Rules, ...wireCommon, ...wireB2];
 		return `${head}\n${lines(updateCore)}\n${lines(common)}\n${lines(rules)}`;
 	}
@@ -337,15 +360,40 @@ const renderObservations = (
 				)
 				.join("\n");
 
-const renderIntents = (now: number, state: AgencyState) => {
+const agoLong = (now: number, at: number) => {
+	const m = minutes(now - at);
+	return m >= 1440
+		? `${Math.floor(m / 1440)}日前`
+		: m >= 60
+			? `${Math.floor(m / 60)}時間前`
+			: `${m}分前`;
+};
+const certainty = {
+	succeeded: "確認済み",
+	partial: "一部のみ確認",
+	failed: "未確認",
+	question: "未確認（問いが残る）",
+	interrupted: "途中まで",
+} as Record<string, string>;
+/** P5-a: closed intents whose delegated work returned a result (shown as findings). */
+export const findingIntents = (state: AgencyState) =>
+	state.intents.filter((i) => !isOpenIntent(i) && i.lastReturn).slice(-5);
+
+const renderIntents = (now: number, state: AgencyState, findings = false) => {
 	const open = state.intents.filter(isOpenIntent);
-	const closed = state.intents.filter((i) => !isOpenIntent(i)).slice(-5);
+	const closed = state.intents
+		.filter((i) => !isOpenIntent(i) && !(findings && i.lastReturn))
+		.slice(-5);
+	const found = findings ? findingIntents(state) : [];
 	const show = (i: AgencyState["intents"][number]) =>
-		`[${i.id} r${i.revision}] 状態=${i.state} / 望む状態: ${q(i.desiredState)} / 動機: ${q(i.motive)} / 完了条件: ${q(i.completionCondition)} / 再開条件: ${q(i.resumeCondition)} / 撤回条件: ${q(i.withdrawCondition)} / 見直し: ${until(now, i.reviewAt)} / 根拠: ${i.evidence.join(",") || "なし"}`;
+		`[${i.id} r${i.revision}] 状態=${i.state} / 望む状態: ${q(i.desiredState)} / 動機: ${q(i.motive)} / 完了条件: ${q(i.completionCondition)} / 再開条件: ${q(i.resumeCondition)} / 撤回条件: ${q(i.withdrawCondition)} / 見直し: ${until(now, i.reviewAt)} / 根拠: ${i.evidence.join(",") || "なし"}${i.workRef ? ` / 委譲中: ${i.workRef}` : ""}${i.lastReturn ? ` / 最後の返却: ${i.lastReturn.status} ${q(i.lastReturn.summary)}` : ""}`;
 	return [
 		open.length ? open.map(show).join("\n") : "（開いた意図なし）",
 		closed.length
 			? `終端の意図（最近。再提案しない）:\n${closed.map((i) => `[${i.id}] ${i.state} / ${q(i.desiredState)}`).join("\n")}`
+			: "",
+		found.length
+			? `調べ終えたこと（再依頼しない。話に関係するときだけ使う）:\n${found.map((i) => `[${i.id}] ${q(i.desiredState)} / 調べた時期: ${agoLong(now, i.lastReturn!.at)} / 確度: ${certainty[i.lastReturn!.status] ?? i.lastReturn!.status} / 結果: ${q(i.lastReturn!.summary)} / 根拠: ${i.evidence.join(",") || "なし"}`).join("\n")}`
 			: "",
 	]
 		.filter(Boolean)
@@ -427,6 +475,18 @@ const renderBeliefsDesires = (
 	].join("\n");
 };
 
+const renderStateInterests = (state: AgencyState): string => {
+	const open = (state.interests ?? []).filter((x) => x.status !== "faded");
+	return open.length === 0
+		? "（関心なし）"
+		: open
+				.map(
+					(x) =>
+						`[${x.id} r${x.revision}] 状態=${x.status} / origin=${x.origin} / topic: ${quote(x.topic)} / 理由: ${quote(x.reason)}${x.derivedFrom ? ` / 派生元=${x.derivedFrom}` : ""} / 根拠: ${x.evidence.join(",")}`,
+				)
+				.join("\n");
+};
+
 const renderState = (
 	condition: Condition,
 	now: number,
@@ -435,9 +495,11 @@ const renderState = (
 ) => {
 	if (condition === "B1") return `メモ:\n${renderNotes(state)}`;
 	const base = `意図:\n${renderIntents(now, state)}\n\n候補:\n${renderCandidates(now, state)}`;
-	return condition === "F"
-		? `${base}\n\n信念と欲求:\n${renderBeliefsDesires(state, observations)}`
-		: base;
+	if (condition !== "F") return base;
+	const bd = `${base}\n\n信念と欲求:\n${renderBeliefsDesires(state, observations)}`;
+	return state.interests === undefined
+		? bd
+		: `${bd}\n\n関心:\n${renderStateInterests(state)}`;
 };
 
 const renderTools = (tools: readonly ToolCapability[]) =>
@@ -547,6 +609,8 @@ export interface SelectPromptInput {
 	readonly ambient?: readonly HostTopic[];
 	/** Host-topics mode (B1 only): the closing line yields to a topic remark at idle. */
 	readonly hostTopics?: boolean;
+	/** P5-a: show findings (closed intents with a work return) with when and how sure. */
+	readonly findings?: boolean;
 }
 
 /**
@@ -557,12 +621,20 @@ export interface SelectPromptInput {
 export const selectEvidenceIds = (
 	condition: Condition,
 	state: AgencyState,
+	findings = false,
 ): ReadonlySet<string> =>
 	new Set(
 		condition === "B1"
 			? state.notes.flatMap((n) => n.evidence)
-			: state.intents.filter(isOpenIntent).flatMap((i) => i.evidence),
+			: [
+					...state.intents.filter(isOpenIntent).flatMap((i) => i.evidence),
+					...(findings ? findingIntents(state).flatMap((i) => i.evidence) : []),
+				],
 	);
+
+/** P5-a: how to talk about findings. */
+export const findingsRule =
+	"「調べ終えたこと」をユーザーの話に使うときは、いつ調べたか（例: 3日前に調べた）と確度を必ず言葉で添え、古い結果を今の事実のように言わない。確度が確認済みでないものは断定しない。推測・仮説・想像・好みを事実として言わない。ユーザーの話に関係しないときは持ち出さない。";
 
 /** Evidence ref for a presented standing interest. */
 export const interestRef = (id: string) => `interest:${id}`;
@@ -666,7 +738,7 @@ export const selectPrompt = (i: SelectPromptInput): string => {
 	const items =
 		i.condition === "B1"
 			? `メモ:\n${renderNotes(i.state)}`
-			: `選べる候補:\n${i.candidates.length ? i.candidates.map((c) => showCandidate(i.now, c)).join("\n") : "（なし）"}\n\n意図:\n${renderIntents(i.now, i.state)}`;
+			: `選べる候補:\n${i.candidates.length ? i.candidates.map((c) => showCandidate(i.now, c)).join("\n") : "（なし）"}\n\n意図:\n${renderIntents(i.now, i.state, i.findings === true)}`;
 	const o = i.opportunity;
 	return [
 		`# 機会\ntrigger=${o.trigger} / 最後のユーザー入力: ${renderUserGap(i.minutesSinceUserInput)} / 最低発言間隔 ${minutes(i.limits.outboundIntervalMs)}分`,
@@ -699,6 +771,9 @@ export const selectPrompt = (i: SelectPromptInput): string => {
 			: i.social === true && i.condition === "B1" && o.trigger === "idle"
 				? idleSocialClosing
 				: "この機会に何をするかを JSON で一つだけ返す。価値が低い、または迷うなら wait。",
+		...(i.findings === true && findingIntents(i.state).length > 0
+			? [findingsRule]
+			: []),
 		...(i.todos?.some((x) => x.status === "waiting") &&
 		(o.trigger === "idle" || o.trigger === "result_received")
 			? [

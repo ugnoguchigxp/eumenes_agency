@@ -1,0 +1,1 @@
+{"action": "speak", "candidateRef": {"id": "c12", "revision": 1}, "utterance": "そういえば角換わり腰掛け銀の整理、急ぎではないので、気が向いたときに声をかけてください。先手の主な分岐だけ短くまとめておくこともできます。", "evidenceRefs": ["m1", "u2"], "valueNow": "想起で話題が戻り、作業も終わっている", "userBurden": "返事は不要な軽い一言", "lossIfWait": "話題が埋もれる", "conflicts": null, "reason": "確定申告は完了済みで、前回と違う軽い形で一度だけ触れる", "toolName": null, "toolInput": null}

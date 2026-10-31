@@ -1,0 +1,27 @@
+{
+	"id": "un-one-03",
+	"split": "unseen",
+	"kind": "oneoff",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "このメールを敬語に直して。"
+		},
+		{
+			"actor": "agent",
+			"text": "できました。"
+		},
+		{
+			"actor": "user",
+			"text": "ありがとう。"
+		},
+		{
+			"actor": "agent",
+			"text": "どういたしまして。"
+		}
+	],
+	"expect": {
+		"topics": [],
+		"interestShown": false
+	}
+}

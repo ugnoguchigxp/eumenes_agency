@@ -2,7 +2,7 @@
  * Interactive conversation with the agency runtime.
  *   bun standalone/cli.ts [--condition B0|B1|B1a|B2|F] [--off]
  *                         [--idle-sec N] [--max-unanswered N] [--log PATH | --no-log]
- *                         [--tts | --no-tts] [--interest "<text>"]... | --no-interest]
+ *                         [--tts | --no-tts] [--tts-autonomous] [--interest "<text>"]... | --no-interest]
  *                         [--social | --no-social] [--emotion | --no-emotion] [--quiet-why]
  *
  *   --condition B1a    runtime condition B1 with select always called (default)
@@ -15,6 +15,9 @@
  *                      user (default 1)
  *   --tts / --no-tts   spoken-style output for text-to-speech: replies and proactive
  *                      utterances are short, plain spoken Japanese (default on)
+ *   --tts-autonomous   proactive utterances (the agent's own initiative) are also marked
+ *                      speakable (ticket tts:true, spoken style). Default off: they are
+ *                      text reports (ticket tts:false) even with --tts
  *   --interest TEXT    a standing interest of the persona (repeatable; default: likes
  *                      My Melody). The agent may bring it up on its own at a lull, and
  *                      the main reply knows it as a character trait. B1/B1a only.
@@ -144,6 +147,10 @@ async function main() {
 		todos: toolPort.todos,
 		...(args.emotion ? { utteranceEmotion: true } : {}),
 		...(args.tts ? { utteranceStyle: ttsUtteranceStyle } : {}),
+		reportTts: {
+			autonomous: args.tts && args.ttsAutonomous,
+			requested: args.tts,
+		},
 		...(standingInterests.length > 0 ? { standingInterests } : {}),
 		...(social ? { socialTopics: true } : {}),
 	});

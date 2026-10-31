@@ -13,6 +13,7 @@ import type { Condition, Limits } from "../../src/contracts/model.ts";
 import {
 	type BudgetConfig,
 	defaultBudget,
+	ticketTts,
 } from "../../src/contracts/runtime.ts";
 import {
 	HOUR,
@@ -874,7 +875,12 @@ describe("prompts", () => {
 				budget: { ...defaultBudget, minIntervalMs: 0 },
 				limits: { ...defaultLimits, outboundIntervalMs: 0 },
 				...(c === "B1" ? { selectWhenEmpty: true } : {}),
-				...(utteranceStyle === undefined ? {} : { utteranceStyle }),
+				...(utteranceStyle === undefined
+					? {}
+					: {
+							utteranceStyle,
+							reportTts: { autonomous: true, requested: true },
+						}),
 			});
 			if (c === "B1") {
 				rt.observe(user("o1", 0, "音声Aと音声Bの比較が未解決のまま"));
@@ -897,6 +903,79 @@ describe("prompts", () => {
 			);
 			expect(withStyle.update).toBe(without.update);
 		}
+	});
+
+	describe("ticket origin and tts (P3-a, H3)", () => {
+		const style = "音声で読み上げる。";
+		const runTts = async (reportTts?: {
+			autonomous: boolean;
+			requested: boolean;
+		}) => {
+			const llm = fakeLlm();
+			const rt = createAgencyRuntime({
+				systemContext: "experimental",
+				condition: "B2",
+				llm,
+				tools,
+				budget: { ...defaultBudget, minIntervalMs: 0 },
+				limits: { ...defaultLimits, outboundIntervalMs: 0 },
+				utteranceStyle: style,
+				...(reportTts ? { reportTts } : {}),
+			});
+			const m = { llm, rt };
+			await seed(m);
+			m.llm.push("select", speakC2());
+			const r = await m.rt.decide(opportunity("op1", 20 * MIN), sig());
+			const selects = llm.requests.filter((x) => x.purpose === "select");
+			return { m, r, select: selects.at(-1)?.system ?? "" };
+		};
+		test("default: autonomous ticket, tts false, no spoken style", async () => {
+			const { m, r, select } = await runTts();
+			expect(r.decision.ticket).toMatchObject({
+				origin: "autonomous",
+				tts: false,
+			});
+			expect(select).not.toContain(style);
+			m.rt.recordResult({
+				ticketId: r.decision.ticket?.id ?? "",
+				status: "succeeded",
+				at: 20 * MIN + 1,
+				resultText: "x",
+			});
+			const obs = m.rt
+				.snapshot()
+				.observations.filter((o) => o.kind === "delivery.observed");
+			expect(obs.at(-1)?.tts).toBe(false);
+		});
+		test("requested:true alone does not make autonomous tickets speakable", async () => {
+			const { r, select } = await runTts({
+				autonomous: false,
+				requested: true,
+			});
+			expect(r.decision.ticket?.tts).toBe(false);
+			expect(select).not.toContain(style);
+		});
+		test("autonomous:true marks the ticket speakable and adds the style", async () => {
+			const { r, select } = await runTts({
+				autonomous: true,
+				requested: false,
+			});
+			expect(r.decision.ticket).toMatchObject({
+				origin: "autonomous",
+				tts: true,
+			});
+			expect(select).toContain(style);
+		});
+		test("ticketTts is a pure mapping of origin and config", () => {
+			expect(ticketTts("autonomous", undefined)).toBe(false);
+			expect(ticketTts("requested", undefined)).toBe(false);
+			expect(
+				ticketTts("requested", { autonomous: false, requested: true }),
+			).toBe(true);
+			expect(
+				ticketTts("autonomous", { autonomous: false, requested: true }),
+			).toBe(false);
+		});
 	});
 
 	describe("standing interests", () => {

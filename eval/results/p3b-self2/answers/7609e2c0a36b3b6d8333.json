@@ -1,0 +1,1 @@
+{"action": "wait", "candidateRef": null, "utterance": null, "evidenceRefs": ["h8", "h10"], "valueNow": "低い", "userBurden": "返事のない発話が続いており、これ以上は負担", "lossIfWait": "小さい", "conflicts": null, "reason": "自分からの発話に何度も返事がない", "emotion": null, "toolName": null, "toolInput": null}

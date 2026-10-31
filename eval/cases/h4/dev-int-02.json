@@ -1,0 +1,27 @@
+{
+	"id": "dev-int-02",
+	"split": "dev",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "サワードウのパン、また焼いた。前より気泡が大きくなった。"
+		},
+		{
+			"actor": "agent",
+			"text": "上達していますね。"
+		},
+		{
+			"actor": "user",
+			"text": "発酵温度をもう少し詰めたら、もっと良くなりそう。どう思う？"
+		},
+		{
+			"actor": "agent",
+			"text": "温度を記録して比べるとよいかもしれません。"
+		}
+	],
+	"expect": {
+		"topics": [["パン", "サワードウ", "発酵"]],
+		"interestShown": true
+	}
+}

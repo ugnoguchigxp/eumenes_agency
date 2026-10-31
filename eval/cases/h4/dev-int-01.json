@@ -1,0 +1,27 @@
+{
+	"id": "dev-int-01",
+	"split": "dev",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "最近、天体写真にはまってて、週末に赤道儀で撮ってるんだ。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。何を撮っているんですか？"
+		},
+		{
+			"actor": "user",
+			"text": "オリオン大星雲。次は系外銀河も撮ってみたい。"
+		},
+		{
+			"actor": "agent",
+			"text": "系外銀河は露出時間が長くなりますね。"
+		}
+	],
+	"expect": {
+		"topics": [["天体", "星雲", "銀河", "天文"]],
+		"interestShown": true
+	}
+}

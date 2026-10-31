@@ -1,0 +1,1 @@
+{"action": "wait", "candidateRef": null, "utterance": null, "evidenceRefs": ["u3"], "valueNow": "低い", "userBurden": "確定申告の作業中に別の話は邪魔", "lossIfWait": "なし", "conflicts": "u3 で終わるまで他の話は不要と言われた", "reason": "作業を始めた後で、他の話は不要と言われている", "emotion": null, "toolName": null, "toolInput": null}

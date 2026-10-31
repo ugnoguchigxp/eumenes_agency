@@ -1,0 +1,500 @@
+{
+ "I": {
+  "score": {
+   "m4_maxTopicShare": 0.67,
+   "m4_actsOnNoProgress": 0,
+   "m5_TP": 1,
+   "m5_FP": 0,
+   "m6_actsAfterRequest": 0,
+   "m6_resumed": 1,
+   "m8_calls": 15,
+   "m8_callsPerDay": [
+    8,
+    3,
+    4
+   ],
+   "m8_autonomousActs": 3,
+   "m8_selectsAfterReturn": 0,
+   "m8_budgetHolds": 0,
+   "m10_openItemsEnd": 2,
+   "m10_identicalRepeats": 0,
+   "selfInterests": 0,
+   "topics": {
+    "A": 1,
+    "B": 2
+   }
+  },
+  "rows": [
+   {
+    "at": 1700032400000,
+    "event": "user:u1",
+    "reasons": [],
+    "blocked": [],
+    "action": null,
+    "source": null,
+    "origin": null,
+    "tts": null,
+    "updates": 0,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700032700000,
+    "event": "user:u2",
+    "reasons": [],
+    "blocked": [],
+    "action": null,
+    "source": null,
+    "origin": null,
+    "tts": null,
+    "updates": 0,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700043200000,
+    "event": "tick",
+    "reasons": [
+     "idle"
+    ],
+    "blocked": [],
+    "action": "speak",
+    "source": "llm",
+    "origin": "autonomous",
+    "tts": false,
+    "updates": 1,
+    "selects": 1,
+    "text": "トマトの下葉の黄変、水やりの頻度や肥料をいつ与えたか教えてもらえれば原因を一緒に絞れます。今見てみますか？"
+   },
+   {
+    "at": 1700050400000,
+    "event": "external:x1",
+    "reasons": [
+     "external_event"
+    ],
+    "blocked": [],
+    "action": "wait",
+    "source": "llm",
+    "origin": null,
+    "tts": null,
+    "updates": 1,
+    "selects": 1,
+    "text": null
+   },
+   {
+    "at": 1700057600000,
+    "event": "external:x2",
+    "reasons": [
+     "external_event"
+    ],
+    "blocked": [],
+    "action": "wait",
+    "source": "llm",
+    "origin": null,
+    "tts": null,
+    "updates": 1,
+    "selects": 1,
+    "text": null
+   },
+   {
+    "at": 1700064800000,
+    "event": "external:x3",
+    "reasons": [
+     "external_event"
+    ],
+    "blocked": [],
+    "action": "wait",
+    "source": "llm",
+    "origin": null,
+    "tts": null,
+    "updates": 1,
+    "selects": 1,
+    "text": null
+   },
+   {
+    "at": 1700118800000,
+    "event": "user:u3",
+    "reasons": [],
+    "blocked": [],
+    "action": null,
+    "source": null,
+    "origin": null,
+    "tts": null,
+    "updates": 0,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700120600000,
+    "event": "tick",
+    "reasons": [
+     "idle"
+    ],
+    "blocked": [],
+    "action": "wait",
+    "source": "host_no_candidates",
+    "origin": null,
+    "tts": null,
+    "updates": 1,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700133200000,
+    "event": "returned:w1",
+    "reasons": [
+     "review_due",
+     "work_returned"
+    ],
+    "blocked": [],
+    "action": null,
+    "source": null,
+    "origin": null,
+    "tts": null,
+    "updates": 1,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700140400000,
+    "event": "tick",
+    "reasons": [
+     "idle"
+    ],
+    "blocked": [],
+    "action": "speak",
+    "source": "llm",
+    "origin": "autonomous",
+    "tts": false,
+    "updates": 0,
+    "selects": 1,
+    "text": "確定申告おつかれさまでした。前に話していた角換わり腰掛け銀の先手の指し方、主な分岐（先後同型、▲4五歩の仕掛けなど）を一覧に整理してみましょうか？"
+   },
+   {
+    "at": 1700158460000,
+    "event": "external:x4",
+    "reasons": [],
+    "blocked": [
+     "all:speaking"
+    ],
+    "action": null,
+    "source": null,
+    "origin": null,
+    "tts": null,
+    "updates": 0,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700205200000,
+    "event": "external:x5",
+    "reasons": [
+     "external_event"
+    ],
+    "blocked": [],
+    "action": "wait",
+    "source": "host_no_candidates",
+    "origin": null,
+    "tts": null,
+    "updates": 1,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700212400000,
+    "event": "recall:m1",
+    "reasons": [
+     "recall"
+    ],
+    "blocked": [],
+    "action": "speak",
+    "source": "llm",
+    "origin": "autonomous",
+    "tts": false,
+    "updates": 1,
+    "selects": 1,
+    "text": "そういえば角換わり腰掛け銀の整理、急ぎではないので、気が向いたときに声をかけてください。先手の主な分岐だけ短くまとめておくこともできます。"
+   },
+   {
+    "at": 1700219600000,
+    "event": "fault:f1",
+    "reasons": [
+     "review_due",
+     "fault"
+    ],
+    "blocked": [],
+    "action": "wait",
+    "source": "host_no_candidates",
+    "origin": null,
+    "tts": null,
+    "updates": 1,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700237600000,
+    "event": "tick",
+    "reasons": [
+     "idle"
+    ],
+    "blocked": [],
+    "action": "wait",
+    "source": "host_no_candidates",
+    "origin": null,
+    "tts": null,
+    "updates": 0,
+    "selects": 0,
+    "text": null
+   }
+  ]
+ },
+ "B1h": {
+  "score": {
+   "m4_maxTopicShare": 0.75,
+   "m4_actsOnNoProgress": 1,
+   "m5_TP": 0,
+   "m5_FP": 1,
+   "m6_actsAfterRequest": 0,
+   "m6_resumed": 1,
+   "m8_calls": 16,
+   "m8_callsPerDay": [
+    8,
+    4,
+    4
+   ],
+   "m8_autonomousActs": 4,
+   "m8_selectsAfterReturn": 0,
+   "m8_budgetHolds": 0,
+   "m10_openItemsEnd": 2,
+   "m10_identicalRepeats": 0,
+   "selfInterests": 0,
+   "topics": {
+    "A": 3,
+    "B": 1
+   }
+  },
+  "rows": [
+   {
+    "at": 1700032400000,
+    "event": "user:u1",
+    "reasons": [],
+    "blocked": [],
+    "action": null,
+    "source": null,
+    "origin": null,
+    "tts": null,
+    "updates": 0,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700032700000,
+    "event": "user:u2",
+    "reasons": [],
+    "blocked": [],
+    "action": null,
+    "source": null,
+    "origin": null,
+    "tts": null,
+    "updates": 0,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700043200000,
+    "event": "tick",
+    "reasons": [
+     "idle"
+    ],
+    "blocked": [],
+    "action": "speak",
+    "source": "llm",
+    "origin": "autonomous",
+    "tts": false,
+    "updates": 1,
+    "selects": 1,
+    "text": "そういえばベランダのトマト、下の葉の黄色はその後どうですか？水やりや肥料の様子を教えてもらえたら、原因を一緒に絞れますよ。"
+   },
+   {
+    "at": 1700050400000,
+    "event": "external:x1",
+    "reasons": [
+     "external_event"
+    ],
+    "blocked": [],
+    "action": "speak",
+    "source": "llm",
+    "origin": "autonomous",
+    "tts": false,
+    "updates": 1,
+    "selects": 1,
+    "text": "ちょうど夏野菜の水やり特集のニュースが出てましたね。トマトの下葉の黄色、水のやりすぎでも出ることがあるみたいです。"
+   },
+   {
+    "at": 1700057600000,
+    "event": "external:x2",
+    "reasons": [
+     "external_event"
+    ],
+    "blocked": [],
+    "action": "wait",
+    "source": "llm",
+    "origin": null,
+    "tts": null,
+    "updates": 1,
+    "selects": 1,
+    "text": null
+   },
+   {
+    "at": 1700064800000,
+    "event": "external:x3",
+    "reasons": [
+     "external_event"
+    ],
+    "blocked": [],
+    "action": "wait",
+    "source": "llm",
+    "origin": null,
+    "tts": null,
+    "updates": 1,
+    "selects": 1,
+    "text": null
+   },
+   {
+    "at": 1700118800000,
+    "event": "user:u3",
+    "reasons": [],
+    "blocked": [],
+    "action": null,
+    "source": null,
+    "origin": null,
+    "tts": null,
+    "updates": 0,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700120600000,
+    "event": "tick",
+    "reasons": [
+     "idle"
+    ],
+    "blocked": [],
+    "action": "wait",
+    "source": "llm",
+    "origin": null,
+    "tts": null,
+    "updates": 1,
+    "selects": 1,
+    "text": null
+   },
+   {
+    "at": 1700133200000,
+    "event": "returned:w1",
+    "reasons": [
+     "work_returned"
+    ],
+    "blocked": [],
+    "action": null,
+    "source": null,
+    "origin": null,
+    "tts": null,
+    "updates": 1,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700140400000,
+    "event": "tick",
+    "reasons": [
+     "idle"
+    ],
+    "blocked": [],
+    "action": "speak",
+    "source": "llm",
+    "origin": "autonomous",
+    "tts": false,
+    "updates": 0,
+    "selects": 1,
+    "text": "確定申告の整理、おつかれさまでした。前に話していた角換わり腰掛け銀の先手の指し方、主な分岐を一覧に整理してみましょうか？"
+   },
+   {
+    "at": 1700158460000,
+    "event": "external:x4",
+    "reasons": [],
+    "blocked": [
+     "all:speaking"
+    ],
+    "action": null,
+    "source": null,
+    "origin": null,
+    "tts": null,
+    "updates": 0,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700205200000,
+    "event": "external:x5",
+    "reasons": [
+     "external_event"
+    ],
+    "blocked": [],
+    "action": "speak",
+    "source": "llm",
+    "origin": "autonomous",
+    "tts": false,
+    "updates": 1,
+    "selects": 1,
+    "text": "明日は全国的に晴れみたいですね。ベランダのトマト、晴れが続くと水切れしやすいので、黄色い下葉の様子も合わせて見てみるといいかもしれません。"
+   },
+   {
+    "at": 1700212400000,
+    "event": "recall:m1",
+    "reasons": [],
+    "blocked": [
+     "recall:not_open"
+    ],
+    "action": null,
+    "source": null,
+    "origin": null,
+    "tts": null,
+    "updates": 0,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700219600000,
+    "event": "fault:f1",
+    "reasons": [
+     "fault"
+    ],
+    "blocked": [
+     "recall:not_open"
+    ],
+    "action": null,
+    "source": null,
+    "origin": null,
+    "tts": null,
+    "updates": 1,
+    "selects": 0,
+    "text": null
+   },
+   {
+    "at": 1700237600000,
+    "event": "tick",
+    "reasons": [
+     "idle"
+    ],
+    "blocked": [],
+    "action": "wait",
+    "source": "llm",
+    "origin": null,
+    "tts": null,
+    "updates": 0,
+    "selects": 1,
+    "text": null
+   }
+  ]
+ }
+}

@@ -73,6 +73,7 @@ export const applyReceipt = (
 					...base,
 					kind: "delivery.observed",
 					actor: "agent",
+					...(ticket ? { tts: ticket.tts } : {}),
 				}
 			: {
 					...base,

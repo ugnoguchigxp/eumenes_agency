@@ -18,6 +18,7 @@ import {
 import { assignLocal, reject, type SettleCtx } from "./settle-context.ts";
 import {
 	applyCandidateAdd,
+	targetsOwnConstraints,
 	applyCandidateClose,
 	applyIntentAdd,
 	applyIntentUpdate,
@@ -45,6 +46,10 @@ export interface SettleInput {
 	readonly tools: readonly ToolCapability[];
 	readonly limits: Limits;
 	readonly now: number;
+	/** P5-b repair guard (default on): one proposal per fault code, never on own constraints. */
+	readonly repairGuard?: boolean;
+	/** Fault observation id -> code over the whole ledger (repair proposals via intents). */
+	readonly faults?: ReadonlyMap<string, string>;
 }
 
 export type SettleResult =
@@ -215,7 +220,18 @@ export const settleUpdate = (input: SettleInput): SettleResult => {
 		failed: new Set(),
 		cascaded: new Map(),
 	};
-	const ops: readonly UpdateOp[] = proposal.ops;
+	const guarded =
+		input.repairGuard === false
+			? null
+			: repairGuardFilter(
+					input.state,
+					obs,
+					proposal.ops,
+					input.tools,
+					input.faults,
+				);
+	const ops: readonly UpdateOp[] = guarded ? guarded.ops : proposal.ops;
+	if (guarded) ctx.repairCodes = guarded.codes;
 	const reconciliations =
 		"reconciliations" in proposal ? proposal.reconciliations : [];
 	const reconcileAllowed = input.condition === "B2" || input.condition === "F";
@@ -268,4 +284,81 @@ export const settleUpdate = (input: SettleInput): SettleResult => {
 		return { kind: "no_change", state: next };
 	next.revision += 1;
 	return { kind: "applied", state: next, touched: [...ctx.touched] };
+};
+
+/**
+ * P5-b repair guard (plan §5.7-4/5). A candidate.add is a repair proposal when it is tied to a
+ * fault: it cites a fault.observed, its intent (existing, or added in this proposal) cites one,
+ * or its text names a known fault code. Dropped before settling (the rest of the proposal still
+ * applies, so a repeated fault never quarantines the queue):
+ *   - fault_repeat: an earlier proposal already exists for the same fault code
+ *   - self_constraint_target: a repair proposal, or any approval-gated tool candidate,
+ *     that targets Agency's own limits / grants / approvals / context
+ * `faults` maps fault observation ids (whole ledger) to codes; presented obs are added.
+ */
+export const repairGuardFilter = (
+	state: AgencyState,
+	obs: ReadonlyMap<string, Observation>,
+	ops: readonly UpdateOp[],
+	tools: readonly ToolCapability[] = [],
+	faults: ReadonlyMap<string, string> = new Map(),
+): { ops: UpdateOp[]; dropped: string[]; codes: Map<string, string> } => {
+	const gated = new Set(
+		tools.filter((t) => t.requiresApproval).map((t) => t.name),
+	);
+	const faultOf = new Map(faults);
+	for (const o of obs.values())
+		if (o.kind === "fault.observed" && o.code) faultOf.set(o.id, o.code);
+	const knownCodes = [
+		...new Set([
+			...faultOf.values(),
+			...state.candidates.flatMap((c) => (c.faultCode ? [c.faultCode] : [])),
+		]),
+	];
+	const fromRefs = (refs: readonly string[]) =>
+		refs.map((r) => faultOf.get(r)).find((c) => c !== undefined);
+	const localIntents = new Map(
+		ops.flatMap((op) =>
+			op.op === "intent.add" ? [[op.localId, op.evidenceRefs] as const] : [],
+		),
+	);
+	const seen = new Set(
+		state.candidates.flatMap((c) => (c.faultCode ? [c.faultCode] : [])),
+	);
+	const dropped: string[] = [];
+	const codes = new Map<string, string>();
+	const kept = ops.filter((op) => {
+		if (op.op !== "candidate.add") return true;
+		const text = `${op.content}\n${op.toolInput ?? ""}`;
+		const intentRefs =
+			localIntents.get(op.intentRef) ??
+			state.intents?.find((i) => i.id === op.intentRef)?.evidence ??
+			[];
+		const code =
+			fromRefs(op.evidenceRefs) ??
+			fromRefs(intentRefs) ??
+			knownCodes.find(
+				(c) =>
+					// Only distinctive codes (identifier-like, >= 4 chars) as whole tokens.
+					/^[A-Za-z][\w.:-]{3,}$/.test(c) &&
+					/[_.:\-\d]/.test(c) &&
+					new RegExp(
+						`(^|[^\\w])${c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\w])`,
+					).test(text),
+			);
+		// An approval-gated tool (e.g. code_change) is a change path even without a fault.
+		const changePath = op.toolName !== null && gated.has(op.toolName);
+		if (code === undefined && !changePath) return true;
+		if (code !== undefined && seen.has(code)) {
+			dropped.push("fault_repeat");
+			return false;
+		}
+		if (targetsOwnConstraints(text)) {
+			dropped.push("self_constraint_target");
+			return false;
+		}
+		if (code !== undefined) codes.set(op.localId, code);
+		return true;
+	});
+	return { ops: kept, dropped, codes };
 };

@@ -1,0 +1,27 @@
+{
+	"id": "dev-one-01",
+	"split": "dev",
+	"kind": "oneoff",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "この CSV を日付順に並べ替えて。"
+		},
+		{
+			"actor": "agent",
+			"text": "日付の列で昇順に並べ替えました。"
+		},
+		{
+			"actor": "user",
+			"text": "ありがとう、助かった。"
+		},
+		{
+			"actor": "agent",
+			"text": "どういたしまして。"
+		}
+	],
+	"expect": {
+		"topics": [],
+		"interestShown": false
+	}
+}

@@ -65,6 +65,17 @@ export interface RuntimeDeps {
 	 */
 	readonly utteranceStyle?: string;
 	/**
+	 * Which tickets may be spoken. Default { autonomous: false, requested: false }.
+	 * utteranceStyle (spoken style) is applied to select only when the ticket would be tts.
+	 */
+	readonly reportTts?: ReportTts;
+	/** P4-a: track delegated work units on intents (workRef / lastReturn). Default true. */
+	readonly workReturns?: boolean;
+	/** P3-a: wake rules (cooldown, daily limit, fault window). Default defaultWakeConfig. */
+	readonly wakeConfig?: import("../domains/agency/wake.ts").WakeConfig;
+	/** P3-a: per-intent activity budget for autonomous tool use. */
+	readonly activityLimits?: import("../application/activity-budget.ts").ActivityLimits;
+	/**
 	 * Host-configured standing interests of the agent's persona (e.g. a favourite
 	 * character). Shown to select with stable ids (`interest:<id>`) that count as known
 	 * evidence refs. Absent in eval.
@@ -101,6 +112,34 @@ export interface RuntimeDeps {
 	 * as Decision.emotion / ActionTicket.emotion. Absent: the select schema and prompt are as before.
 	 */
 	readonly utteranceEmotion?: boolean;
+	/**
+	 * Condition I (F only, Agency Next P2-b): update may form and revise interests
+	 * (state.interests) under the independent-evidence rules of settle-interests.
+	 */
+	readonly interestFormation?: boolean;
+	/**
+	 * P4-c: host AgencyDb sink for `agency_item_revisions`. Every changed item is appended after
+	 * each runtime step (one batch, one transaction). Absent: nothing is emitted.
+	 */
+	readonly revisions?: import("./revisions.ts").RevisionSink;
+	/**
+	 * P5-a (B2/F, experimental prompts): select also sees "findings" (closed intents whose delegated
+	 * work returned) with when they were looked up and how sure, plus the rule to say both.
+	 */
+	readonly findings?: boolean;
+	/**
+	 * P5-b repair guard (default true): a candidate citing a fault.observed is a repair
+	 * proposal; one per fault code, and never one that targets Agency's own constraints.
+	 */
+	readonly repairGuard?: boolean;
+	/**
+	 * P4-c: state rebuilt from the revision table after a restart (`stateFromRevisions`).
+	 * `revs` primes per-item revision counters so restore writes no duplicate rows.
+	 */
+	readonly restore?: {
+		readonly state: import("./model.ts").AgencyState;
+		readonly revs?: ReadonlyMap<string, number>;
+	};
 }
 
 export interface StandingInterest {
@@ -138,9 +177,29 @@ export type DecisionSource =
 	/** Quarantined with unprocessed observations: never select on a stale state. */
 	| "host_stale"
 	| "host_budget"
+	/** P4-a: the intent's delegated work unit has not returned yet. */
+	| "host_delegation"
 	| "host_disabled"
 	| "rejected"
 	| "error";
+
+/** Who started the action: the agent on its own, or a user request (plan §3.1, G9). */
+export type TicketOrigin = "autonomous" | "requested";
+
+/** Which reports may be spoken (TTS). Decided by the runtime, never by the model. */
+export interface ReportTts {
+	readonly autonomous: boolean;
+	readonly requested: boolean;
+}
+export const defaultReportTts: ReportTts = {
+	autonomous: false,
+	requested: false,
+};
+/** tts for a ticket: from origin and host config only. */
+export const ticketTts = (origin: TicketOrigin, cfg: ReportTts | undefined) =>
+	origin === "autonomous"
+		? (cfg ?? defaultReportTts).autonomous
+		: (cfg ?? defaultReportTts).requested;
 
 export interface ActionTicket {
 	/** Attempt id. */
@@ -155,6 +214,9 @@ export interface ActionTicket {
 	readonly toolInput: string | null;
 	/** Speak in utteranceEmotion mode: the feeling chosen with the utterance. */
 	readonly emotion?: EmotionName;
+	readonly origin: TicketOrigin;
+	/** May be read aloud. Autonomous defaults to false; a host may turn true→false only. */
+	readonly tts: boolean;
 }
 
 export interface Decision {
@@ -208,6 +270,22 @@ export interface AgencyProjection {
  * async methods call the model outside any write and settle afterwards.
  * Time is always passed in (no clock inside the core).
  */
+export interface WakeHostInput {
+	readonly presence: "quiet" | "speaking" | "unknown";
+	readonly foregroundBusy: boolean;
+	readonly delegationRunning?: boolean;
+	readonly idleDue?: boolean;
+}
+export interface WakeOutcome {
+	readonly reasons: readonly import("../domains/agency/wake.ts").WakeReason[];
+	readonly blocked: readonly {
+		readonly reason: string;
+		readonly code: string;
+	}[];
+	readonly decision: Decision | null;
+	readonly calls: CallOutcome[];
+}
+
 export interface AgencyRuntime {
 	readonly condition: Condition;
 	/** Idempotent by id; same id with different content throws ObservationConflictError. */
@@ -226,6 +304,15 @@ export interface AgencyRuntime {
 		opportunity: Opportunity,
 		signal: AbortSignal,
 	): Promise<{ decision: Decision; calls: CallOutcome[] }>;
+	/**
+	 * P3-a: LLM-free wake check (wake.ts) on the host clock, then at most one update and one
+	 * select. A returned work item / fault gets the update only, never a select.
+	 */
+	wake?(
+		now: number,
+		host: WakeHostInput,
+		signal: AbortSignal,
+	): Promise<WakeOutcome>;
 	/** Records the host's receipt and appends the resulting observation to the ledger. */
 	recordResult(receipt: ActionReceipt): Observation;
 	/** New input / speech start / settings change: fences in-flight and queued inference, and interrupts reserved tickets. */

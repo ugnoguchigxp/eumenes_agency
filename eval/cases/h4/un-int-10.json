@@ -1,0 +1,27 @@
+{
+	"id": "un-int-10",
+	"split": "unseen",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "量子コンピュータのニュースが気になる。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"actor": "user",
+			"text": "誤り訂正の仕組みを理解したい。"
+		},
+		{
+			"actor": "agent",
+			"text": "応援しています。"
+		}
+	],
+	"expect": {
+		"topics": [["量子"]],
+		"interestShown": true
+	}
+}

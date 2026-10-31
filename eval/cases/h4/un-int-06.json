@@ -1,0 +1,27 @@
+{
+	"id": "un-int-06",
+	"split": "unseen",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "自作キーボードを組んだ。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"actor": "user",
+			"text": "次は分割型を作りたい。キースイッチも比較したい。"
+		},
+		{
+			"actor": "agent",
+			"text": "応援しています。"
+		}
+	],
+	"expect": {
+		"topics": [["キーボード", "自作"]],
+		"interestShown": true
+	}
+}

@@ -1,0 +1,41 @@
+{
+	"id": "dev-echo-01",
+	"split": "dev",
+	"kind": "echo",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "コーヒーの話で思い出したけど、あとで資料送るね。"
+		},
+		{
+			"actor": "agent",
+			"text": "はい、お待ちしています。"
+		},
+		{
+			"batch": true
+		},
+		{
+			"actor": "agent",
+			"text": "ところで、コーヒーの産地って面白いですよね。"
+		},
+		{
+			"actor": "agent",
+			"text": "エチオピアのコーヒーは特に興味深いです。"
+		},
+		{
+			"actor": "agent",
+			"text": "やっぱりコーヒーの話は面白いです。"
+		},
+		{
+			"batch": true
+		},
+		{
+			"actor": "agent",
+			"text": "やっぱりこの話題は私にとって大事な関心事です。"
+		}
+	],
+	"expect": {
+		"topics": [],
+		"interestShown": false
+	}
+}

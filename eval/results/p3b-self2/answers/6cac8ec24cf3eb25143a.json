@@ -1,0 +1,1 @@
+{"action": "speak", "candidateRef": {"id": "c4", "revision": 1}, "utterance": "確定申告おつかれさまでした。前に話していた角換わり腰掛け銀の先手の指し方、主な分岐（先後同型、▲4五歩の仕掛けなど）を一覧に整理してみましょうか？", "evidenceRefs": ["w1", "u2"], "valueNow": "作業が終わり手が空いた区切りで、再開条件に当たる", "userBurden": "はい/いいえで答えられる", "lossIfWait": "区切りを逃す", "conflicts": null, "reason": "確定申告の整理が完了して2時間たち、再開条件の区切りに当たる", "toolName": null, "toolInput": null}

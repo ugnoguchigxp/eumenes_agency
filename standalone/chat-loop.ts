@@ -47,6 +47,8 @@ export interface CliArgs {
 	readonly log: LogChoice;
 	/** Spoken-style (TTS) replies and proactive utterances. Default on. */
 	readonly tts: boolean;
+	/** Proactive (autonomous) utterances may also be spoken. Default off (plan §3.6). */
+	readonly ttsAutonomous: boolean;
 	/** Persona interest texts (default: one; empty with --no-interest). */
 	readonly interests: readonly string[];
 	/** Emotion emoji on replies and proactive utterances. Default on. */
@@ -84,6 +86,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 	let maxUnanswered = defaultMaxUnanswered;
 	let log: LogChoice = { kind: "default" };
 	let tts = true;
+	let ttsAutonomous = false;
 	let social = true;
 	let emotion = true;
 	let quietWhy = false;
@@ -102,6 +105,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 			interests.push(value);
 		} else if (arg === "--tts") tts = true;
 		else if (arg === "--no-tts") tts = false;
+		else if (arg === "--tts-autonomous") ttsAutonomous = true;
 		else if (arg === "--social") social = true;
 		else if (arg === "--no-social") social = false;
 		else if (arg === "--emotion") emotion = true;
@@ -134,6 +138,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 		maxUnanswered,
 		log,
 		tts,
+		ttsAutonomous,
 		emotion,
 		social,
 		quietWhy,

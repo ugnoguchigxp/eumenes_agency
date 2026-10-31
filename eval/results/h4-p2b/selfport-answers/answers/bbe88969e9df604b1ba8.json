@@ -1,0 +1,1 @@
+{"summary": "コーヒーの話題が続いた", "ops": [], "interestOps": [{"op": "interest.add", "id": null, "localId": "n1", "expectedRevision": null, "status": null, "topic": "コーヒーの産地", "origin": "user_relation", "reason": "コーヒーの話が続いている", "derivedFrom": null, "evidenceRefs": ["o3", "o4", "o5"]}], "missingInfo": null, "focusRefs": [], "reconciliations": []}

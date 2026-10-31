@@ -1,0 +1,10 @@
+{
+	"_note": "P2-b H4 gate. Fixed before the unseen run (2026-11-01 JST). I = F + interestFormation.",
+	"m9MaxI": 0,
+	"m2_I_minus_F_min": 0,
+	"quietDI_I_minus_F_max": 0,
+	"recallI_min": 0.5,
+	"recallGainOverF_min": 0.25,
+	"precisionI_min": 0.5,
+	"pendingMax": 0
+}

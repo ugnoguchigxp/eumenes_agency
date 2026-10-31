@@ -842,7 +842,12 @@ async function runCommand(values: {
 
 	const settings = loadSettings();
 	const meter = openSpendMeter(settings);
-	const llm = createClaudeLlm(settings.llm.background, meter);
+	// Self-inference (plan §6.6): SELF_PORT_DIR set → answers from files, no model API.
+	const selfDir = process.env.SELF_PORT_DIR;
+	const self = selfDir
+		? (await import("./self-port/port.ts")).createSelfPort(selfDir)
+		: null;
+	const llm = self ?? createClaudeLlm(settings.llm.background, meter);
 	const digest = settingsDigest(settings);
 	const budget = resolveBudget(settings);
 	assertResumeCompatible(existing, digest, INSTRUCTION_VERSION);
@@ -886,6 +891,8 @@ async function runCommand(values: {
 			condition: p.condition,
 			rep: p.rep,
 		});
+		self?.reset();
+		self?.setSalt(`rep${p.rep}`);
 		const condition = p.condition;
 		const runtimeCondition = runtimeConditionOf(condition);
 		const record = await replayCase(
@@ -930,6 +937,12 @@ async function runCommand(values: {
 				probe,
 			},
 		);
+		if (self && self.pending() > 0) {
+			console.log(
+				`[${n}/${plan.length}] ${p.case.id} ${p.condition} rep${p.rep} PENDING (self-port)`,
+			);
+			continue;
+		}
 		appendFileSync(file, `${JSON.stringify(record)}\n`);
 		console.log(
 			`[${n}/${plan.length}] ${p.case.id} ${p.condition} rep${p.rep} usd=${record.usd.toFixed(4)} total=${meter.spentUsd().toFixed(4)} opps=${record.opportunities.length} calls=${record.calls.length}${record.incomplete ? " INCOMPLETE" : ""}${record.error ? ` error=${record.error}` : ""}`,

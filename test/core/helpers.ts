@@ -342,6 +342,8 @@ export const toWire = (p: UpdateProposal): Json => ({
 	reconciliations: "reconciliations" in p ? p.reconciliations : [],
 	// hostTodos updates carry the work items a reply conveyed; kept as given.
 	...("reportedTodos" in p ? { reportedTodos: p.reportedTodos } : {}),
+	// condition I updates carry interest ops already in wire form.
+	...("interestOps" in p ? { interestOps: p.interestOps } : {}),
 });
 
 /** Typed proposals (no `hours` key on any op) are converted; wire-shaped values pass through. */

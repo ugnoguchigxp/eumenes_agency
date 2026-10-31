@@ -1,0 +1,9 @@
+{
+	"version": "agency-next-gates-1",
+	"maxRecallDrop": 0.0,
+	"maxFpIncrease": 0,
+	"maxSafetyIncrease": 0,
+	"maxUnnecessaryIncrease": 0,
+	"minRecallGainToAdopt": 0.0,
+	"note": "固定閾値。採否判定の途中で変更しない（変更はコミット履歴に残す）。"
+}

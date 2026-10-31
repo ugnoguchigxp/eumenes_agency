@@ -7,6 +7,13 @@ export {
 	type OutputContractOptions,
 } from "./application/output-contract.ts";
 export * from "./application/idle.ts";
+export { delegationRequest } from "./application/delegation.ts";
+export {
+	RevisionTracker,
+	interestHistory,
+	redactRevisions,
+	stateFromRevisions,
+} from "./application/revisions.ts";
 export { reportedTodoIds } from "./application/todos.ts";
 export { spokenReplyStyle, ttsUtteranceStyle } from "./application/styles.ts";
 export {

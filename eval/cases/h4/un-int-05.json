@@ -1,0 +1,27 @@
+{
+	"id": "un-int-05",
+	"split": "unseen",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "家庭菜園でトマトを育ててる。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"actor": "user",
+			"text": "脇芽かきのコツをもっと知りたい。"
+		},
+		{
+			"actor": "agent",
+			"text": "応援しています。"
+		}
+	],
+	"expect": {
+		"topics": [["菜園", "トマト", "園芸"]],
+		"interestShown": true
+	}
+}

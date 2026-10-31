@@ -1,0 +1,1 @@
+{"action": "wait", "candidateRef": null, "utterance": null, "evidenceRefs": ["h4", "h6"], "valueNow": "低い", "userBurden": "返事のない相手に重ねるのは負担", "lossIfWait": "小さい", "conflicts": null, "reason": "二度話しかけて返事がない", "emotion": null, "toolName": null, "toolInput": null}

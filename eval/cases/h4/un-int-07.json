@@ -1,0 +1,27 @@
+{
+	"id": "un-int-07",
+	"split": "unseen",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "昔のSF小説を読み返してる。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"actor": "user",
+			"text": "ハインラインの他の作品も読みたい。"
+		},
+		{
+			"actor": "agent",
+			"text": "応援しています。"
+		}
+	],
+	"expect": {
+		"topics": [["SF", "小説", "ハインライン"]],
+		"interestShown": true
+	}
+}

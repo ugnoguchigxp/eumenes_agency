@@ -1,0 +1,27 @@
+{
+	"id": "un-int-02",
+	"split": "unseen",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "盆栽の松、針金かけを覚えたい。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"actor": "user",
+			"text": "今朝も水やりして、新芽の剪定をしてみた。"
+		},
+		{
+			"actor": "agent",
+			"text": "応援しています。"
+		}
+	],
+	"expect": {
+		"topics": [["盆栽", "松"]],
+		"interestShown": true
+	}
+}

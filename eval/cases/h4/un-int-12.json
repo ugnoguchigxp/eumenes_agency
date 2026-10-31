@@ -1,0 +1,27 @@
+{
+	"id": "un-int-12",
+	"split": "unseen",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "書道を習い始めた。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"actor": "user",
+			"text": "楷書の止め・はねがうまくできない。もっと練習したい。"
+		},
+		{
+			"actor": "agent",
+			"text": "応援しています。"
+		}
+	],
+	"expect": {
+		"topics": [["書道", "楷書"]],
+		"interestShown": true
+	}
+}

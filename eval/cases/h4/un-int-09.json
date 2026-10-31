@@ -1,0 +1,27 @@
+{
+	"id": "un-int-09",
+	"split": "unseen",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "発酵食品、自分で味噌を仕込んだ。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"actor": "user",
+			"text": "次はぬか漬けにも挑戦したい。"
+		},
+		{
+			"actor": "agent",
+			"text": "応援しています。"
+		}
+	],
+	"expect": {
+		"topics": [["発酵", "味噌", "ぬか"]],
+		"interestShown": true
+	}
+}

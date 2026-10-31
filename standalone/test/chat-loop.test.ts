@@ -33,11 +33,13 @@ describe("parseCliArgs / resolveCondition", () => {
 			maxUnanswered: 1,
 			log: { kind: "default" },
 			tts: true,
+			ttsAutonomous: false,
 			emotion: true,
 			social: true,
 			quietWhy: false,
 			interests: [defaultInterestText],
 		});
+		expect(parseCliArgs(["--tts-autonomous"]).ttsAutonomous).toBe(true);
 	});
 
 	test("flags", () => {

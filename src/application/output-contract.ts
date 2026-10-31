@@ -15,6 +15,8 @@ export interface OutputContractOptions {
 	readonly condition: Exclude<Condition, "B0">;
 	readonly hostTodos?: boolean;
 	readonly utteranceEmotion?: boolean;
+	/** Condition I (F only): the update also carries interestOps. */
+	readonly interestFormation?: boolean;
 }
 
 const updateFields = [
@@ -58,6 +60,11 @@ export function agencyOutputContract(
 				: ["belief/desire operations are unavailable; desireRef is null."]),
 			...(condition === "B1"
 				? ["Only note operations are available; reconciliations is []."]
+				: []),
+			...(condition === "F" && options.interestFormation
+				? [
+						"interestOps is an array (max 4) of {op (interest.add/interest.update), id, localId, expectedRevision, status (emerging/active/dormant/faded or null), topic, origin (user_relation/own, add only), reason, derivedFrom (existing interest ID or null), evidenceRefs}. New interests start emerging. Promotion to active, topic rewrites and derived interests need an independent non-agent observation not already in the interest's evidence; host_seed interests cannot be created, rewritten or faded.",
+					]
 				: []),
 			...(condition === "B1" && options.hostTodos
 				? [

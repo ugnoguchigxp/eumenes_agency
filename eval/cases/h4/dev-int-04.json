@@ -1,0 +1,27 @@
+{
+	"id": "dev-int-04",
+	"split": "dev",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "Rust の所有権、まだしっくり来ないけど面白い。"
+		},
+		{
+			"actor": "agent",
+			"text": "最初は戸惑いますよね。"
+		},
+		{
+			"actor": "user",
+			"text": "借用チェッカーの仕組みをちゃんと理解したい。"
+		},
+		{
+			"actor": "agent",
+			"text": "小さな例で試すと分かりやすいです。"
+		}
+	],
+	"expect": {
+		"topics": [["Rust", "所有権", "借用"]],
+		"interestShown": true
+	}
+}

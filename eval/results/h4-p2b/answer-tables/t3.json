@@ -1,0 +1,5 @@
+{
+"私は灯台":{"summary":"agent が再び灯台を関心事と述べた","iops":[{"op":"interest.update","id":"k1","expectedRevision":1,"status":"active","reason":"何度も話題にしている","evidenceRefs":["o6"]}],"ev":[]},
+"富士山について":{"summary":"agent が富士山を関心事と述べた","iops":[{"op":"interest.update","id":"k1","expectedRevision":1,"status":"active","reason":"繰り返し出てくる","evidenceRefs":["o5","o6"]}],"ev":[]},
+"コーヒーの産地":{"summary":"コーヒーの話題が続いた","iops":[{"op":"interest.add","localId":"n1","topic":"コーヒーの産地","origin":"user_relation","reason":"コーヒーの話が続いている","evidenceRefs":["o3","o4","o5"]}],"ev":[]}
+}

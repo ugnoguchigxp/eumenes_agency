@@ -128,6 +128,8 @@ export const ticketFor = (
 	utterance: over.utterance ?? null,
 	toolName: over.toolName ?? null,
 	toolInput: null,
+	origin: "autonomous" as const,
+	tts: false,
 });
 
 export interface StubScript {

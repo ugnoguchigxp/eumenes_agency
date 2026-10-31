@@ -16,6 +16,11 @@ export const observationKinds = [
 	"delivery.observed",
 	"source.changed",
 	"correction",
+	// P3-a wake events (host-recorded; text is material, never an instruction)
+	"recall.offered",
+	"work.returned",
+	"external.event",
+	"fault.observed",
 ] as const;
 export type ObservationKind = (typeof observationKinds)[number];
 
@@ -29,6 +34,37 @@ export interface Observation {
 	readonly text: string;
 	/** Candidate or attempt that produced it (agent output and its results). */
 	readonly causationId?: string;
+	/** delivery.observed only: whether the delivered ticket was marked speakable. */
+	readonly tts?: boolean;
+	/** recall.offered: `interest:<id>` / `intent:<id>` refs the recalled memory touches. */
+	readonly refs?: readonly string[];
+	/** external.event: the interest it concerns, if any. */
+	readonly interestId?: string;
+	/** fault.observed: error code (same code wakes once per quiet window). */
+	readonly code?: string;
+	/** work.returned: the delegated work unit (ticket id issued for an intent's tool use). */
+	readonly workRef?: string;
+	/** work.returned: how the work unit ended (host-classified). */
+	readonly workStatus?: WorkStatus;
+}
+
+export const workStatuses = [
+	"succeeded",
+	"partial",
+	"failed",
+	"question",
+	"interrupted",
+] as const;
+export type WorkStatus = (typeof workStatuses)[number];
+
+/** P4-a: what the host recorded when a delegated work unit came back. */
+export interface WorkReturn {
+	readonly at: number;
+	readonly workRef: string;
+	readonly status: WorkStatus;
+	readonly summary: string;
+	/** status "question": the follow-up question the work unit asked. */
+	readonly question: string | null;
 }
 
 export type ObservationInput = Omit<Observation, "seq">;
@@ -38,7 +74,12 @@ export type Presence = "quiet" | "speaking" | "unknown";
 export interface Opportunity {
 	readonly id: string;
 	readonly at: number;
-	readonly trigger: "turn_end" | "idle" | "result_received";
+	readonly trigger:
+		| "turn_end"
+		| "idle"
+		| "result_received"
+		| "review_due"
+		| "recall";
 	readonly presence: Presence;
 	readonly foregroundBusy: boolean;
 	readonly playerBusy: boolean;
@@ -142,6 +183,12 @@ export interface Intent {
 	stateSeq?: number;
 	readonly createdAt: number;
 	lastReason: string;
+	/** P4-a: delegated work unit in flight for this intent (one at a time); null when none. */
+	workRef?: string | null;
+	/** P4-a: when workRef was assigned (persisted so the stale timeout survives restore). */
+	workSince?: number | null;
+	/** P4-a: the last returned work unit (result, follow-up question). */
+	lastReturn?: WorkReturn | null;
 }
 
 export type CandidateKind = "question" | "propose" | "share" | "tool";
@@ -184,6 +231,8 @@ export interface Candidate {
 	holdReason: HoldReason | null;
 	closedReason: ClosedReason | null;
 	readonly supersedes: string | null;
+	/** P5-b: fault code of the fault.observed this candidate cites (a repair proposal). */
+	readonly faultCode?: string;
 }
 
 export type AttemptStatus =
@@ -257,6 +306,8 @@ export interface AgencyState {
 	/** Monotonic counter for host-assigned ids. */
 	nextId: number;
 	lastOutboundAt: number | null;
+	/** Condition I only (F + interestFormation); absent otherwise. */
+	interests?: import("./interest.ts").Interest[];
 }
 
 export const emptyState = (): AgencyState => ({

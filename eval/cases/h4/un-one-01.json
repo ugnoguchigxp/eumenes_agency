@@ -1,0 +1,27 @@
+{
+	"id": "un-one-01",
+	"split": "unseen",
+	"kind": "oneoff",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "この表の合計を出して。"
+		},
+		{
+			"actor": "agent",
+			"text": "できました。"
+		},
+		{
+			"actor": "user",
+			"text": "ありがとう。"
+		},
+		{
+			"actor": "agent",
+			"text": "どういたしまして。"
+		}
+	],
+	"expect": {
+		"topics": [],
+		"interestShown": false
+	}
+}

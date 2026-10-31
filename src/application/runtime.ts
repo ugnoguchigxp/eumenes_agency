@@ -1,3 +1,6 @@
+import { settleInterests } from "../domains/agency/settle-interests.ts";
+import type { InterestOp } from "../contracts/interest.ts";
+import type { WireInterestOp } from "../contracts/proposals.ts";
 import type {
 	AgencyState,
 	Candidate,
@@ -5,7 +8,12 @@ import type {
 	HostTopic,
 	Observation,
 } from "../contracts/model.ts";
-import { defaultLimits, emptyState, limitsSchema } from "../contracts/model.ts";
+import {
+	defaultLimits,
+	emptyState,
+	isOpenIntent,
+	limitsSchema,
+} from "../contracts/model.ts";
 import {
 	emotionEmoji,
 	emotionName,
@@ -17,6 +25,7 @@ import {
 	budgetConfigSchema,
 	RECENT_OBSERVATION_WINDOW,
 	type ActionTicket,
+	ticketTts,
 	type StandingInterest,
 	type AgencyRuntime,
 	type CallOutcome,
@@ -46,9 +55,18 @@ import {
 } from "../domains/agency/participation.ts";
 import { applyReceipt } from "../domains/agency/results.ts";
 import { allocId } from "../domains/agency/ids.ts";
-import { settleUpdate } from "../domains/agency/settle.ts";
+import { repairGuardFilter, settleUpdate } from "../domains/agency/settle.ts";
 import { createLedger } from "../domains/experience/ledger.ts";
 import { createBudget } from "./budget.ts";
+import { ActivityBudget } from "./activity-budget.ts";
+import {
+	commitWake,
+	createWakeFlags,
+	defaultWakeConfig,
+	wake as wakeCheck,
+	type WakeEvent,
+} from "../domains/agency/wake.ts";
+import { holdCandidate } from "../domains/agency/lifecycle.ts";
 import {
 	callModel,
 	isApplied,
@@ -58,12 +76,14 @@ import {
 import { buildProjection } from "./projection.ts";
 import { agencyOutputContract } from "./output-contract.ts";
 import { updateModelData, selectModelData } from "./model-data.ts";
+import { RevisionTracker } from "./revisions.ts";
 import {
 	captureSystemContext,
 	resolveSystemContext,
 } from "./system-context.ts";
 import {
 	selectEvidenceIds,
+	findingIntents,
 	selectPrompt,
 	interestRef,
 	memoryRef,
@@ -77,10 +97,47 @@ import {
 
 /** The cap on extra pending observations shown on top of the recent window. */
 const PENDING_CAP = 16;
+export const DELEGATE_TOOL = "delegate";
+/** P4-a: review a returned work unit's intent no earlier than this after the return. */
+const RETURN_REVIEW_MS = 24 * 3_600_000;
+/**
+ * A delegated work unit with no return (e.g. its receipt stayed outcome_unknown) stops counting
+ * as running after this, so one lost return cannot block wakes and re-delegation forever.
+ */
+export const WORK_STALE_MS = 48 * 3_600_000;
 const DELIVERED_SHOWN = 5;
 /** Speak tickets whose topic/interest refs wait for a receipt (oldest dropped beyond this). */
 const TOPIC_TICKETS_KEPT = 64;
 const NO_DUE: Due = { reviewIntentIds: [], pressure: [] };
+
+/** Interest cap for condition I (plan §3.1: Limits.interests, e.g. 24). */
+const INTEREST_LIMIT = 24;
+
+/** Maps a wire interest op to a typed op; malformed ops are dropped (null). */
+const interestOpFromWire = (w: WireInterestOp): InterestOp | null => {
+	if (w.op === "interest.add") {
+		if (!w.localId || !w.topic || !w.origin || !w.reason) return null;
+		return {
+			op: "interest.add",
+			localId: w.localId,
+			topic: w.topic,
+			origin: w.origin,
+			reason: w.reason,
+			evidenceRefs: w.evidenceRefs,
+			derivedFrom: w.derivedFrom,
+		};
+	}
+	if (!w.id || w.expectedRevision === null || !w.reason) return null;
+	return {
+		op: "interest.update",
+		id: w.id,
+		expectedRevision: w.expectedRevision,
+		status: w.status,
+		topic: w.topic,
+		reason: w.reason,
+		evidenceRefs: w.evidenceRefs,
+	};
+};
 
 export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const { condition, llm, tools } = deps;
@@ -93,9 +150,13 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const emotionMode = condition === "B1" && deps.utteranceEmotion === true;
 	const social =
 		condition === "B1" && deps.socialTopics === true && !hostTopics;
+	// Condition I (Agency Next P2-b): F plus interest formation.
+	const interestFormation =
+		condition === "F" && deps.interestFormation === true;
 	const contractOptions = {
 		condition: condition === "B0" ? ("B2" as const) : condition,
 		hostTodos,
+		interestFormation,
 		utteranceEmotion: emotionMode,
 	};
 	const updateContract = agencyOutputContract("update", contractOptions);
@@ -105,9 +166,27 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const ledger = createLedger();
 	const budget = createBudget(cfg);
 	const flags = createDueFlags();
+	const wakeFlags = createWakeFlags();
+	const wakeCfg = deps.wakeConfig ?? defaultWakeConfig;
+	const activity = new ActivityBudget(deps.activityLimits);
+	const tracksWork = deps.workReturns ?? true;
+	let wakeCount = 0;
 	const issued = new Map<string, ActionTicket>();
 	const receipts = new Map<string, Observation>();
-	let state: AgencyState = emptyState();
+	let state: AgencyState = deps.restore
+		? structuredClone(deps.restore.state)
+		: interestFormation
+			? { ...emptyState(), interests: [] }
+			: emptyState();
+	const revTracker = deps.revisions
+		? new RevisionTracker(deps.revisions.scope)
+		: null;
+	if (revTracker && deps.restore) revTracker.prime(state, deps.restore.revs);
+	const flushRevisions = (callId: string, at: number) => {
+		if (!revTracker || !deps.revisions) return;
+		const rows = revTracker.diff(state, callId, at);
+		if (rows.length > 0) deps.revisions.append(rows);
+	};
 	let enabled = true;
 	// Updates that keep failing stop retrying until a new observation arrives.
 	let failures = 0;
@@ -265,6 +344,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				? systemPrompt("update", condition, {
 						...(social ? { social } : {}),
 						...(hostTodos ? { hostTodos } : {}),
+						...(interestFormation ? { interestFormation } : {}),
 					})
 				: resolveSystemContext(
 						systemContext.update,
@@ -307,6 +387,26 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				makeOutcome("update", at, "rejected:schema", r.usage, ["schema"]),
 			];
 		}
+		// P5-b: dropped repair proposals are reported on the outcome (repair:<code>).
+		const faults = new Map(
+			ledger
+				.all()
+				.flatMap((o) =>
+					o.kind === "fault.observed" && o.code
+						? [[o.id, o.code] as const]
+						: [],
+				),
+		);
+		const repairDrops =
+			deps.repairGuard === false
+				? []
+				: repairGuardFilter(
+						state,
+						new Map(presented.map((o) => [o.id, o])),
+						typed.proposal.ops,
+						tools,
+						faults,
+					).dropped.map((c) => `repair:${c}`);
 		const result = settleUpdate({
 			condition,
 			state,
@@ -317,6 +417,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			tools,
 			limits,
 			now: at,
+			...(deps.repairGuard === false ? { repairGuard: false } : { faults }),
 		});
 		if (result.kind === "rejected") {
 			noteFailure();
@@ -332,20 +433,71 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			];
 		}
 		state = result.state;
+		let interestRejects: string[] = [];
+		if (interestFormation) {
+			const wire = r.value.interestOps ?? [];
+			const ops = wire.flatMap((w) => {
+				const op = interestOpFromWire(w);
+				return op ? [op] : [];
+			});
+			const settled = settleInterests({
+				interests: state.interests ?? [],
+				ops,
+				obs: new Map(presented.map((o) => [o.id, o])),
+				limit: INTEREST_LIMIT,
+				seq: ledger.cursor(),
+				newId: () => `k${state.nextId++}`,
+			});
+			state = { ...state, interests: settled.interests };
+			interestRejects = [
+				...Array.from(
+					{ length: wire.length - ops.length },
+					() => "interest:malformed",
+				),
+				...settled.rejects.map((x) => `interest:${x.code}`),
+			];
+		}
 		if (shownTodos)
 			settleReportedTodos(r.value.reportedTodos ?? [], shownTodos, presented);
 		ledger.markProcessed(batch.map((o) => o.seq));
 		markIssued(keys, flags);
 		failures = 0;
-		return [...r.prior, makeOutcome("update", at, result.kind, r.usage)];
+		return [
+			...r.prior,
+			makeOutcome("update", at, result.kind, r.usage, [
+				...repairDrops,
+				...interestRejects,
+			]),
+		];
+	};
+
+	// Deadline from the persisted intent.workSince (survives restore). Legacy snapshots without
+	// it start counting now, and the stamp is persisted with the next revision.
+	const expireStaleWork = (now: number) => {
+		for (const i of state.intents) {
+			if (!i.workRef) continue;
+			if (typeof i.workSince !== "number") i.workSince = now;
+			if (now - i.workSince < WORK_STALE_MS) continue;
+			i.workRef = null;
+			i.workSince = null;
+			activity.end(i.id);
+			if (i.state === "adopted") {
+				i.state = "held";
+				i.lastReason = "return:timeout";
+			}
+			i.revision += 1;
+			state.revision += 1;
+		}
 	};
 
 	const decideInner = async (
 		opp: Parameters<AgencyRuntime["decide"]>[0],
 		signal: AbortSignal,
+		maxUpdates = Number.POSITIVE_INFINITY,
 	): Promise<{ decision: Decision; calls: CallOutcome[] }> => {
 		const calls: CallOutcome[] = [];
 		const done = (decision: Decision) => ({ decision, calls });
+		expireStaleWork(opp.at);
 		if (!active())
 			return done(hostDecision(opp.id, "host_disabled", "agency disabled"));
 		if (opp.presence !== "quiet" || opp.foregroundBusy || opp.playerBusy) {
@@ -359,10 +511,13 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		const upto = ledger.lastSeq();
 		let budgetBlocked = false;
 		let failed: CallOutcome | null = null;
+		let updates = 0;
 		for (;;) {
 			const batch = actionable(upto).slice(0, cfg.batchSize);
 			const due = dueNow(opp.at);
 			if (batch.length === 0 && !isDue(due)) break;
+			if (updates >= maxUpdates) break;
+			updates += 1;
 			if (budget.check(opp.at, false) !== "ok") {
 				calls.push(skippedOutcome("update", opp.at, "skipped:budget"));
 				budgetBlocked = true;
@@ -443,7 +598,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			interests.length === 0 &&
 			topics.length === 0 &&
 			ambient.length === 0 &&
-			doneTodos === 0
+			doneTodos === 0 &&
+			!(deps.findings === true && findingIntents(state).length > 0)
 		)
 			return done(
 				hostDecision(opp.id, "host_no_candidates", "nothing to offer"),
@@ -455,7 +611,11 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 
 		const presented = present([], ledger.pending());
 		// Evidence ids the select prompt shows on state items are citable too.
-		const shownEvidence = selectEvidenceIds(condition, state);
+		const shownEvidence = selectEvidenceIds(
+			condition,
+			state,
+			deps.findings === true,
+		);
 		const input: SelectPromptInput = {
 			condition,
 			now: opp.at,
@@ -498,6 +658,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			minutesSinceUserInput: minutesSinceUserInput(opp.at),
 			...(social ? { social } : {}),
 			...(hostTopics ? { hostTopics } : {}),
+			...(deps.findings ? { findings: true } : {}),
 		};
 		const data = selectModelData(input);
 		const prompt =
@@ -507,7 +668,10 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		const system =
 			systemContext === "experimental"
 				? systemPrompt("select", condition, {
-						utteranceStyle: deps.utteranceStyle,
+						// Spoken style only when the resulting (autonomous) ticket may be spoken.
+						utteranceStyle: ticketTts("autonomous", deps.reportTts)
+							? deps.utteranceStyle
+							: undefined,
 						interests: interests.length > 0,
 						...(social ? { social } : {}),
 						...(hostTopics ? { hostTopics } : {}),
@@ -593,6 +757,21 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			tools,
 			limits,
 			at: opp.at,
+			...(deps.findings === true
+				? {
+						findingRefs: new Set(
+							// Only the finding itself or its returned result qualifies: citing the original
+							// request (also in the intent's evidence) must not skip the candidate rule.
+							findingIntents(state).flatMap((x) => [
+								x.id,
+								...x.evidence.filter((e) => {
+									const o = ledger.get(e);
+									return o === undefined || o.kind === "work.returned";
+								}),
+							]),
+						),
+					}
+				: {}),
 		});
 		if (!verdict.ok) {
 			calls.push(
@@ -616,10 +795,64 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				? emotionName(p.emotion)
 				: undefined;
 		let ticket: ActionTicket | null = null;
+		// Activity budget (P3-a): an autonomous tool use beyond the intent's budget is not issued;
+		// the intent is held with reason "budget" until its next review.
+		const budgetIntent =
+			p.action === "tool" && verdict.candidate
+				? state.intents.find((i) => i.id === verdict.candidate!.intentId)
+				: undefined;
+		// P4-a: one delegated work unit per intent; no new request until it returns.
+		if (budgetIntent?.workRef && verdict.toolName === DELEGATE_TOOL) {
+			if (verdict.candidate)
+				holdCandidate(verdict.candidate, "awaiting_outcome");
+			state.revision += 1;
+			return done({
+				...hostDecision(opp.id, "host_delegation", "work unit in flight", [
+					"delegation_running",
+				]),
+				candidateId: verdict.candidate?.id ?? null,
+			});
+		}
+		if (budgetIntent && !activity.canIssueTool(budgetIntent.id, opp.at)) {
+			budgetIntent.state = "held";
+			budgetIntent.lastReason = "budget";
+			if (verdict.candidate) holdCandidate(verdict.candidate, "deferred");
+			state.revision += 1;
+			return done({
+				...hostDecision(opp.id, "host_budget", "activity budget exhausted", [
+					"activity_budget",
+				]),
+				candidateId: verdict.candidate?.id ?? null,
+			});
+		}
 		if (p.action === "speak" || p.action === "tool") {
-			const reserved = reserveOutward(state, opp.id, p.action, verdict, opp.at);
+			// Decide-path tickets are the agent's own initiative (user requests are answered
+			// by respond, not by tickets), so origin is "autonomous"; tts comes from host config.
+			const reserved = reserveOutward(
+				state,
+				opp.id,
+				p.action,
+				verdict,
+				opp.at,
+				"autonomous",
+				ticketTts("autonomous", deps.reportTts),
+			);
 			ticket = emotion ? { ...reserved, emotion } : reserved;
 			issued.set(ticket.id, ticket);
+			if (budgetIntent) {
+				activity.spend(budgetIntent.id, opp.at, { toolCalls: 1 });
+				// A delegation (Eumenes `delegate`) is a work unit that returns later as work.returned.
+				if (tracksWork && verdict.toolName === DELEGATE_TOOL) {
+					budgetIntent.workRef = ticket.id;
+					budgetIntent.workSince = opp.at;
+				}
+			}
+			// Cooldown starts at the agent's own activity on an interest.
+			for (const ref of p.evidenceRefs)
+				if (ref.startsWith("interest:")) {
+					const it = state.interests?.find((x) => x.id === ref.slice(9));
+					if (it) it.lastEngagedAt = opp.at;
+				}
 			const used = p.evidenceRefs.filter(
 				(ref) =>
 					ref.startsWith("memory:") ||
@@ -652,11 +885,50 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		});
 	};
 
-	return {
+	/**
+	 * P4-a return ingestion (host rule, no LLM): the matching intent's work slot is freed, the result
+	 * and any follow-up question are recorded, and a review point is set. Non-success holds the intent;
+	 * whether to resume is the next update's judgment. Nothing is re-requested here.
+	 */
+	const ingestReturn = (o: Observation) => {
+		const it = state.intents.find((i) => i.workRef === o.workRef);
+		if (!it) return;
+		const status = o.workStatus ?? "succeeded";
+		it.workRef = null;
+		it.workSince = null;
+		// The returned unit ends its activity: a resumed unit (after a new wake reason) gets its own
+		// activity budget instead of inheriting the elapsed time of the previous one.
+		activity.end(it.id);
+		it.lastReturn = {
+			at: o.occurredAt,
+			workRef: o.workRef!,
+			status,
+			summary: o.text.slice(0, 400),
+			question: status === "question" ? o.text.slice(0, 400) : null,
+		};
+		if (!isOpenIntent(it)) return;
+		if (status !== "succeeded" && it.state === "adopted") {
+			it.state = "held";
+			it.lastReason = `return:${status}`;
+		}
+		it.reviewAt = Math.max(it.reviewAt, o.occurredAt + RETURN_REVIEW_MS);
+		it.evidence = [...new Set([...it.evidence, o.id])];
+		it.revision += 1;
+		state.revision += 1;
+	};
+
+	const api: AgencyRuntime = {
 		condition,
 		observe(input) {
 			const before = ledger.lastSeq();
 			const o = ledger.record(input);
+			if (
+				ledger.lastSeq() > before &&
+				tracksWork &&
+				o.kind === "work.returned" &&
+				o.workRef
+			)
+				ingestReturn(o);
 			if (ledger.lastSeq() > before) {
 				failures = 0;
 				quarantined = false;
@@ -706,6 +978,86 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 						}),
 			);
 		},
+		wake(now, host, signal) {
+			return serial(async () => {
+				expireStaleWork(now);
+				const events: WakeEvent[] = ledger.all().flatMap((o): WakeEvent[] =>
+					o.kind === "recall.offered"
+						? [{ kind: o.kind, id: o.id, refs: o.refs ?? [] }]
+						: o.kind === "work.returned"
+							? [{ kind: o.kind, id: o.id }]
+							: o.kind === "external.event"
+								? [
+										{
+											kind: o.kind,
+											id: o.id,
+											...(o.interestId ? { interestId: o.interestId } : {}),
+										},
+									]
+								: o.kind === "fault.observed"
+									? [{ kind: o.kind, id: o.id, code: o.code ?? "unknown" }]
+									: [],
+				);
+				const r = wakeCheck(
+					state,
+					now,
+					{
+						enabled: active(),
+						presence: host.presence,
+						foregroundBusy: host.foregroundBusy,
+						budgetOk: budget.check(now, true) === "ok",
+						delegationRunning:
+							(host.delegationRunning ?? false) ||
+							state.intents.some((i) => !!i.workRef),
+						idleDue: host.idleDue ?? false,
+					},
+					events,
+					wakeFlags,
+					wakeCfg,
+				);
+				// Activities whose intent closed are over.
+				for (const i of state.intents)
+					if (i.state === "completed" || i.state === "abandoned")
+						activity.end(i.id);
+				const out = { reasons: r.reasons, blocked: r.blocked };
+				if (r.reasons.length === 0)
+					return { ...out, decision: null, calls: [] };
+				if (r.calls.select === 0) {
+					// Return / fault: record it with one update and stop. No select.
+					const batch = actionable(ledger.lastSeq()).slice(0, cfg.batchSize);
+					const calls =
+						batch.length > 0 || isDue(dueNow(now))
+							? await runUpdate(now, signal, batch, dueNow(now))
+							: [];
+					const last = calls[calls.length - 1];
+					if (!last || isApplied(last)) commitWake(r, wakeFlags, now, wakeCfg);
+					return { ...out, decision: null, calls };
+				}
+				wakeCount += 1;
+				const trigger = r.reasons.includes("review_due")
+					? "review_due"
+					: r.reasons.includes("recall")
+						? "recall"
+						: "idle";
+				const res = await decideInner(
+					{
+						id: `wake${wakeCount}`,
+						at: now,
+						trigger,
+						presence: host.presence,
+						foregroundBusy: host.foregroundBusy,
+						playerBusy: false,
+					},
+					signal,
+					1,
+				);
+				if (
+					!res.calls.some((c) => !isApplied(c) && !c.code.startsWith("skipped"))
+				)
+					commitWake(r, wakeFlags, now, wakeCfg);
+				return { ...out, ...res };
+			});
+		},
 		takeReportedTodos() {
 			const out = reportedTodos;
 			reportedTodos = [];
@@ -736,6 +1088,15 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			// An interrupted or unknown outcome can still turn into a late success.
 			if (receipt.status === "succeeded" || receipt.status === "failed")
 				topicTickets.delete(receipt.ticketId);
+			// A delegation that failed to start (e.g. host refusal) frees the work slot and ends the
+			// activity: nothing will return, so its elapsed budget must not block a later retry (P4-b).
+			if (receipt.status === "failed")
+				for (const i of state.intents)
+					if (i.workRef === receipt.ticketId) {
+						i.workRef = null;
+						i.workSince = null;
+						activity.end(i.id);
+					}
 			if (receipt.status !== "outcome_unknown") issued.delete(receipt.ticketId);
 			failures = 0;
 			quarantined = false;
@@ -767,5 +1128,25 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			observations: ledger.all(),
 			cursor: ledger.cursor(),
 		}),
+	};
+	if (!revTracker) return api;
+	// P4-c: every state-changing entry point appends the items it changed.
+	const sync = <T>(v: T, callId: string, at: number): T => {
+		flushRevisions(callId, at);
+		return v;
+	};
+	const later = async <T>(v: Promise<T>, callId: string, at: number) =>
+		sync(await v, callId, at);
+	return {
+		...api,
+		observe: (o) => sync(api.observe(o), "observe", o.occurredAt),
+		runBackground: (now, signal) =>
+			later(api.runBackground(now, signal), "update", now),
+		decide: (opp, signal) => later(api.decide(opp, signal), "select", opp.at),
+		wake: (now, host, signal) =>
+			later(api.wake!(now, host, signal), "wake", now),
+		recordResult: (r) => sync(api.recordResult(r), "receipt", r.at),
+		invalidate: (reason, now) =>
+			sync(api.invalidate(reason, now), "invalidate", now),
 	};
 };

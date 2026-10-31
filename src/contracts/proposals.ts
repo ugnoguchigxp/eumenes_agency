@@ -326,16 +326,44 @@ export type WireUpdate = Omit<z.infer<(typeof wireSchemas)["F"]>, "ops"> & {
 	ops: WireOp[];
 	/** Present only in the hostTodos update schema. */
 	reportedTodos?: ReportedTodo[];
+	/** Present only in the condition-I (interestFormation) update schema. */
+	interestOps?: z.infer<typeof wireInterestOp>[];
 };
 
-/** `hostTodos`: B1 only, adds the reportedTodos array; every other schema is unchanged. */
+/** Condition I (F + interestFormation): one interest op on the wire (Agency Next P2-b). */
+export const wireInterestOp = z.strictObject({
+	op: z.enum(["interest.add", "interest.update"]),
+	id: ref.nullable(),
+	localId: ref.nullable(),
+	expectedRevision: z.int().min(1).nullable(),
+	status: z.enum(["emerging", "active", "dormant", "faded"]).nullable(),
+	topic: z.string().max(200).nullable(),
+	origin: z.enum(["user_relation", "own"]).nullable(),
+	reason: z.string().max(300).nullable(),
+	derivedFrom: ref.nullable(),
+	evidenceRefs: refs,
+});
+export type WireInterestOp = z.infer<typeof wireInterestOp>;
+const wireFInterests = wireSchemas.F.extend({
+	interestOps: z.array(wireInterestOp).max(4),
+});
+
+/**
+ * `hostTodos`: B1 only, adds the reportedTodos array. `interestFormation`: F only, adds the
+ * interestOps array (condition I). Every other schema is unchanged.
+ */
 export const wireUpdateSchema = (
 	condition: "B1" | "B2" | "F",
-	options: { readonly hostTodos?: boolean } = {},
+	options: {
+		readonly hostTodos?: boolean;
+		readonly interestFormation?: boolean;
+	} = {},
 ): z.ZodType<WireUpdate> =>
 	(condition === "B1" && options.hostTodos === true
 		? wireB1Todos
-		: wireSchemas[condition]) as z.ZodType<WireUpdate>;
+		: condition === "F" && options.interestFormation === true
+			? wireFInterests
+			: wireSchemas[condition]) as z.ZodType<WireUpdate>;
 
 /**
  * Placeholder for a missing intent.update reason; settle stores it as lastReason. Only for

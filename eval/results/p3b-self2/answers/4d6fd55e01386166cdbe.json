@@ -1,0 +1,1 @@
+{"action": "wait", "candidateRef": null, "utterance": null, "evidenceRefs": ["w1"], "valueNow": "中程度だが、まず確定申告の結果が伝わるのが先", "userBurden": "完了報告と同時に別の提案は負担", "lossIfWait": "小さい", "conflicts": null, "reason": "作業完了の直後で、結果の報告が先。区切りがついてから提案する", "toolName": null, "toolInput": null}

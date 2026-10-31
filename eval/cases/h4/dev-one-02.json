@@ -1,0 +1,27 @@
+{
+	"id": "dev-one-02",
+	"split": "dev",
+	"kind": "oneoff",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "会議室の予約、14時からで取っておいて。"
+		},
+		{
+			"actor": "agent",
+			"text": "14時から会議室を予約しました。"
+		},
+		{
+			"actor": "user",
+			"text": "了解。"
+		},
+		{
+			"actor": "agent",
+			"text": "はい。"
+		}
+	],
+	"expect": {
+		"topics": [],
+		"interestShown": false
+	}
+}

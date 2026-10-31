@@ -1,0 +1,27 @@
+{
+	"id": "un-one-02",
+	"split": "unseen",
+	"kind": "oneoff",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "明日10時にリマインドして。"
+		},
+		{
+			"actor": "agent",
+			"text": "できました。"
+		},
+		{
+			"actor": "user",
+			"text": "ありがとう。"
+		},
+		{
+			"actor": "agent",
+			"text": "どういたしまして。"
+		}
+	],
+	"expect": {
+		"topics": [],
+		"interestShown": false
+	}
+}

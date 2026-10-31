@@ -1,0 +1,27 @@
+{
+	"id": "dev-one-03",
+	"split": "dev",
+	"kind": "oneoff",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "この英文のスペルミスだけ直して。"
+		},
+		{
+			"actor": "agent",
+			"text": "2か所直しました。"
+		},
+		{
+			"actor": "user",
+			"text": "OK。"
+		},
+		{
+			"actor": "agent",
+			"text": "はい。"
+		}
+	],
+	"expect": {
+		"topics": [],
+		"interestShown": false
+	}
+}

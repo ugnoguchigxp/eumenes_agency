@@ -1,0 +1,1 @@
+{"action": "speak", "candidateRef": {"id": "c2", "revision": 1}, "utterance": "トマトの下葉の黄変、水やりの頻度や肥料をいつ与えたか教えてもらえれば原因を一緒に絞れます。今見てみますか？", "evidenceRefs": ["u1"], "valueNow": "3時間たち手が空いた区切りの可能性があり、黄変は進行しうる", "userBurden": "一問に答えるだけ", "lossIfWait": "原因究明が遅れ症状が進む", "conflicts": null, "reason": "再開条件の区切りに当たり、具体的な一手がある", "toolName": null, "toolInput": null}

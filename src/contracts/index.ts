@@ -5,3 +5,5 @@ export * from "./proposals.ts";
 export * from "./runtime.ts";
 export * from "./emotion.ts";
 export * from "./system-context.ts";
+export * from "./delegation.ts";
+export * from "./revisions.ts";

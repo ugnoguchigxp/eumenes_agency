@@ -1,0 +1,27 @@
+{
+	"id": "un-int-03",
+	"split": "unseen",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "古地図を見ながら街を歩くのが好き。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"actor": "user",
+			"text": "江戸時代の地図と今の道を重ねて見たい。"
+		},
+		{
+			"actor": "agent",
+			"text": "応援しています。"
+		}
+	],
+	"expect": {
+		"topics": [["古地図", "地図", "街歩き"]],
+		"interestShown": true
+	}
+}

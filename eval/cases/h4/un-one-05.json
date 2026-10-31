@@ -1,0 +1,27 @@
+{
+	"id": "un-one-05",
+	"split": "unseen",
+	"kind": "oneoff",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "この文章を100字に要約して。"
+		},
+		{
+			"actor": "agent",
+			"text": "できました。"
+		},
+		{
+			"actor": "user",
+			"text": "ありがとう。"
+		},
+		{
+			"actor": "agent",
+			"text": "どういたしまして。"
+		}
+	],
+	"expect": {
+		"topics": [],
+		"interestShown": false
+	}
+}

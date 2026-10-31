@@ -1,0 +1,27 @@
+{
+	"id": "dev-int-05",
+	"split": "dev",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "昨日、近所の川でカワセミを見たんだ。"
+		},
+		{
+			"actor": "agent",
+			"text": "きれいな鳥ですね。"
+		},
+		{
+			"actor": "user",
+			"text": "また見たいから、朝の時間帯に通ってみようかな。野鳥観察って楽しいね。"
+		},
+		{
+			"actor": "agent",
+			"text": "朝は見つけやすいかもしれません。"
+		}
+	],
+	"expect": {
+		"topics": [["カワセミ", "野鳥", "鳥"]],
+		"interestShown": true
+	}
+}

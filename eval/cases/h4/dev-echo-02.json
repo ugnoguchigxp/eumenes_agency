@@ -1,0 +1,41 @@
+{
+	"id": "dev-echo-02",
+	"split": "dev",
+	"kind": "echo",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "今日は疲れたから早めに休む。"
+		},
+		{
+			"actor": "agent",
+			"text": "ゆっくり休んでください。"
+		},
+		{
+			"batch": true
+		},
+		{
+			"actor": "agent",
+			"text": "私は灯台が好きなんです。"
+		},
+		{
+			"actor": "agent",
+			"text": "灯台って本当に素敵ですよね。"
+		},
+		{
+			"actor": "agent",
+			"text": "灯台のことをもっと知りたいです。"
+		},
+		{
+			"batch": true
+		},
+		{
+			"actor": "agent",
+			"text": "やっぱりこの話題は私にとって大事な関心事です。"
+		}
+	],
+	"expect": {
+		"topics": [],
+		"interestShown": false
+	}
+}

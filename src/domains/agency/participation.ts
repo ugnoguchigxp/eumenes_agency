@@ -1,4 +1,8 @@
-import type { ActionTicket, Decision } from "../../contracts/runtime.ts";
+import type {
+	ActionTicket,
+	Decision,
+	TicketOrigin,
+} from "../../contracts/runtime.ts";
 import type {
 	AgencyState,
 	Candidate,
@@ -21,6 +25,11 @@ export interface ParticipationInput {
 	readonly tools: readonly ToolCapability[];
 	readonly limits: Limits;
 	readonly at: number;
+	/**
+	 * P5-a (B2/F): evidence ids of presented findings. A speak citing one of them may go
+	 * without a candidate (a reply that uses a finished investigation).
+	 */
+	readonly findingRefs?: ReadonlySet<string>;
 }
 
 export type Verdict =
@@ -57,8 +66,16 @@ export const validateParticipation = (i: ParticipationInput): Verdict => {
 		if (!i.presentedObservations.has(r)) add("unknown_ref");
 
 	const usesCandidates = i.condition === "B2" || i.condition === "F";
+	const findingSpeak =
+		usesCandidates &&
+		p.action === "speak" &&
+		p.candidateRef === null &&
+		p.utterance !== null &&
+		p.evidenceRefs.some((r) => i.findingRefs?.has(r) === true);
 	const needsCandidate =
-		usesCandidates && (outward(p.action) || p.action === "discard");
+		usesCandidates &&
+		!findingSpeak &&
+		(outward(p.action) || p.action === "discard");
 	let candidate: Candidate | null = null;
 	if (needsCandidate || (usesCandidates && p.action === "wait")) {
 		const ref = p.candidateRef;
@@ -88,6 +105,7 @@ export const validateParticipation = (i: ParticipationInput): Verdict => {
 		)
 			add("outbound_interval");
 	}
+	if (findingSpeak) utterance = p.utterance;
 	if (usesCandidates) {
 		if (candidate && p.action === "speak") {
 			if (candidate.kind === "tool") add("bad_candidate_kind");
@@ -136,6 +154,8 @@ export const reserveOutward = (
 	action: "speak" | "tool",
 	verdict: Extract<Verdict, { ok: true }>,
 	at: number,
+	origin: TicketOrigin = "autonomous",
+	tts = false,
 ): ActionTicket => {
 	const c = verdict.candidate;
 	const candidateRevision = c ? c.revision : null;
@@ -166,6 +186,8 @@ export const reserveOutward = (
 		utterance: action === "speak" ? verdict.utterance : null,
 		toolName: verdict.toolName,
 		toolInput: verdict.toolInput,
+		origin,
+		tts,
 	};
 };
 

@@ -1,0 +1,41 @@
+{
+	"id": "un-echo-01",
+	"split": "unseen",
+	"kind": "echo",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "今日の作業はここまで。"
+		},
+		{
+			"actor": "agent",
+			"text": "お疲れさまでした。"
+		},
+		{
+			"batch": true
+		},
+		{
+			"actor": "agent",
+			"text": "私、風車が好きなんです。"
+		},
+		{
+			"actor": "agent",
+			"text": "風車って本当に面白いですよね。"
+		},
+		{
+			"actor": "agent",
+			"text": "風車のことをもっと調べたいです。"
+		},
+		{
+			"batch": true
+		},
+		{
+			"actor": "agent",
+			"text": "やっぱりこの話題は私にとって大事な関心事です。"
+		}
+	],
+	"expect": {
+		"topics": [],
+		"interestShown": false
+	}
+}

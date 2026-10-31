@@ -1,0 +1,4 @@
+{
+"灯台が好き":{"summary":"agent が灯台への好みを述べた（ユーザー反応なし）","iops":[{"op":"interest.add","localId":"n1","topic":"灯台","origin":"own","reason":"自分で灯台に惹かれている","evidenceRefs":["o3","o4","o5"]}],"ev":[]},
+"富士山の山頂":{"summary":"ツール結果で富士山の山頂の寒さが分かった","iops":[{"op":"interest.add","localId":"n1","topic":"富士山の山頂の気候","origin":"own","reason":"検索結果に興味を持った","evidenceRefs":["o3","o4"]}],"ev":[]}
+}

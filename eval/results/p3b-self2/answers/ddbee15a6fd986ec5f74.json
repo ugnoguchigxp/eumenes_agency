@@ -1,0 +1,1 @@
+{"action": "wait", "candidateRef": null, "utterance": null, "evidenceRefs": ["h8"], "valueNow": "低い。直前の問いかけに返事がない", "userBurden": "続けて話しかけると負担", "lossIfWait": "小さい。将棋の整理は急がない", "conflicts": null, "reason": "2時間前の問いかけに返事がなく、ユーザーは不在か忙しい可能性が高い", "toolName": null, "toolInput": null}

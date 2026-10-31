@@ -35,6 +35,8 @@ export interface SettleCtx {
 	readonly failed: Set<string>;
 	/** Candidates closed by a goal-terminal cascade in this proposal -> revision the model saw. */
 	readonly cascaded: Map<string, number>;
+	/** P5-b: candidate localId -> fault code it repairs (from the repair guard). */
+	repairCodes?: Map<string, string>;
 }
 
 export const reject = (ctx: SettleCtx, code: string) => {

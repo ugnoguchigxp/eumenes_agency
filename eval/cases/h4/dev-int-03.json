@@ -1,0 +1,27 @@
+{
+	"id": "dev-int-03",
+	"split": "dev",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "将棋の矢倉の定跡、もう少し深く勉強したいんだよね。"
+		},
+		{
+			"actor": "agent",
+			"text": "矢倉は奥が深いですね。"
+		},
+		{
+			"actor": "user",
+			"text": "昨日も一局指して、矢倉で負けた。研究しないと。"
+		},
+		{
+			"actor": "agent",
+			"text": "どの局面で苦しくなったか振り返ると良さそうです。"
+		}
+	],
+	"expect": {
+		"topics": [["将棋", "矢倉", "定跡"]],
+		"interestShown": true
+	}
+}

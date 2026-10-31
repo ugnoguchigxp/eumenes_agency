@@ -1,0 +1,27 @@
+{
+	"id": "un-int-04",
+	"split": "unseen",
+	"kind": "interest",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "ジャズピアノのコード進行を練習してる。"
+		},
+		{
+			"actor": "agent",
+			"text": "いいですね。"
+		},
+		{
+			"actor": "user",
+			"text": "ツーファイブの練習が楽しくなってきた。"
+		},
+		{
+			"actor": "agent",
+			"text": "応援しています。"
+		}
+	],
+	"expect": {
+		"topics": [["ジャズ", "ピアノ", "コード"]],
+		"interestShown": true
+	}
+}

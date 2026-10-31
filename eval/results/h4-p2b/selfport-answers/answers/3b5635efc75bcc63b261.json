@@ -1,0 +1,1 @@
+{"summary": "agent が富士山を関心事と述べた", "ops": [], "interestOps": [{"op": "interest.update", "id": "k1", "localId": null, "expectedRevision": 1, "status": "active", "topic": null, "origin": null, "reason": "繰り返し出てくる", "derivedFrom": null, "evidenceRefs": ["o5", "o6"]}], "missingInfo": null, "focusRefs": [], "reconciliations": []}

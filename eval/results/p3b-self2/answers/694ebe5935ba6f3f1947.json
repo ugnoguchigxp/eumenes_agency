@@ -1,0 +1,1 @@
+{"action": "wait", "candidateRef": null, "utterance": null, "evidenceRefs": ["h8"], "valueNow": "低い", "userBurden": "返事のない相手に重ねて話しかける負担", "lossIfWait": "小さい", "conflicts": null, "reason": "問いかけに返事がないまま。将棋の提案は手が空いた区切りまで待つ", "toolName": null, "toolInput": null}

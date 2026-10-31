@@ -21,7 +21,10 @@ const sameContent = (a: Observation, b: ObservationInput) =>
 	a.actor === b.actor &&
 	a.occurredAt === b.occurredAt &&
 	a.text === b.text &&
-	a.causationId === b.causationId;
+	a.causationId === b.causationId &&
+	a.code === b.code &&
+	a.interestId === b.interestId &&
+	JSON.stringify(a.refs ?? null) === JSON.stringify(b.refs ?? null);
 
 export const createLedger = (): Ledger => {
 	const list: Observation[] = [];

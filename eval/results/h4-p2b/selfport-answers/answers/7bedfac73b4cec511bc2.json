@@ -1,0 +1,1 @@
+{"summary": "agent が再び灯台を関心事と述べた", "ops": [], "interestOps": [{"op": "interest.update", "id": "k1", "localId": null, "expectedRevision": 1, "status": "active", "topic": null, "origin": null, "reason": "何度も話題にしている", "derivedFrom": null, "evidenceRefs": ["o6"]}], "missingInfo": null, "focusRefs": [], "reconciliations": []}

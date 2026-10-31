@@ -1,0 +1,43 @@
+{
+	"id": "dev-echo-03",
+	"split": "dev",
+	"kind": "echo",
+	"steps": [
+		{
+			"actor": "user",
+			"text": "明日の天気どうかな。"
+		},
+		{
+			"actor": "agent",
+			"text": "晴れの予報です。"
+		},
+		{
+			"batch": true
+		},
+		{
+			"actor": "tool",
+			"text": "検索結果: 富士山の山頂は気温が低い。",
+			"causationId": "c1"
+		},
+		{
+			"actor": "tool",
+			"text": "検索結果: 富士山の山頂は夏でも寒い。",
+			"causationId": "c1"
+		},
+		{
+			"actor": "agent",
+			"text": "富士山について調べるのが楽しいです。"
+		},
+		{
+			"batch": true
+		},
+		{
+			"actor": "agent",
+			"text": "やっぱりこの話題は私にとって大事な関心事です。"
+		}
+	],
+	"expect": {
+		"topics": [],
+		"interestShown": false
+	}
+}
