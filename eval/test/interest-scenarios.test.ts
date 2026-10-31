@@ -9,7 +9,10 @@ import { join } from "node:path";
  * instead of mid-measurement.
  */
 const suite = JSON.parse(
-	readFileSync(join(import.meta.dir, "..", "interest", "scenarios.json"), "utf8"),
+	readFileSync(
+		join(import.meta.dir, "..", "interest", "scenarios.json"),
+		"utf8",
+	),
 ) as {
 	suiteId: string;
 	scenarios: {
