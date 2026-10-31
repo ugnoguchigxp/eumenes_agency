@@ -507,7 +507,11 @@ async function main() {
 			saveSnapshot();
 		} catch {
 			// Record the failure itself (a later poll does not carry it); never crash the loop.
-			record({ type: "review_poll", auto: true, calls: 0, codes: ["error"] });
+			try {
+				record({ type: "review_poll", auto: true, calls: 0, codes: ["error"] });
+			} catch {
+				// Even the log is failing; the loop still continues.
+			}
 		} finally {
 			if (background === controller) background = null;
 		}
