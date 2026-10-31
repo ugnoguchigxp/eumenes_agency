@@ -36,8 +36,22 @@ describe("parseCliArgs / resolveCondition", () => {
 			emotion: true,
 			social: true,
 			quietWhy: false,
+			typedNotes: false,
+			pollMinutes: 0,
 			interests: [defaultInterestText],
 		});
+	});
+
+	test("--typed-notes (default off) and --poll-minutes (default 0 = off)", () => {
+		expect(parseCliArgs([]).typedNotes).toBe(false);
+		expect(parseCliArgs(["--typed-notes"]).typedNotes).toBe(true);
+		expect(parseCliArgs(["--typed-notes", "--no-typed-notes"]).typedNotes).toBe(
+			false,
+		);
+		expect(parseCliArgs([]).pollMinutes).toBe(0);
+		expect(parseCliArgs(["--poll-minutes", "60"]).pollMinutes).toBe(60);
+		expect(() => parseCliArgs(["--poll-minutes", "-1"])).toThrow();
+		expect(() => parseCliArgs(["--poll-minutes", "10081"])).toThrow();
 	});
 
 	test("flags", () => {

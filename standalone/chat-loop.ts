@@ -55,6 +55,10 @@ export interface CliArgs {
 	readonly social: boolean;
 	/** Hide the one-line `[判断]` print of each background decision (the log keeps them). */
 	readonly quietWhy: boolean;
+	/** Typed interest / question notes (design §3). Default off; B1 only. */
+	readonly typedNotes: boolean;
+	/** Low-frequency review polling in minutes (design §5.2). 0 = off. */
+	readonly pollMinutes: number;
 }
 
 const nonNegative = (
@@ -87,6 +91,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 	let social = true;
 	let emotion = true;
 	let quietWhy = false;
+	let typedNotes = false;
+	let pollMinutes = 0;
 	const interests: string[] = [];
 	let noInterest = false;
 	for (let i = 0; i < argv.length; i++) {
@@ -107,6 +113,10 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 		else if (arg === "--emotion") emotion = true;
 		else if (arg === "--no-emotion") emotion = false;
 		else if (arg === "--quiet-why") quietWhy = true;
+		else if (arg === "--typed-notes") typedNotes = true;
+		else if (arg === "--no-typed-notes") typedNotes = false;
+		else if (arg === "--poll-minutes")
+			pollMinutes = nonNegative("--poll-minutes", argv[++i], false, 10080);
 		else if (arg === "--condition") {
 			const value = argv[++i];
 			const found = cliConditions.find((c) => c === value);
@@ -137,6 +147,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 		emotion,
 		social,
 		quietWhy,
+		typedNotes,
+		pollMinutes,
 		interests: noInterest
 			? []
 			: interests.length > 0

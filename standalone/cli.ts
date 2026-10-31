@@ -142,6 +142,7 @@ async function main() {
 		...(selectWhenEmpty ? { selectWhenEmpty: true } : {}),
 		hostTodos: true,
 		todos: toolPort.todos,
+		...(args.typedNotes ? { typedNotes: true } : {}),
 		...(args.emotion ? { utteranceEmotion: true } : {}),
 		...(args.tts ? { utteranceStyle: ttsUtteranceStyle } : {}),
 		...(standingInterests.length > 0 ? { standingInterests } : {}),
@@ -414,6 +415,45 @@ async function main() {
 			record({ type: "idle_cycle", auto: true, outcome, ...planner.status() }),
 	});
 
+	// Review polling (design §5.2): a low-frequency host timer that only runs the
+	// background update — it never creates a speaking opportunity by itself. When
+	// nothing is pending and nothing is due, runBackground makes no model call, so
+	// a poll costs nothing but the wake itself. Every poll is written to the log,
+	// including the zero-call ones (the wake/decision log of §10.3).
+	let pollTimer: ReturnType<typeof setTimeout> | null = null;
+	const runPoll = async (): Promise<void> => {
+		if (closed || backgroundHalted) return;
+		abortBackground();
+		const controller = new AbortController();
+		background = controller;
+		try {
+			const outcomes = await runtime.runBackground(
+				Date.now(),
+				controller.signal,
+			);
+			record({
+				type: "review_poll",
+				auto: true,
+				calls: outcomes.length,
+				codes: outcomes.map((o) => o.code),
+			});
+			if (haltOnOutcomes(outcomes)) return;
+			archiveReported();
+		} catch {
+			// A failed poll is logged by the next successful one; never crash the loop.
+		} finally {
+			if (background === controller) background = null;
+		}
+	};
+	const armPoll = (): void => {
+		if (args.pollMinutes <= 0 || closed) return;
+		pollTimer = setTimeout(() => {
+			void runPoll().then(armPoll);
+		}, args.pollMinutes * 60_000);
+		pollTimer.unref?.();
+	};
+	armPoll();
+
 	// A submitted line supersedes any running background cycle immediately (even when it
 	// arrives in the same tick as a command, e.g. a paste). Commands do not interrupt it.
 	rl.on("line", (raw: string) => {
@@ -428,6 +468,7 @@ async function main() {
 		if (closed) return;
 		closed = true;
 		scheduler.dispose();
+		if (pollTimer) clearTimeout(pollTimer);
 		abortBackground();
 		chatAbort.abort();
 	};
