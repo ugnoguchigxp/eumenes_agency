@@ -10,6 +10,7 @@ import {
 	conditions,
 	type Decision,
 	type Opportunity,
+	type ToolCapability,
 } from "../src/contracts/index.ts";
 import {
 	defaultIdleSec,
@@ -61,6 +62,11 @@ export interface CliArgs {
 	readonly pollMinutes: number;
 	/** Snapshot file for restore-on-start / save-on-change (design §3.4). Null = off. */
 	readonly snapshotPath: string | null;
+	/**
+	 * Investigation round trip (design §10 S6): host-topics + typed notes + the
+	 * fixture log tool, executed minimally by the CLI itself. Default off.
+	 */
+	readonly research: boolean;
 }
 
 const nonNegative = (
@@ -96,6 +102,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 	let typedNotes = false;
 	let pollMinutes = 0;
 	let snapshotPath: string | null = null;
+	let research = false;
 	const interests: string[] = [];
 	let noInterest = false;
 	for (let i = 0; i < argv.length; i++) {
@@ -125,7 +132,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 			if (!value || value.startsWith("--"))
 				throw new Error("usage: --snapshot <path>");
 			snapshotPath = value;
-		} else if (arg === "--condition") {
+		} else if (arg === "--research") research = true;
+		else if (arg === "--no-research") research = false;
+		else if (arg === "--condition") {
 			const value = argv[++i];
 			const found = cliConditions.find((c) => c === value);
 			if (!found)
@@ -158,6 +167,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 		typedNotes,
 		pollMinutes,
 		snapshotPath,
+		research,
 		interests: noInterest
 			? []
 			: interests.length > 0
@@ -165,6 +175,25 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 				: [defaultInterestText],
 	};
 }
+
+// ---------------------------------------------------------------- research fixture (S6)
+
+/**
+ * Fixture investigation tool for --research (design §10 S6): approval-free, so
+ * the agency may request it autonomously; the CLI executes it minimally and
+ * returns the receipt. A real host would hand the ticket to its work system
+ * (Pursuit); the canned finding is the fixture's stand-in for a real search.
+ */
+export const fixtureLogLookupTool: ToolCapability = {
+	name: "log_lookup",
+	description:
+		"サーバーの運用ログを調べる（fixture、承認不要）。固定の調査結果を返す",
+	requiresApproval: false,
+};
+
+/** The fixture's canned finding: deterministic, independent of the query. */
+export const executeFixtureLogLookup = (toolInput: string): string =>
+	`調査結果（fixture）: 日曜 23:00 のバックアップ失敗時、同時刻にスナップショットジョブが実行され、ディスク I/O の競合が発生していた。他の曜日にはこの競合はない。入力: ${toolInput.slice(0, 120)}`;
 
 // ---------------------------------------------------------------- decisions
 

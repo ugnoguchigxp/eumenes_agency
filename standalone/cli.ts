@@ -70,6 +70,8 @@ import {
 	createChatLog,
 	createConversation,
 	decisionEvent,
+	executeFixtureLogLookup,
+	fixtureLogLookupTool,
 	decisionLine,
 	defaultLogPath,
 	parseCliArgs,
@@ -158,12 +160,15 @@ async function main() {
 			systemContext: "experimental",
 			condition,
 			llm,
-			tools: [],
+			// --research offers the one approval-free fixture tool (design §10 S6);
+			// host-topics mode (which wins over social) is what lets select request it.
+			tools: args.research ? [fixtureLogLookupTool] : [],
 			budget: resolveBudget(settings),
 			...(selectWhenEmpty ? { selectWhenEmpty: true } : {}),
 			hostTodos: true,
 			todos: toolPort.todos,
-			...(args.typedNotes ? { typedNotes: true } : {}),
+			...(args.research ? { hostTopics: true } : {}),
+			...(args.typedNotes || args.research ? { typedNotes: true } : {}),
 			...(args.emotion ? { utteranceEmotion: true } : {}),
 			...(args.tts ? { utteranceStyle: ttsUtteranceStyle } : {}),
 			...(standingInterests.length > 0 ? { standingInterests } : {}),
@@ -335,6 +340,27 @@ async function main() {
 				status: "succeeded",
 				at: Date.now(),
 				resultText: text,
+			});
+			return true;
+		}
+		// --research: the fixture tool is executed minimally by the CLI itself and
+		// its finding returns as the receipt (design §10 S6). Any other tool keeps
+		// the fixture-only behavior: never executed here.
+		if (args.research && ticket.toolName === fixtureLogLookupTool.name) {
+			const resultText = executeFixtureLogLookup(ticket.toolInput ?? "");
+			record({
+				type: "proactive_tool",
+				trigger,
+				ticketId: ticket.id,
+				toolName: ticket.toolName,
+				executed: true,
+			});
+			say(`[自発:tool] ${ticket.toolName} を実行しました: ${resultText}`);
+			runtime.recordResult({
+				ticketId: ticket.id,
+				status: "succeeded",
+				at: Date.now(),
+				resultText,
 			});
 			return true;
 		}

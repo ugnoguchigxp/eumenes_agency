@@ -14,6 +14,8 @@ import {
 	decisionEvent,
 	decisionLine,
 	defaultLogPath,
+	executeFixtureLogLookup,
+	fixtureLogLookupTool,
 	parseCliArgs,
 	printAbove,
 	resolveCondition,
@@ -39,8 +41,22 @@ describe("parseCliArgs / resolveCondition", () => {
 			typedNotes: false,
 			pollMinutes: 0,
 			snapshotPath: null,
+			research: false,
 			interests: [defaultInterestText],
 		});
+	});
+
+	test("--research (default off) and the fixture log tool (S6)", () => {
+		expect(parseCliArgs([]).research).toBe(false);
+		expect(parseCliArgs(["--research"]).research).toBe(true);
+		expect(parseCliArgs(["--research", "--no-research"]).research).toBe(false);
+		expect(fixtureLogLookupTool.requiresApproval).toBe(false);
+		expect(executeFixtureLogLookup("問い: テスト")).toContain(
+			"スナップショットジョブ",
+		);
+		expect(executeFixtureLogLookup("問い: テスト")).toBe(
+			executeFixtureLogLookup("問い: テスト"),
+		);
 	});
 
 	test("--snapshot <path> (default null)", () => {
