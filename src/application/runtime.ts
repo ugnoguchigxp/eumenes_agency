@@ -90,6 +90,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	// Host topics (topics kept by the host's own memory) take precedence over note-based seeds.
 	const hostTopics = condition === "B1" && deps.hostTopics === true;
 	const hostTodos = condition === "B1" && deps.hostTodos === true;
+	const typedNotes = condition === "B1" && deps.typedNotes === true;
 	// Utterance emotion (B1 only): select also picks the feeling of a speak.
 	const emotionMode = condition === "B1" && deps.utteranceEmotion === true;
 	const social =
@@ -126,8 +127,11 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const active = () => enabled && condition !== "B0";
 	const actionable = (upto: number): readonly Observation[] =>
 		quarantined ? [] : ledger.pending(upto);
+	// B1 has no due-driven wakes (its notes are re-presented at every opportunity) —
+	// except in typed-notes mode, where interest / question reviews are the one
+	// time-based signal B1 state can carry (design §3.3).
 	const dueNow = (now: number): Due =>
-		condition === "B1" || quarantined
+		(condition === "B1" && !typedNotes) || quarantined
 			? NO_DUE
 			: findDue(state, limits, now, flags);
 	// invalidate() bumps this; a select that straddles it is never reserved.
@@ -266,6 +270,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				? systemPrompt("update", condition, {
 						...(social ? { social } : {}),
 						...(hostTodos ? { hostTodos } : {}),
+						...(typedNotes ? { typedNotes } : {}),
 					})
 				: resolveSystemContext(
 						systemContext.update,

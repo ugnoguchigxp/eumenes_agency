@@ -60,6 +60,12 @@ export interface RuntimeDeps {
 	 */
 	readonly selectWhenEmpty?: boolean;
 	/**
+	 * B1 only (spec/autonomous-interest-design.md §3): the experimental update
+	 * instructions gain the typed interest / open-question note rules. Ignored
+	 * for other conditions and by host-owned SystemContext.
+	 */
+	readonly typedNotes?: boolean;
+	/**
 	 * Host delivery style for utterances (e.g. spoken via TTS), appended to the select
 	 * experimental instructions only. Ignored by host-owned SystemContext.
 	 */

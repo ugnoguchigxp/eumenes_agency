@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { z } from "zod";
-import { updatePrompt } from "../../src/application/prompts.ts";
+import { systemPrompt, updatePrompt } from "../../src/application/prompts.ts";
 import { createAgencyRuntime } from "../../src/application/runtime.ts";
 import { decisionTts } from "../../src/application/todos.ts";
 import type {
@@ -616,5 +616,103 @@ describe("tts: silent self reports (§5.5)", () => {
 		const d = await runTts({ todo: doneTodo("self") });
 		expect(d.tts).toBeUndefined();
 		expect(d.ticket?.tts).toBeUndefined();
+	});
+});
+
+const T0 = 1_700_000_000_000;
+
+describe("typed-notes prompt integration (S3)", () => {
+	test("the update system gains the typed-note rules only with the flag", () => {
+		expect(systemPrompt("update", "B1")).not.toContain("型付きメモ");
+		expect(systemPrompt("update", "B1", { typedNotes: true })).toContain(
+			"型付きメモ",
+		);
+		expect(systemPrompt("update", "B2", { typedNotes: true })).not.toContain(
+			"型付きメモ",
+		);
+	});
+
+	test("updatePrompt renders due typed notes in the host notices", () => {
+		const interest: Note = {
+			id: "n1",
+			revision: 1,
+			text: "登山への関心",
+			evidence: ["o1"],
+			kind: "interest",
+			status: "active",
+			origin: "experienced",
+			derivedFrom: [],
+			reviewAt: T0,
+			createdSeq: 1,
+			updatedSeq: 1,
+		};
+		const prompt = updatePrompt({
+			condition: "B1",
+			now: T0 + HOUR,
+			observations: [],
+			freshIds: new Set<string>(),
+			state: { ...emptyState(), notes: [interest] },
+			due: { reviewIntentIds: [], reviewNoteIds: ["n1"], pressure: [] },
+			delivered: [],
+			tools: [],
+			limits: defaultLimits,
+			minutesSinceUserInput: null,
+		});
+		expect(prompt).toContain("見直し時点を過ぎた関心・問い n1");
+	});
+});
+
+describe("review wake chain (S3)", () => {
+	test("polls call the model only when something is due", async () => {
+		const llm = fakeLlm();
+		const rt = createAgencyRuntime({
+			condition: "B1",
+			systemContext: "experimental",
+			typedNotes: true,
+			llm,
+			tools: [],
+		});
+		const signal = new AbortController().signal;
+		rt.observe(
+			obsInput(
+				"o1",
+				"exchange.adopted",
+				"user",
+				T0,
+				"登山にハマって、月2回は低山に登っている",
+			),
+		);
+		llm.push("update", {
+			...toWire(
+				b1Proposal([
+					noteAddOp("new1", {
+						text: "登山への関心",
+						kind: "interest",
+						status: "active",
+						origin: "experienced",
+						reviewAfterHours: 1,
+					}),
+				]),
+			),
+		});
+		await rt.runBackground(T0, signal);
+		expect(llm.count("update")).toBe(1);
+		// Nothing pending and the review is not due yet: a poll makes no model call.
+		await rt.runBackground(T0 + 30 * MIN, signal);
+		expect(llm.count("update")).toBe(1);
+		// The review comes due: exactly one update call, and its prompt names the note.
+		llm.push("update", {
+			...toWire(b1Proposal([noteUpdateOp("n1", 1, { reviewAfterHours: 1 })])),
+		});
+		await rt.runBackground(T0 + 2 * HOUR, signal);
+		expect(llm.count("update")).toBe(2);
+		const wake = llm.requests.filter((r) => r.purpose === "update")[1];
+		expect(wake?.prompt).toContain("見直し時点を過ぎた関心・問い n1");
+		// An immediate second poll does not fire again.
+		await rt.runBackground(T0 + 2 * HOUR + MIN, signal);
+		expect(llm.count("update")).toBe(2);
+		const interest = rt.snapshot().state.notes[0];
+		expect(interest?.status).toBe("active");
+		expect(interest?.reviewAt).toBe(T0 + 3 * HOUR);
 	});
 });

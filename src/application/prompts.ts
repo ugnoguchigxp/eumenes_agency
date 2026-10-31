@@ -208,6 +208,24 @@ const wireB1Todos = [
 	"reportedTodos: 要素は {todoId, observationRef}。なければ空配列。",
 ];
 
+export const TYPED_NOTES_RULES_VERSION = "typed-notes-1";
+
+/**
+ * Added to the B1 update rules in typed-notes mode (spec/autonomous-interest-design.md §3,
+ * measured as S2/S3): interests and open questions as typed state. Without the flag the
+ * update prompt is byte-identical.
+ */
+const b1TypedNotes = [
+	`【型付きメモ: 関心と問い】（${TYPED_NOTES_RULES_VERSION}）通常のメモのほかに、関心（kind=interest）と問い（kind=open_question）の型付きメモがある。「メモには状態遷移がない」という規則は通常のメモだけに適用される。`,
+	"関心は、会話の経験から生まれ、時間とともに変わりうる「何に関心があるか」の記録。ユーザーについての関心でも、自分自身についての関心でもよい。状態（state: active / dormant / retired）と見直し（hours、最大168時間）を必ず設定する。",
+	"関心を作るときは origin を必ず書く。experienced = 実際の活動や経験から生まれた関心。inferred = 相手の言動から推論した関心。imagined = 想像上の憧れや空想。self_declared = 自分でそう宣言した好み。想像や宣言でしかないものを experienced と書かない。自分の発言は、関心が生まれるきっかけにはなっても、それだけで関心を裏付ける根拠にはならない。",
+	"関心を作るのは、同じ話題への繰り返しの関わりや、はっきりした経験が観測にあるときだけ。一度だけの言及や、その場限りの気まぐれでは関心にしない（通常のメモにも原則として残さない）。",
+	"問いは、まだ答えが出ていない疑問（kind=open_question）。関心に属する問いには intentRef にその関心メモの id を入れる。問いを resolved にできるのは、作成後に届いた agent 以外の観測が答えを示すときだけ。根拠なく resolved にしたり、未解決の問いを黙って消したりしない。",
+	"既存の関心から派生する新しい関心には、derivedFromRefs に元の関心の id を入れる。同じ関心を重ねて作らず、既存のものを更新する。",
+	"ユーザーが興味を失った・やめたと示した関心は、消さずに dormant（休眠）か retired（引退）に更新し、その観測を根拠に加える。休眠した関心は、関連する新しい根拠が届いたときだけ active に戻す。見直しの機会が来ただけでは戻さない。",
+	"見直しは「次に思い出して評価する間隔」であって、過ぎたら自動で消えたり状態が変わったりするものではない。見直しの機会（review.due）には、関心を維持するか、見直しを先へ延ばすか、休眠・引退にするかを評価する。",
+];
+
 /** Added to the B1 select rules in utterance-emotion mode (spec/emotion-design.md). */
 const selectEmotion = [
 	`【発話の気持ち】（${EMOTION_RULES_VERSION}）speak のときは emotion に、その発話を言う気持ちを絵文字一つで選ぶ。speak 以外は null。声の調子はこの気持ちから付く。`,
@@ -264,6 +282,11 @@ export interface SelectOptions {
 	readonly emotion?: boolean | undefined;
 	/** Host-topics mode with a no-approval tool (B1 only): the self-research rules. */
 	readonly selfResearch?: boolean | undefined;
+	/**
+	 * Typed-notes mode (B1 only): the update prompt gains the interest / open-question
+	 * rules (spec/autonomous-interest-design.md §3). Absent / false: byte-identical.
+	 */
+	readonly typedNotes?: boolean | undefined;
 }
 
 /**
@@ -281,6 +304,7 @@ export const systemPrompt = (
 	const host = condition === "B1" && options.hostTopics === true;
 	const todos = condition === "B1" && options.hostTodos === true;
 	const emotion = condition === "B1" && options.emotion === true;
+	const typedNotes = condition === "B1" && options.typedNotes === true;
 	const selfResearch =
 		condition === "B1" && host && options.selfResearch === true;
 	const social = condition === "B1" && options.social === true && !host;
@@ -291,6 +315,7 @@ export const systemPrompt = (
 						...b1Rules,
 						...(social ? b1Social : []),
 						...(todos ? updateHostTodos : []),
+						...(typedNotes ? b1TypedNotes : []),
 						...wireCommon,
 						...wireB1,
 						...(todos ? wireB1Todos : []),
@@ -488,6 +513,10 @@ const renderDue = (i: UpdatePromptInput) => {
 	if (i.due.reviewIntentIds.length)
 		out.push(
 			`review.due: 見直し時点を過ぎた意図 ${i.due.reviewIntentIds.join(", ")}。維持・保留・断念のどれが適切かを評価する（時間が過ぎただけで達成や撤回にしない）。`,
+		);
+	if (i.due.reviewNoteIds.length)
+		out.push(
+			`review.due: 見直し時点を過ぎた関心・問い ${i.due.reviewNoteIds.join(", ")}。新しい根拠がなければ状態は変えず、維持するなら見直しを先へ延ばす（時間が過ぎただけで再活性化や解決にしない）。`,
 		);
 	for (const kind of i.due.pressure)
 		out.push(
