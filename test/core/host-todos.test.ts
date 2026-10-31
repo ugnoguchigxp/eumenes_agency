@@ -41,6 +41,7 @@ const run = async (o: {
 }) => {
 	const llm = fakeLlm();
 	const rt = createAgencyRuntime({
+		systemContext: "experimental",
 		condition: "B1",
 		llm,
 		tools: [],
@@ -234,6 +235,7 @@ describe("hostTodos: reconciling a normal reply with a finished item", () => {
 	}) => {
 		const llm = fakeLlm();
 		const rt = createAgencyRuntime({
+			systemContext: "experimental",
 			condition: "B1",
 			llm,
 			tools: [],
@@ -330,6 +332,7 @@ describe("hostTodos: reconciling a normal reply with a finished item", () => {
 	test("outside hostTodos mode the schema, prompt and reports are as before", async () => {
 		const llm = fakeLlm();
 		const rt = createAgencyRuntime({
+			systemContext: "experimental",
 			condition: "B1",
 			llm,
 			tools: [],

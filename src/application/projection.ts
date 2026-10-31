@@ -31,7 +31,7 @@ const allItems = (
 			text: clip(b.content),
 			confidence: b.confidence,
 			status: b.status,
-			evidence: b.evidence,
+			evidence: [...b.evidence],
 			...(obs
 				? { provenance: provenance(b.evidence, (id) => obs.get(id)) }
 				: {}),

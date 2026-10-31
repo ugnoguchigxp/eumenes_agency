@@ -1,3 +1,19 @@
+/** Missing or invalid host instructions. Raised before the affected model call or budget charge. */
+export class SystemContextConfigurationError extends Error {
+	constructor(readonly purpose: string) {
+		super(`system_context_configuration:${purpose}`);
+		this.name = "SystemContextConfigurationError";
+	}
+}
+
+/** Invalid reply output is rejected before its tool calls execute. Does not contain model text. */
+export class ReplyOutputError extends Error {
+	constructor(readonly reasonCode: "schema" | "duplicate_tool_call") {
+		super(`reply_output:${reasonCode}`);
+		this.name = "ReplyOutputError";
+	}
+}
+
 /** The model returned nothing usable (refusal, cut off, malformed, schema mismatch). */
 export class LlmOutputError extends Error {
 	constructor(

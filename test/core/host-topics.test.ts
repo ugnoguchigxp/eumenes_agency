@@ -41,6 +41,7 @@ const run = async (o: {
 }) => {
 	const llm = fakeLlm();
 	const rt = createAgencyRuntime({
+		systemContext: "experimental",
 		condition: "B1",
 		llm,
 		tools: [],
@@ -268,6 +269,7 @@ describe("topic and interest use (social-rules-3)", () => {
 	) => {
 		const llm = fakeLlm();
 		const rt = createAgencyRuntime({
+			systemContext: "experimental",
 			condition: "B1",
 			llm,
 			tools: [],

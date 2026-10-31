@@ -267,6 +267,7 @@ export interface SelectOptions {
 }
 
 /**
+ * Experimental prompts only: explicitly selected with systemContext="experimental".
  * One system prompt per (purpose x condition). B0 never calls the model.
  * `options` (utteranceStyle, interests, social); absent (or blank / false), the prompt is
  * byte-identical to the one without them.

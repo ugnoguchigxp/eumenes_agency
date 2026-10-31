@@ -1,4 +1,4 @@
-/** Host-neutral style texts for speech output (text read aloud by TTS). */
+/** Experimental speech instructions. Explicit opt-in only; never added to host SystemContext. */
 
 /** Spoken-style rules for a main reply that will be read aloud. */
 export const spokenReplyStyle =

@@ -5,6 +5,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import {
 	type BudgetConfig,
+	budgetConfigSchema,
 	defaultBudget,
 	HOST_RULES_VERSION,
 } from "../src/contracts/index.ts";
@@ -27,15 +28,6 @@ const priceSchema = z.strictObject({
 	output: z.number().nonnegative(),
 });
 
-const budgetSchema = z.strictObject({
-	maxCallsPerWindow: z.int().positive(),
-	windowMs: z.int().positive(),
-	minIntervalMs: z.int().min(0),
-	batchSize: z.int().positive(),
-	updateMaxOutputTokens: z.int().positive(),
-	selectMaxOutputTokens: z.int().positive(),
-});
-
 export const experimentSettingsSchema = z.strictObject({
 	llm: z.strictObject({
 		background: roleSchema,
@@ -47,7 +39,7 @@ export const experimentSettingsSchema = z.strictObject({
 		limitUsd: z.number().positive(),
 		pricing: z.record(z.string(), priceSchema),
 	}),
-	budget: budgetSchema.partial().optional(),
+	budget: budgetConfigSchema.partial().optional(),
 });
 export type ExperimentSettings = z.infer<typeof experimentSettingsSchema>;
 

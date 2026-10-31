@@ -37,6 +37,14 @@ export const requiredExports = [
 	"runRespond",
 	"respondSystem",
 	"respondSystemParts",
+	"respondReferenceData",
+	"agencyOutputContract",
+	"replyOutputContract",
+	"replyResultSchema",
+	"ReplyOutputError",
+	"budgetConfigSchema",
+	"limitsSchema",
+	"SystemContextConfigurationError",
 	"createMockToolPort",
 	"ttsUtteranceStyle",
 	"INSTRUCTION_VERSION",
@@ -185,6 +193,49 @@ export async function checkTarball(tgz: string): Promise<string[]> {
 			for (const name of requiredExports)
 				if (!names.has(name)) errors.push(`missing export: ${name}`);
 		}
+		// Compile a host against only the emitted declarations, including the breaking changes.
+		const consumer = join(pkgDir, "consumer.ts");
+		writeFileSync(
+			consumer,
+			`
+import {
+  createAgencyRuntime, runRespond, agencyOutputContract, respondSystem,
+  type RuntimeDeps, type RespondInput, type BackgroundSystemContext,
+} from "./dist/index.js";
+declare const deps: Omit<RuntimeDeps, "systemContext">;
+declare const reply: Omit<RespondInput, "messages">;
+const systemContext: BackgroundSystemContext = {
+  update: ({ data, outputContract }) => data.condition + outputContract.description,
+  select: ({ data }) => "host: " + data.opportunity.trigger,
+};
+createAgencyRuntime({ ...deps, systemContext });
+createAgencyRuntime({ ...deps, systemContext: "experimental" });
+agencyOutputContract("update", { condition: "B1", hostTodos: true }).schema;
+runRespond({ ...reply, messages: [{ role: "system", content: "host instructions" }] });
+// @ts-expect-error explicit SystemContext selection is required
+createAgencyRuntime(deps);
+// @ts-expect-error reference data no longer belongs in the system helper
+respondSystem({ opening: ["recorded utterance"] });
+`,
+		);
+		const types = await run(
+			[
+				join(root, "node_modules", ".bin", "tsc"),
+				"--noEmit",
+				"--strict",
+				"--skipLibCheck",
+				"--target",
+				"ES2022",
+				"--module",
+				"ESNext",
+				"--moduleResolution",
+				"Bundler",
+				consumer,
+			],
+			{ cwd: pkgDir },
+		);
+		if (types.code !== 0)
+			errors.push(`consumer types failed: ${types.out || types.err}`);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

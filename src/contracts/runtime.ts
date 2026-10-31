@@ -12,6 +12,8 @@ import type {
 import type { LlmPort, LlmPurpose } from "./ports.ts";
 import type { EmotionName } from "./emotion.ts";
 import type { ParticipationAction } from "./proposals.ts";
+import type { BackgroundSystemContext } from "./system-context.ts";
+import { z } from "zod";
 
 export interface BudgetConfig {
 	/** Background calls (update/select/retries) per rolling window. */
@@ -24,6 +26,16 @@ export interface BudgetConfig {
 	readonly selectMaxOutputTokens: number;
 }
 
+/** Shared by host runtime and standalone settings; invalid limits never become an unlimited budget. */
+export const budgetConfigSchema = z.strictObject({
+	maxCallsPerWindow: z.int().positive(),
+	windowMs: z.int().positive(),
+	minIntervalMs: z.int().nonnegative(),
+	batchSize: z.int().positive(),
+	updateMaxOutputTokens: z.int().positive(),
+	selectMaxOutputTokens: z.int().positive(),
+}) satisfies z.ZodType<BudgetConfig>;
+
 export const defaultBudget: BudgetConfig = {
 	maxCallsPerWindow: 12,
 	windowMs: 600_000,
@@ -35,6 +47,8 @@ export const defaultBudget: BudgetConfig = {
 
 export interface RuntimeDeps {
 	readonly condition: Condition;
+	/** Full host-owned instructions, or explicit opt-in to Agency's experimental prompts. No fallback. */
+	readonly systemContext: BackgroundSystemContext | "experimental";
 	/** Background model (update + select). Unused for B0. */
 	readonly llm: LlmPort;
 	readonly tools: readonly ToolCapability[];
@@ -47,7 +61,7 @@ export interface RuntimeDeps {
 	readonly selectWhenEmpty?: boolean;
 	/**
 	 * Host delivery style for utterances (e.g. spoken via TTS), appended to the select
-	 * instructions. Absent in eval, so the evaluated prompts are unchanged.
+	 * experimental instructions only. Ignored by host-owned SystemContext.
 	 */
 	readonly utteranceStyle?: string;
 	/**
@@ -57,21 +71,21 @@ export interface RuntimeDeps {
 	 */
 	readonly standingInterests?: readonly StandingInterest[];
 	/**
-	 * Social conversation mode (B1 only, host-configured; absent in eval): update also keeps
+	 * Experimental social conversation mode (B1 only): the experimental update also keeps
 	 * "topic seed" notes (what the user likes or mentioned that is worth continuing), and
 	 * select treats a quiet lull in casual talk as a fitting time to start a short remark
 	 * from a topic seed or a standing interest.
 	 */
 	readonly socialTopics?: boolean;
 	/**
-	 * Social conversation with topics kept by the host (B1 only; absent in eval): select gets
+	 * Topics kept by the host (B1 only): data presentation and evidence validation. Experimental select gets
 	 * the same lull-talk rule as socialTopics, using Opportunity.topics and standing
 	 * interests, but update does NOT create topic-seed notes (the host's memory accumulates
 	 * them). Takes precedence over socialTopics when both are set.
 	 */
 	readonly hostTopics?: boolean;
 	/**
-	 * Work reports (B1 only; absent in eval except condition B1h): select sees Opportunity.todos,
+	 * Work report data and reconciliation contract (B1 only). Experimental select sees Opportunity.todos,
 	 * reports a done item briefly with one of its nextActions, and never raises open items.
 	 */
 	readonly hostTodos?: boolean;
@@ -98,7 +112,7 @@ export interface StandingInterest {
 export const RECENT_OBSERVATION_WINDOW = 30;
 
 /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
-export const HOST_RULES_VERSION = "host-rules-5";
+export const HOST_RULES_VERSION = "host-rules-6";
 
 /** One background model call (or a host decision not to make one). */
 export interface CallOutcome {
@@ -214,7 +228,7 @@ export interface AgencyRuntime {
 	): Promise<{ decision: Decision; calls: CallOutcome[] }>;
 	/** Records the host's receipt and appends the resulting observation to the ledger. */
 	recordResult(receipt: ActionReceipt): Observation;
-	/** New input / speech start / settings change: interrupts reserved tickets. */
+	/** New input / speech start / settings change: fences in-flight and queued inference, and interrupts reserved tickets. */
 	invalidate(reason: string, now: number): void;
 	/**
 	 * hostTodos mode: drains the work reports the update settled since the last call. Each is a
@@ -223,6 +237,7 @@ export interface AgencyRuntime {
 	 * delivered in full. Always empty outside hostTodos mode.
 	 */
 	takeReportedTodos(): { todoId: string; observationId: string }[];
+	/** OFF fences old inference/tickets and hides projection; retained state returns on ON. */
 	setEnabled(enabled: boolean): void;
 	projection(maxItems: number): AgencyProjection;
 	snapshot(): {

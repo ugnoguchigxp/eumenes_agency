@@ -10,7 +10,10 @@ import {
 	updatePrompt,
 } from "../../src/application/prompts.ts";
 import { provenance, quote } from "../../src/application/quote.ts";
-import { respondSystem } from "../../src/application/respond-system.ts";
+import {
+	respondSystem,
+	respondReferenceData,
+} from "../../src/application/respond-system.ts";
 import { createAgencyRuntime } from "../../src/application/runtime.ts";
 import type { AgencyState, Observation } from "../../src/contracts/model.ts";
 import { defaultBudget } from "../../src/contracts/runtime.ts";
@@ -426,6 +429,7 @@ describe("runtime correction integration", () => {
 	test("a deferred evidence rejection rolls back the whole proposal and leaves the correction pending", async () => {
 		const llm = fakeLlm();
 		const rt = createAgencyRuntime({
+			systemContext: "experimental",
 			condition: "F",
 			llm,
 			tools,
@@ -466,6 +470,7 @@ describe("runtime correction integration", () => {
 		async (correctionFirst) => {
 			const llm = fakeLlm();
 			const rt = createAgencyRuntime({
+				systemContext: "experimental",
 				condition: "F",
 				llm,
 				tools,
@@ -520,7 +525,7 @@ describe("runtime correction integration", () => {
 			expect(rt.snapshot().cursor).toBe(6);
 			expect(await rt.runBackground(6000, signal)).toEqual([]);
 			expect(llm.count("update")).toBe(5);
-			const reference = respondSystem({ projection: rt.projection(10) });
+			const reference = respondReferenceData({ projection: rt.projection(10) });
 			expect(reference).toContain(quote(renewed.content));
 			expect(reference).toContain("根拠: o2, o5（user×1, self×1）");
 			expect(reference).not.toContain(quote("職業は医師"));
@@ -701,7 +706,7 @@ describe("M4/L3: every untrusted text renders as one escaped line (property chec
 
 	test("projection metadata cannot close the reference block or forge a section", () => {
 		const render = (provenance: string) =>
-			respondSystem({
+			respondReferenceData({
 				projection: {
 					stateRevision: 1,
 					hidden: 0,
@@ -796,25 +801,29 @@ describe("M4/L3: every untrusted text renders as one escaped line (property chec
 	});
 
 	test("respondSystem: interests, projection and opening never add headers, separators or delimiters", () => {
-		const clean = respondSystem({
-			interests: [{ id: "i1", text: "猫" }],
-			projection: {
-				stateRevision: 1,
-				hidden: 0,
-				items: [{ id: "b1", kind: "belief", text: "猫" }],
-			},
-			opening: ["猫"],
-		});
-		for (const s of nasty) {
-			const t = respondSystem({
-				interests: [{ id: "i1", text: s }],
+		const clean =
+			respondSystem({ interests: [{ id: "i1", text: "猫" }] }) +
+			"\n\n" +
+			respondReferenceData({
 				projection: {
 					stateRevision: 1,
 					hidden: 0,
-					items: [{ id: "b1", kind: "belief", text: s }],
+					items: [{ id: "b1", kind: "belief", text: "猫" }],
 				},
-				opening: [s],
+				opening: ["猫"],
 			});
+		for (const s of nasty) {
+			const t =
+				respondSystem({ interests: [{ id: "i1", text: s }] }) +
+				"\n\n" +
+				respondReferenceData({
+					projection: {
+						stateRevision: 1,
+						hidden: 0,
+						items: [{ id: "b1", kind: "belief", text: s }],
+					},
+					opening: [s],
+				});
 			expect(headers(t)).toEqual(headers(clean));
 			expect(t).not.toMatch(lineSeps);
 			expect(t.match(/<\/参照資料>/g)?.length).toBe(1);
@@ -862,9 +871,10 @@ describe("M5: evidence provenance breakdown", () => {
 		const { s, id } = correctedWith("disputed");
 		const p = buildProjection("F", { ...s, focus: [id] }, 10, all);
 		expect(p.items[0]).toMatchObject({ status: "disputed" });
-		const reply = respondSystem({ projection: p });
+		const reply = respondReferenceData({ projection: p });
 		expect(reply).toContain("状態=disputed");
-		expect(reply).toContain("disputed は反証や訂正で疑義がある記録");
+		expect(reply).not.toContain("扱わず");
+		expect(respondSystem()).toContain("disputed は反証や訂正で疑義がある記録");
 	});
 
 	test("provenance() counts sources", () => {
@@ -885,7 +895,7 @@ describe("M5: evidence provenance breakdown", () => {
 		const id = s.beliefs[0]!.id;
 		const p = buildProjection("F", { ...s, focus: [id] }, 10, all);
 		expect(p.items[0]?.provenance).toBe("user×1, self×1");
-		expect(respondSystem({ projection: p })).toContain(
+		expect(respondReferenceData({ projection: p })).toContain(
 			"根拠: o1, o2（user×1, self×1）",
 		);
 	});

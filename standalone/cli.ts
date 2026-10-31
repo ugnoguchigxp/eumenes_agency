@@ -60,6 +60,7 @@ import {
 	createMockToolPort,
 	reportedTodoIds,
 	respondSystem,
+	respondReferenceData,
 	runRespond,
 	ttsUtteranceStyle,
 } from "../src/index.ts";
@@ -133,6 +134,7 @@ async function main() {
 	// Social mode only exists for B1 (B1a included); B2/F ignore it.
 	const social = args.social && condition === "B1";
 	const runtime = createAgencyRuntime({
+		systemContext: "experimental",
 		condition,
 		llm,
 		tools: [],
@@ -454,11 +456,16 @@ async function main() {
 				const messages: ReplyMessage[] = [
 					{
 						role: "system",
+						content: respondSystem({
+							interests: standingInterests,
+							spoken: args.tts,
+							emotion: args.emotion,
+						}),
+					},
+					{
+						role: "user",
 						content:
-							respondSystem({
-								interests: standingInterests,
-								spoken: args.tts,
-								emotion: args.emotion,
+							respondReferenceData({
 								projection: runtime.projection(7),
 								opening: conversation.opening(),
 							}) + todosContext(toolPort.todos()),

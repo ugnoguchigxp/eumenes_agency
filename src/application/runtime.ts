@@ -5,22 +5,16 @@ import type {
 	HostTopic,
 	Observation,
 } from "../contracts/model.ts";
-import { defaultLimits, emptyState } from "../contracts/model.ts";
-import type { z } from "zod";
+import { defaultLimits, emptyState, limitsSchema } from "../contracts/model.ts";
 import {
 	emotionEmoji,
 	emotionName,
 	type EmotionEmoji,
 } from "../contracts/emotion.ts";
-import {
-	fromWire,
-	participationEmotionSchema,
-	participationSchema,
-	wireUpdateSchema,
-	type ParticipationProposal,
-} from "../contracts/proposals.ts";
+import { fromWire } from "../contracts/proposals.ts";
 import {
 	defaultBudget,
+	budgetConfigSchema,
 	RECENT_OBSERVATION_WINDOW,
 	type ActionTicket,
 	type StandingInterest,
@@ -51,6 +45,7 @@ import {
 	validateParticipation,
 } from "../domains/agency/participation.ts";
 import { applyReceipt } from "../domains/agency/results.ts";
+import { allocId } from "../domains/agency/ids.ts";
 import { settleUpdate } from "../domains/agency/settle.ts";
 import { createLedger } from "../domains/experience/ledger.ts";
 import { createBudget } from "./budget.ts";
@@ -61,6 +56,12 @@ import {
 	skippedOutcome,
 } from "./model-call.ts";
 import { buildProjection } from "./projection.ts";
+import { agencyOutputContract } from "./output-contract.ts";
+import { updateModelData, selectModelData } from "./model-data.ts";
+import {
+	captureSystemContext,
+	resolveSystemContext,
+} from "./system-context.ts";
 import {
 	selectEvidenceIds,
 	selectPrompt,
@@ -70,6 +71,8 @@ import {
 	todoRef,
 	systemPrompt,
 	updatePrompt,
+	type UpdatePromptInput,
+	type SelectPromptInput,
 } from "./prompts.ts";
 
 /** The cap on extra pending observations shown on top of the recent window. */
@@ -81,22 +84,24 @@ const NO_DUE: Due = { reviewIntentIds: [], pressure: [] };
 
 export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const { condition, llm, tools } = deps;
-	// Social conversation mode applies to B1 only; otherwise every prompt stays as before.
+	const systemContext = captureSystemContext(deps.systemContext);
+	// Experimental social rules apply to B1 only; host-owned instructions are never extended.
 	// Host topics (topics kept by the host's own memory) take precedence over note-based seeds.
 	const hostTopics = condition === "B1" && deps.hostTopics === true;
 	const hostTodos = condition === "B1" && deps.hostTodos === true;
 	// Utterance emotion (B1 only): select also picks the feeling of a speak.
 	const emotionMode = condition === "B1" && deps.utteranceEmotion === true;
-	const selectSchema: z.ZodType<
-		ParticipationProposal & { readonly emotion?: EmotionEmoji | null }
-	> = emotionMode ? participationEmotionSchema : participationSchema;
 	const social =
 		condition === "B1" && deps.socialTopics === true && !hostTopics;
-	const wireSchema = wireUpdateSchema(condition === "B0" ? "B2" : condition, {
+	const contractOptions = {
+		condition: condition === "B0" ? ("B2" as const) : condition,
 		hostTodos,
-	});
-	const limits = deps.limits ?? defaultLimits;
-	const cfg = deps.budget ?? defaultBudget;
+		utteranceEmotion: emotionMode,
+	};
+	const updateContract = agencyOutputContract("update", contractOptions);
+	const selectContract = agencyOutputContract("select", contractOptions);
+	const limits = limitsSchema.parse(deps.limits ?? defaultLimits);
+	const cfg = budgetConfigSchema.parse(deps.budget ?? defaultBudget);
 	const ledger = createLedger();
 	const budget = createBudget(cfg);
 	const flags = createDueFlags();
@@ -233,41 +238,67 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		due: Due,
 	): Promise<CallOutcome[]> => {
 		if (condition === "B0") throw new Error("B0 never calls the model");
+		const startEpoch = epoch;
 		const presented = present(batch, []);
 		const keys = issuedKeys(state, due);
 		const shownTodos = hostTodos ? updateTodos() : undefined;
+		const input: UpdatePromptInput = {
+			condition,
+			now: at,
+			observations: presented,
+			freshIds: new Set(batch.map((o) => o.id)),
+			state,
+			due,
+			delivered: delivered(),
+			tools,
+			limits,
+			minutesSinceUserInput: minutesSinceUserInput(at),
+			...(shownTodos ? { todos: shownTodos } : {}),
+		};
+		const data = updateModelData(input);
+		const prompt =
+			systemContext === "experimental"
+				? updatePrompt(input)
+				: JSON.stringify(data);
+		const system =
+			systemContext === "experimental"
+				? systemPrompt("update", condition, {
+						...(social ? { social } : {}),
+						...(hostTodos ? { hostTodos } : {}),
+					})
+				: resolveSystemContext(
+						systemContext.update,
+						{
+							data,
+							outputContract: agencyOutputContract("update", contractOptions),
+						},
+						"update",
+					);
 		const r = await callModel(
 			llm,
 			budget,
 			{
 				purpose: "update",
 				at,
-				system: systemPrompt("update", condition, {
-					...(social ? { social } : {}),
-					...(hostTodos ? { hostTodos } : {}),
-				}),
-				prompt: updatePrompt({
-					condition,
-					now: at,
-					observations: presented,
-					freshIds: new Set(batch.map((o) => o.id)),
-					state,
-					due,
-					delivered: delivered(),
-					tools,
-					limits,
-					minutesSinceUserInput: minutesSinceUserInput(at),
-					...(shownTodos ? { todos: shownTodos } : {}),
-				}),
-				schema: wireSchema,
+				system,
+				prompt,
+				schema: updateContract.schema,
 				maxOutputTokens: cfg.updateMaxOutputTokens,
 			},
 			signal,
 		);
 		if (!r.ok) {
-			if (countsTowardQuarantine(r.outcome.code)) noteFailure();
+			if (epoch === startEpoch && countsTowardQuarantine(r.outcome.code))
+				noteFailure();
 			return [...r.prior, r.outcome];
 		}
+		if (epoch !== startEpoch || !active())
+			return [
+				...r.prior,
+				makeOutcome("update", at, "rejected:stale_epoch", r.usage, [
+					"stale_epoch",
+				]),
+			];
 		const typed = fromWire(r.value, condition);
 		if (!typed.ok) {
 			noteFailure();
@@ -425,70 +456,87 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		const presented = present([], ledger.pending());
 		// Evidence ids the select prompt shows on state items are citable too.
 		const shownEvidence = selectEvidenceIds(condition, state);
+		const input: SelectPromptInput = {
+			condition,
+			now: opp.at,
+			opportunity: opp,
+			observations: presented,
+			freshIds: new Set(ledger.pending().map((o) => o.id)),
+			state,
+			candidates: pool,
+			delivered: delivered(),
+			...(social || hostTopics || hostTodos
+				? {
+						deliveredMinutesAgo: deliveredObs().map((o) =>
+							minutesAgo(opp.at, o.occurredAt),
+						),
+					}
+				: {}),
+			...(emotionMode
+				? {
+						deliveredEmotions: deliveredObs().map(
+							(o) => feelingByObs.get(o.id) ?? null,
+						),
+					}
+				: {}),
+			...(interests.length > 0 ? { interests } : {}),
+			...(topics.length > 0 ? { topics } : {}),
+			...(ambient.length > 0 ? { ambient } : {}),
+			...(todos.length > 0 ? { todos } : {}),
+			...((social || hostTopics || hostTodos) && lastUsedAt.size > 0
+				? {
+						lastUsedMinutesAgo: new Map(
+							[...lastUsedAt].map(([ref, at]) => [
+								ref,
+								exactMinutesAgo(opp.at, at),
+							]),
+						),
+					}
+				: {}),
+			tools,
+			limits,
+			minutesSinceUserInput: minutesSinceUserInput(opp.at),
+			...(social ? { social } : {}),
+			...(hostTopics ? { hostTopics } : {}),
+		};
+		const data = selectModelData(input);
+		const prompt =
+			systemContext === "experimental"
+				? selectPrompt(input)
+				: JSON.stringify(data);
+		const system =
+			systemContext === "experimental"
+				? systemPrompt("select", condition, {
+						utteranceStyle: deps.utteranceStyle,
+						interests: interests.length > 0,
+						...(social ? { social } : {}),
+						...(hostTopics ? { hostTopics } : {}),
+						...(hostTodos ? { hostTodos } : {}),
+						...(hostTodos && todos.some((x) => x.status === "waiting")
+							? { todoQuestions: true }
+							: {}),
+						...(emotionMode ? { emotion: emotionMode } : {}),
+						...(hostTopics && tools.some((t) => !t.requiresApproval)
+							? { selfResearch: true }
+							: {}),
+					})
+				: resolveSystemContext(
+						systemContext.select,
+						{
+							data,
+							outputContract: agencyOutputContract("select", contractOptions),
+						},
+						"select",
+					);
 		const r = await callModel(
 			llm,
 			budget,
 			{
 				purpose: "select",
 				at: opp.at,
-				system: systemPrompt("select", condition, {
-					utteranceStyle: deps.utteranceStyle,
-					interests: interests.length > 0,
-					...(social ? { social } : {}),
-					...(hostTopics ? { hostTopics } : {}),
-					...(hostTodos ? { hostTodos } : {}),
-					...(hostTodos && todos.some((x) => x.status === "waiting")
-						? { todoQuestions: true }
-						: {}),
-					...(emotionMode ? { emotion: emotionMode } : {}),
-					...(hostTopics && tools.some((t) => !t.requiresApproval)
-						? { selfResearch: true }
-						: {}),
-				}),
-				prompt: selectPrompt({
-					condition,
-					now: opp.at,
-					opportunity: opp,
-					observations: presented,
-					freshIds: new Set(ledger.pending().map((o) => o.id)),
-					state,
-					candidates: pool,
-					delivered: delivered(),
-					...(social || hostTopics || hostTodos
-						? {
-								deliveredMinutesAgo: deliveredObs().map((o) =>
-									minutesAgo(opp.at, o.occurredAt),
-								),
-							}
-						: {}),
-					...(emotionMode
-						? {
-								deliveredEmotions: deliveredObs().map(
-									(o) => feelingByObs.get(o.id) ?? null,
-								),
-							}
-						: {}),
-					...(interests.length > 0 ? { interests } : {}),
-					...(topics.length > 0 ? { topics } : {}),
-					...(ambient.length > 0 ? { ambient } : {}),
-					...(todos.length > 0 ? { todos } : {}),
-					...((social || hostTopics || hostTodos) && lastUsedAt.size > 0
-						? {
-								lastUsedMinutesAgo: new Map(
-									[...lastUsedAt].map(([ref, at]) => [
-										ref,
-										exactMinutesAgo(opp.at, at),
-									]),
-								),
-							}
-						: {}),
-					tools,
-					limits,
-					minutesSinceUserInput: minutesSinceUserInput(opp.at),
-					...(social ? { social } : {}),
-					...(hostTopics ? { hostTopics } : {}),
-				}),
-				schema: selectSchema,
+				system,
+				prompt,
+				schema: selectContract.schema,
 				maxOutputTokens: cfg.selectMaxOutputTokens,
 			},
 			signal,
@@ -615,10 +663,17 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			}
 			return o;
 		},
-		runBackground: (now, signal) =>
-			serial(async () => {
+		runBackground(now, signal) {
+			const requestedEpoch = epoch;
+			return serial(async () => {
 				const out: CallOutcome[] = [];
 				if (!active()) return out;
+				if (epoch !== requestedEpoch)
+					return [
+						makeOutcome("update", now, "rejected:stale_epoch", null, [
+							"stale_epoch",
+						]),
+					];
 				const upto = ledger.lastSeq();
 				for (;;) {
 					const batch = actionable(upto).slice(0, cfg.batchSize);
@@ -635,9 +690,22 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					if (!last || !isApplied(last)) break;
 				}
 				return out;
-			}),
-		decide: (opportunity, signal) =>
-			serial(() => decideInner(opportunity, signal)),
+			});
+		},
+		decide(opportunity, signal) {
+			const requestedEpoch = epoch;
+			const captured = structuredClone(opportunity);
+			return serial(() =>
+				epoch === requestedEpoch
+					? decideInner(captured, signal)
+					: Promise.resolve({
+							decision: hostDecision(captured.id, "rejected", "stale_epoch", [
+								"stale_epoch",
+							]),
+							calls: [],
+						}),
+			);
+		},
 		takeReportedTodos() {
 			const out = reportedTodos;
 			reportedTodos = [];
@@ -648,7 +716,13 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			const known = receipts.get(key);
 			if (known) return known;
 			const ticket = issued.get(receipt.ticketId);
-			const { observation } = applyReceipt(state, receipt, ticket);
+			const { observation } = applyReceipt(state, receipt, ticket, () => {
+				let id: string;
+				do {
+					id = allocId(state, "h");
+				} while (ledger.get(id));
+				return id;
+			});
 			const obs = ledger.record(observation);
 			receipts.set(key, obs);
 			if (ticket?.emotion && receipt.status === "succeeded") {
@@ -673,10 +747,21 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			issued.clear();
 		},
 		setEnabled(value) {
+			if (enabled === value) return;
 			enabled = value;
+			if (!value) {
+				epoch += 1;
+				interruptLive(state);
+				issued.clear();
+			}
 		},
 		projection: (maxItems) =>
-			buildProjection(condition, state, maxItems, ledger.all()),
+			buildProjection(
+				active() ? condition : "B0",
+				state,
+				maxItems,
+				ledger.all(),
+			),
 		snapshot: () => ({
 			state: structuredClone(state),
 			observations: ledger.all(),

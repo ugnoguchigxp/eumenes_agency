@@ -2,6 +2,7 @@
  * Ledger shapes for the P0-E experiment. Conditions:
  * B0 no autonomy, B1 free-text notes, B2 intents + candidates, F adds beliefs/desires.
  */
+import { z } from "zod";
 export const conditions = ["B0", "B1", "B2", "F"] as const;
 export type Condition = (typeof conditions)[number];
 
@@ -281,6 +282,18 @@ export interface Limits {
 	readonly outboundIntervalMs: number;
 	readonly capacityPressureRatio: number;
 }
+
+/** Execution bounds are finite validated values, independent of any model instructions. */
+export const limitsSchema = z.strictObject({
+	openIntents: z.int().nonnegative(),
+	openCandidates: z.int().nonnegative(),
+	beliefsAndDesires: z.int().nonnegative(),
+	notes: z.int().nonnegative(),
+	reviewAfterMaxHours: z.int().positive(),
+	expireAfterMaxHours: z.int().positive(),
+	outboundIntervalMs: z.int().nonnegative(),
+	capacityPressureRatio: z.number().min(0).max(1),
+}) satisfies z.ZodType<Limits>;
 
 export const defaultLimits: Limits = {
 	openIntents: 16,

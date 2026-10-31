@@ -901,6 +901,7 @@ async function runCommand(values: {
 							budget,
 						})
 					: createAgencyRuntime({
+							systemContext: "experimental",
 							condition: runtimeCondition ?? "B1",
 							llm: probed,
 							tools,

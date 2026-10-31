@@ -40,6 +40,7 @@ const make = (
 ) => {
 	const llm = fakeLlm();
 	const rt = createAgencyRuntime({
+		systemContext: "experimental",
 		condition,
 		llm,
 		tools,
@@ -866,6 +867,7 @@ describe("prompts", () => {
 		const run = async (c: Condition, utteranceStyle?: string) => {
 			const llm = fakeLlm();
 			const rt = createAgencyRuntime({
+				systemContext: "experimental",
 				condition: c,
 				llm,
 				tools,
@@ -907,6 +909,7 @@ describe("prompts", () => {
 		) => {
 			const llm = fakeLlm();
 			const rt = createAgencyRuntime({
+				systemContext: "experimental",
 				condition: c,
 				llm,
 				tools,
@@ -982,6 +985,7 @@ describe("prompts", () => {
 			// With a candidate, select runs without the section and the ref is not accepted.
 			const llm = fakeLlm();
 			const rt = createAgencyRuntime({
+				systemContext: "experimental",
 				condition: "B2",
 				llm,
 				tools,

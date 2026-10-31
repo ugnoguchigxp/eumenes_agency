@@ -36,6 +36,7 @@ export const applyReceipt = (
 	state: AgencyState,
 	receipt: ActionReceipt,
 	ticket: ActionTicket | undefined,
+	nextObservationId: () => string = () => allocId(state, "h"),
 ): { attempt: Attempt; observation: ObservationInput; changed: boolean } => {
 	const attempt = findAttempt(state, receipt.ticketId);
 	if (!attempt) throw new UnknownTicketError(receipt.ticketId);
@@ -56,7 +57,7 @@ export const applyReceipt = (
 	}
 	if (changed) state.revision += 1;
 
-	const id = allocId(state, "h");
+	const id = nextObservationId();
 	const ok = receipt.status === "succeeded";
 	const prefix = ok ? "" : `[${receipt.status}] `;
 	const base = {

@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 
 export type LlmPurpose = "update" | "select" | "respond";
 
@@ -19,7 +19,11 @@ export interface LlmResult<T> {
 	readonly latencyMs: number;
 }
 
-/** One stateless structured call. Each call is a fresh context. */
+/**
+ * One stateless structured call. Each call is a fresh context. The runtime revalidates
+ * returned values. Adapters must honor AbortSignal and account actual provider usage;
+ * abandoning a canceled promise cannot force an external provider to stop computing.
+ */
 export interface LlmPort {
 	complete<T>(
 		request: LlmRequest<T>,
@@ -31,10 +35,23 @@ export interface LlmPort {
 
 /** One tool call the model asked for, as the host runs it (arguments: a JSON string). */
 export interface ReplyToolCall {
+	/** Unique in the reply's conversation; reusing an executed call ID is invalid output. */
 	readonly id: string;
 	readonly name: string;
 	readonly arguments: string;
 }
+
+/** Validate and copy provider output before using it as tool calls or history. */
+export const replyResultSchema = z.object({
+	text: z.string(),
+	toolCalls: z.array(
+		z.object({
+			id: z.string().min(1),
+			name: z.string().min(1),
+			arguments: z.string(),
+		}),
+	),
+});
 
 /** A message of the reply conversation (OpenAI chat shape). */
 export interface ReplyMessage {

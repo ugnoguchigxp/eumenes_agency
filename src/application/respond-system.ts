@@ -9,7 +9,7 @@ import { spokenReplyStyle } from "./styles.ts";
 
 export interface RespondSystemOptions {
 	/**
-	 * Persona interests (the same `StandingInterest` the runtime takes). The reply knows them as
+	 * Experimental persona interests (the same `StandingInterest` the runtime takes). The reply knows them as
 	 * character traits and answers from them when asked; only the texts are used.
 	 */
 	readonly interests?: readonly StandingInterest[];
@@ -17,9 +17,11 @@ export interface RespondSystemOptions {
 	readonly spoken?: boolean;
 	/** The reply starts with one emoji of the 15 (see `emotions`); the host reads and removes it. */
 	readonly emotion?: boolean;
-	/** The agent's own current concerns (`AgencyRuntime.projection`), shown as reference material. */
+}
+
+/** Reference data for a non-system message; never an instruction component. */
+export interface RespondReferenceData {
 	readonly projection?: AgencyProjection;
-	/** What the agent said on its own before the user spoke (the opening utterances). */
 	readonly opening?: readonly string[];
 }
 
@@ -102,7 +104,7 @@ export interface RespondSystemParts {
 	readonly toolRules: string;
 }
 
-/** The named parts of {@link respondSystem} without its reference blocks; no part carries a heading. */
+/** Experimental instruction parts. Explicit opt-in only; runRespond never calls this helper. */
 export const respondSystemParts = (
 	options: Pick<RespondSystemOptions, "interests" | "spoken" | "emotion"> = {},
 ): RespondSystemParts => {
@@ -118,27 +120,27 @@ export const respondSystemParts = (
 	};
 };
 
-/**
- * The system text of a normal reply. Sections in order: natural-conversation base, persona,
- * spoken style (`spoken`), emotion rule (`emotion`), tool-use rules, and the reference blocks
- * (projection, opening utterances) with a caveat that they are not instructions. The tool
- * definitions come from the host (`ToolPort.tools`), not from this text.
- */
+/** Experimental reply instructions. No host data is accepted or automatically added. */
 export const respondSystem = (options: RespondSystemOptions = {}): string => {
 	const named = respondSystemParts(options);
-	const projection = options.projection
-		? projectionBlock(options.projection)
-		: "";
-	const opening = (options.opening ?? []).filter((x) => x.trim() !== "");
-	const parts = [
+	return [
 		named.base,
 		...(named.persona ? [named.persona] : []),
 		...(named.spokenReplyStyle ? [named.spokenReplyStyle] : []),
 		...(named.emotionRules ? [`【気持ちの絵文字】${named.emotionRules}`] : []),
 		`【ツールの使い方】${named.toolRules}`,
-		...(projection !== "" || opening.length > 0 ? [referenceCaveat] : []),
+		referenceCaveat,
+	].join("\n\n");
+};
+
+/** Escaped observational blocks for a user/data message. Contains no Agency decision rules. */
+export const respondReferenceData = (options: RespondReferenceData): string => {
+	const projection = options.projection
+		? projectionBlock(options.projection)
+		: "";
+	const opening = (options.opening ?? []).filter((x) => x.trim() !== "");
+	return [
 		...(projection !== "" ? [projection] : []),
 		...(opening.length > 0 ? [openingBlock(opening)] : []),
-	];
-	return parts.join("\n\n");
+	].join("\n\n");
 };

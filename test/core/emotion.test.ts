@@ -31,6 +31,7 @@ const speak = (emotion: unknown) => ({
 const setup = (o: { utteranceEmotion?: boolean; condition?: Condition }) => {
 	const llm = fakeLlm();
 	const rt = createAgencyRuntime({
+		systemContext: "experimental",
 		condition: o.condition ?? "B1",
 		llm,
 		tools: [],

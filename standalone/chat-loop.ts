@@ -186,7 +186,7 @@ export interface Turn {
 /**
  * Turns for the Messages API: roles alternate and start with user. An assistant
  * line that has no user turn before it (a proactive opener) is kept apart as
- * `opening` and handed to the model through the system prompt instead.
+ * `opening` and handed to the model as reference data instead.
  */
 export function createConversation() {
 	const turns: Turn[] = [];
@@ -214,7 +214,7 @@ export function createConversation() {
 		messages(): Turn[] {
 			return [...turns];
 		},
-		/** What the AI said on its own before the user spoke (for respondSystem). */
+		/** What the AI said on its own before the user spoke (for respondReferenceData). */
 		opening(): string[] {
 			return [...opening];
 		},

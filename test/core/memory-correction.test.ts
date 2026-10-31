@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { buildProjection } from "../../src/application/projection.ts";
 import { updatePrompt } from "../../src/application/prompts.ts";
-import { respondSystem } from "../../src/application/respond-system.ts";
+import { respondReferenceData } from "../../src/application/respond-system.ts";
 import type { AgencyState, Observation } from "../../src/contracts/model.ts";
 import { settleUpdate } from "../../src/domains/agency/settle.ts";
 import { defaultLimits, emptyState, obs, proposal, tools } from "./helpers.ts";
@@ -133,7 +133,7 @@ describe("correction of a self-grounded belief", () => {
 		const { s, id } = corrected();
 		const p = projected(s, id);
 		expect(p.items.map((i) => i.id)).not.toContain(id);
-		expect(respondSystem({ projection: p })).not.toContain(
+		expect(respondReferenceData({ projection: p })).not.toContain(
 			"ジョギングしている",
 		);
 	});

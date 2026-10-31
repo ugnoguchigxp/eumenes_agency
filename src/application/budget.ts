@@ -1,4 +1,4 @@
-import type { BudgetConfig } from "../contracts/runtime.ts";
+import { budgetConfigSchema, type BudgetConfig } from "../contracts/runtime.ts";
 
 export type BudgetVerdict = "ok" | "skipped:budget" | "skipped:interval";
 
@@ -11,7 +11,8 @@ export interface Budget {
 	record(now: number): void;
 }
 
-export const createBudget = (config: BudgetConfig): Budget => {
+export const createBudget = (input: BudgetConfig): Budget => {
+	const config = budgetConfigSchema.parse(input);
 	const calls: number[] = [];
 	const inWindow = (now: number) =>
 		calls.filter((t) => t > now - config.windowMs);

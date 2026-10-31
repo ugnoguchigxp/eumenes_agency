@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { LlmCallError, LlmOutputError } from "../contracts/errors.ts";
 import type { LlmPort, LlmPurpose } from "../contracts/ports.ts";
 import type { CallOutcome } from "../contracts/runtime.ts";
+import { untilAborted } from "./abort.ts";
 import type { Budget, BudgetVerdict } from "./budget.ts";
 
 export interface Usage {
@@ -84,14 +85,17 @@ const attempt = async <T>(
 	if (signal.aborted) return fail("aborted");
 	budget.record(spec.at);
 	try {
-		const r = await llm.complete(
-			{
-				purpose: spec.purpose,
-				system: spec.system,
-				prompt: spec.prompt,
-				schema: spec.schema,
-				maxOutputTokens: spec.maxOutputTokens,
-			},
+		const r = await untilAborted(
+			llm.complete(
+				{
+					purpose: spec.purpose,
+					system: spec.system,
+					prompt: spec.prompt,
+					schema: spec.schema,
+					maxOutputTokens: spec.maxOutputTokens,
+				},
+				signal,
+			),
 			signal,
 		);
 		const usage: Usage = {
@@ -102,8 +106,10 @@ const attempt = async <T>(
 		};
 		// A result that arrives after cancellation is never adopted.
 		if (signal.aborted) return fail("aborted", usage);
+		const parsed = spec.schema.safeParse(r.value);
+		if (!parsed.success) return fail("llm:schema", usage);
 		return {
-			call: { ok: true, value: r.value, usage, prior: [] },
+			call: { ok: true, value: parsed.data, usage, prior: [] },
 			retryable: false,
 		};
 	} catch (e) {

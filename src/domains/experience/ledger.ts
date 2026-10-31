@@ -36,7 +36,10 @@ export const createLedger = (): Ledger => {
 				if (sameContent(known, input)) return known;
 				throw new ObservationConflictError(input.id);
 			}
-			const obs: Observation = { ...input, seq: list.length + 1 };
+			const obs: Observation = Object.freeze({
+				...input,
+				seq: list.length + 1,
+			});
 			list.push(obs);
 			byId.set(obs.id, obs);
 			return obs;

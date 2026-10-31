@@ -1,4 +1,11 @@
 import { emotionEmojis, type EmotionEmoji } from "../contracts/emotion.ts";
+import {
+	SystemContextConfigurationError,
+	ReplyOutputError,
+} from "../contracts/errors.ts";
+import { replyResultSchema } from "../contracts/ports.ts";
+import { untilAborted } from "./abort.ts";
+import { requireSystemText } from "./system-context.ts";
 import type {
 	ReplyMessage,
 	ReplyPort,
@@ -10,7 +17,7 @@ import type {
 export const defaultMaxToolCalls = 4;
 
 export interface RespondInput {
-	/** The conversation so far (system first). Not modified. */
+	/** Exactly one nonempty system message first, followed by history/data. Snapshotted, not modified. */
 	readonly messages: readonly ReplyMessage[];
 	readonly chat: ReplyPort;
 	readonly tools: ToolPort;
@@ -103,39 +110,13 @@ const createHeadFilter = (
 	};
 };
 
-/** Awaits `work`, but rejects as soon as the signal aborts even when the work ignores it. */
-const untilAborted = <T>(work: Promise<T>, signal: AbortSignal): Promise<T> => {
-	if (signal.aborted) {
-		work.catch(() => undefined);
-		return Promise.reject(signal.reason ?? new Error("aborted"));
-	}
-	return new Promise<T>((resolve, reject) => {
-		const onAbort = () => {
-			work.catch(() => undefined);
-			reject(signal.reason ?? new Error("aborted"));
-		};
-		signal.addEventListener("abort", onAbort, { once: true });
-		work.then(
-			(value) => {
-				signal.removeEventListener("abort", onAbort);
-				resolve(value);
-			},
-			(error: unknown) => {
-				signal.removeEventListener("abort", onAbort);
-				reject(error);
-			},
-		);
-	});
-};
-
 const toolCallMessage = (c: ReplyToolCall) => ({
 	id: c.id,
 	type: "function" as const,
 	function: { name: c.name, arguments: c.arguments },
 });
 
-const notRun =
-	"ツール呼出しの上限に達したため、この呼出しは実行されなかった。これまでの結果で答えること。";
+const notRun = JSON.stringify({ executed: false, reason: "tool_call_limit" });
 
 /**
  * One normal reply: calls the chat, runs the tool calls it asks for through the ToolPort one
@@ -152,7 +133,16 @@ export async function runRespond(input: RespondInput): Promise<RespondResult> {
 	const max = input.maxToolCalls ?? defaultMaxToolCalls;
 	if (!Number.isInteger(max) || max < 0)
 		throw new Error("maxToolCalls must be a non-negative integer");
-	const messages: ReplyMessage[] = [...input.messages];
+	const messages: ReplyMessage[] = structuredClone([...input.messages]);
+	if (
+		messages[0]?.role !== "system" ||
+		messages.slice(1).some((m) => m.role === "system")
+	)
+		throw new SystemContextConfigurationError("respond");
+	requireSystemText(messages[0].content, "respond");
+	const callIds = new Set(
+		messages.flatMap((m) => m.tool_calls?.map((c) => c.id) ?? []),
+	);
 	const calls: { name: string; arguments: string; content: string }[] = [];
 	const spoken: string[] = [];
 	let emotion: EmotionEmoji | undefined;
@@ -171,9 +161,12 @@ export async function runRespond(input: RespondInput): Promise<RespondResult> {
 				if (emotion === undefined && isEmotion(emoji)) emotion = emoji;
 			},
 		);
-		const reply = await untilAborted(
+		const output = await untilAborted(
 			chat.complete(
-				{ messages: [...messages], tools: limited ? [] : tools.tools },
+				{
+					messages: structuredClone(messages),
+					tools: limited ? [] : tools.tools,
+				},
 				(text) => {
 					if (!signal.aborted) filter.push(text);
 				},
@@ -182,6 +175,14 @@ export async function runRespond(input: RespondInput): Promise<RespondResult> {
 			signal,
 		);
 		signal.throwIfAborted();
+		const parsed = replyResultSchema.safeParse(output);
+		if (!parsed.success) throw new ReplyOutputError("schema");
+		const reply = parsed.data;
+		for (const call of reply.toolCalls) {
+			if (callIds.has(call.id))
+				throw new ReplyOutputError("duplicate_tool_call");
+			callIds.add(call.id);
+		}
 		// A port that does not stream returns the text only.
 		if (!filter.streamed && reply.text !== "") filter.push(reply.text);
 		filter.end();
