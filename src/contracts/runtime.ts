@@ -54,7 +54,11 @@ export interface RuntimeDeps {
 	readonly tools: readonly ToolCapability[];
 	readonly limits?: Limits;
 	readonly budget?: BudgetConfig;
-	/** Host composition may share the same meters with a budgeted LlmPort adapter. */
+	/**
+	 * Host composition may share meters with a budgeted LlmPort adapter.
+	 * The call window must match budget; call/activity limits may only be stricter.
+	 * Incompatible meters are rejected at construction.
+	 */
 	readonly callBudgetMeter?: import("../application/budget.ts").Budget;
 	readonly activityBudgetMeter?: import("../application/activity-budget.ts").ActivityBudget;
 	/**
@@ -153,7 +157,7 @@ export interface StandingInterest {
 export const RECENT_OBSERVATION_WINDOW = 30;
 
 /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
-export const HOST_RULES_VERSION = "host-rules-7";
+export const HOST_RULES_VERSION = "host-rules-8";
 
 /** One background model call (or a host decision not to make one). */
 export interface CallOutcome {

@@ -25,7 +25,10 @@ export interface ActivityUse {
 
 export class ActivityBudget {
 	readonly #use = new Map<string, ActivityUse>();
-	constructor(readonly limits: ActivityLimits = defaultActivityLimits) {}
+	readonly limits: ActivityLimits;
+	constructor(limits: ActivityLimits = defaultActivityLimits) {
+		this.limits = Object.freeze({ ...limits });
+	}
 
 	start(intentId: string, now: number) {
 		if (!this.#use.has(intentId))
