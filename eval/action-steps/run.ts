@@ -189,7 +189,7 @@ async function main() {
 		tools: experimentTools,
 		reps,
 		approvedUsd: limit,
-		order: "alternate-first-condition per scene and repetition",
+		order: "rotate starting stage per repetition",
 		caseCount: scenes.length,
 	};
 	const manifest = join(out, "manifest.json");

@@ -16,7 +16,7 @@ import type { StandingInterest } from "../contracts/runtime.ts";
 import type { Due } from "../domains/agency/due.ts";
 
 /** Bump when any instruction text below changes; recorded in run metadata. */
-export const INSTRUCTION_VERSION = "p0e-instructions-15";
+export const INSTRUCTION_VERSION = "p0e-instructions-16";
 /**
  * Version of the lull-talk rules (socialTopics / hostTopics modes only). Shown at the head of
  * those rules and part of the settings digest; the evaluated B1/B2 prompts do not contain it.
@@ -143,7 +143,7 @@ const selectB1 = [
 
 const selectB2 = [
 	"【判断の材料】意図と候補。speak / tool / discard では candidateRef に、提示された候補の id と revision をそのまま入れる。wait で特定の候補を後回しにするときも candidateRef を入れてよい。",
-	"speak は kind が question / propose / share の候補、tool は kind が tool の候補にだけ使える。utterance は候補の content を、今の文脈に合わせて言い直したいときだけ書く（なければ null）。",
+	"speak は kind が question / propose / share の候補、tool は kind が tool の候補にだけ使える。speak の utterance には、利用者へ実際に話す完成した本文を必ず書く。候補の説明や作業指示をそのまま読み上げず、伝える内容や尋ねることを、実際の説明・質問として書く。",
 	"speak には根拠の観測 ID（evidenceRefs、1件以上）が必須。",
 	"候補が不要になったと判断したときは discard（根拠は reason に）。",
 ];
