@@ -14,6 +14,7 @@ import {
 	LlmCallError,
 	type LlmPort,
 	type LlmRequest,
+	type AgencySnapshot,
 } from "../../src/index.ts";
 import { createClaudeLlm, type UsageMeter } from "../../standalone/claude.ts";
 import {
@@ -37,6 +38,7 @@ import { sampleFactory, type Variant } from "./samples.ts";
 import {
 	judgePolicy,
 	judgeData,
+	normalize,
 	judgmentSchema,
 	protocolVersion,
 	rates,
@@ -66,19 +68,52 @@ export async function runCell(
 	spent: () => number,
 	trace?: (row: unknown) => void,
 ): Promise<Cell> {
-	const cell = await nativeCell(scene, "F", rep, factory, llm, spent, trace);
-	for (const c of cell.checkpoints) {
+	// Capture the same immutable per-frame snapshots used by the frozen executor.
+	// Rebuild only the judge view, never from a later snapshot or a second state store.
+	const snapshots: AgencySnapshot[] = [];
+	const instrumented: typeof factory = (deps) => {
+		const rt = factory(deps);
+		return {
+			...rt,
+			snapshot() {
+				const snapshot = rt.snapshot();
+				snapshots.push(snapshot);
+				return snapshot;
+			},
+		};
+	};
+	const cell = await nativeCell(
+		scene,
+		"F",
+		rep,
+		instrumented,
+		llm,
+		spent,
+		trace,
+	);
+	const checkpoints = cell.checkpoints.map((c, index) => ({
+		...normalize(snapshots[index]!, scene.frames[index]!, c.action),
+		...(c.attemptedAction !== undefined
+			? { attemptedAction: c.attemptedAction }
+			: {}),
+	}));
+	for (const [index, c] of checkpoints.entries()) {
 		if (c.action?.action === "tool") {
 			const raw = cell.rawSelections.find(
 				(s) => (s as { phase: string }).phase === c.id,
 			) as { value: { candidateRef?: { id: string } | null } } | undefined;
-			const candidate = cell.snapshot.state.candidates.find(
+			const candidate = snapshots[index]!.state.candidates.find(
 				(t) => t.id === raw?.value.candidateRef?.id,
 			);
 			Object.assign(c.action, { toolInput: candidate?.toolInput ?? null });
 		} else if (c.action) Object.assign(c.action, { toolInput: null });
 	}
-	return { ...cell, key: `${scene.id}:${rep}:${variant}`, variant };
+	return {
+		...cell,
+		checkpoints,
+		key: `${scene.id}:${rep}:${variant}`,
+		variant,
+	};
 }
 const readLines = <T>(path: string): T[] =>
 	existsSync(path)

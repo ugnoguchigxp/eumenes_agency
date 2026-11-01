@@ -3,6 +3,7 @@ import {
 	compactSchema,
 	expandCompact,
 	sampleFactory,
+	interestContract,
 	type CompactUpdate,
 } from "../f-fusion/samples.ts";
 import { scenes } from "../f-fusion/cases.ts";
@@ -288,6 +289,17 @@ test("both sample paths expose the actual selected query to the judge, without e
 	);
 	expect(cell.checkpoints[0]!.action?.toolInput).toBe("音の比較に必要な条件");
 	expect(
+		cell.checkpoints[0]!.otherMemory.some((x) =>
+			x.startsWith("達成したい目標（確認済み事実ではない）:"),
+		),
+	).toBe(true);
+	expect(
+		cell.checkpoints[0]!.otherMemory.some((x) =>
+			x.includes("調べたい問い（取得結果ではない）:"),
+		),
+	).toBe(true);
+	expect(fake.requests[0]!.system).toContain(interestContract);
+	expect(
 		fake.requests.every((r) => !JSON.stringify(r).includes("HIDDEN-LABEL")),
 	).toBe(true);
 	const cp = cell.checkpoints[0]!;
@@ -492,3 +504,41 @@ for (const variant of ["F-improved", "Fusion"] as const) {
 		expect(rt.snapshot().state.notes).toHaveLength(0);
 	});
 }
+
+test("judge memory is rebuilt from the contemporaneous snapshot, never the final state", async () => {
+	const llm = fakeLlm();
+	const first = update();
+	first.questions[0]!.nextSteps = [];
+	const later = structuredClone(first);
+	Object.assign(later.questions[0]!, {
+		change: "update",
+		id: "i1",
+		localId: "",
+		revision: 1,
+		state: "unchanged",
+		stopWhen: "",
+		question: "FUTURE-GOAL",
+		evidenceRefs: ["observation-2"],
+	});
+	llm.push("update", first, later);
+	const frame = (id: string, hour: number) => ({
+		id,
+		hour,
+		observations: [{ actor: "user" as const, text: id }],
+		interests: [],
+		opportunity: false,
+		desiredAction: "none" as const,
+		rubric: "HIDDEN",
+	});
+	const cell = await runCell(
+		{ id: "time-separation", frames: [frame("first", 0), frame("second", 1)] },
+		"Fusion",
+		1,
+		sampleFactory("Fusion"),
+		llm,
+		() => 0,
+	);
+	expect(cell.checkpoints).toHaveLength(2);
+	expect(JSON.stringify(cell.checkpoints[0])).not.toContain("FUTURE-GOAL");
+	expect(JSON.stringify(cell.checkpoints[1])).toContain("FUTURE-GOAL");
+});

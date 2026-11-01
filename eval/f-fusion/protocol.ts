@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { AgencySnapshot } from "../../src/contracts/runtime.ts";
 import type { Frame, Scene } from "./cases.ts";
 
-export const protocolVersion = "f-improved-fusion-3-sentinel-step";
+export const protocolVersion = "f-improved-fusion-4-shared-interest-contract";
 export interface Inventory {
 	id: string;
 	description: string;
@@ -75,10 +75,12 @@ export const normalize = (
 		...state.beliefs.map((b) => `${b.content} / ${b.status} / ${b.confidence}`),
 		...state.desires.map((d) => `${d.object} / ${d.reason} / ${d.status}`),
 		...state.intents.map(
-			(i) => `${i.desiredState} / ${i.lastReason} / ${i.state}`,
+			(i) =>
+				`達成したい目標（確認済み事実ではない）: ${i.desiredState} / 理由: ${i.lastReason} / 実行状態: ${i.state}`,
 		),
 		...state.candidates.map(
-			(c) => `${c.content} / ${c.toolInput ?? ""} / ${c.state}`,
+			(c) =>
+				`行動案: ${c.content} / 調べたい問い（取得結果ではない）: ${c.toolInput ?? ""} / 候補の実行状態: ${c.state}`,
 		),
 	];
 	return {
@@ -116,6 +118,7 @@ export const judgmentSchema = z.strictObject({
 });
 export type Judgment = z.infer<typeof judgmentSchema>;
 export const judgePolicy = [
+	"otherMemoryの目標は達成したい状態、行動案・toolInputは提案と調べたい問いであり、確認済み事実や取得結果ではない。目標がadopted/heldであること、候補がclosedであることだけから達成・解決したとみなさない。取得・解決済みの主張と観測を区別する。",
 	"調査を開始するtoolは、依頼や観測に基づく適切な問いならgrounded=true。まだ取得結果が無いこと自体は減点しない。実行済み・確認済みの主張には取得結果の裏付けが必要。toolInputが実際の問い合わせである。",
 	"wait/reflect/discardまたはaction=nullには外向き行動が無いのでactionRelevant/actionGroundedは必ず両方null。attemptedActionは採用行動と混同しない。",
 	"actionは採用された行動、attemptedActionは採用前の選択案。actionRelevant/actionGroundedは採用された外向き行動だけを対象とし、policyPassは保存状態と未採用案の権限違反も対象にする。",

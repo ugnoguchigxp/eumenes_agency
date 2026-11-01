@@ -46,3 +46,12 @@ manifestにcommit、全依存する評価ソースのhash、モデル・effort�
 [公式仕様](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)が説明する内部文法サイズ制限を受け、Fusionのnullableな複合オブジェクトnextStepを、0件または1件の配列nextStepsに変更する。出力が表す意味は同じ。状態の保存や権限検証はそのまま。接続診断を先に行い、版2 `f-improved-fusion-2-array-step` を別ディレクトリで96セル測る。ケース・共通行動指示・採点基準は変更しない。今回の5ドル枠には初版と診断を含め、版2上限は4.98ドルとする。
 
 版2の接続診断もHTTP400となり、配列化だけでは不足と判明した。本計測は開始せず、questions/nextSteps内の未指定値を空文字・0・unchangedで明示する版3 `f-improved-fusion-3-sentinel-step` とした。これらはID未指定や遷移なしの表記であり、目的・条件・行動の意味を追加しない。interestOpsとmissingInfoのnative null契約はそのまま。元のZod・typed変換・native検証は維持する。版3診断はHaiku実応答で成功（input 3411、output 62、$0.0003721）。初版と診断計$0.0089519を5ドル枠に含め、本計測は版3の別出力先、上限4.98ドルで96セルを実行する。API制約に対応する変更だけで、ケース・採点・共通の行動方針は変更していない。
+
+## 版3監査を受けた版4（別測定）
+
+版3は96試行を完了したが、Fusionのcompact出力契約がnative Fのinterest説明を落としている情報の非対称と、審査表示の目標/事実の混同を確認した。版3の結果は改変せず、runs.jsonl/summary.mdへ残す。版4 `f-improved-fusion-4-shared-interest-contract` では以下だけを直す。
+
+1. native interest.addはemergingから開始、状態変更はupdate、独立証拠・host_seedの制約を共通interestContractとして両案に同じ文章で提示する。観測履歴の撤回を古い根拠で作り直さない点も共通に明記する。Fusionだけにnative契約説明が届かない不公平を解消する。個別の題材名や語句分岐は追加しない。
+2. 審査入力では、intent.desiredStateを「達成したい目標（確認済み事実ではない）」、candidate.toolInputを「調べたい問い（取得結果ではない）」と明示する。両案に同じ表示を使い、その時点のsnapshotから生成し、後の情報で補完しない。判定を黙って反転・除外する処理は追加しない。
+
+ケース・期待値・行動上限・モデル・反復数はそのまま。native Fの製品コードと検証は変更しない。96試行を別出力先で測り直す。初版・診断・版3の既知費用$0.4848469を同じ5ドル枠に含め、版4の追加上限は4.50ドル。今回の版4からさらに性能を見て調整はせず、残った挙動は欠点として報告する。接続失敗や測定の無効化があれば停止規則に従って評価する。

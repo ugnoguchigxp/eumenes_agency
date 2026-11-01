@@ -175,12 +175,21 @@ export const compactContract = [
 	"questionsは既存Fのintent、そのnextStepsの一手はcandidateへそのまま接続され、同じ検証と実行を通る。行動提案は実行成功ではない。実行結果を待つ。closeStepsは既存candidateのid/revision/終了state/根拠。reconciliationsは既存契約通り。",
 ].join("\n");
 
+/** Shared native interest contract: the compact adapter must not discard these rules. */
+export const interestContract = [
+	"interestOpsは最大4件。interest.addはlocalId/topic/origin(user_relation/own)/reason/evidenceRefs/derivedFromを指定し、必ずemergingから始まる。addのstatusにdormant/faded等を書いて終了・休止を表すことはできない。",
+	"既存関心の変更はinterest.updateにid/expectedRevision/reason/evidenceRefsを示し、statusはemerging/active/dormant/fadedまたは変更なしnull、topicも変更なしならnull。originはaddだけ。",
+	"activeへの昇格、topicの変更、派生関心の形成には既存証拠に未使用の独立した非agent観測が必要。自己発話や同じツール結果の反復を独立証拠に数えない。host_seedは新規作成・書換え・終了不可。",
+	"表示から消えた終了済み関心も、観測履歴にある撤回を忘れて作り直さない。撤回後の新しい利用者の関与・再開意思がなければ新規作成しない。以前の関与を再引用しただけでは再開の根拠にならない。",
+].join("\n");
+
 export function sampleFactory(variant: Variant) {
 	return (deps: RuntimeDeps) => {
 		const policy = (purpose: "update" | "select", contract: string) =>
 			[
 				commonPolicy,
 				improvementPolicy,
+				interestContract,
 				purpose === "update"
 					? "今回の役割は状態更新案の作成。"
 					: "今回の役割は一つの行動または待機を選ぶこと。",
