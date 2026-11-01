@@ -28,6 +28,8 @@ Eumenes が経験から関心・欲求・意図を持ち、発言や行動の機
 
 ホストの推論アダプターと予算器を共有する場合、`callBudgetMeter`の計測窓は`budget.windowMs`と一致させ、呼出回数・間隔と`activityBudgetMeter`の各上限は設定と同じか、より厳しくする。設定より緩い共有予算器はruntime生成時に拒否する。未指定時は従来通りruntime内で予算器を作る。
 
+0.1.2ではFでも`hostTopics`・`hostTodos`・`utteranceEmotion`を明示指定できる。Fのホスト所有updateには`topics()`・`standingInterests`と既存の`todos()`をデータとして渡せる。ホストの記憶は独立した新観測の代わりにはならず、発話には引き続き有効な候補が必要。`reportedTodos`の出力拡張はB1だけである。接続追加後の全体検証は761成功・失敗0件（2 skip、1 todo）。
+
 技術は Bun、TypeScript、SQLite、Zod。検証用の LLM は Claude API の Claude Haiku 5.5（`@anthropic-ai/sdk`、key は standalone の `.env`。値はログ・結果・配布物に含めない）。Pursuit と同じ独立実験構成にし、取り込み時はビルド済み JS・型宣言を版付き tgz にする。Memory と World は公開 API に接続し、Pursuit は採用した行動を遂行する接続先として後から選べる。
 
 研究対象は、自分の経験・理解・関心と次の行動がつながるかである。発言回数が増えたことだけでは成功としない。合成音声の取得と、実際に聞き手に届いたことも分ける。

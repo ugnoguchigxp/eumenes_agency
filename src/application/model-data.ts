@@ -70,6 +70,8 @@ export const updateModelData = (i: UpdatePromptInput): UpdateModelData =>
 		limits: i.limits,
 		minutesSinceUserInput: i.minutesSinceUserInput,
 		...(i.todos ? { todos: i.todos } : {}),
+		...(i.topics ? { topics: i.topics } : {}),
+		...(i.interests ? { interests: i.interests } : {}),
 	});
 
 export const selectModelData = (i: SelectPromptInput): SelectModelData => {

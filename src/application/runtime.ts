@@ -147,10 +147,10 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const systemContext = captureSystemContext(deps.systemContext);
 	// Experimental social rules apply to B1 only; host-owned instructions are never extended.
 	// Host topics (topics kept by the host's own memory) take precedence over note-based seeds.
-	const hostTopics = condition === "B1" && deps.hostTopics === true;
-	const hostTodos = condition === "B1" && deps.hostTodos === true;
-	// Utterance emotion (B1 only): select also picks the feeling of a speak.
-	const emotionMode = condition === "B1" && deps.utteranceEmotion === true;
+	const hostData = condition === "B1" || condition === "F";
+	const hostTopics = hostData && deps.hostTopics === true;
+	const hostTodos = hostData && deps.hostTodos === true;
+	const emotionMode = hostData && deps.utteranceEmotion === true;
 	const social =
 		condition === "B1" && deps.socialTopics === true && !hostTopics;
 	// Condition I (Agency Next P2-b): F plus interest formation.
@@ -393,6 +393,12 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			limits,
 			minutesSinceUserInput: minutesSinceUserInput(at),
 			...(shownTodos ? { todos: shownTodos } : {}),
+			...(condition === "F" && hostTopics
+				? {
+						topics: deps.topics?.() ?? [],
+						interests: deps.standingInterests ?? [],
+					}
+				: {}),
 		};
 		const data = updateModelData(input);
 		const prompt =
@@ -616,10 +622,9 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		const pool: readonly Candidate[] =
 			condition === "B1" ? [] : presentableCandidates(state);
 		const items = condition === "B1" ? state.notes.length : pool.length;
-		// Standing interests are presented to B1 only: B2/F speak needs a candidate, so
-		// interest talk is unsupported there (ignored: no prompt, no gate, no known refs).
+		// F still requires a candidate; host material supplies context, never a fallback action.
 		const interests: readonly StandingInterest[] =
-			condition === "B1"
+			condition === "B1" || (condition === "F" && hostTopics)
 				? (deps.standingInterests ?? []).filter(
 						(x) => x.id !== "" && x.text.trim() !== "",
 					)
@@ -628,14 +633,14 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			condition === "F"
 				? (state.interests ?? []).filter((i) => i.status !== "faded")
 				: [];
-		// Host topics (hostTopics mode, B1 only): seeds supplied by the host for this opportunity.
+		// Host topics: seeds supplied by the host for this opportunity.
 		const topics: readonly HostTopic[] = hostTopics
 			? (opp.topics ?? []).filter((x) => x.id !== "" && x.text.trim() !== "")
 			: [];
 		const ambient: readonly HostTopic[] = hostTopics
 			? (opp.ambient ?? []).filter((x) => x.id !== "" && x.text.trim() !== "")
 			: [];
-		// Work reports (hostTodos mode, B1 only): the host's open and done-unreported items.
+		// Work reports: the host's open and done-unreported items.
 		// Errands are shown only inside their reminder window (spec/errand-design.md).
 		const todos: readonly HostTodo[] = hostTodos
 			? (opp.todos ?? []).filter(

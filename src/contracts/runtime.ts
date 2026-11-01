@@ -3,6 +3,7 @@ import type {
 	BeliefStatus,
 	Condition,
 	HostTodo,
+	HostTopic,
 	Limits,
 	Observation,
 	ObservationInput,
@@ -96,14 +97,16 @@ export interface RuntimeDeps {
 	 */
 	readonly socialTopics?: boolean;
 	/**
-	 * Topics kept by the host (B1 only): data presentation and evidence validation. Experimental select gets
+	 * Topics kept by the host (B1/F): data presentation and select evidence validation. Experimental select gets
 	 * the same lull-talk rule as socialTopics, using Opportunity.topics and standing
 	 * interests, but update does NOT create topic-seed notes (the host's memory accumulates
 	 * them). Takes precedence over socialTopics when both are set.
 	 */
 	readonly hostTopics?: boolean;
+	/** F hostTopics: current topics also shown to the host-owned update SystemContext. */
+	readonly topics?: () => readonly HostTopic[];
 	/**
-	 * Work report data and reconciliation contract (B1 only). Experimental select sees Opportunity.todos,
+	 * Work report data (B1/F), with the reportedTodos reconciliation contract in B1 only. Experimental select sees Opportunity.todos,
 	 * reports a done item briefly with one of its nextActions, and never raises open items.
 	 */
 	readonly hostTodos?: boolean;
@@ -114,7 +117,7 @@ export interface RuntimeDeps {
 	 */
 	readonly todos?: () => readonly HostTodo[];
 	/**
-	 * Utterance emotion (B1 only; absent in eval except condition B1h): select also picks one
+	 * Utterance emotion (B1/F; absent in eval except condition B1h): select also picks one
 	 * emoji for the feeling a speak is said with (spec/emotion-design.md); it reaches the host
 	 * as Decision.emotion / ActionTicket.emotion. Absent: the select schema and prompt are as before.
 	 */
@@ -157,7 +160,7 @@ export interface StandingInterest {
 export const RECENT_OBSERVATION_WINDOW = 30;
 
 /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
-export const HOST_RULES_VERSION = "host-rules-8";
+export const HOST_RULES_VERSION = "host-rules-9";
 
 /** One background model call (or a host decision not to make one). */
 export interface CallOutcome {

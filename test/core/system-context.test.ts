@@ -82,7 +82,7 @@ describe("SystemContext contracts and configuration (partial)", () => {
 			const selectShape = z.toJSONSchema(select.schema) as {
 				properties: Record<string, unknown>;
 			};
-			expect("emotion" in selectShape.properties).toBe(condition === "B1");
+			expect("emotion" in selectShape.properties).toBe(condition !== "B2");
 			for (const text of [update.description, select.description]) {
 				expect(text).not.toContain("迷ったら");
 				expect(text).not.toContain("wait より speak");

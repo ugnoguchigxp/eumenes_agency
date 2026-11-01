@@ -77,7 +77,9 @@ export function agencyOutputContract(
 			description: descriptions.join("\n"),
 		};
 	}
-	const emotion = condition === "B1" && options.utteranceEmotion === true;
+	const emotion =
+		(condition === "B1" || condition === "F") &&
+		options.utteranceEmotion === true;
 	return {
 		schema: emotion ? participationEmotionSchema : participationSchema,
 		description: [

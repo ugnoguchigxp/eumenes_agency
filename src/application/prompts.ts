@@ -539,8 +539,11 @@ export interface UpdatePromptInput {
 	readonly tools: readonly ToolCapability[];
 	readonly limits: Limits;
 	readonly minutesSinceUserInput: number | null;
-	/** hostTodos mode (B1 only): the host's work items, shown with `todo:<id>` refs. */
+	/** Host work data; the reportedTodos output extension remains B1 only. */
 	readonly todos?: readonly HostTodo[];
+	/** F host context; these are not independent observation evidence. */
+	readonly topics?: readonly HostTopic[];
+	readonly interests?: readonly StandingInterest[];
 }
 
 const renderDue = (i: UpdatePromptInput) => {

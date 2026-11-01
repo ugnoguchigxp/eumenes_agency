@@ -45,6 +45,9 @@ interface ModelData {
 }
 
 export interface UpdateModelData extends ModelData {
+	/** Host-owned context, not independent observation evidence for state changes. */
+	readonly topics?: readonly HostTopic[];
+	readonly interests?: readonly StandingInterest[];
 	readonly due: {
 		readonly reviewIntentIds: readonly string[];
 		readonly pressure: readonly ("intents" | "candidates")[];
