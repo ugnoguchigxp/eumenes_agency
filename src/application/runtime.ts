@@ -178,7 +178,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				"callBudgetMeter must use the configured window and equal or stricter call limits",
 			);
 	}
-	const budget = deps.callBudgetMeter ?? createBudget(cfg);
+	const budget =
+		deps.callBudgetMeter ?? createBudget(cfg, deps.restore?.continuity?.calls);
 	const flags = createDueFlags();
 	const wakeFlags = createWakeFlags();
 	const wakeCfg = deps.wakeConfig ?? defaultWakeConfig;
@@ -197,7 +198,11 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		}
 	}
 	const activity =
-		deps.activityBudgetMeter ?? new ActivityBudget(deps.activityLimits);
+		deps.activityBudgetMeter ??
+		new ActivityBudget(
+			deps.activityLimits,
+			deps.restore?.continuity?.activities,
+		);
 	const tracksWork = deps.workReturns ?? true;
 	let wakeCount = 0;
 	const issued = new Map<string, ActionTicket>();
@@ -249,8 +254,10 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	};
 	let enabled = true;
 	// Updates that keep failing stop retrying until a new observation arrives.
-	let failures = 0;
-	let quarantined = false;
+	let failures = deps.restore?.continuity?.failures ?? 0;
+	let diagnostics: readonly string[] =
+		deps.restore?.continuity?.diagnostics ?? [];
+	let quarantined = deps.restore?.continuity?.quarantined ?? false;
 	// hostTodos: finished work items a normal reply conveyed, waiting for the host to take them.
 	let reportedTodos: { todoId: string; observationId: string }[] = [];
 	// Background calls run one at a time.
@@ -276,6 +283,18 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		pending: readonly Observation[],
 	): Observation[] => {
 		const m = new Map<number, Observation>();
+		if (deps.planOnOpportunity) {
+			const refs = [
+				...(state.interests ?? [])
+					.filter((i) => i.status !== "faded")
+					.flatMap((i) => i.evidence),
+				...state.intents.filter(isOpenIntent).flatMap((i) => i.evidence),
+			].slice(-PENDING_CAP);
+			for (const ref of refs) {
+				const o = ledger.get(ref);
+				if (o) m.set(o.seq, o);
+			}
+		}
 		for (const o of ledger.all().slice(-RECENT_OBSERVATION_WINDOW))
 			m.set(o.seq, o);
 		for (const o of pending.slice(-PENDING_CAP)) m.set(o.seq, o);
@@ -299,6 +318,14 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	// from the refs of accepted speak tickets and their successful receipts.
 	const topicTickets = new Map<string, readonly string[]>();
 	const lastUsedAt = new Map<string, number>();
+	if (deps.restore?.continuity) {
+		const c = deps.restore.continuity;
+		for (const t of c.issued) issued.set(t.id, structuredClone(t));
+		for (const [key, o] of c.receipts) receipts.set(key, structuredClone(o));
+		for (const [id, refs] of c.topics) topicTickets.set(id, [...refs]);
+		for (const [id, at] of c.lastUsed) lastUsedAt.set(id, at);
+		for (const [id, feeling] of c.feelings) feelingByObs.set(id, feeling);
+	}
 	const minutesSinceUserInput = (now: number): number | null => {
 		const last = ledger
 			.all()
@@ -370,11 +397,12 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	};
 
 	/** All outcomes of the update; the last one is the final result. */
-	const runUpdate = async (
+	const runUpdateOnce = async (
 		at: number,
 		signal: AbortSignal,
 		batch: readonly Observation[],
 		due: Due,
+		opportunity?: import("../contracts/model.ts").Opportunity,
 	): Promise<CallOutcome[]> => {
 		if (condition === "B0") throw new Error("B0 never calls the model");
 		const startEpoch = epoch;
@@ -384,6 +412,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		const input: UpdatePromptInput = {
 			condition,
 			now: at,
+			...(opportunity ? { opportunity } : {}),
+			...(diagnostics.length ? { validationCodes: diagnostics } : {}),
 			observations: presented,
 			freshIds: new Set(batch.map((o) => o.id)),
 			state,
@@ -485,6 +515,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			...(deps.repairGuard === false ? { repairGuard: false } : { faults }),
 		});
 		if (result.kind === "rejected") {
+			diagnostics = result.codes;
 			noteFailure();
 			return [
 				...r.prior,
@@ -528,6 +559,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		ledger.markProcessed(batch.map((o) => o.seq));
 		markIssued(keys, flags);
 		failures = 0;
+		quarantined = false;
+		diagnostics = [];
 		return [
 			...r.prior,
 			makeOutcome("update", at, result.kind, r.usage, [
@@ -535,6 +568,22 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				...interestRejects,
 			]),
 		];
+	};
+
+	const runUpdate = async (
+		...args: Parameters<typeof runUpdateOnce>
+	): Promise<CallOutcome[]> => {
+		const generation = epoch;
+		const first = await runUpdateOnce(...args);
+		if (
+			epoch !== generation ||
+			!deps.repairUpdates ||
+			!first.at(-1)?.code.startsWith("rejected:") ||
+			args[1].aborted ||
+			budget.check(args[0], false) !== "ok"
+		)
+			return first;
+		return [...first, ...(await runUpdateOnce(...args))];
 	};
 
 	// Deadline from the persisted intent.workSince (survives restore). Legacy snapshots without
@@ -581,7 +630,12 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		for (;;) {
 			const batch = actionable(upto).slice(0, cfg.batchSize);
 			const due = dueNow(opp.at);
-			if (batch.length === 0 && !isDue(due)) break;
+			if (
+				batch.length === 0 &&
+				!isDue(due) &&
+				!(deps.planOnOpportunity && updates === 0 && !quarantined)
+			)
+				break;
 			if (updates >= maxUpdates) break;
 			updates += 1;
 			if (budget.check(opp.at, false) !== "ok") {
@@ -589,7 +643,13 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				budgetBlocked = true;
 				break;
 			}
-			const os = await runUpdate(opp.at, signal, batch, due);
+			const os = await runUpdate(
+				opp.at,
+				signal,
+				batch,
+				due,
+				deps.planOnOpportunity ? opp : undefined,
+			);
 			calls.push(...os);
 			const last = os[os.length - 1];
 			if (last && !isApplied(last)) {
@@ -896,6 +956,10 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				candidateId: verdict.candidate?.id ?? null,
 			});
 		}
+		if (p.action === "speak" && opp.speechAllowed === false)
+			return done(
+				hostDecision(opp.id, "host_blocked", "speech frequency limit"),
+			);
 		if (p.action === "speak" || p.action === "tool") {
 			// Decide-path tickets are the agent's own initiative (user requests are answered
 			// by respond, not by tickets), so origin is "autonomous"; tts comes from host config.
@@ -1150,6 +1214,9 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 						presence: host.presence,
 						foregroundBusy: host.foregroundBusy,
 						playerBusy: false,
+						...(host.speechAllowed === undefined
+							? {}
+							: { speechAllowed: host.speechAllowed }),
 					},
 					signal,
 					1,
@@ -1228,6 +1295,18 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			observations: structuredClone(ledger.all()),
 			cursor: ledger.cursor(),
 			condition,
+			continuity: structuredClone({
+				calls: budget.snapshot?.() ?? [],
+				activities: activity.snapshot(),
+				issued: [...issued.values()],
+				receipts: [...receipts],
+				topics: [...topicTickets],
+				lastUsed: [...lastUsedAt],
+				feelings: [...feelingByObs],
+				failures,
+				quarantined,
+				diagnostics,
+			}),
 			scheduling: {
 				review: [...flags.review],
 				pressure: [...flags.pressure],

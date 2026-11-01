@@ -53,6 +53,10 @@ export interface RuntimeDeps {
 	/** Background model (update + select). Unused for B0. */
 	readonly llm: LlmPort;
 	readonly tools: readonly ToolCapability[];
+	/** Host-owned contexts may plan from an opportunity without inventing an observation. */
+	readonly planOnOpportunity?: boolean;
+	/** One budgeted correction of rejected update proposals with validation codes. */
+	readonly repairUpdates?: boolean;
 	readonly limits?: Limits;
 	readonly budget?: BudgetConfig;
 	/**
@@ -160,7 +164,7 @@ export interface StandingInterest {
 export const RECENT_OBSERVATION_WINDOW = 30;
 
 /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
-export const HOST_RULES_VERSION = "host-rules-9";
+export const HOST_RULES_VERSION = "host-rules-10";
 
 /** One background model call (or a host decision not to make one). */
 export interface CallOutcome {
@@ -256,12 +260,20 @@ export interface ActionReceipt {
 
 export interface ProjectionItem {
 	readonly id: string;
-	readonly kind: "intent" | "candidate" | "note" | "belief" | "desire";
+	readonly kind:
+		| "intent"
+		| "candidate"
+		| "note"
+		| "belief"
+		| "desire"
+		| "interest"
+		| "finding";
 	readonly text: string;
 	/** Beliefs and desires: the settled confidence. */
 	readonly confidence?: "low" | "medium" | "high";
 	/** Belief status, so disputed records remain distinguishable from active ones. */
-	readonly status?: BeliefStatus;
+	readonly status?: BeliefStatus | import("./interest.ts").InterestStatus;
+	readonly origin?: import("./interest.ts").InterestOrigin;
 	/** Observation ids the item rests on (provenance), when the item records them. */
 	readonly evidence?: readonly string[];
 	/** Source breakdown of `evidence`, e.g. `user×1, self×1` (when observations were available). */
@@ -284,6 +296,7 @@ export interface WakeHostInput {
 	readonly foregroundBusy: boolean;
 	readonly delegationRunning?: boolean;
 	readonly idleDue?: boolean;
+	readonly speechAllowed?: boolean;
 }
 export interface WakeOutcome {
 	readonly reasons: readonly import("../domains/agency/wake.ts").WakeReason[];
@@ -312,8 +325,8 @@ export interface SnapshotScheduling {
 /**
  * Full checkpoint, including observation identity, processed cursor and scheduling flags.
  * The host owns storage and must apply its forgetting/retention policy before restoring.
- * Budget windows, activity usage, undrained todo reports, ticket delivery metadata and
- * enabled/disabled state are not included; the host reconciles these on restart.
+ * continuity carries budget windows, activity usage and ticket delivery metadata.
+ * Undrained legacy TODO reports and enabled/disabled state remain host-owned.
  */
 export interface AgencySnapshot {
 	readonly state: AgencyState;
@@ -323,6 +336,24 @@ export interface AgencySnapshot {
 	readonly condition?: Condition;
 	/** Absent on older snapshots, whose scheduling flags start fresh. */
 	readonly scheduling?: SnapshotScheduling;
+	readonly continuity?: {
+		readonly calls: readonly number[];
+		readonly activities: readonly (readonly [
+			string,
+			import("../application/activity-budget.ts").ActivityUse,
+		])[];
+		readonly issued: readonly ActionTicket[];
+		readonly receipts: readonly (readonly [string, Observation])[];
+		readonly topics: readonly (readonly [string, readonly string[]])[];
+		readonly lastUsed: readonly (readonly [string, number])[];
+		readonly feelings: readonly (readonly [
+			string,
+			import("./emotion.ts").EmotionEmoji,
+		])[];
+		readonly failures: number;
+		readonly quarantined: boolean;
+		readonly diagnostics: readonly string[];
+	};
 }
 
 /** Revision-table restores may still provide state only. A full checkpoint restores its ledger too. */

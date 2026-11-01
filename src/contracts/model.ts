@@ -83,6 +83,8 @@ export interface Opportunity {
 	readonly presence: Presence;
 	readonly foregroundBusy: boolean;
 	readonly playerBusy: boolean;
+	/** Host frequency limit applies to speech, not silent work. */
+	readonly speechAllowed?: boolean;
 	/**
 	 * Host-supplied topic seeds for this opportunity (e.g. what the host's long-term memory
 	 * knows the user likes). Shown to select with refs `memory:<id>` that count as known

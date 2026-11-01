@@ -29,12 +29,33 @@ export type IdleBlock =
 	| "exhausted";
 
 /** Pure state machine: when may the next automatic idle cycle run? */
-export function createIdlePlanner(config: IdleConfig, startedAt: number) {
+export interface IdleCheckpoint {
+	readonly anchor: number;
+	readonly level: number;
+	readonly unanswered: number;
+	readonly exhausted: boolean;
+}
+export function createIdlePlanner(
+	config: IdleConfig,
+	startedAt: number,
+	restore?: IdleCheckpoint,
+) {
 	const maxRetries = config.maxRetries ?? 2;
-	let anchor = startedAt;
-	let level = 0;
-	let unanswered = 0;
-	let exhausted = false;
+	if (
+		restore &&
+		(!Number.isFinite(restore.anchor) ||
+			!Number.isInteger(restore.level) ||
+			restore.level < 0 ||
+			restore.level > maxRetries + 1 ||
+			!Number.isInteger(restore.unanswered) ||
+			restore.unanswered < 0 ||
+			typeof restore.exhausted !== "boolean")
+	)
+		throw new TypeError("invalid idle checkpoint");
+	let anchor = restore?.anchor ?? startedAt;
+	let level = restore?.level ?? 0;
+	let unanswered = restore?.unanswered ?? 0;
+	let exhausted = restore?.exhausted ?? false;
 	let paused = false;
 	let stopped = false;
 	let busy = 0;
@@ -51,6 +72,12 @@ export function createIdlePlanner(config: IdleConfig, startedAt: number) {
 	const intervalMs = () => config.idleSec * 1000 * 2 ** level;
 
 	return {
+		checkpoint: (): IdleCheckpoint => ({
+			anchor,
+			level,
+			unanswered,
+			exhausted,
+		}),
 		/** The user submitted a line: the conversation is theirs again. */
 		userTurn(now: number): void {
 			anchor = now;

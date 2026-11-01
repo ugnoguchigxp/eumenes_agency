@@ -33,3 +33,9 @@ Eumenes が経験から関心・欲求・意図を持ち、発言や行動の機
 技術は Bun、TypeScript、SQLite、Zod。検証用の LLM は Claude API の Claude Haiku 5.5（`@anthropic-ai/sdk`、key は standalone の `.env`。値はログ・結果・配布物に含めない）。Pursuit と同じ独立実験構成にし、取り込み時はビルド済み JS・型宣言を版付き tgz にする。Memory と World は公開 API に接続し、Pursuit は採用した行動を遂行する接続先として後から選べる。
 
 研究対象は、自分の経験・理解・関心と次の行動がつながるかである。発言回数が増えたことだけでは成功としない。合成音声の取得と、実際に聞き手に届いたことも分ける。
+
+## 0.1.3のホスト接続
+
+`planOnOpportunity: true`は機会をupdateの資料に渡し、新規観測がなくても既存の根拠から候補を検討する。機会自体は証拠にならない。`repairUpdates: true`は拒否コードを次のupdateへ渡し、既存予算内で修正を1回だけ試す。ホスト所有SystemContextがこれらの資料を読む指示を持つ必要がある。
+
+projectionは形成した関心（状態・起源・根拠）と取得済み結果も含む。`projectAgencyState`は保存済み状態から同じ有界な資料を作る公開関数。snapshotのcontinuityは呼出・活動予算、チケットとreceipt、既出話題、拒否診断・隔離を保存する。idle plannerのcheckpointは発話頻度と次の時点を復元する。ホストは状態とイベントcursorを単一writerで確定し、外部実行前に保存し、復元時には実行台帳と配信記録を照合する。

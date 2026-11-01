@@ -45,6 +45,8 @@ interface ModelData {
 }
 
 export interface UpdateModelData extends ModelData {
+	readonly opportunity?: Opportunity;
+	readonly validationCodes?: readonly string[];
 	/** Host-owned context, not independent observation evidence for state changes. */
 	readonly topics?: readonly HostTopic[];
 	readonly interests?: readonly StandingInterest[];

@@ -61,6 +61,10 @@ export const updateModelData = (i: UpdatePromptInput): UpdateModelData =>
 	structuredClone({
 		condition: i.condition,
 		now: i.now,
+		...(i.opportunity ? { opportunity: i.opportunity } : {}),
+		...(i.validationCodes?.length
+			? { validationCodes: i.validationCodes }
+			: {}),
 		observations: i.observations,
 		freshIds: [...i.freshIds],
 		state: stateData(i.condition, i.state, false),
@@ -75,12 +79,27 @@ export const updateModelData = (i: UpdatePromptInput): UpdateModelData =>
 	});
 
 export const selectModelData = (i: SelectPromptInput): SelectModelData => {
-	const { id, at, trigger, presence, foregroundBusy, playerBusy } =
-		i.opportunity;
+	const {
+		id,
+		at,
+		trigger,
+		presence,
+		foregroundBusy,
+		playerBusy,
+		speechAllowed,
+	} = i.opportunity;
 	return structuredClone({
 		condition: i.condition,
 		now: i.now,
-		opportunity: { id, at, trigger, presence, foregroundBusy, playerBusy },
+		opportunity: {
+			id,
+			at,
+			trigger,
+			presence,
+			foregroundBusy,
+			playerBusy,
+			...(speechAllowed === undefined ? {} : { speechAllowed }),
+		},
 		observations: i.observations,
 		freshIds: [...i.freshIds],
 		state: stateData(i.condition, i.state, true),

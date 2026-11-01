@@ -26,8 +26,16 @@ export interface ActivityUse {
 export class ActivityBudget {
 	readonly #use = new Map<string, ActivityUse>();
 	readonly limits: ActivityLimits;
-	constructor(limits: ActivityLimits = defaultActivityLimits) {
+	constructor(
+		limits: ActivityLimits = defaultActivityLimits,
+		restore: readonly (readonly [string, ActivityUse])[] = [],
+	) {
+		for (const [id, use] of restore) this.#use.set(id, { ...use });
 		this.limits = Object.freeze({ ...limits });
+	}
+
+	snapshot(): readonly (readonly [string, ActivityUse])[] {
+		return [...this.#use].map(([id, use]) => [id, { ...use }] as const);
 	}
 
 	start(intentId: string, now: number) {

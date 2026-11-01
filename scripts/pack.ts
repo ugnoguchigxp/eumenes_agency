@@ -27,6 +27,7 @@ const defaultOut = join(root, "artifacts", "pack");
 /** Names a host needs from the package; the check imports dist/index.js and requires them. */
 export const requiredExports = [
 	"createAgencyRuntime",
+	"projectAgencyState",
 	"createIdlePlanner",
 	"createIdleScheduler",
 	"defaultIdleSec",

@@ -527,6 +527,8 @@ const renderUserGap = (m: number | null) =>
 	m === null ? "ユーザーの入力はまだない" : `${m}分前`;
 
 export interface UpdatePromptInput {
+	readonly opportunity?: Opportunity;
+	readonly validationCodes?: readonly string[];
 	readonly condition: Condition;
 	readonly now: number;
 	/** Context plus the batch, oldest first. */

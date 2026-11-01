@@ -11,15 +11,20 @@ export interface Budget {
 	/** Window check always; the minimum interval only when `spaced`. */
 	check(now: number, spaced: boolean): BudgetVerdict;
 	record(now: number): void;
+	snapshot?(): readonly number[];
 }
 
-export const createBudget = (input: BudgetConfig): Budget => {
+export const createBudget = (
+	input: BudgetConfig,
+	restore: readonly number[] = [],
+): Budget => {
 	const config = Object.freeze(budgetConfigSchema.parse(input));
-	const calls: number[] = [];
+	const calls: number[] = [...restore];
 	const inWindow = (now: number) =>
 		calls.filter((t) => t > now - config.windowMs);
 	return {
 		config,
+		snapshot: () => [...calls],
 		remaining: (now) =>
 			Math.max(0, config.maxCallsPerWindow - inWindow(now).length),
 		check(now, spaced) {

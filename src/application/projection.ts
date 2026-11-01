@@ -16,6 +16,29 @@ const allItems = (
 	obs: ReadonlyMap<string, Observation> | undefined,
 ): Map<string, ProjectionItem> => {
 	const m = new Map<string, ProjectionItem>();
+	for (const i of state.interests ?? [])
+		if (i.status !== "faded")
+			m.set(i.id, {
+				id: i.id,
+				kind: "interest",
+				text: clip(i.topic),
+				status: i.status,
+				origin: i.origin,
+				evidence: [...i.evidence],
+				...(obs
+					? { provenance: provenance(i.evidence, (id) => obs.get(id)) }
+					: {}),
+			});
+	for (const i of state.intents.filter((x) => !!x.lastReturn))
+		m.set(`finding:${i.id}`, {
+			id: `finding:${i.id}`,
+			kind: "finding",
+			text: clip(
+				`${i.lastReturn!.status} @ ${i.lastReturn!.at}: ${i.lastReturn!.summary}`,
+				400,
+			),
+			evidence: [i.lastReturn!.workRef],
+		});
 	for (const i of state.intents.filter(isOpenIntent))
 		m.set(i.id, { id: i.id, kind: "intent", text: clip(i.desiredState) });
 	for (const c of state.candidates.filter(isOpenCandidate))
@@ -60,7 +83,14 @@ export const buildProjection = (
 		condition === "B1"
 			? state.notes.map((n) => n.id)
 			: [
+					...(state.interests ?? [])
+						.filter((i) => i.status !== "faded")
+						.map((i) => i.id),
 					...state.intents.filter(isOpenIntent).map((i) => i.id),
+					...state.intents
+						.filter((i) => !!i.lastReturn)
+						.slice(-3)
+						.map((i) => `finding:${i.id}`),
 					...state.candidates.filter(isOpenCandidate).map((c) => c.id),
 				];
 	const ordered = [...new Set([...state.focus, ...openIds])]

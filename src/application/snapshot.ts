@@ -38,6 +38,41 @@ const scheduling = z.object({
 	}),
 	wakeCount: z.int().nonnegative(),
 });
+const continuity = z.object({
+	calls: z.array(z.number().finite()),
+	activities: z.array(
+		z.tuple([
+			z.string(),
+			z.object({
+				startedAt: z.number().finite(),
+				toolCalls: z.number().nonnegative(),
+				tokens: z.number().nonnegative(),
+			}),
+		]),
+	),
+	issued: z.array(
+		z.object({
+			id: z.string(),
+			opportunityId: z.string(),
+			action: z.enum(["speak", "tool"]),
+			candidateId: z.string().nullable(),
+			candidateRevision: z.number().nullable(),
+			stateRevision: z.number(),
+			utterance: z.string().nullable(),
+			toolName: z.string().nullable(),
+			toolInput: z.string().nullable(),
+			origin: z.enum(["autonomous", "requested"]),
+			tts: z.boolean(),
+		}),
+	),
+	receipts: z.array(z.tuple([z.string(), observation])),
+	topics: z.array(z.tuple([z.string(), z.array(z.string())])),
+	lastUsed: z.array(z.tuple([z.string(), z.number().finite()])),
+	feelings: z.array(z.tuple([z.string(), z.string()])),
+	failures: z.int().nonnegative(),
+	quarantined: z.boolean(),
+	diagnostics: z.array(z.string()),
+});
 const envelope = z.object({
 	state: z.object({
 		revision: z.int().nonnegative(),
@@ -56,6 +91,7 @@ const envelope = z.object({
 	observations: z.array(observation).optional(),
 	cursor: z.int().nonnegative().optional(),
 	scheduling: scheduling.optional(),
+	continuity: continuity.optional(),
 });
 
 export const validateRestore = (

@@ -38,3 +38,5 @@ export {
 	type MockToolPort,
 	type MockToolPortOptions,
 } from "./application/mock-tool-port.ts";
+
+export { buildProjection as projectAgencyState } from "./application/projection.ts";
