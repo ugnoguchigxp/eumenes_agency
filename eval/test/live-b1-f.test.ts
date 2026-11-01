@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { z } from "zod";
+import { shareNullableSchemas, type Json } from "../live-b1-f/transport.ts";
 import { scenes, type Scene } from "../live-b1-f/cases.ts";
 import {
 	judgeData,
@@ -11,6 +13,33 @@ import {
 import { runCell, differences } from "../live-b1-f/run.ts";
 import { createAgencyRuntime, emptyState } from "../../src/index.ts";
 import { fakeLlm, b1Proposal, participation } from "../../test/core/helpers.ts";
+
+test("nullable schema factoring preserves accepted values and the input schema", () => {
+	const schema = z.toJSONSchema(
+		z.strictObject({
+			a: z.string().nullable(),
+			b: z.string().nullable(),
+			c: z.int().nullable(),
+		}),
+	) as { [key: string]: Json };
+	const before = structuredClone(schema);
+	const factored = shareNullableSchemas(schema);
+	const original = z.fromJSONSchema(schema);
+	const after = z.fromJSONSchema(factored);
+	for (const value of [
+		{ a: null, b: "b", c: 3 },
+		{ a: "a", b: null, c: null },
+		{ a: 3, b: null, c: null },
+		{ a: null, b: null, c: 1.5 },
+		{ a: "a" },
+	]) {
+		expect(after.safeParse(value).success).toBe(
+			original.safeParse(value).success,
+		);
+	}
+	expect(schema).toEqual(before);
+	expect(Object.keys(factored.$defs as object)).toHaveLength(2);
+});
 
 const scene: Scene = {
 	id: scenes[0]!.id,

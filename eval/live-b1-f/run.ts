@@ -33,6 +33,7 @@ import {
 } from "../../standalone/settings.ts";
 import { withCommandBudget } from "../budget.ts";
 import { scenes, type Scene } from "./cases.ts";
+import { factoringFetch } from "./transport.ts";
 import {
 	judgePolicy,
 	judgeData,
@@ -188,6 +189,15 @@ export async function runCell(
 			});
 		const signal = new AbortController().signal;
 		outcomes.push(...(await rt.runBackground(at, signal)));
+		if (
+			outcomes.some(
+				(o) =>
+					o.code.startsWith("llm_call:") ||
+					o.code.startsWith("llm:") ||
+					o.code.startsWith("error:"),
+			)
+		)
+			break;
 		let decision: Decision | null = null;
 		if (frame.opportunity) {
 			const r = await rt.decide(
@@ -445,6 +455,7 @@ async function main() {
 	const protocolHash = hash(
 		readFileSync(join(import.meta.dir, "protocol.ts"), "utf8") +
 			readFileSync(join(import.meta.dir, "cases.ts"), "utf8") +
+			readFileSync(join(import.meta.dir, "transport.ts"), "utf8") +
 			readFileSync(import.meta.filename, "utf8"),
 	);
 	const config = {
@@ -485,7 +496,11 @@ async function main() {
 		},
 		spentUsd: () => meter.spentUsd(),
 	};
-	const client = new Anthropic({ maxRetries: 0, timeout: 60_000 });
+	const client = new Anthropic({
+		maxRetries: 0,
+		timeout: 60_000,
+		fetch: factoringFetch,
+	});
 	const priced = Object.values(settings.spend.pricing);
 	if (
 		!settings.spend.pricing[settings.llm.background.model] ||
@@ -533,6 +548,7 @@ async function main() {
 	const results = readLines<Result>(resultPath);
 	const done = new Set(results.map((r) => r.cell.key));
 	let consecutiveFailures = 0;
+	const variantFailures: Record<Variant, number> = { B1: 0, F: 0 };
 	let stop: string | null = null;
 	const save = () =>
 		writeFileSync(
@@ -636,7 +652,10 @@ async function main() {
 				results.push(result);
 				done.add(key);
 				consecutiveFailures = error ? consecutiveFailures + 1 : 0;
+				variantFailures[variant] = error ? variantFailures[variant] + 1 : 0;
 				if (consecutiveFailures >= 3) stop = "three_consecutive_failed_cells";
+				if (variantFailures[variant] >= 3)
+					stop = `three_consecutive_failed_${variant}_cells`;
 				save();
 				console.log(
 					JSON.stringify({
