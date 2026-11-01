@@ -4,6 +4,8 @@ export type BudgetVerdict = "ok" | "skipped:budget" | "skipped:interval";
 
 /** Rolling-window call budget. Every model call counts, failed ones included. */
 export interface Budget {
+	/** Fixed limits used by this meter, for checking host composition. */
+	readonly config: Readonly<BudgetConfig>;
 	/** Calls still available in the window ending at `now`. */
 	remaining(now: number): number;
 	/** Window check always; the minimum interval only when `spaced`. */
@@ -12,11 +14,12 @@ export interface Budget {
 }
 
 export const createBudget = (input: BudgetConfig): Budget => {
-	const config = budgetConfigSchema.parse(input);
+	const config = Object.freeze(budgetConfigSchema.parse(input));
 	const calls: number[] = [];
 	const inWindow = (now: number) =>
 		calls.filter((t) => t > now - config.windowMs);
 	return {
+		config,
 		remaining: (now) =>
 			Math.max(0, config.maxCallsPerWindow - inWindow(now).length),
 		check(now, spaced) {

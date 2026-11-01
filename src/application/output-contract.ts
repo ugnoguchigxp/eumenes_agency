@@ -82,6 +82,7 @@ export function agencyOutputContract(
 		schema: emotion ? participationEmotionSchema : participationSchema,
 		description: [
 			"JSON object: action (speak/tool/reflect/wait/discard), candidateRef ({id, revision} or null), utterance, toolName, toolInput, evidenceRefs, valueNow, userBurden, lossIfWait, conflicts (string or null), reason. Nullable output fields remain present.",
+			"For speak, utterance is the final text addressed to the user: the actual explanation or question, not instructions describing what to say. When null falls back to candidate content, that content must already be suitable as the final utterance.",
 			condition === "B1"
 				? "B1 has no candidates. discard is unavailable. speak requires utterance and evidenceRefs. tool requires an available toolName and toolInput. A note ID used as evidence is resolved to that note's evidence."
 				: "speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.",

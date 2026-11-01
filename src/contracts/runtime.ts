@@ -55,6 +55,13 @@ export interface RuntimeDeps {
 	readonly limits?: Limits;
 	readonly budget?: BudgetConfig;
 	/**
+	 * Host composition may share meters with a budgeted LlmPort adapter.
+	 * The call window must match budget; call/activity limits may only be stricter.
+	 * Incompatible meters are rejected at construction.
+	 */
+	readonly callBudgetMeter?: import("../application/budget.ts").Budget;
+	readonly activityBudgetMeter?: import("../application/activity-budget.ts").ActivityBudget;
+	/**
 	 * B1 only (eval ablation "B1a"): call select even when there are no notes,
 	 * instead of the host_no_candidates gate. Ignored for other conditions.
 	 */
@@ -150,7 +157,7 @@ export interface StandingInterest {
 export const RECENT_OBSERVATION_WINDOW = 30;
 
 /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
-export const HOST_RULES_VERSION = "host-rules-7";
+export const HOST_RULES_VERSION = "host-rules-8";
 
 /** One background model call (or a host decision not to make one). */
 export interface CallOutcome {
