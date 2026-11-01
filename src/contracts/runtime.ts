@@ -134,13 +134,11 @@ export interface RuntimeDeps {
 	 */
 	readonly repairGuard?: boolean;
 	/**
-	 * P4-c: state rebuilt from the revision table after a restart (`stateFromRevisions`).
-	 * `revs` primes per-item revision counters so restore writes no duplicate rows.
+	 * State rebuilt from revisions, or a full checkpoint returned by snapshot().
+	 * Observation history and cursor must be provided together. `revs` primes the
+	 * revision sink's counters when restoring an existing revision table.
 	 */
-	readonly restore?: {
-		readonly state: import("./model.ts").AgencyState;
-		readonly revs?: ReadonlyMap<string, number>;
-	};
+	readonly restore?: AgencyRestore;
 }
 
 export interface StandingInterest {
@@ -152,7 +150,7 @@ export interface StandingInterest {
 export const RECENT_OBSERVATION_WINDOW = 30;
 
 /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
-export const HOST_RULES_VERSION = "host-rules-6";
+export const HOST_RULES_VERSION = "host-rules-7";
 
 /** One background model call (or a host decision not to make one). */
 export interface CallOutcome {
@@ -287,6 +285,42 @@ export interface WakeOutcome {
 	readonly calls: CallOutcome[];
 }
 
+/** Serializable forms of the existing due/wake flags; not another agency state store. */
+export interface SnapshotScheduling {
+	readonly review: readonly string[];
+	readonly pressure: readonly ("intents" | "candidates")[];
+	readonly wake: {
+		readonly review: readonly string[];
+		readonly recall: readonly string[];
+		readonly events: readonly string[];
+		readonly faultUntil: readonly (readonly [string, number])[];
+		readonly perDay: readonly (readonly [string, number])[];
+	};
+	readonly wakeCount: number;
+}
+
+/**
+ * Full checkpoint, including observation identity, processed cursor and scheduling flags.
+ * The host owns storage and must apply its forgetting/retention policy before restoring.
+ * Budget windows, activity usage, undrained todo reports, ticket delivery metadata and
+ * enabled/disabled state are not included; the host reconciles these on restart.
+ */
+export interface AgencySnapshot {
+	readonly state: AgencyState;
+	readonly observations: readonly Observation[];
+	readonly cursor: number;
+	/** Absent on older snapshots; when present it must match the runtime condition. */
+	readonly condition?: Condition;
+	/** Absent on older snapshots, whose scheduling flags start fresh. */
+	readonly scheduling?: SnapshotScheduling;
+}
+
+/** Revision-table restores may still provide state only. A full checkpoint restores its ledger too. */
+export interface AgencyRestore extends Partial<AgencySnapshot> {
+	readonly state: AgencyState;
+	readonly revs?: ReadonlyMap<string, number>;
+}
+
 export interface AgencyRuntime {
 	readonly condition: Condition;
 	/** Idempotent by id; same id with different content throws ObservationConflictError. */
@@ -328,9 +362,5 @@ export interface AgencyRuntime {
 	/** OFF fences old inference/tickets and hides projection; retained state returns on ON. */
 	setEnabled(enabled: boolean): void;
 	projection(maxItems: number): AgencyProjection;
-	snapshot(): {
-		readonly state: AgencyState;
-		readonly observations: readonly Observation[];
-		readonly cursor: number;
-	};
+	snapshot(): AgencySnapshot;
 }

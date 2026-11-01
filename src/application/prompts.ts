@@ -16,12 +16,12 @@ import type { StandingInterest } from "../contracts/runtime.ts";
 import type { Due } from "../domains/agency/due.ts";
 
 /** Bump when any instruction text below changes; recorded in run metadata. */
-export const INSTRUCTION_VERSION = "p0e-instructions-14";
+export const INSTRUCTION_VERSION = "p0e-instructions-15";
 /**
  * Version of the lull-talk rules (socialTopics / hostTopics modes only). Shown at the head of
  * those rules and part of the settings digest; the evaluated B1/B2 prompts do not contain it.
  */
-export const SOCIAL_RULES_VERSION = "social-rules-10";
+export const SOCIAL_RULES_VERSION = "social-rules-11";
 /** Version of the utterance-emotion rules (utteranceEmotion mode only). */
 export const EMOTION_RULES_VERSION = "emotion-rules-2";
 
@@ -240,7 +240,7 @@ const selectSelfResearch = [
 	"頼むのは、次のどれかにつながり、自分も気になる話題のとき: 直前の会話のテーマ、記憶にある話題、いまの話題（ニュースなど）、自分の関心。どれにもつながらない話題、ユーザーが断った話題は頼まない。",
 	"つながる話題があり、自分で頼んだ調べものが進行中でなければ、雑談の間（idle）では雑談の一言より先に調査を頼む（黙って頼めて、ユーザーの邪魔にならない。報告は終わってから）。上の【雑談の間】の「wait より speak」より、この規則を先に使う。",
 	"「依頼された仕事」に自分で頼んだ調べものが進行中なら、新しく頼まない。同じテーマを二度頼まない。",
-	"頼むときは tool を選び、toolInput に「問い: 調べたいこと一文 / 受入条件: 答えに含めてほしいこと（1〜3個、「、」で区切る）」を書き、evidenceRefs にきっかけ（観測の id、`memory:<id>`・`context:<id>`・`interest:<id>`）を入れる。",
+	"頼むときは tool を選び、toolInput に「問い: 調べたいこと一文 / 受入条件: 答えに含めてほしいこと（1〜3個、「、」で区切る）」を書き、evidenceRefs にきっかけ（観測の id、`memory:<id>`・`context:<id>`・`interest:<id>`）を入れる。きっかけがメモそのもののときは、そのメモの id を前置きなしで入れる（メモの根拠に読み替えられる）。",
 	"自分で頼んだ調べものの完了は「気になって調べておいたよ」のように伝え、頼まれたようには言わない。要点を一文と、詳しく話すかの問いを一つ。",
 ];
 

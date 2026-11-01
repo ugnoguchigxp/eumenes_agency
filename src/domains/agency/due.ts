@@ -12,7 +12,7 @@ export interface Due {
 /** Which review.due / capacity.pressure events were already issued. */
 export interface DueFlags {
 	readonly review: Set<string>;
-	readonly pressure: Set<string>;
+	readonly pressure: Set<"intents" | "candidates">;
 }
 
 export const createDueFlags = (): DueFlags => ({
@@ -63,7 +63,7 @@ export const findDue = (
 /** Flag keys for the events a call carried; computed before the call changes the state. */
 export interface IssuedKeys {
 	readonly review: readonly string[];
-	readonly pressure: readonly string[];
+	readonly pressure: readonly ("intents" | "candidates")[];
 }
 
 export const issuedKeys = (state: AgencyState, due: Due): IssuedKeys => ({

@@ -78,6 +78,7 @@ import { buildProjection } from "./projection.ts";
 import { agencyOutputContract } from "./output-contract.ts";
 import { updateModelData, selectModelData } from "./model-data.ts";
 import { RevisionTracker } from "./revisions.ts";
+import { validateRestore } from "./snapshot.ts";
 import type { ItemRevision } from "../contracts/revisions.ts";
 import {
 	captureSystemContext,
@@ -175,6 +176,28 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	let wakeCount = 0;
 	const issued = new Map<string, ActionTicket>();
 	const receipts = new Map<string, Observation>();
+	if (deps.restore !== undefined) validateRestore(deps.restore, condition);
+	if (deps.restore?.observations !== undefined) {
+		for (const o of deps.restore.observations) {
+			const { seq: _seq, ...input } = o;
+			ledger.record(input);
+		}
+		ledger.markProcessed(
+			deps.restore.observations.slice(0, deps.restore.cursor).map((o) => o.seq),
+		);
+	}
+	if (deps.restore?.scheduling) {
+		const s = deps.restore.scheduling;
+		for (const key of s.review) flags.review.add(key);
+		for (const key of s.pressure) flags.pressure.add(key);
+		for (const key of s.wake.review) wakeFlags.review.add(key);
+		for (const key of s.wake.recall) wakeFlags.recall.add(key);
+		for (const key of s.wake.events) wakeFlags.events.add(key);
+		for (const [key, until] of s.wake.faultUntil)
+			wakeFlags.faultUntil.set(key, until);
+		for (const [key, count] of s.wake.perDay) wakeFlags.perDay.set(key, count);
+		wakeCount = s.wakeCount;
+	}
 	let state: AgencyState = deps.restore
 		? structuredClone(deps.restore.state)
 		: interestFormation
@@ -1171,8 +1194,21 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			),
 		snapshot: () => ({
 			state: structuredClone(state),
-			observations: ledger.all(),
+			observations: structuredClone(ledger.all()),
 			cursor: ledger.cursor(),
+			condition,
+			scheduling: {
+				review: [...flags.review],
+				pressure: [...flags.pressure],
+				wake: {
+					review: [...wakeFlags.review],
+					recall: [...wakeFlags.recall],
+					events: [...wakeFlags.events],
+					faultUntil: [...wakeFlags.faultUntil],
+					perDay: [...wakeFlags.perDay],
+				},
+				wakeCount,
+			},
 		}),
 	};
 	if (!revTracker) return api;

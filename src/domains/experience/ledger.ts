@@ -24,6 +24,9 @@ const sameContent = (a: Observation, b: ObservationInput) =>
 	a.causationId === b.causationId &&
 	a.code === b.code &&
 	a.interestId === b.interestId &&
+	a.workRef === b.workRef &&
+	a.workStatus === b.workStatus &&
+	a.tts === b.tts &&
 	JSON.stringify(a.refs ?? null) === JSON.stringify(b.refs ?? null);
 
 export const createLedger = (): Ledger => {
@@ -40,7 +43,7 @@ export const createLedger = (): Ledger => {
 				throw new ObservationConflictError(input.id);
 			}
 			const obs: Observation = Object.freeze({
-				...input,
+				...structuredClone(input),
 				seq: list.length + 1,
 			});
 			list.push(obs);

@@ -2,7 +2,7 @@
 
 Eumenes が経験から関心・欲求・意図を持ち、発言や行動の機会を選ぶ仕組みを、本体と独立して検証するサブプロジェクト。名前は仮称。
 
-**2026-11-01 時点: 関心の形成・変化（条件F + `interestFormation`）、イベントによる断続的な起床、予算付きの委譲契約、ホスト提供SQLiteへの履歴保存、調査結果の会話利用を研究用プロトタイプとして実装した。マージ前レビューの6点を修正し、全体検証は709成功・失敗0件。[進捗・評価結果と限界](docs/agency-next-progress.md)を参照。Eumenes/Pursuit本体への接続と、独立した実モデルによる品質評価は未完了。**
+**2026-11-01 時点: 関心の形成・変化（条件F + `interestFormation`）、イベントによる断続的な起床、予算付きの委譲契約、ホスト提供SQLiteへの履歴保存、調査結果の会話利用を研究用プロトタイプとして実装した。マージ前レビューの6点を修正し、別実装から観測履歴を含む復元を取り込み、全体検証は722成功・失敗0件。[進捗・評価結果と限界](docs/agency-next-progress.md)を参照。Eumenes/Pursuit本体への接続と、独立した実モデルによる品質評価は未完了。**
 
 使い方: `bun run verify`（format / lint / 型 / 境界 / テスト）、`bun eval/main.ts validate [--suite p0e|p1e]`、`bun eval/main.ts run --name <run> [--suite p1e] [--conditions B1,B2,D] [--case <id>] [--reps 3] [--budget-usd n]`、`bun eval/main.ts score --name <run>`、`bun eval/main.ts judge --name <run> [--limit N] [--budget-usd n]`（内容と状態の判定器）、`bun eval/main.ts label-export --suite p1e --split dev --n 12 --out <file.md>` と `agreement --sheet <file.md>`（人手ラベルの一致率）、`judge-export --name <run> --n 30 --out <file.md>` と `judge-agreement --sheet <file.md>`（判定器の較正）、`bun eval/main.ts trace --name <run> --case <id> [--condition B2] [--rep 1] [--prompt]`（モデル呼び出しと最終状態の確認。`traces.jsonl` はローカルのみ）、`bun run agency [-- --condition B1a --idle-sec 40 --max-unanswered 1 --no-log]`（対話。黙っていると AI から話しかける。既定 B1a、会話記録は `data/chats/`）。設定は `config/experiment.json`、費用の記録は `data/spend.jsonl`。
 
@@ -14,6 +14,7 @@ Eumenes が経験から関心・欲求・意図を持ち、発言や行動の機
 - [既存実装の調査](spec/source-audit.md): Eumenes / Pursuit / Memory / World の再利用先と制約。
 - [類似 OSS の参照](spec/oss-reference-2026-10-22.md): LocalAIVtuber2・Anima・AICO・Shikigami・ThoughtField をソースで確かめた結果と、評価対象（実験条件 X1・X2、試験シナリオ S1–S9）。
 - [雑談の間の実験](spec/social-lull-experiment.md): 記憶の話題・関心から話しかける振る舞い（hostTopics）を、取りこぼし・誤発話・内容で測る計画。
+- [関心形成の別実装との比較](spec/autonomous-interest-comparison.md): B1/F方式の評価限界、選択取り込みした復元と引用指示、検証結果。
 - [ホスト所有のSystemContext](spec/host-system-context.md): 用途別の全文指定、動的な構成関数、出力契約、0.1系への移行とEumenesの接続変更。
 - [2026-10-31 全体レビューと修正](spec/review-2026-10-31.md): 無効化・取消・出力検証・状態の隔離・結果ID・予算の整合、0.1.1の検証結果と限界。
 - [ホスト接続契約案](spec/host-contract-v1.md): 推論・保存・発話・ツール・忘却の境界。
