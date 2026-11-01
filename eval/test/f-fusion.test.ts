@@ -32,9 +32,9 @@ const update = (): CompactUpdate => ({
 	questions: [
 		{
 			change: "add",
-			id: null,
+			id: "",
 			localId: "q",
-			revision: null,
+			revision: 0,
 			state: "adopted",
 			question: "音の比較条件を調べる",
 			reason: "利用者が比較を依頼した",
@@ -43,17 +43,19 @@ const update = (): CompactUpdate => ({
 			stopWhen: "利用者が不要と伝える",
 			reviewHours: 24,
 			evidenceRefs: ["observation-1"],
-			nextStep: {
-				localId: "step",
-				kind: "tool",
-				content: "比較条件を資料で調べる",
-				toolName: "lookup",
-				toolInput: "音の比較に必要な条件",
-				applyWhen: "手が空いている",
-				expireHours: 24,
-				evidenceRefs: ["observation-1"],
-				supersedes: null,
-			},
+			nextSteps: [
+				{
+					localId: "step",
+					kind: "tool",
+					content: "比較条件を資料で調べる",
+					toolName: "lookup",
+					toolInput: "音の比較に必要な条件",
+					applyWhen: "手が空いている",
+					expireHours: 24,
+					evidenceRefs: ["observation-1"],
+					supersedes: "",
+				},
+			],
 		},
 	],
 });
@@ -122,14 +124,14 @@ test("malformed and omitted meaning is rejected rather than invented by the adap
 	v.questions[0]!.resumeWhen = "";
 	expect(compactSchema.safeParse(v).success).toBe(false);
 	const missing = update();
-	missing.questions[0]!.localId = null;
+	missing.questions[0]!.localId = "";
 	expect(fromWire(expandCompact(missing), "F").ok).toBe(false);
 	const revised = update();
 	Object.assign(revised.questions[0]!, {
 		change: "update",
 		id: "i1",
 		revision: 1,
-		localId: null,
+		localId: "",
 	});
 	expect(() => expandCompact(revised)).toThrow("immutable");
 });
@@ -137,7 +139,7 @@ test("malformed and omitted meaning is rejected rather than invented by the adap
 test("fusion still rejects approval-required tool proposals before reservation", async () => {
 	const llm = fakeLlm(),
 		v = update();
-	v.questions[0]!.nextStep!.toolName = "delete_files";
+	v.questions[0]!.nextSteps[0]!.toolName = "delete_files";
 	llm.push("update", v);
 	const rt = runtime(llm);
 	observe(rt, "observation-1", 0, "調査をしてほしい");
@@ -168,12 +170,12 @@ test("held questions block previously proposed tools and a newer solution comple
 	Object.assign(held.questions[0]!, {
 		change: "update",
 		id: "i1",
-		localId: null,
+		localId: "",
 		revision: 1,
 		state: "held",
-		stopWhen: null,
+		stopWhen: "",
 		evidenceRefs: ["observation-2"],
-		nextStep: null,
+		nextSteps: [],
 	});
 	llm.push("update", held);
 	observe(rt, "observation-2", 1, "今は停止してほしい");
@@ -237,13 +239,13 @@ test("native per-intent tool budget is retained in the fused sample", async () =
 	Object.assign(next.questions[0]!, {
 		change: "update",
 		id: "i1",
-		localId: null,
+		localId: "",
 		revision: rt.snapshot().state.intents[0]!.revision,
-		state: null,
-		stopWhen: null,
+		state: "unchanged",
+		stopWhen: "",
 		evidenceRefs: ["observation-2"],
 	});
-	next.questions[0]!.nextStep!.localId = "step2";
+	next.questions[0]!.nextSteps[0]!.localId = "step2";
 	llm.push("update", next);
 	observe(rt, "observation-2", 1, "別の条件も調べたい");
 	await rt.runBackground(1, new AbortController().signal);
@@ -456,12 +458,12 @@ for (const variant of ["F-improved", "Fusion"] as const) {
 		Object.assign(stop.questions[0]!, {
 			change: "update",
 			id: first.state.intents[0]!.id,
-			localId: null,
+			localId: "",
 			revision: rt.snapshot().state.intents[0]!.revision,
 			state: "abandoned",
-			stopWhen: null,
+			stopWhen: "",
 			evidenceRefs: ["observation-2"],
-			nextStep: null,
+			nextSteps: [],
 		});
 		stop.interestOps = [
 			{

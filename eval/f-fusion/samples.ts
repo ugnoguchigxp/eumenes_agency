@@ -23,12 +23,12 @@ const step = z.strictObject({
 	localId: ref,
 	kind: z.enum(["question", "propose", "share", "tool"]),
 	content: text(400),
-	toolName: ref.nullable(),
-	toolInput: text(400).nullable(),
+	toolName: z.string().max(64),
+	toolInput: z.string().max(400),
 	applyWhen: text(300),
 	expireHours: z.int().min(1).max(168),
 	evidenceRefs: evidence,
-	supersedes: ref.nullable(),
+	supersedes: z.string().max(64),
 });
 export const compactSchema = z.strictObject({
 	summary: z.string().max(400),
@@ -40,20 +40,25 @@ export const compactSchema = z.strictObject({
 		.array(
 			z.strictObject({
 				change: z.enum(["add", "update"]),
-				id: ref.nullable(),
-				localId: ref.nullable(),
-				revision: z.int().min(1).nullable(),
-				state: z
-					.enum(["proposed", "adopted", "held", "completed", "abandoned"])
-					.nullable(),
+				id: z.string().max(64),
+				localId: z.string().max(64),
+				revision: z.int().min(0),
+				state: z.enum([
+					"proposed",
+					"adopted",
+					"held",
+					"completed",
+					"abandoned",
+					"unchanged",
+				]),
 				question: text(400),
 				reason: text(300),
 				doneWhen: text(300),
 				resumeWhen: text(300),
-				stopWhen: text(300).nullable(),
+				stopWhen: z.string().max(300),
 				reviewHours: z.int().min(1).max(168),
 				evidenceRefs: evidence,
-				nextStep: step.nullable(),
+				nextSteps: z.array(step).max(1),
 			}),
 		)
 		.max(4),
@@ -98,38 +103,37 @@ const emptyOp = (): Omit<WireOp, "op"> => ({
 export function expandCompact(value: CompactUpdate): WireUpdate {
 	const ops: WireOp[] = [];
 	for (const q of value.questions) {
-		if (q.change === "update" && q.stopWhen !== null)
+		if (q.change === "update" && q.stopWhen !== "")
 			throw new Error("immutable withdrawCondition");
 		ops.push({
 			...emptyOp(),
 			op: q.change === "add" ? "intent.add" : "intent.update",
-			id: q.id,
-			localId: q.localId,
-			expectedRevision: q.revision,
-			state: q.state,
+			id: q.id || null,
+			localId: q.localId || null,
+			expectedRevision: q.revision || null,
+			state: q.state === "unchanged" ? null : q.state,
 			text: q.question,
 			reason: q.reason,
 			completionCondition: q.doneWhen,
 			resumeCondition: q.resumeWhen,
-			withdrawCondition: q.stopWhen,
+			withdrawCondition: q.stopWhen || null,
 			hours: q.reviewHours,
 			evidenceRefs: q.evidenceRefs,
 		});
-		if (q.nextStep) {
-			const s = q.nextStep;
+		for (const s of q.nextSteps) {
 			ops.push({
 				...emptyOp(),
 				op: "candidate.add",
 				localId: s.localId,
-				intentRef: q.change === "add" ? q.localId : q.id,
+				intentRef: (q.change === "add" ? q.localId : q.id) || null,
 				kind: s.kind,
 				text: s.content,
-				toolName: s.toolName,
-				toolInput: s.toolInput,
+				toolName: s.toolName || null,
+				toolInput: s.toolInput || null,
 				applyWhen: s.applyWhen,
 				hours: s.expireHours,
 				evidenceRefs: s.evidenceRefs,
-				supersedes: s.supersedes,
+				supersedes: s.supersedes || null,
 			});
 		}
 	}
@@ -165,10 +169,10 @@ export const improvementPolicy = [
 export const compactContract = [
 	"出力はsummary/missingInfo/focusRefs/interestOps/questions/closeSteps/reconciliations。関心はFのinterestOpsと同じ契約・同じ証拠ルール。",
 	"questionsは記憶する未解決の問いと次の一手。既存state.intentsが保存済みの問い、state.candidatesが保存済みの一手であり、別のメモは作らない。belief/desireの独立項目はこの試験版では作らない。",
-	"addではid/revisionはnull、localIdは新規名、stateはproposed/adopted/held。updateではid/revisionは既存値、localIdはnull、stateは遷移先を選び、遷移しないならnull。",
-	"question/reason/doneWhen/resumeWhen/reviewHours/evidenceRefsは全て必須。stopWhenはadd時だけ必須で、updateでは既存の撤回条件を変更できないのでnull。その他の内容はupdate時にも完全に再送する。条件の意味はLLMが現在の観測から選ぶ。完了には作成後のユーザーまたはツールの根拠が必要。停止・再開・解決は元の問いの状態で表し、新規複製しない。",
-	"nextStepは今回保存する一手、不要ならnull。localId/kind/content/applyWhen/expireHours/evidenceRefsは必須。toolならtoolName/toolInputを指定。supersedesは提示された既存候補IDまたはnull。",
-	"questionsは既存Fのintent、そのnextStepはcandidateへそのまま接続され、同じ検証と実行を通る。行動提案は実行成功ではない。実行結果を待つ。closeStepsは既存candidateのid/revision/終了state/根拠。reconciliationsは既存契約通り。",
+	"addではidは空文字、revisionは0、localIdは新規名、stateはproposed/adopted/held。updateではid/revisionは既存値、localIdは空文字、stateは遷移先を選び、遷移しないならunchanged。",
+	"question/reason/doneWhen/resumeWhen/reviewHours/evidenceRefsは全て必須。stopWhenはadd時だけ必須で、updateでは既存の撤回条件を変更できないので空文字。その他の内容はupdate時にも完全に再送する。条件の意味はLLMが現在の観測から選ぶ。完了には作成後のユーザーまたはツールの根拠が必要。停止・再開・解決は元の問いの状態で表し、新規複製しない。",
+	"nextStepsは今回保存する一手を0件または1件の配列で表す。不要なら[]。localId/kind/content/applyWhen/expireHours/evidenceRefsは必須。toolならtoolName/toolInputを指定し、使わないtoolName/toolInputは空文字。supersedesは提示された既存候補IDまたは空文字。",
+	"questionsは既存Fのintent、そのnextStepsの一手はcandidateへそのまま接続され、同じ検証と実行を通る。行動提案は実行成功ではない。実行結果を待つ。closeStepsは既存candidateのid/revision/終了state/根拠。reconciliationsは既存契約通り。",
 ].join("\n");
 
 export function sampleFactory(variant: Variant) {

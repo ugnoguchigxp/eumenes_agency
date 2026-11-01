@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { AgencySnapshot } from "../../src/contracts/runtime.ts";
 import type { Frame, Scene } from "./cases.ts";
 
-export const protocolVersion = "f-improved-fusion-1";
+export const protocolVersion = "f-improved-fusion-3-sentinel-step";
 export interface Inventory {
 	id: string;
 	description: string;
