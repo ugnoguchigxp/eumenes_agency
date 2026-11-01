@@ -54,6 +54,9 @@ export interface RuntimeDeps {
 	readonly tools: readonly ToolCapability[];
 	readonly limits?: Limits;
 	readonly budget?: BudgetConfig;
+	/** Host composition may share the same meters with a budgeted LlmPort adapter. */
+	readonly callBudgetMeter?: import("../application/budget.ts").Budget;
+	readonly activityBudgetMeter?: import("../application/activity-budget.ts").ActivityBudget;
 	/**
 	 * B1 only (eval ablation "B1a"): call select even when there are no notes,
 	 * instead of the host_no_candidates gate. Ignored for other conditions.

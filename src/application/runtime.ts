@@ -167,11 +167,12 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const limits = limitsSchema.parse(deps.limits ?? defaultLimits);
 	const cfg = budgetConfigSchema.parse(deps.budget ?? defaultBudget);
 	const ledger = createLedger();
-	const budget = createBudget(cfg);
+	const budget = deps.callBudgetMeter ?? createBudget(cfg);
 	const flags = createDueFlags();
 	const wakeFlags = createWakeFlags();
 	const wakeCfg = deps.wakeConfig ?? defaultWakeConfig;
-	const activity = new ActivityBudget(deps.activityLimits);
+	const activity =
+		deps.activityBudgetMeter ?? new ActivityBudget(deps.activityLimits);
 	const tracksWork = deps.workReturns ?? true;
 	let wakeCount = 0;
 	const issued = new Map<string, ActionTicket>();
