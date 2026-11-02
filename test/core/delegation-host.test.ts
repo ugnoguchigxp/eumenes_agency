@@ -112,6 +112,14 @@ describe("P4-b delegationRequest", () => {
 		expect(r.acceptance).toBe(it.completionCondition);
 		expect(r.motive).toBe(it.motive);
 		expect(r.origin).toBe("autonomous");
+		const { budget, ...identity } = r;
+		expect(budget).toEqual(BUDGET);
+		const hostBudget = delegationRequest(t, m.rt.snapshot().state, 10 * MIN)!;
+		expect(hostBudget).toEqual(identity);
+		expect(hostBudget).not.toHaveProperty("budget");
+		expect(
+			delegationRequest({ ...t, id: "other" }, m.rt.snapshot().state, 0),
+		).toBeNull();
 	});
 	test("non-delegate, requested, or unbound tickets yield null", async () => {
 		const m = make();
