@@ -515,6 +515,7 @@ const typedSchemas = {
 export const fromWire = (
 	wire: WireUpdate,
 	condition: "B1" | "B2" | "F",
+	onInvalid?: (codes: readonly string[]) => void,
 ): { ok: true; proposal: UpdateProposal } | { ok: false } => {
 	const used = new Set<string>();
 	for (const w of wire.ops) {
@@ -530,5 +531,11 @@ export const fromWire = (
 		...(condition === "B1" ? {} : { reconciliations: wire.reconciliations }),
 	};
 	const parsed = typedSchemas[condition].safeParse(candidate);
+	if (!parsed.success)
+		onInvalid?.(
+			parsed.error.issues
+				.slice(0, 8)
+				.map((issue) => `schema:${issue.path.join(".")}:${issue.code}`),
+		);
 	return parsed.success ? { ok: true, proposal: parsed.data } : { ok: false };
 };

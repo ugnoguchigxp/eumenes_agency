@@ -475,12 +475,20 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					"stale_epoch",
 				]),
 			];
-		const typed = fromWire(r.value, condition);
+		const typed = fromWire(r.value, condition, (codes) => {
+			diagnostics = codes;
+		});
 		if (!typed.ok) {
 			noteFailure();
 			return [
 				...r.prior,
-				makeOutcome("update", at, "rejected:schema", r.usage, ["schema"]),
+				makeOutcome(
+					"update",
+					at,
+					"rejected:schema",
+					r.usage,
+					deps.repairUpdates ? ["schema", ...diagnostics] : ["schema"],
+				),
 			];
 		}
 		// P5-b: dropped repair proposals are reported on the outcome (repair:<code>).

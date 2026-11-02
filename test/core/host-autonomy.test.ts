@@ -13,8 +13,31 @@ import {
 	participation,
 	intentAddOp,
 	candidateAddOp,
+	toWire,
 } from "./helpers.ts";
 const sig = () => new AbortController().signal;
+
+test("strict wire failures return bounded field diagnostics to the one repair call", async () => {
+	const m = make();
+	m.rt.observe(obsInput("o1", "user.report", "user", 0, "未解決"));
+	const bad = toWire(proposal([intentAddOp("g")]));
+	(bad.ops as Record<string, unknown>[])[0]!.resumeCondition = null;
+	m.llm.push(
+		"update",
+		bad,
+		(request: import("../../src/index.ts").LlmRequest<unknown>) => {
+			expect(JSON.parse(request.prompt).validationCodes).toContain(
+				"schema:ops.0.resumeCondition:invalid_type",
+			);
+			return proposal([intentAddOp("g")]);
+		},
+	);
+	const calls = await m.rt.runBackground(1, sig());
+	expect(calls[0]?.code).toBe("rejected:schema");
+	expect(calls.at(-1)?.code).toBe("applied");
+	expect(m.llm.count()).toBe(2);
+	expect(m.rt.snapshot().continuity?.diagnostics).toEqual([]);
+});
 function make(restore?: AgencySnapshot, maxCallsPerWindow = 12) {
 	const llm = fakeLlm();
 	const rt = createAgencyRuntime({
