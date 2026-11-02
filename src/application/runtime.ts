@@ -161,6 +161,9 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		hostTodos,
 		interestFormation,
 		utteranceEmotion: emotionMode,
+		...(deps.constrainToolNames
+			? { toolNames: tools.map((tool) => tool.name) }
+			: {}),
 	};
 	const updateContract = agencyOutputContract("update", contractOptions);
 	const selectContract = agencyOutputContract("select", contractOptions);

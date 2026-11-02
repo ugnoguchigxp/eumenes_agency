@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
 	participationEmotionSchema,
 	participationSchema,
@@ -17,6 +18,7 @@ export interface OutputContractOptions {
 	readonly utteranceEmotion?: boolean;
 	/** Condition I (F only): the update also carries interestOps. */
 	readonly interestFormation?: boolean;
+	readonly toolNames?: readonly string[];
 }
 
 const updateFields = [
@@ -47,6 +49,11 @@ export function agencyOutputContract(
 	const { condition } = options;
 	if (purpose === "update") {
 		const descriptions = [
+			...(options.toolNames
+				? [
+						`toolName is null or one of ${JSON.stringify(options.toolNames)}. A capability revision belongs in toolInput, not toolName.`,
+					]
+				: []),
 			...updateFields.slice(0, 2),
 			...(condition === "B1"
 				? [updateFields[2]!]
@@ -80,8 +87,15 @@ export function agencyOutputContract(
 	const emotion =
 		(condition === "B1" || condition === "F") &&
 		options.utteranceEmotion === true;
+	const schema = emotion ? participationEmotionSchema : participationSchema;
 	return {
-		schema: emotion ? participationEmotionSchema : participationSchema,
+		schema: options.toolNames
+			? schema.extend({
+					toolName: options.toolNames.length
+						? z.enum(options.toolNames).nullable()
+						: z.null(),
+				})
+			: schema,
 		description: [
 			"JSON object: action (speak/tool/reflect/wait/discard), candidateRef ({id, revision} or null), utterance, toolName, toolInput, evidenceRefs, valueNow, userBurden, lossIfWait, conflicts (string or null), reason. Nullable output fields remain present.",
 			"For speak, utterance is the final text addressed to the user: the actual explanation or question, not instructions describing what to say. When null falls back to candidate content, that content must already be suitable as the final utterance.",

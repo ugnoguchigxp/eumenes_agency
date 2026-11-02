@@ -57,6 +57,8 @@ export interface RuntimeDeps {
 	readonly planOnOpportunity?: boolean;
 	/** One budgeted correction of rejected update proposals with validation codes. */
 	readonly repairUpdates?: boolean;
+	/** Bind native toolName fields to this host's advertised tools (keeps the flat wire grammar). */
+	readonly constrainToolNames?: boolean;
 	readonly limits?: Limits;
 	readonly budget?: BudgetConfig;
 	/**
@@ -164,7 +166,7 @@ export interface StandingInterest {
 export const RECENT_OBSERVATION_WINDOW = 30;
 
 /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
-export const HOST_RULES_VERSION = "host-rules-12";
+export const HOST_RULES_VERSION = "host-rules-13";
 
 /** One background model call (or a host decision not to make one). */
 export interface CallOutcome {

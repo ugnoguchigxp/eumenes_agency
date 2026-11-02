@@ -38,6 +38,8 @@ Eumenes が経験から関心・欲求・意図を持ち、発言や行動の機
 
 `planOnOpportunity: true`は機会をupdateの資料に渡し、新規観測がなくても既存の根拠から候補を検討する。機会自体は証拠にならない。`repairUpdates: true`は拒否コードを次のupdateへ渡し、既存予算内で修正を1回だけ試す。ホスト所有SystemContextがこれらの資料を読む指示を持つ必要がある。
 
+`constrainToolNames: true`は既存のflat wire形式を保ったまま、update/selectのnative schemaでホストのツール名だけを列挙する。指定しない利用側のschemaは変わらない。厳密な型変換で種別が拒否された場合、修正用診断には項目path・違反codeとschema由来の正しい選択肢を有界に返し、モデルの不正出力値は含めない。
+
 projectionは形成した関心（状態・起源・根拠）と取得済み結果も含む。`projectAgencyState`は保存済み状態から同じ有界な資料を作る公開関数。snapshotのcontinuityは呼出・活動予算、チケットとreceipt、既出話題、拒否診断・隔離を保存する。idle plannerのcheckpointは発話頻度と次の時点を復元する。ホストは状態とイベントcursorを単一writerで確定し、外部実行前に保存し、復元時には実行台帳と配信記録を照合する。
 
 `delegationRequest(ticket, state, at)`は実在する意図との結び付きを検証し、実行ホストが既存の予算を適用する依頼を作る。数値の追加上限を提案する場合は従来の`delegationRequest(ticket, state, budget, at)`を使い、ホストはその上限以下で実行する。適用しない数値を依頼の上限として記載しない。

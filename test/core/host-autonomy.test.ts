@@ -3,6 +3,7 @@ import {
 	createAgencyRuntime,
 	defaultBudget,
 	defaultLimits,
+	agencyOutputContract,
 	type AgencySnapshot,
 } from "../../src/index.ts";
 import {
@@ -16,6 +17,58 @@ import {
 	toWire,
 } from "./helpers.ts";
 const sig = () => new AbortController().signal;
+
+test("host native contracts enumerate available tool names without changing legacy wire output", () => {
+	const wire = toWire(
+		proposal([
+			candidateAddOp("c", "i1", {
+				kind: "tool",
+				toolName: "unavailable",
+				toolInput: "{}",
+			}),
+		]),
+	);
+	const legacy = agencyOutputContract("update", { condition: "F" }).schema;
+	const native = agencyOutputContract("update", {
+		condition: "F",
+		toolNames: ["delegate"],
+	}).schema;
+	expect(legacy.safeParse(wire).success).toBe(true);
+	expect(native.safeParse(wire).success).toBe(false);
+	(wire.ops as Record<string, unknown>[])[0]!.toolName = "delegate";
+	expect(native.safeParse(wire).success).toBe(true);
+	expect(
+		agencyOutputContract("update", {
+			condition: "F",
+			toolNames: [],
+		}).schema.safeParse(wire).success,
+	).toBe(false);
+	const pick = participation({ toolName: "unavailable" });
+	expect(
+		agencyOutputContract("select", {
+			condition: "F",
+			toolNames: ["delegate"],
+		}).schema.safeParse(pick).success,
+	).toBe(false);
+});
+
+test("a kind rejected after wire parsing supplies the operation's allowed choices to repair", async () => {
+	const m = make();
+	m.rt.observe(obsInput("o1", "user.report", "user", 0, "未解決"));
+	const bad = toWire(proposal([intentAddOp("g"), candidateAddOp("c", "g")]));
+	(bad.ops as Record<string, unknown>[])[1]!.kind = "understand";
+	m.llm.push(
+		"update",
+		bad,
+		(request: import("../../src/index.ts").LlmRequest<unknown>) => {
+			expect(JSON.parse(request.prompt).validationCodes).toContain(
+				"schema_expected:ops.1.kind:question|propose|share|tool",
+			);
+			return proposal([intentAddOp("g"), candidateAddOp("c", "g")]);
+		},
+	);
+	expect((await m.rt.runBackground(1, sig())).at(-1)?.code).toBe("applied");
+});
 
 test("strict wire failures return bounded field diagnostics to the one repair call", async () => {
 	const m = make();

@@ -357,13 +357,28 @@ export const wireUpdateSchema = (
 	options: {
 		readonly hostTodos?: boolean;
 		readonly interestFormation?: boolean;
+		readonly toolNames?: readonly string[];
 	} = {},
-): z.ZodType<WireUpdate> =>
-	(condition === "B1" && options.hostTodos === true
-		? wireB1Todos
-		: condition === "F" && options.interestFormation === true
-			? wireFInterests
-			: wireSchemas[condition]) as z.ZodType<WireUpdate>;
+): z.ZodType<WireUpdate> => {
+	const schema =
+		condition === "B1" && options.hostTodos === true
+			? wireB1Todos
+			: condition === "F" && options.interestFormation === true
+				? wireFInterests
+				: wireSchemas[condition];
+	if (options.toolNames === undefined) return schema as z.ZodType<WireUpdate>;
+	return schema.extend({
+		ops: z
+			.array(
+				wireOpShape(wireOpNames[condition]).extend({
+					toolName: options.toolNames.length
+						? z.enum(options.toolNames).nullable()
+						: z.null(),
+				}),
+			)
+			.max(condition === "F" ? 12 : 8),
+	}) as z.ZodType<WireUpdate>;
+};
 
 /**
  * Placeholder for a missing intent.update reason; settle stores it as lastReason. Only for
@@ -535,7 +550,15 @@ export const fromWire = (
 		onInvalid?.(
 			parsed.error.issues
 				.slice(0, 8)
-				.map((issue) => `schema:${issue.path.join(".")}:${issue.code}`),
+				.flatMap((issue) => [
+					`schema:${issue.path.join(".")}:${issue.code}`,
+					...(issue.code === "invalid_value"
+						? [
+								`schema_expected:${issue.path.join(".")}:${issue.values.map(String).join("|").slice(0, 200)}`,
+							]
+						: []),
+				])
+				.slice(0, 8),
 		);
 	return parsed.success ? { ok: true, proposal: parsed.data } : { ok: false };
 };
