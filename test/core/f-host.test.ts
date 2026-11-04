@@ -112,3 +112,17 @@ test("F host material does not bypass observation evidence or candidate validati
 	expect(result.decision.ticket).toBeNull();
 	expect(result.decision.rejectCodes).toContain("missing_candidate");
 });
+
+test("F skips selection after no_change even when standing interests and host material are present", async () => {
+	const { runtime, llm } = setup();
+	llm.push("update", proposal([], { interestOps: [] }));
+	const result = await runtime.decide(
+		opportunity("proof", 60_000, {
+			topics: [{ id: "m1", text: "現在の関心" }],
+		}),
+		signal(),
+	);
+	expect(result.decision.source).toBe("host_no_candidates");
+	expect(llm.count("select")).toBe(0);
+	expect(result.decision.ticket).toBeNull();
+});

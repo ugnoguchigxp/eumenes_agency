@@ -759,16 +759,14 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		const findings =
 			deps.findings && condition !== "B1" ? findingIntents(state) : [];
 		// B1a (eval ablation): with no notes, still let select speak from the observations.
-		const selectEmpty = condition === "B1" && deps.selectWhenEmpty === true;
-		if (
-			items === 0 &&
-			!selectEmpty &&
-			interests.length === 0 &&
-			topics.length === 0 &&
-			ambient.length === 0 &&
-			doneTodos === 0 &&
-			findings.length === 0
-		)
+		const selectEmpty =
+			condition === "B1" &&
+			(deps.selectWhenEmpty === true ||
+				interests.length > 0 ||
+				topics.length > 0 ||
+				ambient.length > 0 ||
+				doneTodos > 0);
+		if (items === 0 && !selectEmpty && findings.length === 0)
 			return done(
 				hostDecision(opp.id, "host_no_candidates", "nothing to offer"),
 			);
