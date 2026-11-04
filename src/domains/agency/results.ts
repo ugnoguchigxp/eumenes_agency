@@ -58,7 +58,7 @@ export const applyReceipt = (
 	if (changed) state.revision += 1;
 
 	const id = nextObservationId();
-	const ok = receipt.status === "succeeded";
+	const ok = receipt.status === "succeeded" && attempt.status === "succeeded";
 	const prefix = ok ? "" : `[${receipt.status}] `;
 	const base = {
 		id,
@@ -73,6 +73,10 @@ export const applyReceipt = (
 					...base,
 					kind: "delivery.observed",
 					actor: "agent",
+					deliveryStatus:
+						receipt.status === "succeeded" && !ok
+							? "outcome_unknown"
+							: receipt.status,
 					...(ticket ? { tts: ticket.tts } : {}),
 					...(ok && receipt.speechHandoff && ticket?.utterance
 						? {

@@ -15,6 +15,7 @@ import type {
 } from "../contracts/model.ts";
 import {
 	defaultLimits,
+	deliveryStatuses,
 	emptyState,
 	isOpenIntent,
 	limitsSchema,
@@ -218,9 +219,22 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const receipts = new Map<string, Observation>();
 	if (deps.restore !== undefined) validateRestore(deps.restore, condition);
 	if (deps.restore?.observations !== undefined) {
+		// Older snapshots kept the status in the receipt key but not on the observation.
+		const legacyStatuses = new Map<string, Observation["deliveryStatus"]>();
+		for (const [key, observation] of deps.restore.continuity?.receipts ?? []) {
+			if (
+				observation.kind === "delivery.observed" &&
+				!observation.deliveryStatus
+			)
+				legacyStatuses.set(
+					observation.id,
+					deliveryStatuses.find((status) => key.endsWith(":" + status)),
+				);
+		}
 		for (const o of deps.restore.observations) {
 			const { seq: _seq, ...input } = o;
-			ledger.record(input);
+			const status = o.deliveryStatus ?? legacyStatuses.get(o.id);
+			ledger.record(status ? { ...input, deliveryStatus: status } : input);
 		}
 		ledger.markProcessed(
 			deps.restore.observations.slice(0, deps.restore.cursor).map((o) => o.seq),
@@ -331,7 +345,14 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const deliveredObs = () =>
 		ledger
 			.all()
-			.filter((o) => o.kind === "delivery.observed" && o.actor === "agent")
+			.filter(
+				(o) =>
+					o.kind === "delivery.observed" &&
+					o.actor === "agent" &&
+					(o.deliveryStatus === "succeeded" ||
+						(o.deliveryStatus === undefined &&
+							(!o.causationId || o.speechHandoff !== undefined))),
+			)
 			.slice(-DELIVERED_SHOWN);
 	const delivered = () => deliveredObs().map((o) => o.text);
 	// Utterance emotion: the feeling each delivered utterance was said with, by its receipt observation.
@@ -348,7 +369,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	if (deps.restore?.continuity) {
 		const c = deps.restore.continuity;
 		for (const t of c.issued) issued.set(t.id, structuredClone(t));
-		for (const [key, o] of c.receipts) receipts.set(key, structuredClone(o));
+		for (const [key, o] of c.receipts)
+			receipts.set(key, ledger.get(o.id) ?? structuredClone(o));
 		for (const [id, refs] of c.topics) topicTickets.set(id, [...refs]);
 		for (const [id, at] of c.lastUsed) lastUsedAt.set(id, at);
 		for (const [id, feeling] of c.feelings) feelingByObs.set(id, feeling);

@@ -27,6 +27,7 @@ const sameContent = (a: Observation, b: ObservationInput) =>
 	a.workRef === b.workRef &&
 	a.workStatus === b.workStatus &&
 	a.tts === b.tts &&
+	a.deliveryStatus === b.deliveryStatus &&
 	a.speechHandoff?.proposedText === b.speechHandoff?.proposedText &&
 	JSON.stringify(a.speechHandoff?.findingWorkRefs) ===
 		JSON.stringify(b.speechHandoff?.findingWorkRefs) &&

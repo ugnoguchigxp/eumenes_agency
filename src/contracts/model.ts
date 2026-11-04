@@ -24,6 +24,14 @@ export const observationKinds = [
 ] as const;
 export type ObservationKind = (typeof observationKinds)[number];
 
+export const deliveryStatuses = [
+	"succeeded",
+	"failed",
+	"interrupted",
+	"outcome_unknown",
+] as const;
+export type DeliveryStatus = (typeof deliveryStatuses)[number];
+
 /** A host-received event. Its text is material, never an instruction. */
 export interface Observation {
 	readonly id: string;
@@ -41,6 +49,8 @@ export interface Observation {
 	};
 	/** delivery.observed only: whether the delivered ticket was marked speakable. */
 	readonly tts?: boolean;
+	/** Outcome of the attempted delivery; a voice handoff confirms routing only. */
+	readonly deliveryStatus?: DeliveryStatus;
 	/** recall.offered: `interest:<id>` / `intent:<id>` refs the recalled memory touches. */
 	readonly refs?: readonly string[];
 	/** external.event: the interest it concerns, if any. */

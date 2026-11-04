@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
 	actors,
 	conditions,
+	deliveryStatuses,
 	observationKinds,
 	workStatuses,
 	type Condition,
@@ -20,6 +21,7 @@ const observation = z.object({
 	text: z.string(),
 	causationId: z.string().optional(),
 	tts: z.boolean().optional(),
+	deliveryStatus: z.enum(deliveryStatuses).optional(),
 	speechHandoff: z
 		.object({ proposedText: z.string(), findingWorkRefs: z.array(z.string()) })
 		.optional(),

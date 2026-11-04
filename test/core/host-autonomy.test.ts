@@ -253,3 +253,55 @@ test("idle checkpoint preserves unanswered limits and next opportunity time", as
 		"unanswered",
 	);
 });
+
+test("failed, interrupted and unknown speech stay in observations and outside delivered, including legacy restore", async () => {
+	for (const status of [
+		"succeeded",
+		"interrupted",
+		"outcome_unknown",
+		"failed",
+	] as const) {
+		const m = make();
+		m.rt.observe(obsInput("o1", "user.report", "user", 0, "確認"));
+		m.llm.push(
+			"update",
+			proposal([intentAddOp("g"), candidateAddOp("c", "g")]),
+		);
+		m.llm.push(
+			"select",
+			participation({
+				action: "speak",
+				candidateRef: { id: "c2", revision: 1 },
+				evidenceRefs: ["o1"],
+				utterance: "伝言",
+			}),
+		);
+		const { decision } = await m.rt.decide(opportunity("one", 10), sig());
+		const o = m.rt.recordResult({
+			ticketId: decision.ticket!.id,
+			status,
+			at: 11,
+			resultText: "",
+		});
+		expect(o.deliveryStatus).toBe(status);
+		const saved = m.rt.snapshot();
+		const legacy = JSON.parse(
+			JSON.stringify(saved, (key, value) =>
+				key === "deliveryStatus" ? undefined : value,
+			),
+		);
+		for (const trial of [m, make(saved), make(legacy)]) {
+			trial.llm.push("update", proposal());
+			await trial.rt.decide(opportunity("next", 70000), sig());
+			const update = trial.llm.requests
+				.filter((r) => r.purpose === "update")
+				.at(-1)!;
+			const data = JSON.parse(update.prompt);
+			expect(data.delivered).toEqual(status === "succeeded" ? ["伝言"] : []);
+			expect(
+				data.observations.find((x: { id: string }) => x.id === o.id)
+					?.deliveryStatus,
+			).toBe(status);
+		}
+	}
+});

@@ -259,7 +259,7 @@ export interface ActionReceipt {
 	/** The voice destination accepted the proposed text. Playback is unconfirmed. */
 	readonly speechHandoff?: true;
 	readonly ticketId: string;
-	readonly status: "succeeded" | "failed" | "interrupted" | "outcome_unknown";
+	readonly status: import("./model.ts").DeliveryStatus;
 	readonly at: number;
 	/** Tool result text, or the delivered utterance for speak. */
 	readonly resultText: string;
