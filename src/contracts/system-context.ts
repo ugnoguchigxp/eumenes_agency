@@ -57,6 +57,10 @@ export interface UpdateModelData extends ModelData {
 }
 
 export interface SelectModelData extends ModelData {
+	readonly findingRefs?: readonly {
+		readonly intentId: string;
+		readonly ref: string;
+	}[];
 	readonly opportunity: Omit<Opportunity, "topics" | "ambient" | "todos">;
 	readonly candidates: AgencyState["candidates"];
 	readonly deliveredMinutesAgo?: readonly number[];

@@ -1,3 +1,4 @@
+import { findingIntents } from "./findings.ts";
 import type {
 	AgencyState,
 	Candidate,
@@ -16,7 +17,7 @@ import type { StandingInterest } from "../contracts/runtime.ts";
 import type { Due } from "../domains/agency/due.ts";
 
 /** Bump when any instruction text below changes; recorded in run metadata. */
-export const INSTRUCTION_VERSION = "p0e-instructions-16";
+export const INSTRUCTION_VERSION = "p0e-instructions-17";
 /**
  * Version of the lull-talk rules (socialTopics / hostTopics modes only). Shown at the head of
  * those rules and part of the settings digest; the evaluated B1/B2 prompts do not contain it.
@@ -364,7 +365,7 @@ const renderObservations = (
 		: observations
 				.map(
 					(o) =>
-						`[${o.id}] ${o.kind} / actor=${o.actor}${o.causationId === undefined ? "" : ` / causationId=${q(o.causationId)}`} / ${ago(now, o.occurredAt)}${fresh.has(o.id) ? " / 新着" : ""}\n  本文: ${q(o.text)}`,
+						`[${o.id}] ${o.kind} / actor=${o.actor}${o.causationId === undefined ? "" : ` / causationId=${q(o.causationId)}`} / ${ago(now, o.occurredAt)}${fresh.has(o.id) ? " / 新着" : ""}\n  本文: ${q(o.text)}${o.speechHandoff ? " / speechHandoff: " + q(JSON.stringify(o.speechHandoff)) : ""}`,
 				)
 				.join("\n");
 
@@ -383,10 +384,6 @@ const certainty = {
 	question: "未確認（問いが残る）",
 	interrupted: "途中まで",
 } as Record<string, string>;
-/** P5-a: closed intents whose delegated work returned a result (shown as findings). */
-export const findingIntents = (state: AgencyState) =>
-	state.intents.filter((i) => !isOpenIntent(i) && i.lastReturn).slice(-5);
-
 const renderIntents = (now: number, state: AgencyState, findings = false) => {
 	const open = state.intents.filter(isOpenIntent);
 	const closed = state.intents
@@ -624,6 +621,7 @@ export interface SelectPromptInput {
 	readonly hostTopics?: boolean;
 	/** P5-a: show findings (closed intents with a work return) with when and how sure. */
 	readonly findings?: boolean;
+	readonly findingRefs?: readonly { intentId: string; ref: string }[];
 }
 
 /**
@@ -641,9 +639,7 @@ export const selectEvidenceIds = (
 			? state.notes.flatMap((n) => n.evidence)
 			: [
 					...state.intents.filter(isOpenIntent).flatMap((i) => i.evidence),
-					...(findings
-						? findingIntents(state).flatMap((i) => [i.id, ...i.evidence])
-						: []),
+					...(findings ? findingIntents(state).flatMap((i) => i.evidence) : []),
 				],
 	);
 
@@ -789,6 +785,9 @@ export const selectPrompt = (i: SelectPromptInput): string => {
 			: i.social === true && i.condition === "B1" && o.trigger === "idle"
 				? idleSocialClosing
 				: "この機会に何をするかを JSON で一つだけ返す。価値が低い、または迷うなら wait。",
+		...(i.findingRefs?.length
+			? [JSON.stringify({ findingRefs: i.findingRefs })]
+			: []),
 		...(i.findings === true && findingIntents(i.state).length > 0
 			? [findingsRule]
 			: []),

@@ -227,6 +227,8 @@ export interface ActionTicket {
 	readonly utterance: string | null;
 	readonly toolName: string | null;
 	readonly toolInput: string | null;
+	/** The work units behind findings cited by this speech, resolved at selection time. */
+	readonly findingWorkRefs?: readonly string[];
 	/** Speak in utteranceEmotion mode: the feeling chosen with the utterance. */
 	readonly emotion?: EmotionName;
 	readonly origin: TicketOrigin;
@@ -253,6 +255,8 @@ export interface Decision {
 }
 
 export interface ActionReceipt {
+	/** The voice destination accepted the proposed text. Playback is unconfirmed. */
+	readonly speechHandoff?: true;
 	readonly ticketId: string;
 	readonly status: "succeeded" | "failed" | "interrupted" | "outcome_unknown";
 	readonly at: number;

@@ -1,3 +1,4 @@
+import { findingIntents, selectionFindingRefs } from "./findings.ts";
 import { settleInterests } from "../domains/agency/settle-interests.ts";
 import type { InterestOp } from "../contracts/interest.ts";
 import type { WireInterestOp } from "../contracts/proposals.ts";
@@ -86,7 +87,6 @@ import {
 } from "./system-context.ts";
 import {
 	selectEvidenceIds,
-	findingIntents,
 	selectPrompt,
 	interestRef,
 	memoryRef,
@@ -299,6 +299,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				if (o) m.set(o.seq, o);
 			}
 		}
+		// Preserve the identity of recent voice offers even when other observations push them out of the window.
+		for (const o of deliveredObs()) if (o.speechHandoff) m.set(o.seq, o);
 		for (const o of ledger.all().slice(-RECENT_OBSERVATION_WINDOW))
 			m.set(o.seq, o);
 		for (const o of pending.slice(-PENDING_CAP)) m.set(o.seq, o);
@@ -731,6 +733,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			(x) =>
 				x.status === "done" || x.status === "waiting" || x.kind === "errand",
 		).length;
+		const findings =
+			deps.findings && condition !== "B1" ? findingIntents(state) : [];
 		// B1a (eval ablation): with no notes, still let select speak from the observations.
 		const selectEmpty = condition === "B1" && deps.selectWhenEmpty === true;
 		if (
@@ -740,7 +744,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			topics.length === 0 &&
 			ambient.length === 0 &&
 			doneTodos === 0 &&
-			!(deps.findings === true && findingIntents(state).length > 0)
+			findings.length === 0
 		)
 			return done(
 				hostDecision(opp.id, "host_no_candidates", "nothing to offer"),
@@ -757,6 +761,11 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			state,
 			deps.findings === true,
 		);
+		const findingRefs = selectionFindingRefs(
+			findings,
+			shownEvidence,
+			ledger.get,
+		);
 		const input: SelectPromptInput = {
 			condition,
 			now: opp.at,
@@ -765,6 +774,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			freshIds: new Set(ledger.pending().map((o) => o.id)),
 			state,
 			candidates: pool,
+			findingRefs: findingRefs.shown,
 			delivered: delivered(),
 			...(social || hostTopics || hostTodos
 				? {
@@ -890,6 +900,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			presentedObservations: new Set([
 				...presented.map((o) => o.id),
 				...shownEvidence,
+				...findingRefs.workByRef.keys(),
 				...interests.map((x) => interestRef(x.id)),
 				...formedInterests.map((x) => interestRef(x.id)),
 				...topics.map((x) => memoryRef(x.id)),
@@ -900,21 +911,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			tools,
 			limits,
 			at: opp.at,
-			...(deps.findings === true
-				? {
-						findingRefs: new Set(
-							// Only the finding itself or its returned result qualifies: citing the original
-							// request (also in the intent's evidence) must not skip the candidate rule.
-							findingIntents(state).flatMap((x) => [
-								x.id,
-								...x.evidence.filter((e) => {
-									const o = ledger.get(e);
-									return o?.kind === "work.returned";
-								}),
-							]),
-						),
-					}
-				: {}),
+			findingRefs: new Set(findingRefs.workByRef.keys()),
 		});
 		if (!verdict.ok) {
 			calls.push(
@@ -984,7 +981,21 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				"autonomous",
 				ticketTts("autonomous", deps.reportTts),
 			);
-			ticket = emotion ? { ...reserved, emotion } : reserved;
+			const findingWorkRefs =
+				p.action === "speak"
+					? [
+							...new Set(
+								p.evidenceRefs.flatMap(
+									(ref) => findingRefs.workByRef.get(ref) ?? [],
+								),
+							),
+						]
+					: [];
+			ticket = {
+				...reserved,
+				...(emotion ? { emotion } : {}),
+				...(findingWorkRefs.length ? { findingWorkRefs } : {}),
+			};
 			issued.set(ticket.id, ticket);
 			if (budgetIntent) {
 				activity.spend(budgetIntent.id, opp.at, { toolCalls: 1 });

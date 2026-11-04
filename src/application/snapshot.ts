@@ -20,6 +20,9 @@ const observation = z.object({
 	text: z.string(),
 	causationId: z.string().optional(),
 	tts: z.boolean().optional(),
+	speechHandoff: z
+		.object({ proposedText: z.string(), findingWorkRefs: z.array(z.string()) })
+		.optional(),
 	refs: z.array(z.string()).optional(),
 	interestId: z.string().optional(),
 	code: z.string().optional(),
@@ -63,6 +66,7 @@ const continuity = z.object({
 			toolInput: z.string().nullable(),
 			origin: z.enum(["autonomous", "requested"]),
 			tts: z.boolean(),
+			findingWorkRefs: z.array(z.string()).optional(),
 		}),
 	),
 	receipts: z.array(z.tuple([z.string(), observation])),

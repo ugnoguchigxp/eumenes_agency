@@ -74,6 +74,14 @@ export const applyReceipt = (
 					kind: "delivery.observed",
 					actor: "agent",
 					...(ticket ? { tts: ticket.tts } : {}),
+					...(ok && receipt.speechHandoff && ticket?.utterance
+						? {
+								speechHandoff: {
+									proposedText: ticket.utterance,
+									findingWorkRefs: ticket.findingWorkRefs ?? [],
+								},
+							}
+						: {}),
 				}
 			: {
 					...base,

@@ -27,6 +27,9 @@ const sameContent = (a: Observation, b: ObservationInput) =>
 	a.workRef === b.workRef &&
 	a.workStatus === b.workStatus &&
 	a.tts === b.tts &&
+	a.speechHandoff?.proposedText === b.speechHandoff?.proposedText &&
+	JSON.stringify(a.speechHandoff?.findingWorkRefs) ===
+		JSON.stringify(b.speechHandoff?.findingWorkRefs) &&
 	JSON.stringify(a.refs ?? null) === JSON.stringify(b.refs ?? null);
 
 export const createLedger = (): Ledger => {

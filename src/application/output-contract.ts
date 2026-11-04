@@ -105,7 +105,7 @@ export function agencyOutputContract(
 				: "By default, speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.",
 			...(options.findings && condition !== "B1"
 				? [
-						"A speak using a presented closed intent with lastReturn may set candidateRef to null. Provide the final utterance and cite the intent ID in evidenceRefs (or its recorded work.returned observation). The original request alone does not qualify.",
+						"A speak using a presented closed intent with lastReturn may set candidateRef to null. Provide the final utterance and cite the ref supplied for that intent in findingRefs (or the evidence ID of the matching work.returned observation for lastReturn.workRef). The original request alone does not qualify.",
 					]
 				: []),
 			"Evidence refs are presented observation IDs, evidence on presented notes/open intents, interest:<id> for presented formed or standing interests, or memory:<id>, context:<id>, todo:<id> for the corresponding presented host data. Unknown evidence refs, stale candidate revisions, unavailable/approval-required tools, outbound interval violations and invalidated opportunities are rejected before reservation. Tickets do not execute tools; execution and receipts belong to the host.",

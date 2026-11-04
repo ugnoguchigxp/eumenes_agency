@@ -1,3 +1,4 @@
+import { recentFindings } from "./findings.ts";
 import type {
 	AgencyState,
 	Condition,
@@ -87,10 +88,7 @@ export const buildProjection = (
 						.filter((i) => i.status !== "faded")
 						.map((i) => i.id),
 					...state.intents.filter(isOpenIntent).map((i) => i.id),
-					...state.intents
-						.filter((i) => !!i.lastReturn)
-						.slice(-3)
-						.map((i) => `finding:${i.id}`),
+					...recentFindings(state.intents, 3).map((i) => `finding:${i.id}`),
 					...state.candidates.filter(isOpenCandidate).map((c) => c.id),
 				];
 	const ordered = [...new Set([...state.focus, ...openIds])]

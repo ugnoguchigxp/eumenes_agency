@@ -34,6 +34,11 @@ export interface Observation {
 	readonly text: string;
 	/** Candidate or attempt that produced it (agent output and its results). */
 	readonly causationId?: string;
+	/** A successful handoff to a voice destination, distinct from its transcript or playback. */
+	readonly speechHandoff?: {
+		readonly proposedText: string;
+		readonly findingWorkRefs: readonly string[];
+	};
 	/** delivery.observed only: whether the delivered ticket was marked speakable. */
 	readonly tts?: boolean;
 	/** recall.offered: `interest:<id>` / `intent:<id>` refs the recalled memory touches. */

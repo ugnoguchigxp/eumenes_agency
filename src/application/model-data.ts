@@ -5,7 +5,7 @@ import type {
 	SelectModelData,
 	UpdateModelData,
 } from "../contracts/system-context.ts";
-import { findingIntents } from "./prompts.ts";
+import { findingIntents } from "./findings.ts";
 import type { SelectPromptInput, UpdatePromptInput } from "./prompts.ts";
 
 /** Same visibility bounds as the experimental renderers; no behavioral ordering. */
@@ -109,6 +109,7 @@ export const selectModelData = (i: SelectPromptInput): SelectModelData => {
 		freshIds: [...i.freshIds],
 		state: stateData(i.condition, i.state, true, i.findings),
 		candidates: [...i.candidates],
+		...(i.findingRefs?.length ? { findingRefs: i.findingRefs } : {}),
 		delivered: i.delivered,
 		...(i.deliveredMinutesAgo
 			? { deliveredMinutesAgo: i.deliveredMinutesAgo }
