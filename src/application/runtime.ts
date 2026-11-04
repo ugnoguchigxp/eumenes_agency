@@ -952,6 +952,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			);
 			return done(hostDecision(opp.id, "rejected", p.reason, ["stale_epoch"]));
 		}
+		const reservationAt = deps.now?.() ?? opp.at;
 		const verdict = validateParticipation({
 			condition,
 			state,
@@ -960,7 +961,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			presentedCandidates: new Map(pool.map((c) => [c.id, c.revision])),
 			tools,
 			limits,
-			at: opp.at,
+			at: reservationAt,
 			findingRefs: findingRefs.accepted,
 		});
 		if (!verdict.ok) {
@@ -1027,7 +1028,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				opp.id,
 				p.action,
 				verdict,
-				opp.at,
+				reservationAt,
 				"autonomous",
 				ticketTts("autonomous", deps.reportTts),
 			);

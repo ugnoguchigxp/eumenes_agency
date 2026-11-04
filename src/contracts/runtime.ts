@@ -47,6 +47,8 @@ export const defaultBudget: BudgetConfig = {
 };
 
 export interface RuntimeDeps {
+	/** Host clock at reservation. Replay hosts may use the opportunity timestamp. */
+	readonly now?: () => number;
 	readonly condition: Condition;
 	/** Full host-owned instructions, or explicit opt-in to Agency's experimental prompts. No fallback. */
 	readonly systemContext: BackgroundSystemContext | "experimental";
