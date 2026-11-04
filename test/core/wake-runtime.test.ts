@@ -10,6 +10,7 @@ import {
 	defaultLimits,
 	fakeLlm,
 	intentAddOp,
+	intentUpdateOp,
 	obsInput,
 	opportunity,
 	participation,
@@ -258,4 +259,47 @@ describe("H8 fixtures (P3-b)", () => {
 		const again = await m.rt.wake!(10 * MIN + HOUR + 2 * MIN, quiet, sig());
 		expect(again.reasons).toEqual([]);
 	});
+});
+
+test("a bounded review drains queued observations before it can issue a ticket", async () => {
+	const m = make("F", { budget: { ...defaultBudget, minIntervalMs: 0 } });
+	await seed(m, [
+		candidateAddOp("t", "g", {
+			kind: "tool",
+			toolName: "run_compare",
+			toolInput: "A B",
+		}),
+	]);
+	for (let n = 0; n < defaultBudget.batchSize; n++)
+		m.rt.observe(
+			obsInput("pre" + n, "exchange.adopted", "agent", n + 1, "既読"),
+		);
+	m.rt.observe(
+		obsInput("withdraw", "correction", "user", 20, "この比較は取り消します"),
+	);
+	for (let n = 0; n < 32; n++)
+		m.rt.observe(
+			obsInput("extra" + n, "exchange.adopted", "agent", 30 + n, "別件"),
+		);
+	m.llm.push("update", proposal());
+	const at = m.rt.snapshot().state.intents[0]!.reviewAt;
+	const first = await m.rt.wake!(at, quiet, sig());
+	expect(first.decision?.source).toBe("host_stale");
+	expect(first.calls.map((c) => c.purpose)).toEqual(["update"]);
+	expect(m.rt.snapshot().state.attempts).toHaveLength(0);
+	expect(m.rt.snapshot().cursor).toBe(1 + defaultBudget.batchSize);
+	// The review was deferred. Interpret the user's withdrawal on the next wake.
+	m.llm.push(
+		"update",
+		proposal([
+			intentUpdateOp("i1", 1, {
+				transition: "abandoned",
+				evidenceRefs: ["withdraw"],
+			}),
+		]),
+	);
+	const next = await m.rt.wake!(at + 1, quiet, sig());
+	expect(next.reasons).toContain("review_due");
+	expect(m.rt.snapshot().state.intents[0]!.state).toBe("abandoned");
+	expect(next.decision?.ticket).toBeNull();
 });

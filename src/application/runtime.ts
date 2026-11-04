@@ -705,15 +705,14 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				),
 			);
 
-		// Quarantined updates leave observations unprocessed. Never select or reserve on a state
-		// that has not seen them (it could re-propose what the user just declined).
+		// A bounded wake, exhausted call budget or quarantine can leave an older candidate stale.
 		const unprocessed = ledger.pending(upto).length;
-		if (quarantined && unprocessed > 0)
+		if (unprocessed > 0)
 			return done(
 				hostDecision(
 					opp.id,
-					"host_stale",
-					`state is stale: ${unprocessed} unprocessed observations (update quarantined)`,
+					budgetBlocked ? "host_budget" : "host_stale",
+					`state is stale: ${unprocessed} unprocessed observations`,
 				),
 			);
 
@@ -1261,7 +1260,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					signal,
 					1,
 				);
-				if (res.calls.every(isApplied)) commitProcessedWake(r, now);
+				if (res.decision.source !== "host_stale" && res.calls.every(isApplied))
+					commitProcessedWake(r, now);
 				return { ...out, ...res };
 			});
 		},

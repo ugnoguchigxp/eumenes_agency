@@ -190,7 +190,7 @@ export type DecisionSource =
 	| "llm"
 	| "host_blocked"
 	| "host_no_candidates"
-	/** Quarantined with unprocessed observations: never select on a stale state. */
+	/** Observations still await interpretation: never select on a stale state. */
 	| "host_stale"
 	| "host_budget"
 	/** P4-a: the intent's delegated work unit has not returned yet. */
