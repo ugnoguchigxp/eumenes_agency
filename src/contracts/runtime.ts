@@ -139,8 +139,8 @@ export interface RuntimeDeps {
 	 */
 	readonly revisions?: import("./revisions.ts").RevisionSink;
 	/**
-	 * P5-a (B2/F, experimental prompts): select also sees "findings" (closed intents whose delegated
-	 * work returned) with when they were looked up and how sure, plus the rule to say both.
+	 * B2/F: select may speak from a presented closed intent with a work return. The host sees
+	 * its recorded result, time and status; experimental prompts also describe how to report it.
 	 */
 	readonly findings?: boolean;
 	/**

@@ -641,7 +641,9 @@ export const selectEvidenceIds = (
 			? state.notes.flatMap((n) => n.evidence)
 			: [
 					...state.intents.filter(isOpenIntent).flatMap((i) => i.evidence),
-					...(findings ? findingIntents(state).flatMap((i) => i.evidence) : []),
+					...(findings
+						? findingIntents(state).flatMap((i) => [i.id, ...i.evidence])
+						: []),
 				],
 	);
 

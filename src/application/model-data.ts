@@ -5,6 +5,7 @@ import type {
 	SelectModelData,
 	UpdateModelData,
 } from "../contracts/system-context.ts";
+import { findingIntents } from "./prompts.ts";
 import type { SelectPromptInput, UpdatePromptInput } from "./prompts.ts";
 
 /** Same visibility bounds as the experimental renderers; no behavioral ordering. */
@@ -12,6 +13,7 @@ const stateData = (
 	condition: Condition,
 	state: AgencyState,
 	select: boolean,
+	findings = false,
 ): ModelStateData => ({
 	revision: state.revision,
 	...(condition === "F" && state.interests !== undefined
@@ -23,7 +25,10 @@ const stateData = (
 			? []
 			: [
 					...state.intents.filter(isOpenIntent),
-					...state.intents.filter((i) => !isOpenIntent(i)).slice(-5),
+					...state.intents
+						.filter((i) => !isOpenIntent(i) && !(findings && i.lastReturn))
+						.slice(-5),
+					...(findings ? findingIntents(state) : []),
 				],
 	candidates:
 		condition === "B1" || select
@@ -102,7 +107,7 @@ export const selectModelData = (i: SelectPromptInput): SelectModelData => {
 		},
 		observations: i.observations,
 		freshIds: [...i.freshIds],
-		state: stateData(i.condition, i.state, true),
+		state: stateData(i.condition, i.state, true, i.findings),
 		candidates: [...i.candidates],
 		delivered: i.delivered,
 		...(i.deliveredMinutesAgo

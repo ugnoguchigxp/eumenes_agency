@@ -159,6 +159,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const contractOptions = {
 		condition: condition === "B0" ? ("B2" as const) : condition,
 		hostTodos,
+		findings: deps.findings === true,
 		interestFormation,
 		utteranceEmotion: emotionMode,
 		...(deps.constrainToolNames
@@ -908,7 +909,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 								x.id,
 								...x.evidence.filter((e) => {
 									const o = ledger.get(e);
-									return o === undefined || o.kind === "work.returned";
+									return o?.kind === "work.returned";
 								}),
 							]),
 						),

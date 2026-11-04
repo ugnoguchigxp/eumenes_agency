@@ -60,6 +60,9 @@ const make = async (findings: boolean) => {
 		restore: { state: await withFinding() },
 		...(findings ? { findings: true } : {}),
 	});
+	rt.observe(
+		obsInput("w1", "work.returned", "tool", NOW - 3 * D, "3系統に整理"),
+	);
 	rt.observe(obsInput("u9", "user.report", "user", NOW, "角換わりどう指そう"));
 	llm.push("update", proposal([]));
 	return { llm, rt };
@@ -87,21 +90,31 @@ describe("P5-a findings in conversation", () => {
 		expect(d.decision.action).toBe("speak");
 		expect(d.decision.ticket?.tts).toBe(false);
 	});
-	test("speak citing only the original request (u1) still needs a candidate", async () => {
-		const m = await make(true);
-		m.rt.observe(obsInput("u1", "user.report", "user", 0, "角換わりを調べて"));
-		m.llm.push("update", proposal());
-		m.llm.push(
-			"select",
-			participation({ action: "speak", evidenceRefs: ["u1"], utterance: "x" }),
-		);
-		const d = await m.rt.decide(
-			{ ...opportunity("op", NOW + 1), trigger: "turn_end" } as never,
-			sig(),
-		);
-		expect(d.decision.action).toBe("wait");
-		expect(d.decision.source).toBe("rejected");
-	});
+	test.each([true, false])(
+		"original request still needs a candidate (observation retained: %s)",
+		async (retained) => {
+			const m = await make(true);
+			if (retained)
+				m.rt.observe(
+					obsInput("u1", "user.report", "user", 0, "角換わりを調べて"),
+				);
+			m.llm.push("update", proposal());
+			m.llm.push(
+				"select",
+				participation({
+					action: "speak",
+					evidenceRefs: ["u1"],
+					utterance: "x",
+				}),
+			);
+			const d = await m.rt.decide(
+				{ ...opportunity("op", NOW + 1), trigger: "turn_end" } as never,
+				sig(),
+			);
+			expect(d.decision.action).toBe("wait");
+			expect(d.decision.source).toBe("rejected");
+		},
+	);
 	test("speak citing no finding still needs a candidate", async () => {
 		const m = await make(true);
 		m.llm.push(
@@ -124,4 +137,53 @@ describe("P5-a findings in conversation", () => {
 		expect(m.llm.requests.some((r) => r.purpose === "select")).toBe(false);
 		expect(d.decision.action).toBe("wait");
 	});
+});
+
+test("host select sees the contracted finding even after newer intents close", async () => {
+	const state = await withFinding();
+	const finding = state.intents[0]!;
+	const llm = fakeLlm();
+	let contract = "";
+	const rt = createAgencyRuntime({
+		condition: "F",
+		findings: true,
+		systemContext: {
+			update: "update",
+			select: ({ outputContract }) => {
+				contract = outputContract.description;
+				return contract;
+			},
+		},
+		llm,
+		tools: [],
+		restore: {
+			state: {
+				...state,
+				intents: [
+					finding,
+					...Array.from({ length: 6 }, (_, n) => ({
+						...finding,
+						id: "later-" + n,
+						evidence: [],
+						lastReturn: null,
+					})),
+				],
+			},
+		},
+	});
+	llm.push(
+		"select",
+		participation({
+			action: "speak",
+			utterance: "3日前に確認できたのは3系統までです。",
+			evidenceRefs: [finding.id],
+		}),
+	);
+	const { decision } = await rt.decide(opportunity("idle", NOW), sig());
+	const data = JSON.parse(llm.requests[0]!.prompt);
+	expect(data.state.intents).toContainEqual(finding);
+	expect(contract).toContain("closed intent with lastReturn");
+	expect(decision.ticket?.utterance).toBe(
+		"3日前に確認できたのは3系統までです。",
+	);
 });

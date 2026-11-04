@@ -15,6 +15,7 @@ import type {
 export interface OutputContractOptions {
 	readonly condition: Exclude<Condition, "B0">;
 	readonly hostTodos?: boolean;
+	readonly findings?: boolean;
 	readonly utteranceEmotion?: boolean;
 	/** Condition I (F only): the update also carries interestOps. */
 	readonly interestFormation?: boolean;
@@ -101,7 +102,12 @@ export function agencyOutputContract(
 			"For speak, utterance is the final text addressed to the user: the actual explanation or question, not instructions describing what to say. When null falls back to candidate content, that content must already be suitable as the final utterance.",
 			condition === "B1"
 				? "B1 has no candidates. discard is unavailable. speak requires utterance and evidenceRefs. tool requires an available toolName and toolInput. A note ID used as evidence is resolved to that note's evidence."
-				: "speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.",
+				: "By default, speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.",
+			...(options.findings && condition !== "B1"
+				? [
+						"A speak using a presented closed intent with lastReturn may set candidateRef to null. Provide the final utterance and cite the intent ID in evidenceRefs (or its recorded work.returned observation). The original request alone does not qualify.",
+					]
+				: []),
 			"Evidence refs are presented observation IDs, evidence on presented notes/open intents, interest:<id> for presented formed or standing interests, or memory:<id>, context:<id>, todo:<id> for the corresponding presented host data. Unknown evidence refs, stale candidate revisions, unavailable/approval-required tools, outbound interval violations and invalidated opportunities are rejected before reservation. Tickets do not execute tools; execution and receipts belong to the host.",
 			...(emotion
 				? [
