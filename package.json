@@ -18,6 +18,7 @@
 		"test": "bun test ./src ./test ./standalone ./eval",
 		"agency": "bun standalone/cli.ts",
 		"eval": "bun eval/main.ts",
+		"eval:initiative": "bun eval/initiative/run.ts",
 		"pack": "bun scripts/pack.ts"
 	},
 	"dependencies": {

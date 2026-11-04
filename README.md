@@ -6,6 +6,13 @@ Eumenes が経験から関心・欲求・意図を持ち、発言や行動の機
 
 使い方: `bun run verify`（format / lint / 型 / 境界 / テスト）、`bun eval/main.ts validate [--suite p0e|p1e]`、`bun eval/main.ts run --name <run> [--suite p1e] [--conditions B1,B2,D] [--case <id>] [--reps 3] [--budget-usd n]`、`bun eval/main.ts score --name <run>`、`bun eval/main.ts judge --name <run> [--limit N] [--budget-usd n]`（内容と状態の判定器）、`bun eval/main.ts label-export --suite p1e --split dev --n 12 --out <file.md>` と `agreement --sheet <file.md>`（人手ラベルの一致率）、`judge-export --name <run> --n 30 --out <file.md>` と `judge-agreement --sheet <file.md>`（判定器の較正）、`bun eval/main.ts trace --name <run> --case <id> [--condition B2] [--rep 1] [--prompt]`（モデル呼び出しと最終状態の確認。`traces.jsonl` はローカルのみ）、`bun run agency [-- --condition B1a --idle-sec 40 --max-unanswered 1 --no-log]`（対話。黙っていると AI から話しかける。既定 B1a、会話記録は `data/chats/`）。設定は `config/experiment.json`、費用の記録は `data/spend.jsonl`。
 
+### GPT-6 Luna で自発行動を試す
+
+Agencyで `bun run eval:initiative --model gpt-6-luna --reps 2` を実行すると、過去の仕事、現在の関心、共有した出来事、撤回・完了を含む合成会話10場面を試せる。`--case proof --case proof-declined` のように対象を絞れる。各試行の期待行動・判断・却下理由・調査の受付結果をJSONLで出力し、不一致があっても指定した全件を実行する。1件でも失敗すれば終了コードは1になる。
+
+本体のCodex CLIログインと、依存関係・指示カタログを準備したEumenesのチェックアウトを使う。本体の場所は既定で隣の `../eumenes`、指定には `--eumenes <path>` を使う。モデルの呼び出しは利用枠を消費する。提示した候補と版・引用可能な根拠・モデルの提案は一時ディレクトリのトレースに保存する。保存先は `--trace <file>` でも指定できる。調査は一時DBで本体の受付処理まで通し、ワーカーは模擬実装を使う。音声再生は対象外。[初回6場面の結果](eval/results/initiative-luna-20261104/summary.md)・[追加4場面の結果](eval/results/initiative-luna-followup-20261104/summary.md)
+
+
 - [計画と設計](plan.md): 最小循環、状態、処理、段階的な取り込み。
 - [P0-E 実験仕様](spec/p0e-experiment.md): 最初の比較実験。B0/B1/B2/F、Claude Haiku 5.5、費用上限、判断方法、実施の記録と逸脱。
 - [検証結果](spec/results.md): P0-E の各回の結果と読み取り。
