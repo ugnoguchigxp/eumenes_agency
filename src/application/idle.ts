@@ -26,7 +26,8 @@ export type IdleBlock =
 	| "busy"
 	| "paused"
 	| "unanswered"
-	| "exhausted";
+	| "exhausted"
+	| "retry_limit";
 
 /** Pure state machine: when may the next automatic idle cycle run? */
 export interface IdleCheckpoint {
@@ -34,6 +35,7 @@ export interface IdleCheckpoint {
 	readonly level: number;
 	readonly unanswered: number;
 	readonly exhausted: boolean;
+	readonly failures?: number;
 }
 export function createIdlePlanner(
 	config: IdleConfig,
@@ -49,6 +51,10 @@ export function createIdlePlanner(
 			restore.level > maxRetries + 1 ||
 			!Number.isInteger(restore.unanswered) ||
 			restore.unanswered < 0 ||
+			(restore.failures !== undefined &&
+				(!Number.isInteger(restore.failures) ||
+					restore.failures < 0 ||
+					restore.failures > maxRetries + 1)) ||
 			typeof restore.exhausted !== "boolean")
 	)
 		throw new TypeError("invalid idle checkpoint");
@@ -56,6 +62,7 @@ export function createIdlePlanner(
 	let level = restore?.level ?? 0;
 	let unanswered = restore?.unanswered ?? 0;
 	let exhausted = restore?.exhausted ?? false;
+	let failures = restore?.failures ?? 0;
 	let paused = false;
 	let stopped = false;
 	let busy = 0;
@@ -67,9 +74,11 @@ export function createIdlePlanner(
 		if (paused) return "paused";
 		if (unanswered >= config.maxUnanswered) return "unanswered";
 		if (exhausted) return "exhausted";
+		if (failures > maxRetries) return "retry_limit";
 		return null;
 	};
-	const intervalMs = () => config.idleSec * 1000 * 2 ** level;
+	const intervalMs = () =>
+		config.idleSec * 1000 * 2 ** Math.max(level, failures);
 
 	return {
 		checkpoint: (): IdleCheckpoint => ({
@@ -77,6 +86,7 @@ export function createIdlePlanner(
 			level,
 			unanswered,
 			exhausted,
+			...(failures ? { failures } : {}),
 		}),
 		/** The user submitted a line: the conversation is theirs again. */
 		userTurn(now: number): void {
@@ -84,6 +94,7 @@ export function createIdlePlanner(
 			level = 0;
 			unanswered = 0;
 			exhausted = false;
+			failures = 0;
 		},
 		/** A background cycle or reply is running (nestable). */
 		enter(): void {
@@ -96,14 +107,21 @@ export function createIdlePlanner(
 		/** The AI spoke on its own (any trigger). */
 		proactiveSpoke(now: number): void {
 			unanswered++;
+			failures = 0;
 			level = 0;
 			anchor = now;
 		},
 		/** An automatic idle cycle finished without speaking: back off, then give up. */
 		idleSilent(now: number): void {
 			anchor = now;
+			failures = 0;
 			level++;
 			if (level > maxRetries) exhausted = true;
+		},
+		/** A technical failure consumes its own bounded retries, never a silent or unanswered turn. */
+		idleFailed(now: number): void {
+			anchor = now;
+			failures = Math.min(maxRetries + 1, failures + 1);
 		},
 		/** /off pauses automatic idle without touching the backoff; /on resumes it. */
 		setPaused(value: boolean, now: number): void {
@@ -133,7 +151,7 @@ export function createIdlePlanner(
 
 export type IdlePlanner = ReturnType<typeof createIdlePlanner>;
 
-export type CycleOutcome = "spoke" | "silent" | "aborted" | "halted";
+export type CycleOutcome = "spoke" | "silent" | "failed" | "aborted" | "halted";
 
 export interface SchedulerDeps {
 	readonly planner: IdlePlanner;
@@ -179,6 +197,7 @@ export function createIdleScheduler(deps: SchedulerDeps) {
 		try {
 			const outcome = await run();
 			if (outcome === "silent") planner.idleSilent(now());
+			else if (outcome === "failed") planner.idleFailed(now());
 			else if (outcome === "halted") planner.stop();
 			if (!disposed) onCycle?.(outcome);
 		} finally {

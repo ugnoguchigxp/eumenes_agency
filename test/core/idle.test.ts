@@ -276,3 +276,25 @@ describe("createIdleScheduler", () => {
 		expect(e.clock.pending()).toBe(0);
 	});
 });
+
+test("technical retries survive restore without spending silence or unanswered budgets", () => {
+	const cfg = { idleSec: 20, maxUnanswered: 1 };
+	const p = createIdlePlanner(cfg, 0);
+	p.idleFailed(1);
+	expect(p.delayMs(1)).toBe(40000);
+	const restored = createIdlePlanner(cfg, 2, p.checkpoint());
+	restored.idleFailed(2);
+	restored.idleFailed(3);
+	expect(restored.status()).toMatchObject({
+		level: 0,
+		unanswered: 0,
+		blockedBy: "retry_limit",
+	});
+	expect(restored.delayMs(3)).toBeNull();
+	restored.userTurn(4);
+	expect(restored.delayMs(4)).toBe(20000);
+	restored.idleFailed(5);
+	restored.idleSilent(6);
+	expect(restored.checkpoint()).toMatchObject({ level: 1, unanswered: 0 });
+	expect(restored.checkpoint().failures).toBeUndefined();
+});
