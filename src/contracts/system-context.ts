@@ -57,6 +57,8 @@ export interface UpdateModelData extends ModelData {
 }
 
 export interface SelectModelData extends ModelData {
+	/** Exact selection evidence whitelist for candidate-based conditions. */
+	readonly citableEvidenceRefs?: readonly string[];
 	readonly findingRefs?: readonly {
 		readonly intentId: string;
 		readonly ref: string;

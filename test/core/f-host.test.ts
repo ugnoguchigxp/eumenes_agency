@@ -126,3 +126,16 @@ test("F skips selection after no_change even when standing interests and host ma
 	expect(llm.count("select")).toBe(0);
 	expect(result.decision.ticket).toBeNull();
 });
+
+test("the F selection input enumerates citable references from the exact request", async () => {
+	const { llm, runtime } = setup();
+	llm.push(
+		"update",
+		proposal([intentAddOp("g"), candidateAddOp("c", "g")], { interestOps: [] }),
+	);
+	llm.push("select", { ...participation(), emotion: null });
+	await runtime.decide(opportunity("check", 0), signal());
+	expect(
+		JSON.parse(llm.requests.at(-1)!.prompt).citableEvidenceRefs.sort(),
+	).toEqual(["interest:s1", "o1"]);
+});

@@ -855,7 +855,22 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			...(hostTopics ? { hostTopics } : {}),
 			...(deps.findings ? { findings: true } : {}),
 		};
-		const data = selectModelData(input);
+		const citableEvidence = new Set([
+			...presented.map((o) => o.id),
+			...shownEvidence,
+			...findingRefs.accepted,
+			...interests.map((x) => interestRef(x.id)),
+			...formedInterests.map((x) => interestRef(x.id)),
+			...topics.map((x) => memoryRef(x.id)),
+			...ambient.map((x) => contextRef(x.id)),
+			...todos.map((x) => todoRef(x.id)),
+		]);
+		const data = {
+			...selectModelData(input),
+			...(condition !== "B1"
+				? { citableEvidenceRefs: [...citableEvidence] }
+				: {}),
+		};
 		const prompt =
 			systemContext === "experimental"
 				? selectPrompt(input)
@@ -941,16 +956,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			condition,
 			state,
 			proposal: p,
-			presentedObservations: new Set([
-				...presented.map((o) => o.id),
-				...shownEvidence,
-				...findingRefs.accepted,
-				...interests.map((x) => interestRef(x.id)),
-				...formedInterests.map((x) => interestRef(x.id)),
-				...topics.map((x) => memoryRef(x.id)),
-				...ambient.map((x) => contextRef(x.id)),
-				...todos.map((x) => todoRef(x.id)),
-			]),
+			presentedObservations: citableEvidence,
 			presentedCandidates: new Map(pool.map((c) => [c.id, c.revision])),
 			tools,
 			limits,
