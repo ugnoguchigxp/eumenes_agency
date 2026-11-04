@@ -406,7 +406,7 @@ const renderIntents = (now: number, state: AgencyState, findings = false) => {
 };
 
 const showCandidate = (now: number, c: Candidate) =>
-	`[${c.id} r${c.revision}] 意図=${c.intentId} / kind=${c.kind} / 状態=${c.state}${c.holdReason ? `(${c.holdReason})` : ""} / 内容: ${q(c.content)} / 適用条件: ${q(c.applyWhen)} / 期限: ${until(now, c.expiresAt)}${c.toolName ? ` / tool=${c.toolName} input=${q(c.toolInput ?? "")}` : ""}`;
+	`[${c.id} r${c.revision}] 意図=${c.intentId} / kind=${c.kind} / 状態=${c.state}${c.holdReason ? `(${c.holdReason})` : ""} / 内容: ${q(c.content)} / 適用条件: ${q(c.applyWhen)} / 根拠: ${c.evidence.map(q).join(", ")} / 期限: ${until(now, c.expiresAt)}${c.toolName ? ` / tool=${c.toolName} input=${q(c.toolInput ?? "")}` : ""}`;
 
 const renderCandidates = (now: number, state: AgencyState) => {
 	const open = state.candidates.filter(isOpenCandidate);
@@ -635,11 +635,13 @@ export const selectEvidenceIds = (
 	condition: Condition,
 	state: AgencyState,
 	findings = false,
+	candidates: readonly Candidate[] = [],
 ): ReadonlySet<string> =>
 	new Set(
 		condition === "B1"
 			? state.notes.flatMap((n) => n.evidence)
 			: [
+					...candidates.flatMap((c) => c.evidence),
 					...state.intents.filter(isOpenIntent).flatMap((i) => i.evidence),
 					...(findings ? findingIntents(state).flatMap((i) => i.evidence) : []),
 				],

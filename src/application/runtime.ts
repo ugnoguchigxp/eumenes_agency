@@ -781,6 +781,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			condition,
 			state,
 			deps.findings === true,
+			pool,
 		);
 		const findingRefs = selectionFindingRefs(
 			findings,

@@ -159,3 +159,29 @@ describe("selectEvidenceIds", () => {
 		expect([...selectEvidenceIds("B1", s)]).toEqual(["o2"]);
 	});
 });
+
+test("an offered candidate's own old evidence remains citable independently of the parent intent", async () => {
+	const m = make("F");
+	m.rt.observe(obsInput("o1", "user.report", "user", 0, "製本の相談"));
+	m.rt.observe(
+		obsInput("change", "external.event", "host", 1, "試し刷りが届いた"),
+	);
+	m.llm.push(
+		"update",
+		proposal([
+			intentAddOp("g"),
+			candidateAddOp("k", "g", { evidenceRefs: ["change"] }),
+		]),
+	);
+	await m.rt.runBackground(MIN, sig());
+	for (let n = 0; n <= RECENT_OBSERVATION_WINDOW; n++)
+		m.rt.observe(
+			obsInput("later" + n, "user.report", "user", 2000 + n, "別件"),
+		);
+	m.llm.push("update", proposal());
+	await m.rt.runBackground(2 * MIN, sig());
+	m.llm.push("select", speak(["change"], true));
+	const r = await m.rt.decide(opportunity("op1", 3 * MIN), sig());
+	expect(r.decision.ticket?.action).toBe("speak");
+	expect(m.llm.requests.at(-1)?.prompt).not.toContain("[change]");
+});
