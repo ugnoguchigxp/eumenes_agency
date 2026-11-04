@@ -3,6 +3,7 @@ import { createAgencyRuntime, type AgencyState } from "../../src/index.ts";
 import {
 	HOUR,
 	fakeLlm,
+	candidateAddOp,
 	intentAddOp,
 	obsInput,
 	opportunity,
@@ -342,4 +343,37 @@ test("routing two different findings leaves distinguishable evidence without cla
 			findingWorkRefs: [intent.lastReturn.workRef],
 		});
 	}
+});
+
+test("a candidate that cites a returned work unit retains that unit on its speech ticket", async () => {
+	const llm = fakeLlm();
+	const rt = createAgencyRuntime({
+		condition: "F",
+		findings: true,
+		systemContext: { update: "host", select: "host" },
+		llm,
+		tools: [],
+	});
+	rt.observe({
+		...obsInput("r1", "work.returned", "tool", NOW, "partial result"),
+		workRef: "work-A",
+	});
+	llm.push(
+		"update",
+		proposal([
+			intentAddOp("g", { evidenceRefs: ["r1"] }),
+			candidateAddOp("c", "g", { evidenceRefs: ["r1"] }),
+		]),
+	);
+	llm.push(
+		"select",
+		participation({
+			action: "speak",
+			candidateRef: { id: "c2", revision: 1 },
+			evidenceRefs: ["r1"],
+			utterance: "partial result",
+		}),
+	);
+	const { decision } = await rt.decide(opportunity("op", NOW), sig());
+	expect(decision.ticket?.findingWorkRefs).toEqual(["work-A"]);
 });

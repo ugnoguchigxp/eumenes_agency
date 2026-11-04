@@ -46,5 +46,16 @@ export function selectionFindingRefs(
 		}
 		return { intentId: i.id, ref };
 	});
-	return { shown, workByRef };
+	// A regular candidate can also cite a work return before its intent is closed.
+	// Recording its origin does not grant the candidate-free speech exception.
+	function citedWorkRefs(refs: readonly string[]): string[] {
+		const units = new Set<string>();
+		for (const ref of refs) {
+			const o = observation(ref);
+			const work = o?.kind === "work.returned" ? o.workRef : workByRef.get(ref);
+			if (work) units.add(work);
+		}
+		return [...units];
+	}
+	return { shown, accepted: new Set(workByRef.keys()), citedWorkRefs };
 }

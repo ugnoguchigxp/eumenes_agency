@@ -900,7 +900,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			presentedObservations: new Set([
 				...presented.map((o) => o.id),
 				...shownEvidence,
-				...findingRefs.workByRef.keys(),
+				...findingRefs.accepted,
 				...interests.map((x) => interestRef(x.id)),
 				...formedInterests.map((x) => interestRef(x.id)),
 				...topics.map((x) => memoryRef(x.id)),
@@ -911,7 +911,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			tools,
 			limits,
 			at: opp.at,
-			findingRefs: new Set(findingRefs.workByRef.keys()),
+			findingRefs: findingRefs.accepted,
 		});
 		if (!verdict.ok) {
 			calls.push(
@@ -982,15 +982,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				ticketTts("autonomous", deps.reportTts),
 			);
 			const findingWorkRefs =
-				p.action === "speak"
-					? [
-							...new Set(
-								p.evidenceRefs.flatMap(
-									(ref) => findingRefs.workByRef.get(ref) ?? [],
-								),
-							),
-						]
-					: [];
+				p.action === "speak" ? findingRefs.citedWorkRefs(p.evidenceRefs) : [];
 			ticket = {
 				...reserved,
 				...(emotion ? { emotion } : {}),
