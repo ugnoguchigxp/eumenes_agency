@@ -305,3 +305,25 @@ test("failed, interrupted and unknown speech stay in observations and outside de
 		}
 	}
 });
+
+test("update repair identifies the rejected operation and its editable wire field", async () => {
+	const m = make();
+	m.rt.observe(obsInput("o1", "user.report", "user", 0, "新しい気づき"));
+	const ops = [intentAddOp("g"), candidateAddOp("c", "g")];
+	const invalid = toWire(proposal(ops));
+	(invalid.ops as Record<string, unknown>[])[0]!.hours = null;
+	(invalid.ops as Record<string, unknown>[])[1]!.intentRef = null;
+	m.llm.push(
+		"update",
+		invalid,
+		(request: import("../../src/index.ts").LlmRequest<unknown>) => {
+			const codes = JSON.parse(request.prompt).validationCodes;
+			expect(codes).toContain("schema:ops.0.hours:invalid_type");
+			expect(codes).toContain("schema_op:ops.0:intent.add");
+			expect(codes).toContain("schema_op:ops.1:candidate.add");
+			expect(codes).toContain("schema_expected:ops.1.intentRef:string");
+			return proposal(ops);
+		},
+	);
+	expect((await m.rt.runBackground(1, sig())).at(-1)?.code).toBe("applied");
+});

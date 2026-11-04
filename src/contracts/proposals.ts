@@ -526,6 +526,19 @@ const typedSchemas = {
 	F: fUpdateSchema,
 };
 
+// Validation uses domain field names; the caller can only correct fields on the wire operation.
+const wireField: Record<string, string> = {
+	initialState: "state",
+	transition: "state",
+	status: "state",
+	desiredState: "text",
+	content: "text",
+	object: "text",
+	motive: "reason",
+	reviewAfterHours: "hours",
+	expireAfterHours: "hours",
+};
+
 /** Maps the flat wire update to typed ops and re-validates them strictly. */
 export const fromWire = (
 	wire: WireUpdate,
@@ -550,14 +563,31 @@ export const fromWire = (
 		onInvalid?.(
 			parsed.error.issues
 				.slice(0, 8)
-				.flatMap((issue) => [
-					`schema:${issue.path.join(".")}:${issue.code}`,
-					...(issue.code === "invalid_value"
-						? [
-								`schema_expected:${issue.path.join(".")}:${issue.values.map(String).join("|").slice(0, 200)}`,
-							]
-						: []),
-				])
+				.flatMap((issue) => {
+					const path = [...issue.path];
+					const index = path[1];
+					const op =
+						path[0] === "ops" && typeof index === "number"
+							? wire.ops[index]?.op
+							: undefined;
+					const field = path[2];
+					if (op && typeof field === "string") {
+						path[2] =
+							op === "candidate.close" && field === "reason"
+								? "state"
+								: (wireField[field] ?? field);
+					}
+					const name = path.join(".");
+					const codes = [`schema:${name}:${issue.code}`];
+					if (op) codes.push(`schema_op:ops.${String(index)}:${op}`);
+					if (issue.code === "invalid_value")
+						codes.push(
+							`schema_expected:${name}:${issue.values.map(String).join("|").slice(0, 200)}`,
+						);
+					if (issue.code === "invalid_type")
+						codes.push(`schema_expected:${name}:${issue.expected}`);
+					return codes;
+				})
 				.slice(0, 8),
 		);
 	return parsed.success ? { ok: true, proposal: parsed.data } : { ok: false };
