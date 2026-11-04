@@ -377,3 +377,67 @@ test("a candidate that cites a returned work unit retains that unit on its speec
 	const { decision } = await rt.decide(opportunity("op", NOW), sig());
 	expect(decision.ticket?.findingWorkRefs).toEqual(["work-A"]);
 });
+
+test("opportunity planning can build on an earlier work return and new user evidence", async () => {
+	const state = await withFinding();
+	const finding = state.intents[0]!;
+	const later = Array.from({ length: 6 }, (_, n) => ({
+		...finding,
+		id: "later" + n,
+		lastReturn: null,
+		evidence: [],
+	}));
+	const body = "Previous comparison details ".repeat(40);
+	const history = [
+		{
+			...obsInput("w1", "work.returned", "tool", 0, body),
+			workRef: "work:1",
+		},
+		...Array.from({ length: 32 }, (_, n) =>
+			obsInput("old" + n, "user.report", "user", n + 1, "Other conversation"),
+		),
+	].map((o, n) => ({ ...o, seq: n + 1 }));
+	const llm = fakeLlm();
+	const rt = createAgencyRuntime({
+		condition: "F",
+		findings: true,
+		planOnOpportunity: true,
+		systemContext: { update: "host", select: "host" },
+		llm,
+		tools: [],
+		restore: {
+			state: { ...state, intents: [finding, ...later] },
+			observations: history,
+			cursor: history.length,
+		},
+	});
+	rt.observe(
+		obsInput(
+			"now",
+			"exchange.adopted",
+			"user",
+			NOW,
+			"The requirements have changed",
+		),
+	);
+	const evidenceRefs = ["w1", "now"];
+	llm.push(
+		"update",
+		proposal([
+			intentAddOp("g", { evidenceRefs }),
+			candidateAddOp("c", "g", { evidenceRefs }),
+		]),
+	);
+	llm.push("select", participation({ action: "wait" }));
+	const result = await rt.decide(opportunity("idle", NOW), sig());
+	const data = JSON.parse(llm.requests[0]!.prompt);
+	expect(data.state.intents).toContainEqual(finding);
+	expect(data.observations).toContainEqual({
+		...history[0],
+		text: body.slice(0, 400) + "…",
+	});
+	expect(rt.snapshot().observations[0]?.text).toBe(body);
+	expect(data.freshIds).toEqual(["now"]);
+	expect(result.calls[0]?.code).toBe("applied");
+	expect(rt.snapshot().state.candidates.at(-1)?.evidence).toEqual(evidenceRefs);
+});

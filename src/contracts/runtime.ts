@@ -140,7 +140,8 @@ export interface RuntimeDeps {
 	readonly revisions?: import("./revisions.ts").RevisionSink;
 	/**
 	 * B2/F: select may speak from a presented closed intent with a work return. The host sees
-	 * its recorded result, time and status; experimental prompts also describe how to report it.
+	 * its recorded result, time and status. With planOnOpportunity the update also sees these
+	 * findings and any matching retained return evidence when planning at an opportunity.
 	 */
 	readonly findings?: boolean;
 	/**

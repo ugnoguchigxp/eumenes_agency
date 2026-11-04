@@ -72,7 +72,7 @@ export const updateModelData = (i: UpdatePromptInput): UpdateModelData =>
 			: {}),
 		observations: i.observations,
 		freshIds: [...i.freshIds],
-		state: stateData(i.condition, i.state, false),
+		state: stateData(i.condition, i.state, false, i.findings),
 		due: i.due,
 		delivered: i.delivered,
 		tools: i.tools,

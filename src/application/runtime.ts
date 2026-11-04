@@ -1,4 +1,8 @@
-import { findingIntents, selectionFindingRefs } from "./findings.ts";
+import {
+	findingIntents,
+	isFindingReturn,
+	selectionFindingRefs,
+} from "./findings.ts";
 import { settleInterests } from "../domains/agency/settle-interests.ts";
 import type { InterestOp } from "../contracts/interest.ts";
 import type { WireInterestOp } from "../contracts/proposals.ts";
@@ -109,6 +113,7 @@ const RETURN_REVIEW_MS = 24 * 3_600_000;
  */
 export const WORK_STALE_MS = 48 * 3_600_000;
 const DELIVERED_SHOWN = 5;
+const WORK_SUMMARY_CHARS = 400;
 /** Speak tickets whose topic/interest refs wait for a receipt (oldest dropped beyond this). */
 const TOPIC_TICKETS_KEPT = 64;
 const NO_DUE: Due = { reviewIntentIds: [], pressure: [] };
@@ -285,8 +290,24 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const present = (
 		batch: readonly Observation[],
 		pending: readonly Observation[],
+		includeFindings = false,
 	): Observation[] => {
 		const m = new Map<number, Observation>();
+		// Recall a bounded excerpt; recent observations and the current batch below retain their full text.
+		if (includeFindings) {
+			for (const finding of findingIntents(state)) {
+				for (const ref of finding.evidence) {
+					const o = ledger.get(ref);
+					if (!isFindingReturn(o, finding.lastReturn.workRef)) continue;
+					const text =
+						o.text.length > WORK_SUMMARY_CHARS
+							? o.text.slice(0, WORK_SUMMARY_CHARS) + "…"
+							: o.text;
+					m.set(o.seq, { ...o, text });
+					break;
+				}
+			}
+		}
 		if (deps.planOnOpportunity) {
 			const refs = [
 				...(state.interests ?? [])
@@ -412,13 +433,16 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	): Promise<CallOutcome[]> => {
 		if (condition === "B0") throw new Error("B0 never calls the model");
 		const startEpoch = epoch;
-		const presented = present(batch, []);
+		const findings =
+			opportunity !== undefined && deps.findings === true && condition !== "B1";
+		const presented = present(batch, [], findings);
 		const keys = issuedKeys(state, due);
 		const shownTodos = hostTodos ? updateTodos() : undefined;
 		const input: UpdatePromptInput = {
 			condition,
 			now: at,
 			...(opportunity ? { opportunity } : {}),
+			findings,
 			...(diagnostics.length ? { validationCodes: diagnostics } : {}),
 			observations: presented,
 			freshIds: new Set(batch.map((o) => o.id)),
@@ -1053,8 +1077,9 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			at: o.occurredAt,
 			workRef: o.workRef!,
 			status,
-			summary: o.text.slice(0, 400),
-			question: status === "question" ? o.text.slice(0, 400) : null,
+			summary: o.text.slice(0, WORK_SUMMARY_CHARS),
+			question:
+				status === "question" ? o.text.slice(0, WORK_SUMMARY_CHARS) : null,
 		};
 		if (!isOpenIntent(it)) return;
 		if (status !== "succeeded" && it.state === "adopted") {

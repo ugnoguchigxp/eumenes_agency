@@ -8,6 +8,11 @@ import {
 
 type Finding = Intent & { lastReturn: WorkReturn };
 
+export const isFindingReturn = (
+	o: Observation | undefined,
+	workRef: string,
+): o is Observation => o?.kind === "work.returned" && o.workRef === workRef;
+
 export const recentFindings = (
 	intents: readonly Intent[],
 	limit: number,
@@ -41,7 +46,7 @@ export function selectionFindingRefs(
 		if (!occupied(i.id)) workByRef.set(i.id, i.lastReturn.workRef);
 		for (const id of i.evidence) {
 			const o = observation(id);
-			if (o?.kind === "work.returned" && o.workRef === i.lastReturn.workRef)
+			if (isFindingReturn(o, i.lastReturn.workRef))
 				workByRef.set(id, i.lastReturn.workRef);
 		}
 		return { intentId: i.id, ref };
