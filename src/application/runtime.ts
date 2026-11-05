@@ -996,6 +996,15 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			p.action === "tool" && verdict.candidate
 				? state.intents.find((i) => i.id === verdict.candidate!.intentId)
 				: undefined;
+		// Selection usage belongs to the intent it actually resolved, including failed attempts.
+		// Updates without an identified activity remain scope usage (CallOutcome/provider meter).
+		if (budgetIntent)
+			activity.spend(budgetIntent.id, reservationAt, {
+				tokens:
+					r.usage.inputTokens +
+					r.usage.outputTokens +
+					r.prior.reduce((n, c) => n + c.inputTokens + c.outputTokens, 0),
+			});
 		// P4-a: one delegated work unit per intent; no new request until it returns.
 		if (budgetIntent?.workRef && verdict.toolName === DELEGATE_TOOL) {
 			if (verdict.candidate)
@@ -1011,6 +1020,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		if (budgetIntent && !activity.canIssueTool(budgetIntent.id, opp.at)) {
 			budgetIntent.state = "held";
 			budgetIntent.lastReason = "budget";
+			budgetIntent.revision += 1;
 			if (verdict.candidate) holdCandidate(verdict.candidate, "deferred");
 			state.revision += 1;
 			return done({
@@ -1216,8 +1226,17 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 						}),
 			);
 		},
-		wake(now, host, signal) {
+		wake(now, input, signal) {
+			const requestedEpoch = epoch;
+			const host = structuredClone(input);
 			return serial(async () => {
+				if (epoch !== requestedEpoch)
+					return {
+						reasons: [],
+						blocked: [{ reason: "all", code: "stale_epoch" }],
+						decision: null,
+						calls: [],
+					};
 				expireStaleWork(now);
 				const events: WakeEvent[] = ledger.all().flatMap((o): WakeEvent[] =>
 					o.kind === "recall.offered"

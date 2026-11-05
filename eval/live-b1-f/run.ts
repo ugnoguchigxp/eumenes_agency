@@ -10,7 +10,6 @@ import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
 import { parseArgs } from "node:util";
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import {
 	createAgencyRuntime,
@@ -25,7 +24,11 @@ import {
 	type LlmResult,
 	LlmCallError,
 } from "../../src/index.ts";
-import { createClaudeLlm, type UsageMeter } from "../../standalone/claude.ts";
+import {
+	createClaudeClient,
+	createClaudeLlm,
+	type UsageMeter,
+} from "../../standalone/claude.ts";
 import {
 	loadSettings,
 	judgeRole,
@@ -496,7 +499,7 @@ async function main() {
 		},
 		spentUsd: () => meter.spentUsd(),
 	};
-	const client = new Anthropic({
+	const client = createClaudeClient({
 		maxRetries: 0,
 		timeout: 60_000,
 		fetch: factoringFetch,

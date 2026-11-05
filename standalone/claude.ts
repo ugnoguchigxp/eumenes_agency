@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { apiKeyFromEnvironment } from "./api-keys.ts";
 import {
 	LlmCallError,
 	LlmOutputError,
@@ -93,10 +94,20 @@ async function guarded<R>(
 	}
 }
 
+/** All API entry points share the user's exported key names; explicit SDK options win. */
+export function createClaudeClient(
+	options: ConstructorParameters<typeof Anthropic>[0] = {},
+	env: Readonly<Record<string, string | undefined>> = process.env,
+): Anthropic {
+	const apiKey = apiKeyFromEnvironment("anthropic", env);
+	return new Anthropic({ ...(apiKey ? { apiKey } : {}), ...options });
+}
+
 /** Core calls: the runtime counts its single retry in the budget, so the SDK never retries. */
-export const llmClient = (): Anthropic => new Anthropic({ maxRetries: 0 });
+export const llmClient = (): Anthropic => createClaudeClient({ maxRetries: 0 });
 /** CLI conversation: no budgeted retry above it, so let the SDK retry transient failures. */
-export const chatClient = (): Anthropic => new Anthropic({ maxRetries: 2 });
+export const chatClient = (): Anthropic =>
+	createClaudeClient({ maxRetries: 2 });
 
 /** One stateless structured call per request: every call is a fresh context. */
 export function createClaudeLlm(

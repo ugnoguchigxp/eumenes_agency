@@ -46,8 +46,14 @@ export const createLedger = (): Ledger => {
 				if (sameContent(known, input)) return known;
 				throw new ObservationConflictError(input.id);
 			}
+			const copy = structuredClone(input);
+			if (copy.refs) Object.freeze(copy.refs);
+			if (copy.speechHandoff) {
+				Object.freeze(copy.speechHandoff.findingWorkRefs);
+				Object.freeze(copy.speechHandoff);
+			}
 			const obs: Observation = Object.freeze({
-				...structuredClone(input),
+				...copy,
 				seq: list.length + 1,
 			});
 			list.push(obs);

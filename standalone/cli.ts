@@ -80,6 +80,7 @@ import {
 	resolveCondition,
 } from "./chat-loop.ts";
 import { createClaudeLlm, createClaudeReply } from "./claude.ts";
+import { apiKeyFromEnvironment } from "./api-keys.ts";
 import { toStandingInterests } from "./persona.ts";
 import { expressTicket } from "./utterance.ts";
 import {
@@ -160,8 +161,8 @@ async function main() {
 		...(social ? { socialTopics: true } : {}),
 	});
 	if (args.off) runtime.setEnabled(false);
-	if (!process.env.ANTHROPIC_API_KEY)
-		console.warn("[warn] ANTHROPIC_API_KEY is not set");
+	if (!apiKeyFromEnvironment("anthropic"))
+		console.warn("[warn] CLAUDE_API_KEY / ANTHROPIC_API_KEY is not set");
 	const digest = settingsDigest(settings);
 	console.log(
 		dim(

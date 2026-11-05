@@ -24,6 +24,8 @@ export async function createResearchFixture(host: string, now: number) {
 		minImpact: "read",
 	};
 	const entry = { revisionId: card.revisionId, runtime: { route: "web" } };
+	// The inert worker only counts starts; nothing is executed or sent.
+	let workerStarts = 0;
 	const state = createAgencyStatePort({
 		now: () => now,
 		toolchains: {
@@ -34,7 +36,12 @@ export async function createResearchFixture(host: string, now: number) {
 				packageRevisionId: card.revisionId,
 			}),
 		},
-		agents: { startInTransaction: () => ({ taskId: "fixture-worker" }) },
+		agents: {
+			startInTransaction: () => {
+				workerStarts++;
+				return { taskId: "fixture-worker" };
+			},
+		},
 	});
 	const db = new Database(":memory:");
 	try {
@@ -46,9 +53,16 @@ export async function createResearchFixture(host: string, now: number) {
 		);
 		return {
 			tools,
-			admit(ticket: ActionTicket, runtime: AgencyRuntime, scope: string) {
+			/** `failSave`: the checkpoint write fails inside the admission transaction (P0 save-failure case). */
+			admit(
+				ticket: ActionTicket,
+				runtime: AgencyRuntime,
+				scope: string,
+				fault: { failSave?: boolean } = {},
+			) {
 				const input = researchInput(ticket, runtime, scope, scope, 0, now);
 				db.transaction(() => {
+					if (fault.failSave) throw new Error("fixture_save_failed");
 					state.saveInTransaction(
 						db,
 						{
@@ -64,6 +78,22 @@ export async function createResearchFixture(host: string, now: number) {
 					);
 					state.startInTransaction(db, input);
 				})();
+			},
+			/** Starts of the inert worker and rows the admission left in the disposable store. */
+			counts(scope?: string) {
+				const rows = (table: string) =>
+					(
+						db
+							.query(
+								`SELECT count(*) AS n FROM ${table}${scope === undefined ? "" : " WHERE conversation_id = ?"}`,
+							)
+							.get(...(scope === undefined ? [] : [scope])) as { n: number }
+					).n;
+				return {
+					workerStarts,
+					workRows: rows("dialogue_agency_work"),
+					stateRows: rows("dialogue_agency_state"),
+				};
 			},
 			close: () => db.close(),
 		};

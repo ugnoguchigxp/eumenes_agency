@@ -30,6 +30,26 @@ export class ActivityBudget {
 		limits: ActivityLimits = defaultActivityLimits,
 		restore: readonly (readonly [string, ActivityUse])[] = [],
 	) {
+		if (
+			!Number.isSafeInteger(limits.toolCalls) ||
+			limits.toolCalls < 0 ||
+			!Number.isSafeInteger(limits.tokens) ||
+			limits.tokens < 0 ||
+			!Number.isFinite(limits.elapsedMs) ||
+			limits.elapsedMs < 0
+		)
+			throw new RangeError(
+				"activityBudgetMeter limits must be finite and non-negative; calls and tokens must be integers",
+			);
+		for (const [, use] of restore)
+			if (
+				!Number.isFinite(use.startedAt) ||
+				!Number.isSafeInteger(use.toolCalls) ||
+				use.toolCalls < 0 ||
+				!Number.isSafeInteger(use.tokens) ||
+				use.tokens < 0
+			)
+				throw new RangeError("invalid activityBudgetMeter checkpoint");
 		for (const [id, use] of restore) this.#use.set(id, { ...use });
 		this.limits = Object.freeze({ ...limits });
 	}
@@ -48,6 +68,11 @@ export class ActivityBudget {
 		now: number,
 		d: { toolCalls?: number; tokens?: number },
 	) {
+		for (const value of [d.toolCalls ?? 0, d.tokens ?? 0])
+			if (!Number.isSafeInteger(value) || value < 0)
+				throw new RangeError("activity usage must be non-negative integers");
+		if (!Number.isFinite(now))
+			throw new RangeError("activity time must be finite");
 		this.start(intentId, now);
 		const u = this.#use.get(intentId)!;
 		u.toolCalls += d.toolCalls ?? 0;
@@ -56,6 +81,12 @@ export class ActivityBudget {
 	}
 	/** Whether a further tool call may start now (checked before issuing a ticket). */
 	canIssueTool(intentId: string, now: number) {
+		if (
+			this.limits.toolCalls === 0 ||
+			this.limits.tokens === 0 ||
+			this.limits.elapsedMs === 0
+		)
+			return false;
 		const u = this.#use.get(intentId);
 		if (!u) return true;
 		return (
@@ -77,6 +108,7 @@ export class ActivityBudget {
 		this.#use.delete(intentId);
 	}
 	use(intentId: string): Readonly<ActivityUse> | undefined {
-		return this.#use.get(intentId);
+		const use = this.#use.get(intentId);
+		return use ? { ...use } : undefined;
 	}
 }

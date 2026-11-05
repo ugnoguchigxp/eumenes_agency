@@ -39,7 +39,9 @@ Agencyで `bun run eval:initiative --model gpt-6-luna --reps 2` を実行する�
 
 0.1.2ではFでも`hostTopics`・`hostTodos`・`utteranceEmotion`を明示指定できる。Fのホスト所有updateには`topics()`・`standingInterests`と既存の`todos()`をデータとして渡せる。ホストの記憶は独立した新観測の代わりにはならず、発話には引き続き有効な候補が必要。`reportedTodos`の出力拡張はB1だけである。接続追加後の全体検証は761成功・失敗0件（2 skip、1 todo）。
 
-技術は Bun、TypeScript、SQLite、Zod。検証用の LLM は Claude API の Claude Haiku 5.5（`@anthropic-ai/sdk`、key は standalone の `.env`。値はログ・結果・配布物に含めない）。Pursuit と同じ独立実験構成にし、取り込み時はビルド済み JS・型宣言を版付き tgz にする。Memory と World は公開 API に接続し、Pursuit は採用した行動を遂行する接続先として後から選べる。
+技術は Bun、TypeScript、SQLite、Zod。検証用の LLM は Claude API の Claude Haiku 5.5（`@anthropic-ai/sdk`）。APIキーは、`.zprofile`などからexportした`CLAUDE_API_KEY`を使えるため、プロジェクトごとの`.env`は不要。標準名`ANTHROPIC_API_KEY`も使用でき、両方ある場合は`CLAUDE_API_KEY`を優先する。値はログ・結果・配布物に含めない。Pursuit と同じ独立実験構成にし、取り込み時はビルド済み JS・型宣言を版付き tgz にする。Memory と World は公開 API に接続し、Pursuit は採用した行動を遂行する接続先として後から選べる。
+
+キーを設定した後は、新しいターミナル、または`source ~/.zprofile`を実行したシェルから起動する。OpenAI用の共通読込は`OPEN_AI_API_KEY`を優先し、`OPENAI_API_KEY`も受け付ける。Lunaの直接API接続は[総合80点に向けた実装計画](spec/improvement-implementation-plan-2026-11-05.md)のW3で実装する。
 
 研究対象は、自分の経験・理解・関心と次の行動がつながるかである。発言回数が増えたことだけでは成功としない。合成音声の取得と、実際に聞き手に届いたことも分ける。
 
