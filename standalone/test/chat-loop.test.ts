@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	maxIdleSec,
+	createAgencyRuntime,
+	createIdlePlanner,
 	respondSystem,
 	spokenReplyStyle,
 	ttsUtteranceStyle,
@@ -17,20 +19,138 @@ import {
 	parseCliArgs,
 	printAbove,
 	resolveCondition,
+	cliBudgetDefaults,
+	cliLimits,
 } from "../chat-loop.ts";
 import {
 	defaultInterestText,
 	maxInterestChars,
 	toStandingInterests,
 } from "../persona.ts";
+import { b1Proposal, fakeLlm, participation } from "../../test/core/helpers.ts";
+
+test("conversation profile supports successive turns and a bounded three-part continuation", async () => {
+	const llm = fakeLlm();
+	const args = parseCliArgs([]);
+	const planner = createIdlePlanner(args, 0);
+	const runtime = createAgencyRuntime({
+		systemContext: "experimental",
+		condition: "B1",
+		llm,
+		tools: [],
+		budget: cliBudgetDefaults,
+		limits: cliLimits,
+		selectWhenEmpty: true,
+		socialTopics: true,
+	});
+	const signal = new AbortController().signal;
+	let id = 0;
+	const idle = async (at: number) => {
+		if (id > 0) llm.push("update", b1Proposal());
+		llm.push(
+			"select",
+			participation({
+				action: "speak",
+				utterance: `まだ話していない観点${++id}`,
+				evidenceRefs: ["u7"],
+			}),
+		);
+		const result = await runtime.decide(
+			{
+				id: `gap${id}`,
+				at,
+				trigger: "idle",
+				presence: "quiet",
+				foregroundBusy: false,
+				playerBusy: false,
+			},
+			signal,
+		);
+		expect(result.decision.source).toBe("llm");
+		expect(result.decision.rejectCodes).toEqual([]);
+		expect(result.decision.ticket).not.toBeNull();
+		runtime.recordResult({
+			ticketId: result.decision.ticket!.id,
+			at,
+			status: "succeeded",
+			resultText: result.decision.ticket!.utterance ?? "",
+		});
+		planner.proactiveSpoke(at);
+	};
+	// Eight exchanges in under three minutes used to exhaust the ten-minute call window.
+	for (let turn = 0; turn < 8; turn++) {
+		const at = turn * 20_000;
+		planner.userTurn(at);
+		runtime.observe({
+			id: `u${turn}`,
+			kind: "exchange.adopted",
+			actor: "user",
+			occurredAt: at,
+			text: "好きな話を続けて。",
+		});
+		runtime.observe({
+			id: `r${turn}`,
+			kind: "exchange.adopted",
+			actor: "agent",
+			occurredAt: at + 1000,
+			text: "自分の好きな点を話すね。",
+		});
+		llm.push("update", b1Proposal());
+		const calls = await runtime.runBackground(at + 2000, signal);
+		expect(calls.map((c) => c.code)).toEqual(["no_change"]);
+		if (turn === 7) break;
+		llm.push("select", participation());
+		const result = await runtime.decide(
+			{
+				id: `pause${turn}`,
+				at: at + 12_000,
+				trigger: "idle",
+				presence: "quiet",
+				foregroundBusy: false,
+				playerBusy: false,
+			},
+			signal,
+		);
+		expect(result.decision.source).toBe("llm");
+	}
+	await idle(152_000);
+	await idle(164_000);
+	await idle(176_000);
+	// Host limit remains finite even if the model would choose another utterance.
+	llm.push("update", b1Proposal());
+	llm.push(
+		"select",
+		participation({
+			action: "speak",
+			utterance: "すぐにもう一つ。",
+			evidenceRefs: ["u7"],
+		}),
+	);
+	const tooSoon = await runtime.decide(
+		{
+			id: "early",
+			at: 177_000,
+			trigger: "idle",
+			presence: "quiet",
+			foregroundBusy: false,
+			playerBusy: false,
+		},
+		signal,
+	);
+	expect(tooSoon.decision.action).toBe("wait");
+	expect(tooSoon.decision.rejectCodes).toContain("outbound_interval");
+	expect(planner.blockedBy()).toBe("unanswered");
+	planner.userTurn(180_000);
+	expect(planner.blockedBy()).toBeNull();
+});
 
 describe("parseCliArgs / resolveCondition", () => {
-	test("defaults: B1a, idle 10s, one unanswered, default log, social on", () => {
+	test("defaults: B1a, idle 10s, up to three unanswered, default log, social on", () => {
 		expect(parseCliArgs([])).toEqual({
 			condition: "B1a",
 			off: false,
 			idleSec: 10,
-			maxUnanswered: 1,
+			maxUnanswered: 3,
 			log: { kind: "default" },
 			tts: true,
 			ttsAutonomous: false,

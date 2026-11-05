@@ -6,6 +6,8 @@ Eumenes が経験から関心・欲求・意図を持ち、発言や行動の機
 
 使い方: `bun run verify`（format / lint / 型 / 境界 / テスト）、`bun eval/main.ts validate [--suite p0e|p1e]`、`bun eval/main.ts run --name <run> [--suite p1e] [--conditions B1,B2,D] [--case <id>] [--reps 3] [--budget-usd n]`、`bun eval/main.ts score --name <run>`、`bun eval/main.ts judge --name <run> [--limit N] [--budget-usd n]`（内容と状態の判定器）、`bun eval/main.ts label-export --suite p1e --split dev --n 12 --out <file.md>` と `agreement --sheet <file.md>`（人手ラベルの一致率）、`judge-export --name <run> --n 30 --out <file.md>` と `judge-agreement --sheet <file.md>`（判定器の較正）、`bun eval/main.ts trace --name <run> --case <id> [--condition B2] [--rep 1] [--prompt]`（モデル呼び出しと最終状態の確認。`traces.jsonl` はローカルのみ）、`bun run agency [-- --condition B1a --idle-sec 40 --max-unanswered 1 --no-log]`（対話。黙っていると AI から話しかける。既定 B1a、会話記録は `data/chats/`）。設定は `config/experiment.json`、費用の記録は `data/spend.jsonl`。
 
+対話CLIは、通常応答の後は状態の更新だけを行い、静かな間に発話を判断する。既定は10秒の間、返事なしで最大3回まで。CLIの背景呼出し枠は1分12回、自発アクションの最低間隔は10秒で、設定ファイルの `budget` を指定した場合はそちらを優先する。自発発話の文章は通常応答のモデルで作成し、実際に表示した内容を会話へ戻す。`--max-unanswered 1` で1回ごとに返事を待つ設定に戻せる。評価実験・ライブラリの予算と間隔の既定値は従来どおり。
+
 ### GPT-6 Luna で自発行動を試す
 
 Agencyで `bun run eval:initiative --model gpt-6-luna --reps 2` を実行すると、過去の仕事、現在の関心、共有した出来事、撤回・完了を含む合成会話10場面を試せる。`--case proof --case proof-declined` のように対象を絞れる。各試行の期待行動・判断・却下理由・調査の受付結果をJSONLで出力し、不一致があっても指定した全件を実行する。1件でも失敗すれば終了コードは1になる。

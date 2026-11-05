@@ -55,11 +55,14 @@ export function judgeRole(settings: ExperimentSettings) {
 }
 
 /** Budget with the settings overrides applied on top of the defaults. */
-export function resolveBudget(settings: ExperimentSettings): BudgetConfig {
+export function resolveBudget(
+	settings: ExperimentSettings,
+	defaults: BudgetConfig = defaultBudget,
+): BudgetConfig {
 	const overrides = Object.fromEntries(
 		Object.entries(settings.budget ?? {}).filter(([, v]) => v !== undefined),
 	);
-	return { ...defaultBudget, ...overrides };
+	return { ...defaults, ...overrides };
 }
 
 const canonical = (value: unknown): unknown =>

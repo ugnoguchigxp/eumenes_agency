@@ -17,6 +17,7 @@ import {
 	settingsDigest,
 } from "../settings.ts";
 import { SOCIAL_RULES_VERSION } from "../../src/application/prompts.ts";
+import { cliBudgetDefaults } from "../chat-loop.ts";
 
 const dirs: string[] = [];
 const tempDir = () => {
@@ -91,6 +92,17 @@ describe("loadSettings", () => {
 		expect(resolveBudget({ ...base, budget: { batchSize: 2 } }).windowMs).toBe(
 			defaultBudget.windowMs,
 		);
+	});
+
+	test("conversation defaults preserve explicit limits and evaluation defaults", () => {
+		expect(resolveBudget(base)).toEqual(defaultBudget);
+		expect(resolveBudget(base, cliBudgetDefaults).windowMs).toBe(60_000);
+		const budget = resolveBudget(
+			{ ...base, budget: { maxCallsPerWindow: 2, windowMs: 300_000 } },
+			cliBudgetDefaults,
+		);
+		expect(budget.maxCallsPerWindow).toBe(2);
+		expect(budget.windowMs).toBe(300_000);
 	});
 });
 

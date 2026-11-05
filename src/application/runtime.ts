@@ -375,7 +375,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		for (const [id, at] of c.lastUsed) lastUsedAt.set(id, at);
 		for (const [id, feeling] of c.feelings) feelingByObs.set(id, feeling);
 	}
-	const minutesSinceUserInput = (now: number): number | null => {
+	const timeSinceUserInput = (now: number, unitMs: number): number | null => {
 		const last = ledger
 			.all()
 			.filter((o) => o.actor === "user")
@@ -385,7 +385,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			);
 		return last === null
 			? null
-			: Math.max(0, Math.round((now - last) / 60_000));
+			: Math.max(0, Math.round((now - last) / unitMs));
 	};
 
 	const noteFailure = () => {
@@ -473,7 +473,8 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			delivered: delivered(),
 			tools,
 			limits,
-			minutesSinceUserInput: minutesSinceUserInput(at),
+			minutesSinceUserInput: timeSinceUserInput(at, 60_000),
+			...(social ? { interests: deps.standingInterests ?? [] } : {}),
 			...(shownTodos ? { todos: shownTodos } : {}),
 			...(condition === "F" && hostTopics
 				? {
@@ -850,7 +851,10 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				: {}),
 			tools,
 			limits,
-			minutesSinceUserInput: minutesSinceUserInput(opp.at),
+			minutesSinceUserInput: timeSinceUserInput(opp.at, 60_000),
+			...(opp.trigger === "idle" && (social || hostTopics)
+				? { secondsSinceUserInput: timeSinceUserInput(opp.at, 1000) }
+				: {}),
 			...(social ? { social } : {}),
 			...(hostTopics ? { hostTopics } : {}),
 			...(deps.findings ? { findings: true } : {}),

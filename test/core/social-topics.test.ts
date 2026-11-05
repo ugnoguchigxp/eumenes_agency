@@ -100,6 +100,13 @@ describe("socialTopics", () => {
 		expect(sys).toContain(systemPrompt("update", "B1").split("\n")[1] ?? "x");
 	});
 
+	test("the topic planner sees the persona interest as quoted source data", async () => {
+		const { update } = await run("B1", { social: true, withInterests: true });
+		expect(update?.prompt).toContain('[interest:i1] "マイメロディが好き。"');
+		const plain = await run("B1", { withInterests: true });
+		expect(plain.update?.prompt).not.toContain("[interest:i1]");
+	});
+
 	test("B1 social: select prompt has the lull rules; idle closing line yields to speaking", async () => {
 		const idle = await run("B1", { social: true, trigger: "idle" });
 		const sys = idle.select?.system ?? "";
@@ -128,6 +135,65 @@ describe("socialTopics", () => {
 			const social = await run(c, { social: true });
 			expect(social.update).toEqual(base.update);
 			expect(social.select).toEqual(base.select);
+		}
+	});
+
+	test("both lull modes distinguish a normal reply from the outbound interval", async () => {
+		for (const mode of ["socialTopics", "hostTopics"] as const) {
+			const llm = fakeLlm();
+			const rt = createAgencyRuntime({
+				systemContext: "experimental",
+				condition: "B1",
+				llm,
+				tools: [],
+				selectWhenEmpty: true,
+				[mode]: true,
+			});
+			rt.observe(
+				obsInput(
+					"u1",
+					"exchange.adopted",
+					"user",
+					0,
+					"キャラクターの話をしよう。",
+				),
+			);
+			rt.observe(obsInput("r1", "exchange.adopted", "agent", 1000, "いいね。"));
+			llm.push("update", b1Proposal());
+			llm.push(
+				"select",
+				participation({
+					action: "speak",
+					utterance: "どんなキャラクターが好き？",
+					evidenceRefs: ["u1"],
+				}),
+			);
+			const first = await rt.decide(
+				opportunity("first", 12_000, { trigger: "idle" }),
+				sig(),
+			);
+			expect(first.decision.action).toBe("speak");
+			const firstPrompt = llm.requests.find(
+				(r) => r.purpose === "select",
+			)?.prompt;
+			expect(firstPrompt).toContain("通常の応答からの待機時間ではない");
+			expect(firstPrompt).toContain("最後のユーザー入力: 12秒前");
+			expect(firstPrompt).not.toContain("最後のユーザー入力: 0分前");
+			expect(firstPrompt).toContain("直近の採用: なし（間隔による制限なし）");
+			llm.push(
+				"select",
+				participation({
+					action: "speak",
+					utterance: "もう一つ聞きたいな。",
+					evidenceRefs: ["u1"],
+				}),
+			);
+			const next = await rt.decide(
+				opportunity("next", 22_000, { trigger: "idle" }),
+				sig(),
+			);
+			expect(llm.requests.at(-1)?.prompt).toContain("直近の採用: 10秒前");
+			expect(next.decision.rejectCodes).toContain("outbound_interval");
 		}
 	});
 

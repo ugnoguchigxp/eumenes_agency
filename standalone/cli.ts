@@ -12,7 +12,7 @@
  *                      retried at 2N, 4N, then stops until the next user input. Typing
  *                      does not count: only a submitted line (Enter) is user input.
  *   --max-unanswered N proactive utterances allowed in a row before waiting for the
- *                      user (default 1)
+ *                      user (default 3)
  *   --tts / --no-tts   spoken-style output for text-to-speech: replies and proactive
  *                      utterances are short, plain spoken Japanese (default on)
  *   --tts-autonomous   proactive utterances (the agent's own initiative) are also marked
@@ -70,6 +70,8 @@ import {
 import {
 	createChatLog,
 	createConversation,
+	cliBudgetDefaults,
+	cliLimits,
 	decisionEvent,
 	decisionLine,
 	defaultLogPath,
@@ -79,6 +81,7 @@ import {
 } from "./chat-loop.ts";
 import { createClaudeLlm, createClaudeReply } from "./claude.ts";
 import { toStandingInterests } from "./persona.ts";
+import { expressTicket } from "./utterance.ts";
 import {
 	loadSettings,
 	openSpendMeter,
@@ -136,12 +139,14 @@ async function main() {
 	const standingInterests = toStandingInterests(args.interests);
 	// Social mode only exists for B1 (B1a included); B2/F ignore it.
 	const social = args.social && condition === "B1";
+	const budget = resolveBudget(settings, cliBudgetDefaults);
 	const runtime = createAgencyRuntime({
 		systemContext: "experimental",
 		condition,
 		llm,
 		tools: [],
-		budget: resolveBudget(settings),
+		budget,
+		limits: cliLimits,
 		...(selectWhenEmpty ? { selectWhenEmpty: true } : {}),
 		hostTodos: true,
 		todos: toolPort.todos,
@@ -190,6 +195,8 @@ async function main() {
 		backgroundModel: settings.llm.background.model,
 		idleSec: args.idleSec,
 		maxUnanswered: args.maxUnanswered,
+		budget,
+		outboundIntervalMs: cliLimits.outboundIntervalMs,
 	});
 	console.log(
 		dim(
@@ -282,13 +289,46 @@ async function main() {
 		archiveDone(runtime.takeReportedTodos().map((r) => r.todoId));
 
 	/** Returns true when the AI actually said something. */
-	const deliver = (
+	const deliver = async (
 		ticket: ActionTicket,
 		trigger: Opportunity["trigger"],
-	): boolean => {
+		signal: AbortSignal,
+		mine: number,
+	): Promise<boolean> => {
 		if (closed) return false;
 		if (ticket.action === "speak") {
-			const text = ticket.utterance ?? "";
+			let text = ticket.utterance ?? "";
+			if (ticket.origin === "autonomous") {
+				try {
+					text = await expressTicket({
+						ticket,
+						history: conversation.messages(),
+						opening: conversation.opening(),
+						interests: standingInterests,
+						chat,
+						signal,
+					});
+				} catch (error) {
+					if (!signal.aborted && !closed && mine === generation)
+						runtime.recordResult({
+							ticketId: ticket.id,
+							status: "failed",
+							at: Date.now(),
+							resultText: "utterance_generation_failed",
+						});
+					throw error;
+				}
+			}
+			if (closed || signal.aborted || mine !== generation) return false;
+			if (text === "") {
+				runtime.recordResult({
+					ticketId: ticket.id,
+					status: "failed",
+					at: Date.now(),
+					resultText: "empty_utterance",
+				});
+				return false;
+			}
 			// The main model must know what it said, or the next reply contradicts it.
 			if (text !== "") conversation.addAssistant(text);
 			planner.proactiveSpoke(Date.now());
@@ -328,7 +368,7 @@ async function main() {
 	};
 
 	const cycleBody = async (
-		trigger: Opportunity["trigger"],
+		trigger: Opportunity["trigger"] | null,
 		update: boolean,
 		auto: boolean,
 		controller: AbortController,
@@ -343,6 +383,8 @@ async function main() {
 			archiveReported();
 		}
 		if (controller.signal.aborted) return "aborted";
+		// A normal reply already owns the floor: update/reconcile, then offer the next idle.
+		if (trigger === null) return "silent";
 		// decide() itself interprets observations received before the opportunity, so an
 		// idle cycle needs no separate runBackground.
 		const { decision, calls } = await runtime.decide(
@@ -364,7 +406,9 @@ async function main() {
 		if (haltOnOutcomes(calls)) return "halted";
 		if (superseded) return "aborted";
 		if (!args.quietWhy) out(dim(`  ${decisionLine(decision)}`));
-		const spoke = decision.ticket && deliver(decision.ticket, trigger);
+		const spoke =
+			decision.ticket &&
+			(await deliver(decision.ticket, trigger, controller.signal, mine));
 		// The whole utterance is printed at once: a reported finished item is archived. A
 		// waiting item stays until the user's answer reaches the sub-agent.
 		if (spoke) archiveDone(reportedTodoIds(decision.evidenceRefs));
@@ -373,7 +417,7 @@ async function main() {
 
 	/** Background update, then an opportunity. Superseded by any newer input. */
 	const runCycle = async (
-		trigger: Opportunity["trigger"],
+		trigger: Opportunity["trigger"] | null,
 		update: boolean,
 		auto: boolean,
 	): Promise<CycleOutcome> => {
@@ -389,6 +433,7 @@ async function main() {
 			outcome = await cycleBody(trigger, update, auto, controller, mine);
 		} catch (error) {
 			if (controller.signal.aborted) outcome = "aborted";
+			else if (haltOnSpendLimit(error)) outcome = "halted";
 			else
 				out(
 					dim(
@@ -514,7 +559,7 @@ async function main() {
 				});
 				printSpend();
 				// Another line is already waiting: it will supersede this cycle anyway.
-				if (queuedLines === 0) void runCycle("turn_end", true, true);
+				if (queuedLines === 0) void runCycle(null, true, true);
 			} catch (error) {
 				conversation.rollbackUser();
 				if (!closed && !haltOnSpendLimit(error))

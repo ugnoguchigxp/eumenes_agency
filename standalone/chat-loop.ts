@@ -8,14 +8,12 @@ import { clearScreenDown, cursorTo, moveCursor } from "node:readline";
 import {
 	type Condition,
 	conditions,
+	defaultBudget,
+	defaultLimits,
 	type Decision,
 	type Opportunity,
 } from "../src/contracts/index.ts";
-import {
-	defaultIdleSec,
-	defaultMaxUnanswered,
-	maxIdleSec,
-} from "../src/index.ts";
+import { defaultIdleSec, maxIdleSec } from "../src/index.ts";
 import { defaultInterestText, maxInterestChars } from "./persona.ts";
 
 // ---------------------------------------------------------------- arguments
@@ -24,6 +22,18 @@ import { defaultInterestText, maxInterestChars } from "./persona.ts";
 export const cliConditions = [...conditions, "B1a"] as const;
 export type CliCondition = (typeof cliConditions)[number];
 export const defaultCliCondition: CliCondition = "B1a";
+
+/** Conversation gets twelve background calls per minute, with a finite three-part burst. */
+export const cliBudgetDefaults = {
+	...defaultBudget,
+	windowMs: 60_000,
+	minIntervalMs: 0,
+};
+export const cliLimits = {
+	...defaultLimits,
+	outboundIntervalMs: defaultIdleSec * 1000,
+};
+export const defaultCliMaxUnanswered = 3;
 
 export function resolveCondition(condition: CliCondition): {
 	readonly condition: Condition;
@@ -83,7 +93,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 	let condition: CliCondition = defaultCliCondition;
 	let off = false;
 	let idleSec = defaultIdleSec;
-	let maxUnanswered = defaultMaxUnanswered;
+	let maxUnanswered = defaultCliMaxUnanswered;
 	let log: LogChoice = { kind: "default" };
 	let tts = true;
 	let ttsAutonomous = false;
