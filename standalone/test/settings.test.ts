@@ -17,6 +17,7 @@ import {
 	settingsDigest,
 } from "../settings.ts";
 import { SOCIAL_RULES_VERSION } from "../../src/application/prompts.ts";
+import { API_ADAPTER_VERSION } from "../versions.ts";
 import { cliBudgetDefaults } from "../chat-loop.ts";
 
 const dirs: string[] = [];
@@ -134,7 +135,7 @@ describe("settingsDigest", () => {
 		// key-sorted JSON of the settings plus hostRules, hashed like settingsDigest does.
 		const expected = createHash("sha256")
 			.update(
-				'{"hostRules":' +
+				`{"adapterVersion":${JSON.stringify(API_ADAPTER_VERSION)},"hostRules":` +
 					JSON.stringify(HOST_RULES_VERSION) +
 					',"llm":{"background":{"effort":"low","model":"m-small","thinkingHeadroom":100},' +
 					'"main":{"effort":"medium","model":"m-small","thinkingHeadroom":200}},' +

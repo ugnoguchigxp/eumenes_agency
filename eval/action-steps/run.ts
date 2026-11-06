@@ -16,7 +16,6 @@ import {
 } from "../../src/index.ts";
 import {
 	createClaudeClient,
-	createClaudeLlm,
 	type UsageMeter,
 } from "../../standalone/claude.ts";
 import {
@@ -24,6 +23,7 @@ import {
 	judgeRole,
 	openSpendMeter,
 } from "../../standalone/settings.ts";
+import { createProviderLlm } from "../../standalone/providers.ts";
 import { withCommandBudget } from "../budget.ts";
 import { runCell as baseCell, type Cell as BaseCell } from "../f-fusion/run.ts";
 import {
@@ -206,17 +206,26 @@ async function main() {
 	} else writeFileSync(manifest, JSON.stringify(config, null, 2));
 	const meter = openSpendMeter(settings, join(out, "spend.jsonl"));
 	const globalMeter = openSpendMeter(settings);
-	const commandMeter: UsageMeter = {
-		assertWithinLimit() {
-			if (meter.spentUsd() >= limit) throw new Error("command budget reached");
-			globalMeter.assertWithinLimit();
-		},
-		record(model, usage) {
-			meter.record(model, usage);
-			globalMeter.record(model, usage);
-		},
-		spentUsd: () => meter.spentUsd(),
-	};
+	const commandMeter: UsageMeter = process.env.AGENCY_API_LEDGER
+		? meter
+		: {
+				assertWithinLimit() {
+					if (meter.spentUsd() >= limit)
+						throw new Error("command budget reached");
+					globalMeter.assertWithinLimit();
+				},
+				recordProvider(usage) {
+					if (!meter.recordProvider || !globalMeter.recordProvider)
+						throw new Error("provider accounting unavailable");
+					meter.recordProvider(usage);
+					globalMeter.recordProvider(usage);
+				},
+				record(model, usage) {
+					meter.record(model, usage);
+					globalMeter.record(model, usage);
+				},
+				spentUsd: () => meter.spentUsd(),
+			};
 	const client = createClaudeClient({
 		maxRetries: 0,
 		timeout: 60_000,
@@ -262,7 +271,11 @@ async function main() {
 	const inputPrice = Math.max(...priced.map((p) => p.input));
 	const outputPrice = Math.max(...priced.map((p) => p.output));
 	const bounded = (role: typeof settings.llm.background): LlmPort => {
-		const base = createClaudeLlm(role, commandMeter, client);
+		const base = createProviderLlm(
+			role,
+			commandMeter,
+			role.provider === "openai" ? undefined : client,
+		);
 		return {
 			complete<T>(request: LlmRequest<T>, signal: AbortSignal) {
 				const schema = JSON.stringify(

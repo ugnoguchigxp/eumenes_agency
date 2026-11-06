@@ -1,0 +1,36 @@
+{
+	"llm": {
+		"background": {
+			"provider": "openai",
+			"model": "gpt-6-luna",
+			"effort": "high",
+			"thinkingHeadroom": 6000
+		},
+		"main": {
+			"provider": "openai",
+			"model": "gpt-6-luna",
+			"effort": "high",
+			"thinkingHeadroom": 6000
+		},
+		"judge": {
+			"provider": "anthropic",
+			"model": "claude-haiku-5-5",
+			"effort": "high",
+			"thinkingHeadroom": 6000
+		}
+	},
+	"spend": {
+		"limitUsd": 9,
+		"pricing": {
+			"claude-haiku-5-5": {
+				"input": 0.1,
+				"output": 0.5
+			},
+			"gpt-6-luna": {
+				"input": 0.1,
+				"output": 0.5
+			}
+		}
+	},
+	"budget": {}
+}

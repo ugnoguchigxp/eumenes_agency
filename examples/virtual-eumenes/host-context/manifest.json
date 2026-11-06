@@ -1,0 +1,25 @@
+{
+	"scope": "Eumenes-owned instruction assets copied read-only as fixed local integration fixtures; synthetic literal persona, emotion disabled. Not a production host connection or behavior result.",
+	"files": {
+		"background.context.toml": {
+			"source": "/Users/y.noguchi/Code/eumenes/api/domains/dialogue/contexts/agency/background.context.toml",
+			"sha256": "e5e54b879b4b070b3230cba997c35a70d13c8bea433d93be4d37779fcea7c2ae"
+		},
+		"update.context.toml": {
+			"source": "/Users/y.noguchi/Code/eumenes/api/domains/dialogue/contexts/agency/update.context.toml",
+			"sha256": "c43d3f192fec855878191115f52520c3ecd527333e3a3a7ce913344c7a7feb21"
+		},
+		"select.context.toml": {
+			"source": "/Users/y.noguchi/Code/eumenes/api/domains/dialogue/contexts/agency/select.context.toml",
+			"sha256": "fb8ce9433f232c1e5eb36f2d74a2bab931fd16c3a7c3d5c30eba0728e060fb6f"
+		},
+		"utterance.context.toml": {
+			"source": "/Users/y.noguchi/Code/eumenes/api/domains/dialogue/contexts/agency/utterance.context.toml",
+			"sha256": "5c9b7d81a97edf6dbb553e03bb830f5e798a5c3247ebffb7f6444e1c0d84a56c"
+		},
+		"output-contract.context.toml": {
+			"source": "/Users/y.noguchi/Code/eumenes/api/domains/dialogue/contexts/agency/output-contract.context.toml",
+			"sha256": "00f6b05a23779ac1d5f34f1162798e1d14c44fdf75f6a35fffa9f09b0ff61311"
+		}
+	}
+}

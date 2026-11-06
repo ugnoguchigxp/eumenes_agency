@@ -1,19 +1,114 @@
 # eumenes-agency
 
-Eumenes が経験から関心・欲求・意図を持ち、発言や行動の機会を選ぶ仕組みを、本体と独立して検証するサブプロジェクト。名前は仮称。
+会話を主用途とし、会話や結果から自動発話・確認・ツールチェーン利用を発案する、Eumenes向けの独立した研究用ライブラリです。必要な依頼の目的・理由・内容をホストへ渡し、バンドルやサブエージェントの実行はEumenesの既存機構が担当します。
 
-**2026-11-01 時点: 関心の形成・変化（条件F + `interestFormation`）、イベントによる断続的な起床、予算付きの委譲契約、ホスト提供SQLiteへの履歴保存、調査結果の会話利用を研究用プロトタイプとして実装した。実モデルで改善F・融合版と4段階の改善を比較し、③「利用者へ実際に話す完成本文を生成する」を発話契約とB2/Fの実験用指示に採用した。全体検証は759成功・失敗0件（2 skip、1 todo）。[進捗・評価結果と限界](docs/agency-next-progress.md)と下記の比較結果を参照。Eumenes/Pursuit本体への接続、未知のシナリオや独立した人間による品質評価は未完了。**
+**mockツールチェーンまでの導線は結合成功しました。** `bun run demo:mock-toolchain`で、会話→発案→mockバンドル・サブエージェント→結果→自動発話をAPI費用0で確認できます。[導線の検証結果](docs/mock-toolchain-integration-2026-11-06.md)を参照してください。実モデルの会話品質や正式点とは分けて扱います。
 
-使い方: `bun run verify`（format / lint / 型 / 境界 / テスト）、`bun eval/main.ts validate [--suite p0e|p1e]`、`bun eval/main.ts run --name <run> [--suite p1e] [--conditions B1,B2,D] [--case <id>] [--reps 3] [--budget-usd n]`、`bun eval/main.ts score --name <run>`、`bun eval/main.ts judge --name <run> [--limit N] [--budget-usd n]`（内容と状態の判定器）、`bun eval/main.ts label-export --suite p1e --split dev --n 12 --out <file.md>` と `agreement --sheet <file.md>`（人手ラベルの一致率）、`judge-export --name <run> --n 30 --out <file.md>` と `judge-agreement --sheet <file.md>`（判定器の較正）、`bun eval/main.ts trace --name <run> --case <id> [--condition B2] [--rep 1] [--prompt]`（モデル呼び出しと最終状態の確認。`traces.jsonl` はローカルのみ）、`bun run agency [-- --condition B1a --idle-sec 40 --max-unanswered 1 --no-log]`（対話。黙っていると AI から話しかける。既定 B1a、会話記録は `data/chats/`）。設定は `config/experiment.json`、費用の記録は `data/spend.jsonl`。
+0.1.5では、[Haiku/Lunaによる会話・自発発話・発案の実API検証](docs/native-conversation-validation-2026-11-06.md)を追加しています。Fの会話参加、通常応答との重複抑制、再読枠と実際の送出間隔の提示を改善し、同じ条件で測定します。ツールチェーンの実行先はmockです。
 
-対話CLIは、通常応答の後は状態の更新だけを行い、静かな間に発話を判断する。既定は10秒の間、返事なしで最大3回まで。CLIの背景呼出し枠は1分12回、自発アクションの最低間隔は10秒で、設定ファイルの `budget` を指定した場合はそちらを優先する。自発発話の文章は通常応答のモデルで作成し、実際に表示した内容を会話へ戻す。`--max-unanswered 1` で1回ごとに返事を待つ設定に戻せる。評価実験・ライブラリの予算と間隔の既定値は従来どおり。
+**現在は責務内の単体完成度を再評価中で、80点超えは未判定です。** 修正後の技術品質は同じ30項目で75.5点。会話・自動発話・発案とmockへの受け渡しを主判定にし、他機能に属するリマインド等の旧評価は参考として残します。成功率と不要介入率の基準は維持しています。[現在の検証](docs/native-conversation-validation-2026-11-06.md)、[前回の再評価書](docs/standalone-reevaluation-2026-11-05.md)、[俯瞰レビュー](docs/agency-review-2026-11-06.md)を参照してください。CIとEumenes本体への取り込みは今回の対象外です。
 
-### GPT-6 Luna で自発行動を試す
+Memory側の追加レビューを踏まえ、[ホスト入力の出典契約](spec/host-input-provenance-2026-11-06.md)を追加しました。F・独自指示・話題・TODOで、忘却後も独立した会話を結果受付・保存・再起動まで継続するmock結合試験が通っています。実ホストの完全な出典対応と非破壊の再検証は残作業です。
 
-Agencyで `bun run eval:initiative --model gpt-6-luna --reps 2` を実行すると、過去の仕事、現在の関心、共有した出来事、撤回・完了を含む合成会話10場面を試せる。`--case proof --case proof-declined` のように対象を絞れる。各試行の期待行動・判断・却下理由・調査の受付結果をJSONLで出力し、不一致があっても指定した全件を実行する。1件でも失敗すれば終了コードは1になる。
+## できること
 
-本体のCodex CLIログインと、依存関係・指示カタログを準備したEumenesのチェックアウトを使う。本体の場所は既定で隣の `../eumenes`、指定には `--eumenes <path>` を使う。モデルの呼び出しは利用枠を消費する。提示した候補と版・引用可能な根拠・モデルの提案は一時ディレクトリのトレースに保存する。保存先は `--trace <file>` でも指定できる。調査は一時DBで本体の受付処理まで通し、ワーカーは模擬実装を使う。音声再生は対象外。[初回6場面の結果](eval/results/initiative-luna-20261104/summary.md)・[追加4場面の結果](eval/results/initiative-luna-followup-20261104/summary.md)
+- ユーザー・ツール・ホストから観測を受け取り、LLMが記憶を更新し、発言やツール利用の候補を選びます。意味や状況の判断はLLM、参照・権限・予算・状態の整合性はコードで扱います。
+- 取消・再起動・重複する結果・保持上限を扱い、状態と処理位置をsnapshotに保存します。ツールの実行と発話の配信はホストが担当します。
+- 引用とは別に、モデルへ渡した入力への依存を記録します。忘却の計画とjournalで派生状態や古い保存からの復活を防ぎます。処理済みの原観測は、IDと順序を保って退避できます。
+- Claude HaikuとOpenAI Lunaの直接APIで、同じケース・指示・採点基準を比較できます。呼び出し前の費用予約と使用量の精算を、両モデルで同じ台帳に記録します。
 
+まだ実利用での有用性・長期運用を確認した製品ではありません。忘却はこのライブラリと任意のstandalone保存内の論理削除で、外部の記憶・会話ログ・providerの保持や物理媒体の消去はホスト側の対応が必要です。圧縮は原文の損失なし退避であり、意味要約で原文を捨てる方式ではありません。
+
+**[examples/virtual-eumenes](examples/virtual-eumenes/README.md)でeumenes_memoryの実公開APIに接続しました。** Eumenes採用配布物を固定し、原観測はMemoryに置き、Agencyの状態・実行票との忘却連動と再起動を検証します。独自のstandalone保存例は本番用Memoryに採用しません。小規模なAPI比較の効果と限界は[俯瞰レビュー](docs/agency-review-2026-11-06.md)、責務は[記憶と忘却の境界](docs/memory-lifecycle.md#eumenes_memoryとの境界)を参照してください。実Eumenes本体・本番DBへの接続は別途必要です。
+
+## ローカルで確認する
+
+BunとTypeScriptを使います。通常の実行時依存はZod、直接APIを試す環境では各providerのSDKも使います。
+
+```sh
+bun install --frozen-lockfile
+bun run verify
+```
+
+`verify`は整形・静的検査・型・ホスト境界・テスト・配布物のローカル検査です。実APIの試験は明示的に実行します。隣にEumenesのチェックアウトがある場合は、既存のホスト接続試験も対象になります。外部ホストの変更で失敗した場合は、このプロジェクト単体の失敗と分けて記録してください。
+
+```sh
+bun run eval validate --suite p0e
+bun run eval validate --suite p1e
+bun run eval:performance
+bun run eval:memory-performance
+bun run eval:synergy
+bun run demo:mock-toolchain
+```
+
+性能試験はAPIを使いません。実モデルの待ち時間や本番環境の性能は別途測る必要があります。
+
+## 共通のAPIキーを使う
+
+`~/.zprofile`にexport済みなら、プロジェクトごとの`.env`は不要です。API関連の`bun run`コマンドはログインシェルから設定を読み、`.env`を使わずに起動します。
+
+| provider | 優先する変数 | 互換名 |
+| --- | --- | --- |
+| Anthropic | `CLAUDE_API_KEY` | `ANTHROPIC_API_KEY` |
+| OpenAI | `OPEN_AI_API_KEY` | `OPENAI_API_KEY` |
+
+```sh
+bun run eval:api preflight --provider anthropic
+bun run eval:api preflight --provider openai
+```
+
+ここまではAPI呼び出し0件です。`keyConfigured: true`を確認してから課金試験へ進みます。キーの値はログや結果へ出しません。`bun eval/main.ts`などを直接起動する場合は、そのシェル自身がキーを引き継いでいる必要があります。
+
+## API費用をまとめて制限する
+
+台帳と上限を、対話・評価・採点で共通に指定します。同じ検証を継続するときは台帳を変更・削除しないでください。
+
+```sh
+export AGENCY_API_LEDGER="$PWD/data/api-validation/my-session/usage.jsonl"
+export AGENCY_API_LIMIT_USD=9
+export AGENCY_SETTINGS="$PWD/config/api-haiku.json"
+```
+
+この例の9 USDは、新規の検証で10 USD以内に収める余裕を持った設定です。Lunaへ切り替える場合は`AGENCY_SETTINGS`だけを`config/api-luna.json`へ変え、台帳を共有します。使用量が分からない通信失敗は予約を残すため、残額を使い切る前に停止する場合があります。
+
+現在継続中の検証は`data/api-validation/improvement-20261105/usage.jsonl`と**10 USD**の上限を使います。当初の9 USDから、利用者の許可範囲内で監査付き変更を行いました。台帳・不確定な呼び出し・過去のキャッシュ書き込み費用の最大補正は保持しています。上限の環境変数を変えるだけではpolicyは変更できず、既存台帳の削除・作り直しで予算を増やしません。
+
+```sh
+# 以下はAPI利用料が発生します
+bun run agency --condition B1a --idle-sec 40 --max-unanswered 1 --no-log
+bun run eval run --name my-haiku-run --suite p1e --split unseen --conditions B1 --reps 1 --budget-usd 1
+bun run eval judge --name my-haiku-run --budget-usd 1
+bun run eval score --name my-haiku-run
+```
+
+コマンド単体の`--budget-usd`は停止目安です。厳密な累計管理には、上の共通台帳も必要です。`judge`の採点役は設定上、相手providerです。モデルの採点は人による有用性の評価の代わりにはなりません。[API検証・費用・復旧の手順](docs/api-validation.md)に詳しい説明があります。
+
+対話CLIは通常応答後に状態を更新し、静かな間に自発発話を判断します。既定はB1a、10秒の間、返事なし最大3回。上の例は40秒・1回に制限し、会話ログを保存しません。ログを保存する設定では`data/chats/`に記録し、`/feedback useful`・`/feedback intrusive`・`/feedback missed`で本人の評価を残せます。`bun run usage:report`は本文を出さず集計します。計測機能の実装と、実利用での評価実績は分けて扱っています。
+
+## ライブラリとして接続する
+
+`createAgencyRuntime`の`systemContext`に、用途に合う`{ update, select }`の全文または構成関数を必ず渡します。リポジトリの実験用指示を使うときだけ`"experimental"`を明示します。通常応答は`runRespond`へ渡し、観測や参照資料は指示とは別のデータとして扱います。出力契約は`agencyOutputContract`・`replyOutputContract`で確認できます。
+
+主な実験方式は、記憶なしのB0、自由文メモのB1、意図と候補を持つB2、信念・欲求も扱うFです。B1aはメモがなくても選択を呼ぶ比較方式、Dはケースが指定した関連観測を渡す診断です。Dは正解に近い資料の選択を検証側から受け取るため、製品の完成度として採点しません。
+
+0.1.5の接続では次を利用できます。
+
+- `planOnOpportunity`: 新着観測がなくても、機会を資料にして候補を検討します。機会そのものを外部の証拠にはしません。
+- `repairUpdates`: 拒否コードを渡し、既存予算内で更新案の修正を1回だけ試します。
+- `constrainToolNames`: ホストが提示したツール名を出力schemaに限定します。
+- `recordUsage`: 委譲先の実使用量を実行IDへ結び付け、再送や遅着を扱います。
+- `WithInput<string>`: 独自SystemContextの本文と追加の入力依存を同時に渡せます。話題・TODO・関心・ツール説明にも`input`を申告できます。不明な依存は完全扱いにせず、忘却後は推論前に停止します。
+- `conversationParticipation`: Fで明示したとき、提示された外部観測を根拠に、その場の一言を候補なしで選べます。ツールの発案には意図と候補が必要です。ホストの指示には、この会話モードと`conversationEvidenceRefs`の意味を記載します。既定は無効です。
+
+モデル向けの`delivered`には採用済み通常応答と自発発話が入り、`outboundWaitMs`は背景処理自身の送出間隔の残りを示します。実際の制限はruntimeでも検査します。通常応答の記録は、音声の再生済みを保証するものではありません。
+
+ホストは単一writerで状態と処理位置を確定し、外部実行前に保存します。復元時には実行台帳・配信記録を照合してください。共有予算器はruntimeの設定と同じか、より厳しい上限にします。直接APIと実行権限は別であり、モデルの提案だけで要承認ツールを実行しません。
+
+忘却・退避・復元の契約と検証用保存例は[忘却と圧縮](docs/memory-lifecycle.md)、ホストの指示やデータの分離は[SystemContext接続仕様](spec/host-system-context.md)を参照してください。Memory公開APIの仮想接続を、本番ホスト・Worldまでの接続済みという意味では使いません。
+
+## 設計と過去の検証
+
+過去の成功件数や比較は、それぞれの当時の版・ケースに対する記録です。現在の品質を証明する数値として合算しません。
 
 - [計画と設計](plan.md): 最小循環、状態、処理、段階的な取り込み。
 - [P0-E 実験仕様](spec/p0e-experiment.md): 最初の比較実験。B0/B1/B2/F、Claude Haiku 5.5、費用上限、判断方法、実施の記録と逸脱。
@@ -33,24 +128,6 @@ Agencyで `bun run eval:initiative --model gpt-6-luna --reps 2` を実行する�
 - [研究根拠と適用限界](spec/research-basis.md): 一次資料12件、参考実装、設計判断との対応、代替案。
 - [2026-10-21 レビュー](spec/review-2026-10-21.md): 評価、修正点、次レビューで決めること。
 
-ライブラリ利用時は`RuntimeDeps.systemContext`に`{ update, select }`（全文または構成関数）を必ず渡す。旧実験の指示を使う場合だけ`"experimental"`を明示する。通常応答は`runRespond`の先頭に非空のsystemを1件渡し、観測・履歴・参照資料は別メッセージに置く。出力形式の説明は`agencyOutputContract`と`replyOutputContract`で確認でき、指示へ自動追加されない。
+Eumenes本体を使う`bun run eval:initiative`は別のホスト結合経路です。既定のCodex CLI方式と直接API方式を区別し、隣のチェックアウト・依存関係・指示カタログを準備する必要があります。今回の単体改善では本流接続を実施していません。[Lunaによる初回の記録](eval/results/initiative-luna-20261104/summary.md)も当時の版の結果です。
 
-ホストの推論アダプターと予算器を共有する場合、`callBudgetMeter`の計測窓は`budget.windowMs`と一致させ、呼出回数・間隔と`activityBudgetMeter`の各上限は設定と同じか、より厳しくする。設定より緩い共有予算器はruntime生成時に拒否する。未指定時は従来通りruntime内で予算器を作る。
-
-0.1.2ではFでも`hostTopics`・`hostTodos`・`utteranceEmotion`を明示指定できる。Fのホスト所有updateには`topics()`・`standingInterests`と既存の`todos()`をデータとして渡せる。ホストの記憶は独立した新観測の代わりにはならず、発話には引き続き有効な候補が必要。`reportedTodos`の出力拡張はB1だけである。接続追加後の全体検証は761成功・失敗0件（2 skip、1 todo）。
-
-技術は Bun、TypeScript、SQLite、Zod。検証用の LLM は Claude API の Claude Haiku 5.5（`@anthropic-ai/sdk`）。APIキーは、`.zprofile`などからexportした`CLAUDE_API_KEY`を使えるため、プロジェクトごとの`.env`は不要。標準名`ANTHROPIC_API_KEY`も使用でき、両方ある場合は`CLAUDE_API_KEY`を優先する。値はログ・結果・配布物に含めない。Pursuit と同じ独立実験構成にし、取り込み時はビルド済み JS・型宣言を版付き tgz にする。Memory と World は公開 API に接続し、Pursuit は採用した行動を遂行する接続先として後から選べる。
-
-キーを設定した後は、新しいターミナル、または`source ~/.zprofile`を実行したシェルから起動する。OpenAI用の共通読込は`OPEN_AI_API_KEY`を優先し、`OPENAI_API_KEY`も受け付ける。Lunaの直接API接続は[総合80点に向けた実装計画](spec/improvement-implementation-plan-2026-11-05.md)のW3で実装する。
-
-研究対象は、自分の経験・理解・関心と次の行動がつながるかである。発言回数が増えたことだけでは成功としない。合成音声の取得と、実際に聞き手に届いたことも分ける。
-
-## 0.1.3のホスト接続
-
-`planOnOpportunity: true`は機会をupdateの資料に渡し、新規観測がなくても既存の根拠から候補を検討する。機会自体は証拠にならない。`repairUpdates: true`は拒否コードを次のupdateへ渡し、既存予算内で修正を1回だけ試す。ホスト所有SystemContextがこれらの資料を読む指示を持つ必要がある。
-
-`constrainToolNames: true`は既存のflat wire形式を保ったまま、update/selectのnative schemaでホストのツール名だけを列挙する。指定しない利用側のschemaは変わらない。厳密な型変換で種別が拒否された場合、修正用診断には項目path・違反codeとschema由来の正しい選択肢を有界に返し、モデルの不正出力値は含めない。
-
-projectionは形成した関心（状態・起源・根拠）と取得済み結果も含む。`projectAgencyState`は保存済み状態から同じ有界な資料を作る公開関数。snapshotのcontinuityは呼出・活動予算、チケットとreceipt、既出話題、拒否診断・隔離を保存する。idle plannerのcheckpointは発話頻度と次の時点を復元する。ホストは状態とイベントcursorを単一writerで確定し、外部実行前に保存し、復元時には実行台帳と配信記録を照合する。
-
-`delegationRequest(ticket, state, at)`は実在する意図との結び付きを検証し、実行ホストが既存の予算を適用する依頼を作る。数値の追加上限を提案する場合は従来の`delegationRequest(ticket, state, budget, at)`を使い、ホストはその上限以下で実行する。適用しない数値を依頼の上限として記載しない。
+ライセンスは[MIT](LICENSE)、著作権表記はy.noguchiです。

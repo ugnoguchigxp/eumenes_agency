@@ -30,6 +30,7 @@ export interface ParticipationInput {
 	 * without a candidate (a reply that uses a finished investigation).
 	 */
 	readonly findingRefs?: ReadonlySet<string>;
+	readonly conversationRefs?: ReadonlySet<string>;
 }
 
 export type Verdict =
@@ -44,6 +45,15 @@ export type Verdict =
 
 const outward = (a: ParticipationProposal["action"]) =>
 	a === "speak" || a === "tool";
+
+export const outboundWaitMs = (
+	state: Pick<AgencyState, "lastOutboundAt">,
+	limits: Pick<Limits, "outboundIntervalMs">,
+	at: number,
+) =>
+	state.lastOutboundAt === null
+		? 0
+		: Math.max(0, limits.outboundIntervalMs - (at - state.lastOutboundAt));
 
 /** Unknown tool, or a tool that needs the user's explicit grant (never autonomous). */
 const toolProblem = (
@@ -72,9 +82,16 @@ export const validateParticipation = (i: ParticipationInput): Verdict => {
 		p.candidateRef === null &&
 		p.utterance !== null &&
 		p.evidenceRefs.some((r) => i.findingRefs?.has(r) === true);
+	const conversationSpeak =
+		i.condition === "F" &&
+		p.action === "speak" &&
+		p.candidateRef === null &&
+		p.utterance !== null &&
+		p.evidenceRefs.some((r) => i.conversationRefs?.has(r) === true);
 	const needsCandidate =
 		usesCandidates &&
 		!findingSpeak &&
+		!conversationSpeak &&
 		(outward(p.action) || p.action === "discard");
 	let candidate: Candidate | null = null;
 	if (needsCandidate || (usesCandidates && p.action === "wait")) {
@@ -99,13 +116,9 @@ export const validateParticipation = (i: ParticipationInput): Verdict => {
 	let toolName: string | null = null;
 	let toolInput: string | null = null;
 	if (outward(p.action)) {
-		if (
-			i.state.lastOutboundAt !== null &&
-			i.at - i.state.lastOutboundAt < i.limits.outboundIntervalMs
-		)
-			add("outbound_interval");
+		if (outboundWaitMs(i.state, i.limits, i.at) > 0) add("outbound_interval");
 	}
-	if (findingSpeak) utterance = p.utterance;
+	if (findingSpeak || conversationSpeak) utterance = p.utterance;
 	if (usesCandidates) {
 		if (candidate && p.action === "speak") {
 			if (candidate.kind === "tool") add("bad_candidate_kind");

@@ -17,7 +17,7 @@ import type { ObservationInput } from "../src/contracts/model.ts";
 import { replayScript, type ScriptEvent } from "./scenario.ts";
 import { createH11Host, h11Violations, type HostLimits } from "./h11-host.ts";
 import { delegateTools } from "./h10-scene.ts";
-import { createSelfPort } from "./self-port/port.ts";
+import { createEvaluationPort } from "./port.ts";
 
 const H = 3_600_000;
 const D = 24 * H;
@@ -194,7 +194,7 @@ if (import.meta.main) {
 	).split(",");
 	const out: Record<string, unknown> = {};
 	for (const c of conds) {
-		const port = createSelfPort(dir);
+		const port = createEvaluationPort(dir);
 		port.setSalt(`h11s:${c === "after" ? "m3" : "z8"}`);
 		const r = await runH11(c, port);
 		if (port.pending() > 0) {

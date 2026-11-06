@@ -19,7 +19,7 @@ import {
 	proposal,
 	tools,
 } from "../test/core/helpers.ts";
-import { createSelfPort } from "./self-port/port.ts";
+import { createEvaluationPort } from "./port.ts";
 
 const D = 24 * HOUR;
 const CODE = "tool.timeout:search";
@@ -46,7 +46,7 @@ export async function runSFault(
 	mode: "script" | "self",
 	dir: string,
 ) {
-	const port = mode === "self" ? createSelfPort(dir) : null;
+	const port = mode === "self" ? createEvaluationPort(dir) : null;
 	port?.setSalt(`sf:${cond === "after" ? "a6" : "b1"}`);
 	const fake = fakeLlm();
 	// Script mode: unscripted calls answer "no change" / "wait".

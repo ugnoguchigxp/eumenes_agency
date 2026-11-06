@@ -1,0 +1,281 @@
+{
+	"date": "2026-11-06",
+	"sourceSha256": "2ebba5a6916d4d775efcce93a5b9063ebe3c6ec35e6ad0ba34ca236ed763f8aa",
+	"memoryArtifact": {
+		"package": "eumenes-memory",
+		"version": "0.0.2",
+		"artifact": "eumenes-memory-0.0.2-3070b7dd6e4a.tgz",
+		"sha256": "3070b7dd6e4a4db945300407851b6678d65af35fb8badfe5df93c33d037e6706",
+		"contractVersions": {
+			"records": 1,
+			"state": 1,
+			"lifecycle": 1,
+			"external": 1
+		},
+		"dbSchemaVersion": 8,
+		"verifiedWith": "eumenes_memory: 807 local tests passed; Eumenes host integration recorded in spec/memory-integration-2026-11-05.md",
+		"sourceGitCommit": "5504945f838935fbff6401c962bdecb1d3b49956",
+		"sourceHash": "410170e57d78030890b67b5041cc94a6a727e4965fcb251face9a2c32e35d6f4"
+	},
+	"measurement": {
+		"scope": "Synthetic 1000 independent user observations; no LLM/API/network. Same originals, Memory public package, local SQLite. Not an action-quality or production load score.",
+		"memory": {
+			"package": "eumenes-memory",
+			"version": "0.0.2",
+			"artifact": "eumenes-memory-0.0.2-3070b7dd6e4a.tgz",
+			"sha256": "3070b7dd6e4a4db945300407851b6678d65af35fb8badfe5df93c33d037e6706",
+			"contractVersions": {
+				"records": 1,
+				"state": 1,
+				"lifecycle": 1,
+				"external": 1
+			},
+			"dbSchemaVersion": 8,
+			"verifiedWith": "eumenes_memory: 807 local tests passed; Eumenes host integration recorded in spec/memory-integration-2026-11-05.md",
+			"sourceGitCommit": "5504945f838935fbff6401c962bdecb1d3b49956",
+			"sourceHash": "410170e57d78030890b67b5041cc94a6a727e4965fcb251face9a2c32e35d6f4"
+		},
+		"sampleCount": 50,
+		"baseline": {
+			"kind": "full Agency RAM checkpoint; no durable archive port",
+			"observations": 1000,
+			"checkpointBytes": 106733,
+			"sourceReadAfterDiscardingOldObservations": false
+		},
+		"connected": {
+			"kind": "same Agency checkpoint compacted, Memory canonical records + archive port",
+			"observations": 30,
+			"archived": 970,
+			"checkpointBytes": 3472,
+			"storedHostEnvelopeBytes": 2287,
+			"originalTextDuplicatedInHostEnvelope": false,
+			"oldSourceReadable": true
+		},
+		"timingMs": {
+			"initialSave": 100.745333,
+			"compact": 79.24237500000001,
+			"sourceLookupP95": 0.07566700000000992,
+			"reload30P95": 1.6122910000000275,
+			"commit30P95": 2.3954999999999984
+		},
+		"limits": [
+			"Memory consumes additional disk space for canonical records, revisions, dependency metadata and journal; reduced RAM checkpoint bytes are not total storage savings.",
+			"Source lookup is by an already selected ID, not semantic retrieval. A restored synthetic note in adapter tests selects the old ID; no claim that an LLM would discover it.",
+			"No equivalence to real Eumenes scheduling, Memory curation, recall or production deletion is established."
+		]
+	},
+	"pairedApi": {
+		"scope": "4 synthetic oracle-ID fixtures,1 repetition,per provider; only archive port differs. Not retrieval discovery, human evaluation or standalone acceptance. One failed paid adapter trial excluded, retained in local artifacts. Final source cached-replays all16 requests/decisions without new charges.",
+		"rows": [
+			{
+				"provider": "haiku",
+				"caseId": "unit",
+				"connected": false,
+				"action": "wait",
+				"utterance": null,
+				"evidenceRefs": ["o80"],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "haiku",
+				"caseId": "unit",
+				"connected": true,
+				"action": "speak",
+				"utterance": "別業者の12枚セットと2箱を比べる前に、業者確認では1箱8枚でした。2箱は16枚になるので、価格は箱単位ではなく枚数で揃えてから比べてください。",
+				"evidenceRefs": ["o1", "o80"],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "haiku",
+				"caseId": "access",
+				"connected": true,
+				"action": "speak",
+				"utterance": "別部署の共用分析ツールで集計を始める前に、実行権限が部署ごとの登録に紐づく点を確認しておくと安心です。以前の確認では、管理者による登録後に実行できていました。",
+				"evidenceRefs": ["o1", "o80"],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "haiku",
+				"caseId": "access",
+				"connected": false,
+				"action": "wait",
+				"utterance": null,
+				"evidenceRefs": ["o80"],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "haiku",
+				"caseId": "scope",
+				"connected": false,
+				"action": "wait",
+				"utterance": null,
+				"evidenceRefs": ["o80"],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "haiku",
+				"caseId": "scope",
+				"connected": true,
+				"action": "speak",
+				"utterance": "資料Aの公開に進む前に確認させてください。公開には責任者の許可が必要ですが、許可を取ったという記録はまだ見当たりません。印刷用PDFの修正が終わったことは把握しています。公開の前に許可の有無を確認しておくと安心です。",
+				"evidenceRefs": ["o1", "o80"],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "haiku",
+				"caseId": "conditional",
+				"connected": true,
+				"action": "wait",
+				"utterance": null,
+				"evidenceRefs": ["o1", "o80"],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "haiku",
+				"caseId": "conditional",
+				"connected": false,
+				"action": "wait",
+				"utterance": null,
+				"evidenceRefs": ["o80"],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "luna",
+				"caseId": "unit",
+				"connected": false,
+				"action": "wait",
+				"utterance": null,
+				"evidenceRefs": [],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "luna",
+				"caseId": "unit",
+				"connected": true,
+				"action": "speak",
+				"utterance": "比較前に、両方の価格を枚数で割って1枚あたりにそろえると間違いを防げます。1箱8枚なので、2箱は16枚として比べてください。",
+				"evidenceRefs": ["o1", "o80"],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "luna",
+				"caseId": "access",
+				"connected": true,
+				"action": "speak",
+				"utterance": "別部署の共用分析ツールは、部署ごとの実行権限登録が必要で、登録後に使えたという確認があります。集計を始める前に、今回の部署の登録状況を確認してください。",
+				"evidenceRefs": ["o1", "o80"],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "luna",
+				"caseId": "access",
+				"connected": false,
+				"action": "wait",
+				"utterance": null,
+				"evidenceRefs": [],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "luna",
+				"caseId": "scope",
+				"connected": false,
+				"action": "wait",
+				"utterance": null,
+				"evidenceRefs": [],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "luna",
+				"caseId": "scope",
+				"connected": true,
+				"action": "speak",
+				"utterance": "資料Aは最終公開に責任者の許可が必要とのことでした。印刷用PDFの修正が終わり公開へ進む前に、許可の確認が取れているかだけ確かめてください。",
+				"evidenceRefs": ["o1", "o80"],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "luna",
+				"caseId": "conditional",
+				"connected": true,
+				"action": "wait",
+				"utterance": null,
+				"evidenceRefs": [],
+				"source": "llm",
+				"calls": 1
+			},
+			{
+				"provider": "luna",
+				"caseId": "conditional",
+				"connected": false,
+				"action": "wait",
+				"utterance": null,
+				"evidenceRefs": [],
+				"source": "llm",
+				"calls": 1
+			}
+		]
+	},
+	"verification": {
+		"exampleTestsPass": 13,
+		"fullTestsPass": 909,
+		"skip": 25,
+		"todo": 1,
+		"fail": 0,
+		"negativeControlsDetected": 2,
+		"sourceChangedInCoreThisTurn": false
+	},
+	"technicalReview": {
+		"rubric": "1.1.0",
+		"profile": "agent",
+		"depth": "deep",
+		"score": 68.8,
+		"confidence": "Medium",
+		"readiness": "conditional",
+		"coveragePercent": 100.0,
+		"findings": [
+			"R01: custom host context cannot resume receipts after forgetting",
+			"R02: duplicate references exhaust recall capacity before deduplication",
+			"R03: contradictory repetition permissions without precedence"
+		],
+		"standaloneOver80Confirmed": false
+	},
+	"budget": {
+		"ledger": "data/api-validation/improvement-20261105/usage.jsonl",
+		"ledgerSha256": "414b06300092e5f44944ffbd1dd4fd1e245f06c98bbaf78404a4fa195e181ecd",
+		"knownUsd": "3.331764220000000096457",
+		"reservedUsd": "3.7464",
+		"uncertain": 5,
+		"conservativeUpperUsd": "7.078164220000000096457",
+		"roundedUpUsd": "7.08",
+		"historicalPeakExposureUsd": "8.888234409999999795647",
+		"thisTurnKnownUsd": "0.008445540000000000230",
+		"newPaidAttempts": 17,
+		"validPairedDecisions": 16,
+		"paidFailedTrialAttempts": 1,
+		"uncertainReservationIds": [
+			"7bb37885-0fc7-4113-8a86-4c4a49fe227f",
+			"7accb287-df71-49f5-82dd-8b0f781b4d03",
+			"1d895b19-172b-4a66-835f-c034ceeb0544",
+			"4c498f62-aa7d-4d2e-967f-aef83b4c7624",
+			"aeba6e4d-b326-45c9-a558-488ee1cae52f"
+		],
+		"userLimitUsd": 10,
+		"executionPolicyUsd": 9
+	},
+	"memoryConfirmedDefects": 0,
+	"memoryChangeRequests": []
+}

@@ -1,6 +1,6 @@
 {
 	"name": "eumenes-agency",
-	"version": "0.1.3",
+	"version": "0.1.5",
 	"private": true,
 	"license": "MIT",
 	"type": "module",
@@ -15,19 +15,29 @@
 		"format": "oxfmt --write",
 		"format:check": "oxfmt --check",
 		"check:boundaries": "bun scripts/check-boundaries.ts",
-		"test": "bun test ./src ./test ./standalone ./eval",
-		"agency": "bun standalone/cli.ts",
-		"eval": "bun eval/main.ts",
-		"eval:initiative": "bun eval/initiative/run.ts",
-		"pack": "bun scripts/pack.ts"
+		"test": "bun test ./src ./test ./standalone ./eval ./examples",
+		"agency": "zsh -l scripts/api-entry.zsh standalone/cli.ts",
+		"eval": "zsh -l scripts/api-entry.zsh eval/main.ts",
+		"eval:initiative": "zsh -l scripts/api-entry.zsh eval/initiative/run.ts",
+		"pack": "bun scripts/pack.ts",
+		"eval:api": "zsh -l scripts/api-entry.zsh eval/api.ts",
+		"usage:report": "bun scripts/usage-report.ts",
+		"eval:performance": "bun eval/performance.ts",
+		"eval:memory-performance": "bun eval/memory-performance.ts",
+		"eval:cross-judge": "zsh -l scripts/api-entry.zsh eval/cross-judge.ts",
+		"eval:synergy": "bun examples/virtual-eumenes/measure.ts",
+		"eval:synergy:api": "zsh -l scripts/api-entry.zsh examples/virtual-eumenes/live.ts",
+		"demo:mock-toolchain": "bun examples/virtual-eumenes/mock-demo.ts",
+		"eval:conversation:api": "zsh -l scripts/api-entry.zsh examples/virtual-eumenes/native.ts"
 	},
 	"dependencies": {
-		"zod": "4.4.3"
+		"zod": "4.6.7"
 	},
 	"devDependencies": {
 		"@anthropic-ai/sdk": "0.131.0",
 		"@types/bun": "1.3.14",
 		"@types/node": "25.9.3",
+		"eumenes-memory": "./examples/virtual-eumenes/vendor/eumenes-memory-0.0.2-3070b7dd6e4a.tgz",
 		"openai": "7.51.0",
 		"oxfmt": "0.71.0",
 		"oxlint": "1.86.0",

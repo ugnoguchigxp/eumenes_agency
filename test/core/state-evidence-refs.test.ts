@@ -88,7 +88,8 @@ describe("select evidence refs may cite presented state items' evidence", () => 
 			const r = await m.rt.decide(opportunity("op1", 30 * MIN), sig());
 			const prompt = m.llm.requests.at(-1)?.prompt ?? "";
 			expect(prompt).toContain("根拠: o1");
-			expect(prompt).not.toContain("[o1]");
+			if (condition === "B1") expect(prompt).toContain("[o1]");
+			else expect(prompt).not.toContain("[o1]");
 			expect(r.decision.rejectCodes).toEqual([]);
 			expect(r.decision.action).toBe("speak");
 		});

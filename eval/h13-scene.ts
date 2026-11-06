@@ -19,7 +19,8 @@ import {
 	tools,
 } from "../test/core/helpers.ts";
 import { writeFileSync, mkdirSync } from "node:fs";
-import { createSelfPort, SelfPortPending } from "./self-port/port.ts";
+import { SelfPortPending } from "./self-port/port.ts";
+import { createEvaluationPort } from "./port.ts";
 
 const D = 24 * HOUR;
 const NOW = 10 * D;
@@ -89,7 +90,7 @@ export const CONDS = ["noInv", "invOff", "invOn"] as const;
 const SALT: Record<string, string> = { noInv: "m3", invOff: "p8", invOn: "z5" };
 
 export async function runH13(dir: string) {
-	const port = createSelfPort(dir);
+	const port = createEvaluationPort(dir);
 	const out: any[] = [];
 	let pending = 0;
 	for (const c of CONDS) {

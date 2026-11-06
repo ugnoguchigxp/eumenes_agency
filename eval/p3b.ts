@@ -12,7 +12,7 @@ import { createAgencyRuntime } from "../src/application/runtime.ts";
 import { defaultBudget } from "../src/contracts/runtime.ts";
 import { tools } from "../test/core/helpers.ts";
 import { replayScript, type ScriptEvent, type TraceRow } from "./scenario.ts";
-import { createSelfPort } from "./self-port/port.ts";
+import { createEvaluationPort } from "./port.ts";
 
 const H = 3_600_000;
 const D = 24 * H;
@@ -216,7 +216,7 @@ if (import.meta.main) {
 	).split(",");
 	const out: Record<string, unknown> = {};
 	for (const c of conds) {
-		const port = createSelfPort(dir);
+		const port = createEvaluationPort(dir);
 		port.setSalt(`p3b:${c}`);
 		const rt = makeRuntime(c, port);
 		const rows = await replayScript(rt, SCENE);

@@ -1225,7 +1225,7 @@ export function scanForSecrets(paths: readonly string[]) {
 			v.length >= 12,
 	);
 	const patterns = [
-		/sk-[A-Za-z0-9_-]{8,}/,
+		/\bsk-[A-Za-z0-9_-]{8,}/,
 		/-----BEGIN [A-Z ]*PRIVATE KEY-----/,
 		/\bBearer\s+[A-Za-z0-9._-]{12,}/,
 		/"envRef"\s*:\s*"/,

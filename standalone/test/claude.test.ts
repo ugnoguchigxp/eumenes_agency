@@ -104,7 +104,7 @@ describe("createClaudeLlm", () => {
 		expect(recorded).toHaveLength(1);
 		expect(result.value).toEqual({ answer: "ok" });
 		expect(result.model).toBe("served-model");
-		expect(result.inputTokens).toBe(110);
+		expect(result.inputTokens).toBe(115);
 		expect(result.outputTokens).toBe(50);
 		expect(result.cacheReadTokens).toBe(5);
 	});
@@ -141,9 +141,9 @@ describe("createClaudeLlm", () => {
 			expect(error).toBeInstanceOf(LlmOutputError);
 			expect((error as LlmOutputError).reasonCode).toBe(code);
 			expect((error as LlmOutputError).model).toBe("served-model");
-			// input includes cache creation (100 + 10); cache reads are not counted
+			// Total input includes uncached input, cache creation and cache reads.
 			expect((error as LlmOutputError).usage).toEqual({
-				inputTokens: 110,
+				inputTokens: 115,
 				outputTokens: 50,
 			});
 			expect(recorded).toHaveLength(1);

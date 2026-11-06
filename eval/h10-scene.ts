@@ -12,7 +12,7 @@ import { defaultBudget } from "../src/contracts/runtime.ts";
 import { tools } from "../test/core/helpers.ts";
 import { replayScript, type ScriptEvent, type TraceRow } from "./scenario.ts";
 import { H10_TEXT } from "./h10.ts";
-import { createSelfPort } from "./self-port/port.ts";
+import { createEvaluationPort } from "./port.ts";
 
 const H = 3_600_000;
 const D = 24 * H;
@@ -151,7 +151,7 @@ if (import.meta.main) {
 	).split(",");
 	const out: Record<string, unknown> = {};
 	for (const c of conds) {
-		const port = createSelfPort(dir);
+		const port = createEvaluationPort(dir);
 		port.setSalt(`h10s:${c === "after" ? "k7" : "q2"}`);
 		const rt = makeRuntime(c, port);
 		// Per return: was result/status/reviewAt recorded on the intent right after work.returned?

@@ -12,6 +12,7 @@ import type {
 import type { EmotionEmoji } from "./emotion.ts";
 import type { ParticipationProposal, WireUpdate } from "./proposals.ts";
 import type { StandingInterest } from "./runtime.ts";
+import type { WithInput } from "./memory.ts";
 
 /** Public execution contract. Its description is never inserted into model messages. */
 export interface AgencyOutputContract<T> {
@@ -37,6 +38,7 @@ interface ModelData {
 	readonly observations: readonly Observation[];
 	readonly freshIds: readonly string[];
 	readonly state: ModelStateData;
+	/** Recent accepted normal replies and successful autonomous deliveries; not proof of playback. */
 	readonly delivered: readonly string[];
 	readonly tools: readonly ToolCapability[];
 	readonly limits: Limits;
@@ -59,6 +61,10 @@ export interface UpdateModelData extends ModelData {
 export interface SelectModelData extends ModelData {
 	/** Exact selection evidence whitelist for candidate-based conditions. */
 	readonly citableEvidenceRefs?: readonly string[];
+	/** F opt-in: actual external observation IDs that can ground speech without a candidate. */
+	readonly conversationEvidenceRefs?: readonly string[];
+	/** Remaining core-enforced autonomous outbound interval; normal replies do not reset it. */
+	readonly outboundWaitMs?: number;
 	readonly findingRefs?: readonly {
 		readonly intentId: string;
 		readonly ref: string;
@@ -88,7 +94,10 @@ export interface SelectSystemContextInput {
 }
 
 /** Resolved once per logical call, before the budgeted attempt (including its retry). */
-export type SystemContextSource<T> = string | ((input: T) => string);
+export type SystemContextSource<T> =
+	| string
+	| WithInput<string>
+	| ((input: T) => string | WithInput<string>);
 
 export interface BackgroundSystemContext {
 	readonly update: SystemContextSource<UpdateSystemContextInput>;

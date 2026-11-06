@@ -836,27 +836,28 @@ async function runCommand(values: {
 
 	const { loadSettings, settingsDigest, openSpendMeter, resolveBudget } =
 		await import("../standalone/settings.ts");
-	const { createClaudeLlm } = await import("../standalone/claude.ts");
+	const { createProviderLlm } = await import("../standalone/providers.ts");
 	const { createAgencyRuntime, INSTRUCTION_VERSION } =
 		await import("../src/index.ts");
 
 	const settings = loadSettings();
 	const meter = openSpendMeter(settings);
+	const ownSpend = () => meter.localSpentUsd?.() ?? meter.spentUsd();
 	// Self-inference (plan §6.6): SELF_PORT_DIR set → answers from files, no model API.
 	const selfDir = process.env.SELF_PORT_DIR;
 	const self = selfDir
 		? (await import("./self-port/port.ts")).createSelfPort(selfDir)
 		: null;
-	const llm = self ?? createClaudeLlm(settings.llm.background, meter);
+	const llm = self ?? createProviderLlm(settings.llm.background, meter);
 	const digest = settingsDigest(settings);
 	const budget = resolveBudget(settings);
 	assertResumeCompatible(existing, digest, INSTRUCTION_VERSION);
 	mkdirSync(dir, { recursive: true });
-	const startSpent = meter.spentUsd();
+	const startSpent = ownSpend();
 	const capped =
 		values.budgetUsd === undefined
 			? llm
-			: withCommandBudget(llm, () => meter.spentUsd(), values.budgetUsd);
+			: withCommandBudget(llm, ownSpend, values.budgetUsd);
 	const recorder = createTraceRecorder(
 		capped,
 		join(dir, "traces.jsonl"),
@@ -879,7 +880,7 @@ async function runCommand(values: {
 		}
 		if (
 			values.budgetUsd !== undefined &&
-			commandBudgetReached(() => meter.spentUsd(), startSpent, values.budgetUsd)
+			commandBudgetReached(ownSpend, startSpent, values.budgetUsd)
 		) {
 			console.log(
 				`stop: --budget-usd ${values.budgetUsd} reached; use --resume to continue`,
@@ -931,7 +932,7 @@ async function runCommand(values: {
 				runName: values.name,
 				settingsDigest: digest,
 				instructionVersion: INSTRUCTION_VERSION,
-				spent: () => meter.spentUsd(),
+				spent: ownSpend,
 				batchSize: budget.batchSize,
 				onFinal: (state) => recorder.final(state),
 				probe,
@@ -1098,16 +1099,20 @@ export async function main(argv: string[]): Promise<number> {
 				: positiveInt(values.limit, "--limit");
 		const { loadSettings, judgeRole, openSpendMeter } =
 			await import("../standalone/settings.ts");
-		const { createClaudeLlm } = await import("../standalone/claude.ts");
+		const { createProviderLlm } = await import("../standalone/providers.ts");
 		const settings = loadSettings();
 		const meter = openSpendMeter(settings);
 		const role = judgeRole(settings);
 		const budgetUsd = parseBudget(values["budget-usd"]);
-		const base = createClaudeLlm(role, meter);
+		const base = createProviderLlm(role, meter);
 		const llm =
 			budgetUsd === undefined
 				? base
-				: withCommandBudget(base, () => meter.spentUsd(), budgetUsd);
+				: withCommandBudget(
+						base,
+						() => meter.localSpentUsd?.() ?? meter.spentUsd(),
+						budgetUsd,
+					);
 		console.log(
 			await judgeCommand(name, {
 				llm,

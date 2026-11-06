@@ -19,6 +19,8 @@ import {
 	emptyState,
 	isOpenIntent,
 	limitsSchema,
+	defaultRetentionLimits,
+	retentionLimitsSchema,
 } from "../contracts/model.ts";
 import {
 	emotionEmoji,
@@ -85,10 +87,18 @@ import { agencyOutputContract } from "./output-contract.ts";
 import { updateModelData, selectModelData } from "./model-data.ts";
 import { RevisionTracker } from "./revisions.ts";
 import { validateRestore } from "./snapshot.ts";
+import {
+	ProvenanceTracker,
+	mergeInputs,
+	observationInput,
+	unknownInput,
+	hostInputs,
+} from "./provenance.ts";
+import { prepareForgetting, dependsOn } from "./memory.ts";
 import type { ItemRevision } from "../contracts/revisions.ts";
 import {
 	captureSystemContext,
-	resolveSystemContext,
+	resolveSystemContextInput,
 } from "./system-context.ts";
 import {
 	selectEvidenceIds,
@@ -149,13 +159,37 @@ const interestOpFromWire = (w: WireInterestOp): InterestOp | null => {
 };
 
 export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
-	const { condition, llm, tools } = deps;
+	if (deps.restore) {
+		validateRestore(deps.restore, deps.condition);
+		const refs = [
+			...(deps.forgottenRefs ?? []),
+			...(deps.restore.forgottenRefs ?? []),
+		];
+		if (refs.length) {
+			const full = {
+				...deps.restore,
+				observations: deps.restore.observations ?? [],
+				cursor: deps.restore.cursor ?? 0,
+			};
+			deps = {
+				...deps,
+				restore: {
+					...deps.restore,
+					...prepareForgetting(full, refs).checkpoint,
+				},
+			};
+		}
+	}
+	const { condition, llm } = deps;
+	const tools = structuredClone(deps.tools);
 	const systemContext = captureSystemContext(deps.systemContext);
 	// Experimental social rules apply to B1 only; host-owned instructions are never extended.
 	// Host topics (topics kept by the host's own memory) take precedence over note-based seeds.
 	const hostData = condition === "B1" || condition === "F";
 	const hostTopics = hostData && deps.hostTopics === true;
 	const hostTodos = hostData && deps.hostTodos === true;
+	const conversation =
+		condition === "F" && deps.conversationParticipation === true;
 	const emotionMode = hostData && deps.utteranceEmotion === true;
 	const social =
 		condition === "B1" && deps.socialTopics === true && !hostTopics;
@@ -176,7 +210,42 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	const selectContract = agencyOutputContract("select", contractOptions);
 	const limits = limitsSchema.parse(deps.limits ?? defaultLimits);
 	const cfg = budgetConfigSchema.parse(deps.budget ?? defaultBudget);
-	const ledger = createLedger();
+	const retention = retentionLimitsSchema.parse(
+		deps.retentionLimits ?? defaultRetentionLimits,
+	);
+	const forgotten = new Set([
+		...(deps.forgottenRefs ?? []),
+		...(deps.restore?.forgottenRefs ?? []),
+	]);
+	const provenance = new ProvenanceTracker(
+		deps.restore?.provenance,
+		retention.totalObservationBytes,
+	);
+	const archived = (id: string) => {
+		const entry = deps.archive?.get(id);
+		return entry && !forgotten.has(id) && !dependsOn(entry.input, forgotten)
+			? entry
+			: undefined;
+	};
+	const legacyStatuses = new Map(
+		(deps.restore?.continuity?.receipts ?? []).map(([key, o]) => [
+			o.id,
+			deliveryStatuses.find((status) => key.endsWith(":" + status)),
+		]),
+	);
+	const ledger = createLedger(
+		retention,
+		deps.restore?.observations
+			? {
+					observations: deps.restore.observations.map((o) => {
+						const status = o.deliveryStatus ?? legacyStatuses.get(o.id);
+						return status ? { ...o, deliveryStatus: status } : o;
+					}),
+					cursor: deps.restore.cursor!,
+				}
+			: undefined,
+		{ get: archived },
+	);
 	if (deps.callBudgetMeter) {
 		const shared = budgetConfigSchema.parse(deps.callBudgetMeter.config);
 		if (
@@ -217,29 +286,20 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	let wakeCount = 0;
 	const issued = new Map<string, ActionTicket>();
 	const receipts = new Map<string, Observation>();
+	const usageReceipts = new Map(
+		(deps.restore?.continuity?.usageReceipts ?? []).map((r) => [
+			r.id,
+			structuredClone(r),
+		]),
+	);
+	if (
+		usageReceipts.size !==
+			(deps.restore?.continuity?.usageReceipts?.length ?? 0) ||
+		usageReceipts.size > retention.stateItems
+	)
+		throw new RangeError("invalid usage receipt checkpoint");
 	if (deps.restore !== undefined) validateRestore(deps.restore, condition);
-	if (deps.restore?.observations !== undefined) {
-		// Older snapshots kept the status in the receipt key but not on the observation.
-		const legacyStatuses = new Map<string, Observation["deliveryStatus"]>();
-		for (const [key, observation] of deps.restore.continuity?.receipts ?? []) {
-			if (
-				observation.kind === "delivery.observed" &&
-				!observation.deliveryStatus
-			)
-				legacyStatuses.set(
-					observation.id,
-					deliveryStatuses.find((status) => key.endsWith(":" + status)),
-				);
-		}
-		for (const o of deps.restore.observations) {
-			const { seq: _seq, ...input } = o;
-			const status = o.deliveryStatus ?? legacyStatuses.get(o.id);
-			ledger.record(status ? { ...input, deliveryStatus: status } : input);
-		}
-		ledger.markProcessed(
-			deps.restore.observations.slice(0, deps.restore.cursor).map((o) => o.seq),
-		);
-	}
+
 	if (deps.restore?.scheduling) {
 		const s = deps.restore.scheduling;
 		for (const key of s.review) flags.review.add(key);
@@ -257,10 +317,21 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		: interestFormation
 			? { ...emptyState(), interests: [] }
 			: emptyState();
+	const itemCount = (s: AgencyState) =>
+		s.intents.length +
+		s.candidates.length +
+		s.attempts.length +
+		s.beliefs.length +
+		s.desires.length +
+		s.notes.length +
+		(s.interests?.length ?? 0);
+	if (itemCount(state) > retention.stateItems)
+		throw new RangeError("snapshot exceeds retained state capacity");
 	const revTracker = deps.revisions
 		? new RevisionTracker(deps.revisions.scope)
 		: null;
-	if (revTracker && deps.restore) revTracker.prime(state, deps.restore.revs);
+	if (revTracker && deps.restore)
+		revTracker.prime(state, deps.restore.revs, provenance.snapshot());
 	// Retain a failed batch verbatim so its provenance and revision numbers survive retry.
 	let pendingRevisions: readonly ItemRevision[] = [];
 	const flushRevisions = (callId: string, at: number) => {
@@ -272,7 +343,12 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			pendingRevisions = [];
 		};
 		appendPending();
-		pendingRevisions = revTracker.diff(state, callId, at);
+		pendingRevisions = revTracker.diff(
+			state,
+			callId,
+			at,
+			provenance.snapshot(),
+		);
 		appendPending();
 	};
 	let enabled = true;
@@ -292,8 +368,16 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 	};
 
 	const active = () => enabled && condition !== "B0";
-	const actionable = (upto: number): readonly Observation[] =>
-		quarantined ? [] : ledger.pending(upto);
+	const actionable = (upto: number): readonly Observation[] => {
+		// Forgetting authorizes only these empty slots; unrelated pending inputs stay pending.
+		ledger.markProcessed(
+			ledger
+				.pending(upto)
+				.filter((o) => forgotten.has(o.id))
+				.map((o) => o.seq),
+		);
+		return quarantined ? [] : ledger.pending(upto);
+	};
 	const dueNow = (now: number): Due =>
 		condition === "B1" || quarantined
 			? NO_DUE
@@ -322,12 +406,22 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				}
 			}
 		}
-		if (deps.planOnOpportunity) {
+		// Resolve model-selected memory citations through the same ledger/archive boundary.
+		// Semantic relevance stays with the model; recall is bounded like the existing intent path.
+		if (condition === "B1" || deps.planOnOpportunity) {
 			const refs = [
-				...(state.interests ?? [])
-					.filter((i) => i.status !== "faded")
-					.flatMap((i) => i.evidence),
-				...state.intents.filter(isOpenIntent).flatMap((i) => i.evidence),
+				...new Set(
+					condition === "B1"
+						? state.notes.flatMap((n) => n.evidence)
+						: [
+								...(state.interests ?? [])
+									.filter((i) => i.status !== "faded")
+									.flatMap((i) => i.evidence),
+								...state.intents
+									.filter(isOpenIntent)
+									.flatMap((i) => i.evidence),
+							],
+				),
 			].slice(-PENDING_CAP);
 			for (const ref of refs) {
 				const o = ledger.get(ref);
@@ -340,18 +434,21 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			m.set(o.seq, o);
 		for (const o of pending.slice(-PENDING_CAP)) m.set(o.seq, o);
 		for (const o of batch) m.set(o.seq, o);
-		return [...m.values()].sort((a, b) => a.seq - b.seq);
+		return [...m.values()]
+			.filter((o) => !forgotten.has(o.id))
+			.sort((a, b) => a.seq - b.seq);
 	};
 	const deliveredObs = () =>
 		ledger
 			.all()
 			.filter(
 				(o) =>
-					o.kind === "delivery.observed" &&
 					o.actor === "agent" &&
-					(o.deliveryStatus === "succeeded" ||
-						(o.deliveryStatus === undefined &&
-							(!o.causationId || o.speechHandoff !== undefined))),
+					(o.kind === "exchange.adopted" ||
+						(o.kind === "delivery.observed" &&
+							(o.deliveryStatus === "succeeded" ||
+								(o.deliveryStatus === undefined &&
+									(!o.causationId || o.speechHandoff !== undefined))))),
 			)
 			.slice(-DELIVERED_SHOWN);
 	const delivered = () => deliveredObs().map((o) => o.text);
@@ -484,32 +581,65 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				: {}),
 		};
 		const data = updateModelData(input);
+		const hostInput = hostInputs([
+			...tools,
+			...(input.todos ?? []),
+			...(input.topics ?? []),
+			...(input.interests ?? []),
+			...(systemContext !== "experimental"
+				? [
+						...(input.opportunity?.topics ?? []),
+						...(input.opportunity?.ambient ?? []),
+						...(input.opportunity?.todos ?? []),
+					]
+				: []),
+		]);
 		const prompt =
 			systemContext === "experimental"
 				? updatePrompt(input)
 				: JSON.stringify(data);
-		const system =
+		const resolvedSystem =
 			systemContext === "experimental"
-				? systemPrompt("update", condition, {
-						...(social ? { social } : {}),
-						...(hostTodos ? { hostTodos } : {}),
-						...(interestFormation ? { interestFormation } : {}),
-					})
-				: resolveSystemContext(
+				? {
+						value: systemPrompt("update", condition, {
+							...(social ? { social } : {}),
+							...(hostTodos ? { hostTodos } : {}),
+							...(interestFormation ? { interestFormation } : {}),
+						}),
+						input: { sources: [], complete: true },
+					}
+				: resolveSystemContextInput(
 						systemContext.update,
 						{
-							data,
+							data: structuredClone(data),
 							outputContract: agencyOutputContract("update", contractOptions),
 						},
 						"update",
 					);
+		const callInput = provenance.capture(
+			data.state,
+			[...presented, ...deliveredObs()],
+			[
+				...presented.flatMap((o) =>
+					archived(o.id) ? [archived(o.id)!.input] : [],
+				),
+				...hostInput,
+				resolvedSystem.input,
+			],
+		);
+		if (dependsOn(callInput, forgotten))
+			return [
+				makeOutcome("update", at, "rejected:input_dependency", null, [
+					callInput.complete ? "forgotten_input" : "incomplete_input",
+				]),
+			];
 		const r = await callModel(
 			llm,
 			budget,
 			{
 				purpose: "update",
 				at,
-				system,
+				system: resolvedSystem.value,
 				prompt,
 				schema: updateContract.schema,
 				maxOutputTokens: cfg.updateMaxOutputTokens,
@@ -589,6 +719,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				),
 			];
 		}
+		const previousState = state;
 		state = result.state;
 		let interestRejects: string[] = [];
 		if (interestFormation) {
@@ -613,6 +744,38 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 					() => "interest:malformed",
 				),
 				...settled.rejects.map((x) => `interest:${x.code}`),
+			];
+		}
+		if (itemCount(state) > retention.stateItems) {
+			state = previousState;
+			diagnostics = ["retention_capacity"];
+			noteFailure();
+			return [
+				...r.prior,
+				makeOutcome(
+					"update",
+					at,
+					"rejected:retention_capacity",
+					r.usage,
+					diagnostics,
+				),
+			];
+		}
+		try {
+			provenance.track(previousState, state, callInput);
+		} catch (error) {
+			state = previousState;
+			if (!(error instanceof RangeError)) throw error;
+			diagnostics = ["provenance_capacity"];
+			return [
+				...r.prior,
+				makeOutcome(
+					"update",
+					at,
+					"rejected:provenance_capacity",
+					r.usage,
+					diagnostics,
+				),
 			];
 		}
 		if (shownTodos)
@@ -742,7 +905,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		const pool: readonly Candidate[] =
 			condition === "B1" ? [] : presentableCandidates(state);
 		const items = condition === "B1" ? state.notes.length : pool.length;
-		// F still requires a candidate; host material supplies context, never a fallback action.
+		// F tools require a candidate; opt-in conversation speech has its own evidence contract.
 		const interests: readonly StandingInterest[] =
 			condition === "B1" || (condition === "F" && hostTopics)
 				? (deps.standingInterests ?? []).filter(
@@ -789,7 +952,15 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				topics.length > 0 ||
 				ambient.length > 0 ||
 				doneTodos > 0);
-		if (items === 0 && !selectEmpty && findings.length === 0)
+		const conversationReady =
+			conversation &&
+			ledger.all().some((o) => o.actor !== "agent" && !forgotten.has(o.id));
+		if (
+			items === 0 &&
+			!selectEmpty &&
+			!conversationReady &&
+			findings.length === 0
+		)
 			return done(
 				hostDecision(opp.id, "host_no_candidates", "nothing to offer"),
 			);
@@ -871,49 +1042,84 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		]);
 		const data = {
 			...selectModelData(input),
+			...(conversation
+				? {
+						conversationEvidenceRefs: presented
+							.filter((o) => o.actor !== "agent")
+							.map((o) => o.id),
+					}
+				: {}),
 			...(condition !== "B1"
 				? { citableEvidenceRefs: [...citableEvidence] }
 				: {}),
 		};
+		const selectionBefore = structuredClone(state);
+		const hostInput = hostInputs([
+			...tools,
+			...topics,
+			...ambient,
+			...todos,
+			...interests,
+		]);
 		const prompt =
 			systemContext === "experimental"
 				? selectPrompt(input)
 				: JSON.stringify(data);
-		const system =
+		const resolvedSystem =
 			systemContext === "experimental"
-				? systemPrompt("select", condition, {
-						// Spoken style only when the resulting (autonomous) ticket may be spoken.
-						utteranceStyle: ticketTts("autonomous", deps.reportTts)
-							? deps.utteranceStyle
-							: undefined,
-						interests: interests.length > 0,
-						...(social ? { social } : {}),
-						...(hostTopics ? { hostTopics } : {}),
-						...(interestFormation ? { interestFormation } : {}),
-						...(hostTodos ? { hostTodos } : {}),
-						...(hostTodos && todos.some((x) => x.status === "waiting")
-							? { todoQuestions: true }
-							: {}),
-						...(emotionMode ? { emotion: emotionMode } : {}),
-						...(hostTopics && tools.some((t) => !t.requiresApproval)
-							? { selfResearch: true }
-							: {}),
-					})
-				: resolveSystemContext(
+				? {
+						value: systemPrompt("select", condition, {
+							// Spoken style only when the resulting (autonomous) ticket may be spoken.
+							utteranceStyle: ticketTts("autonomous", deps.reportTts)
+								? deps.utteranceStyle
+								: undefined,
+							interests: interests.length > 0,
+							...(social ? { social } : {}),
+							...(hostTopics ? { hostTopics } : {}),
+							...(interestFormation ? { interestFormation } : {}),
+							...(hostTodos ? { hostTodos } : {}),
+							...(hostTodos && todos.some((x) => x.status === "waiting")
+								? { todoQuestions: true }
+								: {}),
+							...(emotionMode ? { emotion: emotionMode } : {}),
+							...(hostTopics && tools.some((t) => !t.requiresApproval)
+								? { selfResearch: true }
+								: {}),
+						}),
+						input: { sources: [], complete: true },
+					}
+				: resolveSystemContextInput(
 						systemContext.select,
 						{
-							data,
+							data: structuredClone(data),
 							outputContract: agencyOutputContract("select", contractOptions),
 						},
 						"select",
 					);
+		const selectionInput = provenance.capture(
+			{ ...data.state, candidates: data.candidates },
+			[...presented, ...deliveredObs()],
+			[
+				...presented.flatMap((o) =>
+					archived(o.id) ? [archived(o.id)!.input] : [],
+				),
+				...hostInput,
+				resolvedSystem.input,
+			],
+		);
+		if (dependsOn(selectionInput, forgotten))
+			return done(
+				hostDecision(opp.id, "rejected", "input dependencies unavailable", [
+					selectionInput.complete ? "forgotten_input" : "incomplete_input",
+				]),
+			);
 		const r = await callModel(
 			llm,
 			budget,
 			{
 				purpose: "select",
 				at: opp.at,
-				system,
+				system: resolvedSystem.value,
 				prompt,
 				schema: selectContract.schema,
 				maxOutputTokens: cfg.selectMaxOutputTokens,
@@ -967,6 +1173,13 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			limits,
 			at: reservationAt,
 			findingRefs: findingRefs.accepted,
+			...(conversation
+				? {
+						conversationRefs: new Set(
+							presented.filter((o) => o.actor !== "agent").map((o) => o.id),
+						),
+					}
+				: {}),
 		});
 		if (!verdict.ok) {
 			calls.push(
@@ -1017,7 +1230,10 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				candidateId: verdict.candidate?.id ?? null,
 			});
 		}
-		if (budgetIntent && !activity.canIssueTool(budgetIntent.id, opp.at)) {
+		if (
+			budgetIntent &&
+			!activity.canIssueTool(budgetIntent.id, reservationAt)
+		) {
 			budgetIntent.state = "held";
 			budgetIntent.lastReason = "budget";
 			budgetIntent.revision += 1;
@@ -1035,6 +1251,15 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 				hostDecision(opp.id, "host_blocked", "speech frequency limit"),
 			);
 		if (p.action === "speak" || p.action === "tool") {
+			if (itemCount(state) >= retention.stateItems)
+				return done(
+					hostDecision(
+						opp.id,
+						"host_budget",
+						"retained state capacity exhausted",
+						["retention_capacity"],
+					),
+				);
 			// Decide-path tickets are the agent's own initiative (user requests are answered
 			// by respond, not by tickets), so origin is "autonomous"; tts comes from host config.
 			const reserved = reserveOutward(
@@ -1055,11 +1280,13 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			};
 			issued.set(ticket.id, ticket);
 			if (budgetIntent) {
-				activity.spend(budgetIntent.id, opp.at, { toolCalls: 1 });
+				state.attempts.find((a) => a.id === ticket!.id)!.activityId =
+					activity.bind(budgetIntent.id, ticket.id);
+				activity.spend(budgetIntent.id, reservationAt, { toolCalls: 1 });
 				// A delegation (Eumenes `delegate`) is a work unit that returns later as work.returned.
 				if (tracksWork && verdict.toolName === DELEGATE_TOOL) {
 					budgetIntent.workRef = ticket.id;
-					budgetIntent.workSince = opp.at;
+					budgetIntent.workSince = reservationAt;
 				}
 			}
 			// Cooldown starts at the agent's own activity on an interest.
@@ -1084,6 +1311,21 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			deferCandidate(state, verdict.candidate);
 		else if (p.action === "discard" && verdict.candidate)
 			dismissCandidate(state, verdict.candidate);
+		try {
+			provenance.track(selectionBefore, state, selectionInput);
+		} catch (error) {
+			state = selectionBefore;
+			if (ticket) issued.delete(ticket.id);
+			if (!(error instanceof RangeError)) throw error;
+			return done(
+				hostDecision(
+					opp.id,
+					"host_budget",
+					"input provenance capacity exhausted",
+					["provenance_capacity"],
+				),
+			);
+		}
 		return done({
 			opportunityId: opp.id,
 			action: p.action,
@@ -1167,9 +1409,45 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 
 	const api: AgencyRuntime = {
 		condition,
-		observe(input) {
+		observe(input, context) {
+			const declared = context ?? observationInput({ ...input, seq: 0 });
+			const inputContext = mergeInputs(
+				{ sources: [input.id, ...(input.refs ?? [])], complete: true },
+				declared,
+				...declared.sources.flatMap((id) => {
+					const known =
+						provenance.find(`observation:${id}`) ?? archived(id)?.input;
+					return known ? [known] : [];
+				}),
+			);
+			const retainInput =
+				context !== undefined ||
+				JSON.stringify(inputContext) !==
+					JSON.stringify(mergeInputs(observationInput({ ...input, seq: 0 })));
+			if (forgotten.has(input.id) || dependsOn(inputContext, forgotten))
+				throw new Error("observation depends on forgotten input");
+			if (ledger.get(input.id)) return ledger.record(input);
 			const before = ledger.lastSeq();
+			const returning =
+				tracksWork && input.kind === "work.returned" && input.workRef
+					? state.intents.find((i) => i.workRef === input.workRef)
+					: undefined;
+			const previous = returning ? structuredClone(state) : null;
+			// Validate metadata capacity before acknowledging the observation.
+			if (retainInput || returning) {
+				const check = new ProvenanceTracker(
+					provenance.snapshot(),
+					retention.totalObservationBytes,
+				);
+				if (retainInput) check.set(`observation:${input.id}`, inputContext);
+				if (returning)
+					check.set(
+						`intent:${returning.id}`,
+						mergeInputs(check.get(`intent:${returning.id}`), inputContext),
+					);
+			}
 			const o = ledger.record(input);
+			if (retainInput) provenance.set(`observation:${input.id}`, inputContext);
 			if (
 				ledger.lastSeq() > before &&
 				tracksWork &&
@@ -1178,6 +1456,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			)
 				ingestReturn(o);
 			if (ledger.lastSeq() > before) {
+				if (previous) provenance.track(previous, state, inputContext);
 				failures = 0;
 				quarantined = false;
 			}
@@ -1255,6 +1534,13 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 									? [{ kind: o.kind, id: o.id, code: o.code ?? "unknown" }]
 									: [],
 				);
+				const currentReviews = new Set(
+					state.intents
+						.filter(isOpenIntent)
+						.map((i) => `${i.id}@${i.reviewAt}`),
+				);
+				for (const key of wakeFlags.review)
+					if (!currentReviews.has(key)) wakeFlags.review.delete(key);
 				const r = wakeCheck(
 					state,
 					now,
@@ -1321,19 +1607,83 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			reportedTodos = [];
 			return out;
 		},
-		recordResult(receipt) {
+		recordUsage(receipt) {
+			if (
+				!receipt.id ||
+				receipt.id.length > 256 ||
+				!receipt.ticketId ||
+				receipt.ticketId.length > 256 ||
+				!Number.isFinite(receipt.at) ||
+				!Number.isSafeInteger(receipt.inputTokens) ||
+				receipt.inputTokens < 0 ||
+				!Number.isSafeInteger(receipt.outputTokens) ||
+				receipt.outputTokens < 0 ||
+				!Number.isSafeInteger(receipt.inputTokens + receipt.outputTokens)
+			)
+				throw new RangeError("invalid activity usage receipt");
+			const known = usageReceipts.get(receipt.id);
+			if (known) {
+				if (
+					known.ticketId !== receipt.ticketId ||
+					known.at !== receipt.at ||
+					known.inputTokens !== receipt.inputTokens ||
+					known.outputTokens !== receipt.outputTokens
+				)
+					throw new RangeError("activity usage receipt conflict");
+				return;
+			}
+			if (usageReceipts.size >= retention.stateItems)
+				throw new RangeError("activity usage receipt capacity");
+			const attempt = state.attempts.find((a) => a.id === receipt.ticketId);
+			const candidate = state.candidates.find(
+				(c) => c.id === attempt?.candidateId,
+			);
+			const intent = state.intents.find((i) => i.id === candidate?.intentId);
+			if (!attempt || attempt.action !== "tool" || !intent)
+				throw new RangeError("unknown activity usage ticket");
+			const use = activity.use(intent.id);
+			// Late usage must not reopen returned work or charge a later activity on this intent.
+			if (use && (!use.generation || !attempt.activityId))
+				throw new RangeError(
+					"activity usage binding unavailable; reconcile legacy worker usage before continuing",
+				);
+			if (use && use.generation === attempt.activityId)
+				activity.spend(intent.id, receipt.at, {
+					tokens: receipt.inputTokens + receipt.outputTokens,
+				});
+			usageReceipts.set(receipt.id, structuredClone(receipt));
+		},
+		recordResult(receipt, context) {
 			const key = `${receipt.ticketId}:${receipt.status}`;
 			const known = receipts.get(key);
 			if (known) return known;
 			const ticket = issued.get(receipt.ticketId);
-			const { observation } = applyReceipt(state, receipt, ticket, () => {
+			// Capacity checks may reject the append. Keep state and cursor atomic in that case.
+			const next = structuredClone(state);
+			const { observation } = applyReceipt(next, receipt, ticket, () => {
 				let id: string;
 				do {
-					id = allocId(state, "h");
-				} while (ledger.get(id));
+					id = allocId(next, "h");
+				} while (ledger.get(id) || forgotten.has(id));
 				return id;
 			});
+			const inputContext = mergeInputs(
+				provenance.get(`attempt:${receipt.ticketId}`),
+				context ?? unknownInput,
+				{ sources: [observation.id], complete: true },
+			);
+			if (dependsOn(inputContext, forgotten))
+				throw new Error("receipt depends on forgotten input");
+			const check = new ProvenanceTracker(
+				provenance.snapshot(),
+				retention.totalObservationBytes,
+			);
+			check.set(`observation:${observation.id}`, inputContext);
+			check.track(state, next, inputContext);
 			const obs = ledger.record(observation);
+			provenance.set(`observation:${obs.id}`, inputContext);
+			provenance.track(state, next, inputContext);
+			state = next;
 			receipts.set(key, obs);
 			if (ticket?.emotion && receipt.status === "succeeded") {
 				feelingByObs.set(obs.id, emotionEmoji(ticket.emotion));
@@ -1385,8 +1735,14 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			state: structuredClone(state),
 			observations: structuredClone(ledger.all()),
 			cursor: ledger.cursor(),
+			...(deps.restore?.compactedThrough !== undefined
+				? { compactedThrough: deps.restore.compactedThrough }
+				: {}),
+			provenance: provenance.snapshot(),
+			forgottenRefs: [...forgotten],
 			condition,
 			continuity: structuredClone({
+				usageReceipts: [...usageReceipts.values()],
 				calls: budget.snapshot?.() ?? [],
 				activities: activity.snapshot(),
 				issued: [...issued.values()],
@@ -1422,13 +1778,16 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		sync(await v, callId, at);
 	return {
 		...api,
-		observe: (o) => sync(api.observe(o), "observe", o.occurredAt),
+		observe: (o, context) =>
+			sync(api.observe(o, context), "observe", o.occurredAt),
 		runBackground: (now, signal) =>
 			later(api.runBackground(now, signal), "update", now),
 		decide: (opp, signal) => later(api.decide(opp, signal), "select", opp.at),
 		wake: (now, host, signal) =>
 			later(api.wake!(now, host, signal), "wake", now),
-		recordResult: (r) => sync(api.recordResult(r), "receipt", r.at),
+		recordResult: (r, context) =>
+			sync(api.recordResult(r, context), "receipt", r.at),
+		recordUsage: (r) => sync(api.recordUsage!(r), "usage", r.at),
 		invalidate: (reason, now) =>
 			sync(api.invalidate(reason, now), "invalidate", now),
 	};

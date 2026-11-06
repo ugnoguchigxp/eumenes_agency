@@ -3,12 +3,25 @@ import type {
 	BackgroundSystemContext,
 	SystemContextSource,
 } from "../contracts/system-context.ts";
+import type { WithInput } from "../contracts/memory.ts";
+import { mergeInputs, unknownInput } from "./provenance.ts";
 
 export const requireSystemText = (value: unknown, purpose: string): string => {
 	if (typeof value !== "string" || value.trim() === "")
 		throw new SystemContextConfigurationError(purpose);
 	return value;
 };
+
+const declaredSystem = (
+	value: string | WithInput<string>,
+	purpose: string,
+): WithInput<string> =>
+	typeof value === "string"
+		? { value: requireSystemText(value, purpose), input: unknownInput }
+		: {
+				value: requireSystemText(value?.value, purpose),
+				input: mergeInputs(value.input),
+			};
 
 /** Capture the host's sources, so later edits to its configuration cannot replace them. */
 export const captureSystemContext = (
@@ -19,9 +32,19 @@ export const captureSystemContext = (
 		throw new SystemContextConfigurationError("background");
 	const { update, select } = value;
 	for (const [purpose, source] of Object.entries({ update, select })) {
-		if (typeof source !== "function") requireSystemText(source, purpose);
+		if (typeof source !== "function") {
+			try {
+				declaredSystem(source, purpose);
+			} catch {
+				throw new SystemContextConfigurationError(purpose);
+			}
+		}
 	}
-	return { update, select };
+	const capture = <T>(source: SystemContextSource<T>) =>
+		typeof source === "function" || typeof source === "string"
+			? source
+			: structuredClone(source);
+	return { update: capture(update), select: capture(select) };
 };
 
 export const resolveSystemContext = <T>(
@@ -29,8 +52,17 @@ export const resolveSystemContext = <T>(
 	input: T,
 	purpose: "update" | "select",
 ): string => {
+	return resolveSystemContextInput(source, input, purpose).value;
+};
+
+/** Resolve text and its declaration once; retries use the same captured result. */
+export const resolveSystemContextInput = <T>(
+	source: SystemContextSource<T>,
+	input: T,
+	purpose: "update" | "select",
+): WithInput<string> => {
 	try {
-		return requireSystemText(
+		return declaredSystem(
 			typeof source === "function" ? source(input) : source,
 			purpose,
 		);

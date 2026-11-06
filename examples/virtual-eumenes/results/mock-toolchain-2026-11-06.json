@@ -1,0 +1,71 @@
+{
+	"success": true,
+	"scope": "Scripted model and mock execution; real Agency F, pinned host instructions, real Memory public API. No external execution or paid API. Integration success only; not a behavior-quality score.",
+	"events": [
+		{
+			"stage": "agency.idea",
+			"workRef": "a3"
+		},
+		{
+			"stage": "toolchain.accepted",
+			"workRef": "a3",
+			"revisionId": "mock-history@1"
+		},
+		{
+			"stage": "bundle.started",
+			"workRef": "a3",
+			"revisionId": "mock-history@1"
+		},
+		{
+			"stage": "subagent.started",
+			"workRef": "a3",
+			"revisionId": "mock-history@1"
+		},
+		{
+			"stage": "subagent.returned",
+			"workRef": "a3",
+			"revisionId": "mock-history@1"
+		},
+		{
+			"stage": "result.accepted",
+			"workRef": "a3",
+			"revisionId": "mock-history@1"
+		},
+		{
+			"stage": "agency.speech"
+		}
+	],
+	"utterance": "前に話した条件だと、明るい日陰に置けて、水やりが少なめのものが合いそうだね。そこから候補を考えてみようか。",
+	"workRef": "a3",
+	"resultObservationId": "mock-return:a3",
+	"apiCalls": 0,
+	"sourceSha256": "2a73c3c414c89ffe31abee5f5916c1128af26f8f9522b2f0e28dd6cc72c3797b",
+	"version": "0.1.4",
+	"hostRulesVersion": "host-rules-22",
+	"instructionVersion": "p0e-instructions-27",
+	"verification": {
+		"partialAndIntegrationPass": 28,
+		"fullPass": 924,
+		"fullSkip": 25,
+		"fullTodo": 1,
+		"fullFail": 0,
+		"tests": 950,
+		"files": 76,
+		"negativeControlsDetected": 2
+	},
+	"budget": {
+		"newPaidCalls": 0,
+		"knownUsd": "3.33176422",
+		"uncertainReservedUsd": "3.7464",
+		"conservativeUpperUsd": "7.07816422",
+		"roundedUpUsd": "7.08",
+		"ledgerUnchanged": true
+	},
+	"remaining": [
+		"Real host State/work/settings source mapping",
+		"Non-destructive correction/inactivation/expiry revalidation",
+		"R02 recall reference deduplication",
+		"Native model conversation/initiative quality evaluation; this scripted integration is not a new completeness score"
+	],
+	"noMainlineOrMemoryRepositoryChanges": true
+}

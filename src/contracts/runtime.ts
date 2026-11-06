@@ -63,6 +63,11 @@ export interface RuntimeDeps {
 	readonly constrainToolNames?: boolean;
 	readonly limits?: Limits;
 	readonly budget?: BudgetConfig;
+	/** Bounded RAM checkpoint; capacity rejection never acknowledges the input event. */
+	readonly retentionLimits?: import("./model.ts").RetentionLimits;
+	readonly archive?: import("./memory.ts").ObservationArchive;
+	/** Durable, host-owned journal; checked before inference and on input admission. */
+	readonly forgottenRefs?: readonly string[];
 	/**
 	 * Host composition may share meters with a budgeted LlmPort adapter.
 	 * The call window must match budget; call/activity limits may only be stricter.
@@ -75,6 +80,13 @@ export interface RuntimeDeps {
 	 * instead of the host_no_candidates gate. Ignored for other conditions.
 	 */
 	readonly selectWhenEmpty?: boolean;
+	/**
+	 * F conversation mode: select from presented external observations even without a
+	 * persistent candidate. Only grounded speech gains this path; tools still require
+	 * an intent/candidate. Host-owned select instructions must describe this mode.
+	 * Default false; the B1/B2 and default F contracts are unchanged.
+	 */
+	readonly conversationParticipation?: boolean;
 	/**
 	 * Host delivery style for utterances (e.g. spoken via TTS), appended to the select
 	 * experimental instructions only. Ignored by host-owned SystemContext.
@@ -163,13 +175,14 @@ export interface RuntimeDeps {
 export interface StandingInterest {
 	readonly id: string;
 	readonly text: string;
+	readonly input?: import("./memory.ts").InputContext;
 }
 
 /** Recent observations shown to update/select (and to eval condition D). */
 export const RECENT_OBSERVATION_WINDOW = 30;
 
 /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
-export const HOST_RULES_VERSION = "host-rules-14";
+export const HOST_RULES_VERSION = "host-rules-25";
 
 /** One background model call (or a host decision not to make one). */
 export interface CallOutcome {
@@ -341,11 +354,17 @@ export interface AgencySnapshot {
 	readonly state: AgencyState;
 	readonly observations: readonly Observation[];
 	readonly cursor: number;
+	/** Holes are permitted only at or below this processed watermark. */
+	readonly compactedThrough?: number;
+	readonly provenance?: import("./memory.ts").InputProvenance;
+	readonly forgottenRefs?: readonly string[];
 	/** Absent on older snapshots; when present it must match the runtime condition. */
 	readonly condition?: Condition;
 	/** Absent on older snapshots, whose scheduling flags start fresh. */
 	readonly scheduling?: SnapshotScheduling;
 	readonly continuity?: {
+		/** Trusted worker usage, idempotent across restart. */
+		readonly usageReceipts?: readonly ActivityUsageReceipt[];
 		readonly calls: readonly number[];
 		readonly activities: readonly (readonly [
 			string,
@@ -365,6 +384,14 @@ export interface AgencySnapshot {
 	};
 }
 
+export interface ActivityUsageReceipt {
+	readonly id: string;
+	readonly ticketId: string;
+	readonly at: number;
+	readonly inputTokens: number;
+	readonly outputTokens: number;
+}
+
 /** Revision-table restores may still provide state only. A full checkpoint restores its ledger too. */
 export interface AgencyRestore extends Partial<AgencySnapshot> {
 	readonly state: AgencyState;
@@ -374,7 +401,10 @@ export interface AgencyRestore extends Partial<AgencySnapshot> {
 export interface AgencyRuntime {
 	readonly condition: Condition;
 	/** Idempotent by id; same id with different content throws ObservationConflictError. */
-	observe(input: ObservationInput): Observation;
+	observe(
+		input: ObservationInput,
+		context?: import("./memory.ts").InputContext,
+	): Observation;
 	/**
 	 * Processes pending observations in batches, plus review.due / capacity.pressure,
 	 * within the budget. Returns one outcome per call or skipped call.
@@ -399,7 +429,12 @@ export interface AgencyRuntime {
 		signal: AbortSignal,
 	): Promise<WakeOutcome>;
 	/** Records the host's receipt and appends the resulting observation to the ledger. */
-	recordResult(receipt: ActionReceipt): Observation;
+	recordResult(
+		receipt: ActionReceipt,
+		context?: import("./memory.ts").InputContext,
+	): Observation;
+	/** Report actual delegated usage from the host; never grants execution authority. */
+	recordUsage?(receipt: ActivityUsageReceipt): void;
 	/** New input / speech start / settings change: fences in-flight and queued inference, and interrupts reserved tickets. */
 	invalidate(reason: string, now: number): void;
 	/**

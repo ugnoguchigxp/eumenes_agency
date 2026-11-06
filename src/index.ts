@@ -15,6 +15,7 @@ export {
 	stateFromRevisions,
 } from "./application/revisions.ts";
 export { reportedTodoIds } from "./application/todos.ts";
+export { prepareForgetting, prepareCompaction } from "./application/memory.ts";
 export { spokenReplyStyle, ttsUtteranceStyle } from "./application/styles.ts";
 export {
 	defaultMaxToolCalls,

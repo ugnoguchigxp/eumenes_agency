@@ -16,7 +16,7 @@ import {
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { createAgencyRuntime } from "../src/index.ts";
-import { createSelfPort } from "./self-port/port.ts";
+import { createEvaluationPort } from "./port.ts";
 import { independentRefs } from "../src/domains/agency/settle-interests.ts";
 
 type Step =
@@ -41,7 +41,7 @@ export function loadH4(split: string): H4Case[] {
 }
 
 async function runOne(c: H4Case, cond: (typeof CONDS)[number], dir: string) {
-	const port = createSelfPort(dir);
+	const port = createEvaluationPort(dir);
 	port.setSalt(`h4:${c.id}:${cond}`);
 	const rt = createAgencyRuntime({
 		systemContext: "experimental",
@@ -182,8 +182,13 @@ if (import.meta.main) {
 	const out = values.out!;
 	const cases = loadH4(values.split!);
 	if (positionals[0] === "run") {
-		const dir = process.env.SELF_PORT_DIR;
-		if (!dir) throw new Error("SELF_PORT_DIR required (self-inference only)");
+		const dir =
+			process.env.SELF_PORT_DIR ??
+			(process.env.AGENCY_EVAL_TRANSPORT === "api" ? out : undefined);
+		if (!dir)
+			throw new Error(
+				"Set SELF_PORT_DIR for self, or explicitly select AGENCY_EVAL_TRANSPORT=api",
+			);
 		mkdirSync(out, { recursive: true });
 		const recs = [];
 		for (const c of cases)

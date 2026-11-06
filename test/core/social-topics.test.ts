@@ -75,7 +75,7 @@ describe("socialTopics", () => {
 				expect(base.select?.system).toBe(systemPrompt("select", c));
 				expect(base.select?.system).not.toContain("雑談の間");
 				expect(base.select?.prompt).toContain(
-					"価値が低い、または迷うなら wait。",
+					"根拠のない行動や実施済みの内容なら wait。",
 				);
 			}
 		}
@@ -115,13 +115,13 @@ describe("socialTopics", () => {
 		expect(sys).toContain("`interest:<id>`");
 		expect(sys).toContain("turn_end");
 		expect(idle.select?.prompt).not.toContain(
-			"価値が低い、または迷うなら wait。",
+			"根拠のない行動や実施済みの内容なら wait。",
 		);
 		expect(idle.select?.prompt).toContain("迷っても speak を選ぶ");
 		// turn_end keeps the conservative closing line
 		const turnEnd = await run("B1", { social: true, trigger: "turn_end" });
 		expect(turnEnd.select?.prompt).toContain(
-			"価値が低い、または迷うなら wait。",
+			"根拠のない行動や実施済みの内容なら wait。",
 		);
 		expect(turnEnd.select?.prompt).not.toContain("迷っても speak");
 		// the user prompt differs from the non-social one only at idle

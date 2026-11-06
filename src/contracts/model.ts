@@ -123,9 +123,12 @@ export interface Opportunity {
 export interface HostTopic {
 	readonly id: string;
 	readonly text: string;
+	/** All host inputs used to produce this value; never inserted into model data. */
+	readonly input?: import("./memory.ts").InputContext;
 }
 
 export interface HostTodo {
+	readonly input?: import("./memory.ts").InputContext;
 	readonly id: string;
 	/**
 	 * work (default): background work the host does for the user. errand: the user's own task with
@@ -163,6 +166,8 @@ export interface HostTodo {
 }
 
 export interface ToolCapability {
+	/** Provenance of the host-provided tool description/catalog, not an execution grant. */
+	readonly input?: import("./memory.ts").InputContext;
 	readonly name: string;
 	readonly description: string;
 	/** Needs an explicit user grant; autonomous tickets are never issued for it. */
@@ -268,6 +273,8 @@ export interface Attempt {
 	readonly action: "speak" | "tool";
 	status: AttemptStatus;
 	readonly startedAt: number;
+	/** Host receipt correlation, excluded from model input. Absent on older snapshots. */
+	activityId?: string;
 }
 
 export type Confidence = "low" | "medium" | "high";
@@ -377,3 +384,18 @@ export const defaultLimits: Limits = {
 export const isOpenIntent = (i: Intent) =>
 	i.state === "proposed" || i.state === "adopted" || i.state === "held";
 export const isOpenCandidate = (c: Candidate) => c.state !== "closed";
+
+/** Finite RAM envelope. Full hosts keep durable source events and retry backpressured input. */
+export const retentionLimitsSchema = z.strictObject({
+	observations: z.int().positive(),
+	observationBytes: z.int().positive(),
+	totalObservationBytes: z.int().positive(),
+	stateItems: z.int().positive(),
+});
+export type RetentionLimits = z.infer<typeof retentionLimitsSchema>;
+export const defaultRetentionLimits: RetentionLimits = {
+	observations: 10_000,
+	observationBytes: 65_536,
+	totalObservationBytes: 16_777_216,
+	stateItems: 10_000,
+};

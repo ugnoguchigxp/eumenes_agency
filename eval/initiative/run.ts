@@ -18,10 +18,17 @@ import {
 } from "../../src/index.ts";
 import { runTrials } from "./trials.ts";
 import { scenes, opportunityAt, type Scene } from "./cases.ts";
+import { createProviderLlm } from "../../standalone/providers.ts";
+import {
+	loadSettings,
+	openSpendMeter,
+	settingsDigest,
+} from "../../standalone/settings.ts";
 
 const { values } = parseArgs({
 	options: {
 		model: { type: "string", default: "gpt-6-luna" },
+		transport: { type: "string", default: "codex-cli" },
 		case: { type: "string", multiple: true },
 		trace: { type: "string" },
 		reps: { type: "string", default: "1" },
@@ -32,6 +39,15 @@ const { values } = parseArgs({
 	},
 });
 const model = values.model;
+if (values.transport !== "api" && values.transport !== "codex-cli")
+	throw new Error("--transport api|codex-cli");
+if (
+	values.transport === "api" &&
+	(!process.env.AGENCY_API_LEDGER || !process.env.AGENCY_API_LIMIT_USD)
+)
+	throw new Error(
+		"API initiative requires an explicit shared ledger and limit",
+	);
 const reps = Number(values.reps);
 const selected = scenes.filter(
 	(s) => values.case === undefined || values.case.includes(s.id),
@@ -68,7 +84,7 @@ const system = (
 	input: UpdateSystemContextInput | SelectSystemContextInput,
 ): string => agencyBackgroundSystem(purpose, input, persona, false);
 
-const llm: LlmPort = {
+const codexLlm: LlmPort = {
 	async complete<T>(request: LlmRequest<T>, signal: AbortSignal) {
 		const start = performance.now();
 		const result = await agent.run({
@@ -109,6 +125,23 @@ const llm: LlmPort = {
 		};
 	},
 };
+
+const settings = values.transport === "api" ? loadSettings() : null;
+const llm = settings
+	? createProviderLlm(
+			{ ...settings.llm.background, model },
+			openSpendMeter(settings),
+		)
+	: codexLlm;
+console.error(
+	JSON.stringify({
+		transport: values.transport,
+		model,
+		settingsDigest: settings ? settingsDigest(settings) : null,
+		hostIntegration: true,
+		executed: false,
+	}),
+);
 
 const tracePath =
 	values.trace ??

@@ -1,7 +1,7 @@
 /** Opt-in: AGENCY_LIVE_SOCIAL=1 bun test standalone/test/social-lull.live.test.ts */
 import { describe, expect, test } from "bun:test";
 import { createAgencyRuntime, ttsUtteranceStyle } from "../../src/index.ts";
-import { createClaudeLlm } from "../claude.ts";
+import { createProviderLlm } from "../providers.ts";
 import { loadSettings, openSpendMeter, resolveBudget } from "../settings.ts";
 
 type Exchange = readonly [user: string, agent: string];
@@ -107,7 +107,7 @@ describe.skipIf(!process.env.AGENCY_LIVE_SOCIAL)(
 						],
 						tools: [],
 						budget: resolveBudget(settings),
-						llm: createClaudeLlm(
+						llm: createProviderLlm(
 							settings.llm.background,
 							openSpendMeter(settings),
 						),

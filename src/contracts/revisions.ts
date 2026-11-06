@@ -1,8 +1,8 @@
 /**
  * P4-c: item revision history. The host's AgencyDb owns the single SQLite table
  * `agency_item_revisions(scope, item_kind, item_id, revision, state_json, reason, evidence_json, call_id, at)`.
- * Agency only emits rows; there is no second canon. Rows carry observation ids / Memory refs,
- * never conversation text; forgetting redacts the rows that reference a forgotten id.
+ * Agency only emits rows; there is no second canon. References use IDs, but stateJson and reason
+ * can contain derived text. Forgetting must redact every affected version, not just the latest row.
  */
 import type { AgencyState } from "./model.ts";
 

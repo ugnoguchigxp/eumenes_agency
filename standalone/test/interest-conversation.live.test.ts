@@ -8,7 +8,7 @@ import {
 	runRespond,
 	ttsUtteranceStyle,
 } from "../../src/index.ts";
-import { createClaudeLlm, createClaudeReply } from "../claude.ts";
+import { createProviderLlm, createProviderReply } from "../providers.ts";
 import { cliBudgetDefaults, cliLimits } from "../chat-loop.ts";
 import type { Turn } from "../chat-loop.ts";
 import { expressTicket } from "../utterance.ts";
@@ -64,7 +64,7 @@ describe.skipIf(!process.env.AGENCY_LIVE_SOCIAL)(
 	() => {
 		test("the content judge accepts a new perspective and rejects paraphrase and empty handoff", async () => {
 			const settings = loadSettings();
-			const review = await createClaudeLlm(
+			const review = await createProviderLlm(
 				settings.llm.judge ?? settings.llm.background,
 				openSpendMeter(settings),
 			).complete(
@@ -100,7 +100,7 @@ describe.skipIf(!process.env.AGENCY_LIVE_SOCIAL)(
 				test(`${mode}: ${scene.id} continues with content through three idle opportunities`, async () => {
 					const settings = loadSettings();
 					const meter = openSpendMeter(settings);
-					const llm = createClaudeLlm(settings.llm.background, meter);
+					const llm = createProviderLlm(settings.llm.background, meter);
 					const interests = [{ id: "i1", text: scene.interest }];
 					const runtime = createAgencyRuntime({
 						systemContext: "experimental",
@@ -188,7 +188,7 @@ describe.skipIf(!process.env.AGENCY_LIVE_SOCIAL)(
 							ticket,
 							history,
 							interests,
-							chat: createClaudeReply(settings.llm.main, meter),
+							chat: createProviderReply(settings.llm.main, meter),
 							signal,
 						});
 						history.push({ role: "assistant", text });
@@ -210,7 +210,7 @@ describe.skipIf(!process.env.AGENCY_LIVE_SOCIAL)(
 					// The previous interest was delivered less than a minute before the next request.
 					const earlier = await speak("earlier", 1_032_000);
 					const result = await runRespond({
-						chat: createClaudeReply(settings.llm.main, meter),
+						chat: createProviderReply(settings.llm.main, meter),
 						tools: createMockToolPort({ now: () => 1_040_000 }),
 						messages: [
 							{
@@ -241,7 +241,7 @@ describe.skipIf(!process.env.AGENCY_LIVE_SOCIAL)(
 					const parts: string[] = [];
 					for (let part = 0; part < 3; part++)
 						parts.push(await speak(`part${part}`, 1_052_000 + part * 12_000));
-					const review = await createClaudeLlm(
+					const review = await createProviderLlm(
 						settings.llm.judge ?? settings.llm.background,
 						meter,
 					).complete(

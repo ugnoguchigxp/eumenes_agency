@@ -11,12 +11,18 @@ import {
 } from "../src/contracts/index.ts";
 import { SOCIAL_RULES_VERSION } from "../src/application/prompts.ts";
 import type { UsageMeter } from "./claude.ts";
+import { openApiMeter, usageUsd } from "./usage.ts";
+import { API_ADAPTER_VERSION } from "./versions.ts";
 
 const root = resolve(import.meta.dir, "..");
-export const settingsPath = resolve(root, "config/experiment.json");
+export const settingsPath = resolve(
+	root,
+	process.env.AGENCY_SETTINGS ?? "config/experiment.json",
+);
 export const spendPath = resolve(root, "data/spend.jsonl");
 
 const roleSchema = z.strictObject({
+	provider: z.enum(["anthropic", "openai"]).optional(),
 	model: z.string().min(1),
 	effort: z.enum(["low", "medium", "high", "xhigh", "max"]),
 	thinkingHeadroom: z.int().min(0),
@@ -91,6 +97,7 @@ export function settingsDigest(settings: ExperimentSettings): string {
 		.update(
 			JSON.stringify(
 				canonical({
+					adapterVersion: API_ADAPTER_VERSION,
 					...settings,
 					llm,
 					hostRules: HOST_RULES_VERSION,
@@ -117,6 +124,11 @@ export function openSpendMeter(
 	settings: ExperimentSettings,
 	path = spendPath,
 ): UsageMeter {
+	if (process.env.AGENCY_API_LEDGER)
+		return openApiMeter(
+			resolve(process.env.AGENCY_API_LEDGER),
+			Number(process.env.AGENCY_API_LIMIT_USD ?? "10"),
+		);
 	mkdirSync(dirname(path), { recursive: true });
 	let total = 0;
 	if (existsSync(path)) {
@@ -129,6 +141,22 @@ export function openSpendMeter(
 	const prices = Object.values(pricing);
 	return {
 		spentUsd: () => total,
+		recordProvider(usage) {
+			const usd = usageUsd(usage);
+			appendFileSync(
+				path,
+				JSON.stringify({
+					model: usage.model,
+					inputTokens: usage.inputTokens,
+					outputTokens: usage.outputTokens,
+					cacheReadTokens: usage.cacheReadTokens,
+					cacheWriteTokens: usage.cacheWriteTokens,
+					usd,
+					at: Date.now(),
+				}) + "\n",
+			);
+			total += usd;
+		},
 		assertWithinLimit() {
 			if (total >= limitUsd) throw new Error(`spend_limit_reached:${limitUsd}`);
 		},

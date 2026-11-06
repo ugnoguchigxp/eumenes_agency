@@ -19,6 +19,8 @@ export type ActivityStop = "tool_calls" | "tokens" | "elapsed";
 
 export interface ActivityUse {
 	readonly startedAt: number;
+	/** First reserved ticket of this activity; time is not a unique generation key. */
+	generation?: string;
 	toolCalls: number;
 	tokens: number;
 }
@@ -50,6 +52,14 @@ export class ActivityBudget {
 				use.tokens < 0
 			)
 				throw new RangeError("invalid activityBudgetMeter checkpoint");
+		for (const [, use] of restore)
+			if (
+				use.generation !== undefined &&
+				(typeof use.generation !== "string" ||
+					!use.generation ||
+					use.generation.length > 256)
+			)
+				throw new RangeError("invalid activity generation");
 		for (const [id, use] of restore) this.#use.set(id, { ...use });
 		this.limits = Object.freeze({ ...limits });
 	}
@@ -59,8 +69,18 @@ export class ActivityBudget {
 	}
 
 	start(intentId: string, now: number) {
+		if (!Number.isFinite(now))
+			throw new RangeError("activity time must be finite");
 		if (!this.#use.has(intentId))
 			this.#use.set(intentId, { startedAt: now, toolCalls: 0, tokens: 0 });
+	}
+	/** Bind the current activity to its first reserved ticket; subsequent tickets share it. */
+	bind(intentId: string, ticketId: string): string {
+		const use = this.#use.get(intentId);
+		if (!use || !ticketId || ticketId.length > 256)
+			throw new RangeError("invalid activity binding");
+		use.generation ??= ticketId;
+		return use.generation;
 	}
 	/** Record use; returns why the activity must stop, or null. */
 	spend(
@@ -75,8 +95,12 @@ export class ActivityBudget {
 			throw new RangeError("activity time must be finite");
 		this.start(intentId, now);
 		const u = this.#use.get(intentId)!;
-		u.toolCalls += d.toolCalls ?? 0;
-		u.tokens += d.tokens ?? 0;
+		const toolCalls = u.toolCalls + (d.toolCalls ?? 0);
+		const tokens = u.tokens + (d.tokens ?? 0);
+		if (!Number.isSafeInteger(toolCalls) || !Number.isSafeInteger(tokens))
+			throw new RangeError("activity usage overflow");
+		u.toolCalls = toolCalls;
+		u.tokens = tokens;
 		return this.exceeded(intentId, now);
 	}
 	/** Whether a further tool call may start now (checked before issuing a ticket). */

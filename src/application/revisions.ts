@@ -1,5 +1,6 @@
 /** P4-c: diff the in-RAM state into revision rows, rebuild state from rows, redact on forget. */
 import type { AgencyState } from "../contracts/model.ts";
+import type { InputProvenance, InputContext } from "../contracts/memory.ts";
 import {
 	DELETED,
 	REDACTED,
@@ -26,13 +27,23 @@ const rootOf = (s: AgencyState) => ({
 	hasInterests: s.interests !== undefined,
 });
 
-const items = (s: AgencyState): [ItemKind, string, unknown][] => [
+const items = (
+	s: AgencyState,
+	provenance?: InputProvenance,
+): [ItemKind, string, unknown][] => [
 	["agency", ROOT, rootOf(s)],
 	...lists.flatMap(([k, f]) =>
 		((s[f] as Item[] | undefined) ?? []).map(
 			(x): [ItemKind, string, unknown] => [k, x.id, x],
 		),
 	),
+	...(provenance?.entries
+		.filter(([key]) => !key.startsWith("observation:"))
+		.map(([key, value]): [ItemKind, string, unknown] => [
+			"agency",
+			`inputs:${key}`,
+			value,
+		]) ?? []),
 ];
 
 const refsOf = (x: unknown): string[] => {
@@ -46,17 +57,27 @@ export class RevisionTracker {
 	private readonly last = new Map<string, { json: string; rev: number }>();
 	constructor(private readonly scope: string) {}
 	/** Seeds from restored rows' state without emitting (no duplicate history). */
-	prime(state: AgencyState, revs?: ReadonlyMap<string, number>): void {
-		for (const [k, id, v] of items(state)) {
+	prime(
+		state: AgencyState,
+		revs?: ReadonlyMap<string, number>,
+		provenance?: InputProvenance,
+	): void {
+		for (const [k, id, v] of items(state, provenance)) {
 			const key = `${k}:${id}`;
 			this.last.set(key, { json: JSON.stringify(v), rev: revs?.get(key) ?? 1 });
 		}
 	}
 	/** Prepare rows without advancing the saved baseline. Call commit only after append succeeds. */
-	diff(state: AgencyState, callId: string, at: number): ItemRevision[] {
+	diff(
+		state: AgencyState,
+		callId: string,
+		at: number,
+		provenance?: InputProvenance,
+	): ItemRevision[] {
 		const out: ItemRevision[] = [];
 		const present = new Set<string>();
-		for (const [k, id, v] of items(state)) {
+		const inputs = new Map(provenance?.entries);
+		for (const [k, id, v] of items(state, provenance)) {
 			const key = `${k}:${id}`;
 			present.add(key);
 			const json = JSON.stringify(v);
@@ -71,7 +92,15 @@ export class RevisionTracker {
 				revision: rev,
 				stateJson: json,
 				reason: typeof reason === "string" ? reason : callId,
-				evidence: refsOf(v),
+				evidence: [
+					...new Set([
+						...refsOf(v),
+						...(inputs.get(key)?.sources ?? []),
+						...(k === "agency" && id.startsWith("inputs:")
+							? (v as InputContext).sources
+							: []),
+					]),
+				],
 				callId,
 				at,
 			});
@@ -106,7 +135,11 @@ export class RevisionTracker {
 /** Latest row per item → state. The table alone restores open and closed items. */
 export const stateFromRevisions = (
 	rows: readonly ItemRevision[],
-): { state: AgencyState; revs: Map<string, number> } | null => {
+): {
+	state: AgencyState;
+	revs: Map<string, number>;
+	provenance?: InputProvenance;
+} | null => {
 	const latest = new Map<string, ItemRevision>();
 	for (const r of rows) {
 		const key = `${r.itemKind}:${r.itemId}`;
@@ -142,7 +175,23 @@ export const stateFromRevisions = (
 			arr.push(JSON.parse(cur.stateJson) as Item);
 	}
 	const revs = new Map([...latest].map(([k, r]) => [k, r.revision]));
-	return { state, revs };
+	const entries = [...latest.values()]
+		.filter(
+			(r) =>
+				r.itemKind === "agency" &&
+				r.itemId.startsWith("inputs:") &&
+				r.stateJson !== REDACTED &&
+				r.stateJson !== DELETED,
+		)
+		.map((r): [string, InputContext] => [
+			r.itemId.slice(7),
+			JSON.parse(r.stateJson),
+		]);
+	return {
+		state,
+		revs,
+		...(entries.length ? { provenance: { version: 1 as const, entries } } : {}),
+	};
 };
 
 /** Forgetting: every row of an item that ever cited a forgotten id loses its body. */
@@ -155,6 +204,36 @@ export const redactRevisions = (
 			.filter((r) => r.evidence.some((e) => forgotten.has(e)))
 			.map((r) => `${r.itemKind}:${r.itemId}`),
 	);
+	if (forgotten.size) {
+		// Legacy revisions have only citations, not an input manifest. Precision is unavailable.
+		const tracked = new Map<string, InputContext>();
+		for (const r of rows)
+			if (
+				r.itemKind === "agency" &&
+				r.itemId.startsWith("inputs:") &&
+				r.stateJson !== REDACTED &&
+				r.stateJson !== DELETED
+			) {
+				const key = r.itemId.slice(7);
+				const input = JSON.parse(r.stateJson) as InputContext;
+				const old = tracked.get(key);
+				tracked.set(key, {
+					sources: [...(old?.sources ?? []), ...input.sources],
+					complete: input.complete && (old?.complete ?? true),
+				});
+			}
+		for (const r of rows)
+			if (r.itemKind !== "agency") {
+				const key = `${r.itemKind}:${r.itemId}`;
+				const input = tracked.get(key);
+				if (!input?.complete || input.sources.some((id) => forgotten.has(id)))
+					hit.add(key);
+			}
+		for (const key of hit) {
+			if (key.startsWith("agency:inputs:")) hit.add(key.slice(14));
+			else if (!key.startsWith("agency:")) hit.add(`agency:inputs:${key}`);
+		}
+	}
 	return rows.map((r) =>
 		hit.has(`${r.itemKind}:${r.itemId}`)
 			? { ...r, stateJson: REDACTED, reason: "", evidence: [] }

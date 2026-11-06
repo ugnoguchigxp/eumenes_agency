@@ -156,8 +156,8 @@ describe("pendingJudgeTasks by action kind", () => {
 });
 
 test("the judge fingerprint carries the bumped prompt version", () => {
-	expect(JUDGE_PROMPT_VERSION).toBe("judge-prompt-9");
-	expect(judgeFingerprint()).toContain("judge-prompt-9");
+	expect(JUDGE_PROMPT_VERSION).toBe("judge-prompt-10");
+	expect(judgeFingerprint()).toContain("judge-prompt-10");
 });
 
 test("social cases: interests and the opportunity's topics are judge facts", () => {
@@ -232,4 +232,20 @@ describe("summary splits speak and tool judgments", () => {
 		expect(md).toContain(`| tool | ${genericToolCriterion} | 0/1/0 |`);
 		expect(md).toContain("直接比べられない");
 	});
+});
+import { judgeDigest } from "../judge.ts";
+
+test("judge digest distinguishes provider and output reasoning headroom", () => {
+	const role = {
+		model: "m",
+		effort: "low",
+		provider: "anthropic",
+		thinkingHeadroom: 100,
+	};
+	expect(judgeDigest(role, "s")).not.toBe(
+		judgeDigest({ ...role, provider: "openai" }, "s"),
+	);
+	expect(judgeDigest(role, "s")).not.toBe(
+		judgeDigest({ ...role, thinkingHeadroom: 200 }, "s"),
+	);
 });

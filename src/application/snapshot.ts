@@ -44,12 +44,24 @@ const scheduling = z.object({
 	wakeCount: z.int().nonnegative(),
 });
 const continuity = z.object({
+	usageReceipts: z
+		.array(
+			z.object({
+				id: z.string().min(1).max(256),
+				ticketId: z.string().min(1).max(256),
+				at: z.number().finite(),
+				inputTokens: z.int().nonnegative(),
+				outputTokens: z.int().nonnegative(),
+			}),
+		)
+		.optional(),
 	calls: z.array(z.number().finite()),
 	activities: z.array(
 		z.tuple([
 			z.string(),
 			z.object({
 				startedAt: z.number().finite(),
+				generation: z.string().min(1).max(256).optional(),
 				toolCalls: z.number().nonnegative(),
 				tokens: z.number().nonnegative(),
 			}),
@@ -96,6 +108,19 @@ const envelope = z.object({
 	condition: z.enum(conditions).optional(),
 	observations: z.array(observation).optional(),
 	cursor: z.int().nonnegative().optional(),
+	compactedThrough: z.int().nonnegative().optional(),
+	forgottenRefs: z.array(z.string().min(1)).optional(),
+	provenance: z
+		.object({
+			version: z.literal(1),
+			entries: z.array(
+				z.tuple([
+					z.string(),
+					z.object({ sources: z.array(z.string()), complete: z.boolean() }),
+				]),
+			),
+		})
+		.optional(),
 	scheduling: scheduling.optional(),
 	continuity: continuity.optional(),
 });
@@ -120,17 +145,35 @@ export const validateRestore = (
 		throw new TypeError(
 			"invalid snapshot: scheduling requires an observation ledger",
 		);
-	if (s.observations === undefined) return;
-	if (s.cursor! > s.observations.length)
+	if (s.observations === undefined) {
+		if (s.compactedThrough !== undefined)
+			throw new TypeError("invalid snapshot: compaction requires ledger");
+		return;
+	}
+	const compacted = s.compactedThrough ?? 0;
+	if (compacted > s.cursor!)
+		throw new TypeError("invalid snapshot: unprocessed compaction");
+	const last = Math.max(s.cursor!, s.observations.at(-1)?.seq ?? 0);
+	if (s.cursor! > (s.observations.at(-1)?.seq ?? 0) && compacted !== s.cursor)
 		throw new TypeError("invalid snapshot: cursor outside observation list");
 	const ids = new Set<string>();
-	for (const [index, o] of s.observations.entries()) {
-		if (o.seq !== index + 1)
+	let previous = 0;
+	for (const o of s.observations) {
+		if (o.seq <= previous || (o.seq !== previous + 1 && o.seq - 1 > compacted))
 			throw new TypeError(
 				"invalid snapshot: observations must have consecutive seqs",
 			);
 		if (ids.has(o.id))
 			throw new TypeError(`invalid snapshot: duplicate observation id ${o.id}`);
 		ids.add(o.id);
+		previous = o.seq;
 	}
+	if (previous < last && compacted < last)
+		throw new TypeError("invalid snapshot: missing pending observations");
+	if (
+		s.provenance &&
+		new Set(s.provenance.entries.map(([k]) => k)).size !==
+			s.provenance.entries.length
+	)
+		throw new TypeError("invalid snapshot: duplicate provenance key");
 };

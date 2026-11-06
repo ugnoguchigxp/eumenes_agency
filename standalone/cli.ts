@@ -79,8 +79,9 @@ import {
 	printAbove,
 	resolveCondition,
 } from "./chat-loop.ts";
-import { createClaudeLlm, createClaudeReply } from "./claude.ts";
+import { createProviderLlm, createProviderReply } from "./providers.ts";
 import { apiKeyFromEnvironment } from "./api-keys.ts";
+import { parseFeedback } from "./metrics.ts";
 import { toStandingInterests } from "./persona.ts";
 import { expressTicket } from "./utterance.ts";
 import {
@@ -134,8 +135,8 @@ async function main() {
 	const { condition, selectWhenEmpty } = resolveCondition(args.condition);
 	const settings = loadSettings();
 	const meter = openSpendMeter(settings);
-	const llm = createClaudeLlm(settings.llm.background, meter);
-	const chat = createClaudeReply(settings.llm.main, meter);
+	const llm = createProviderLlm(settings.llm.background, meter);
+	const chat = createProviderReply(settings.llm.main, meter);
 	const toolPort = createMockToolPort({ now: Date.now });
 	const standingInterests = toStandingInterests(args.interests);
 	// Social mode only exists for B1 (B1a included); B2/F ignore it.
@@ -161,8 +162,12 @@ async function main() {
 		...(social ? { socialTopics: true } : {}),
 	});
 	if (args.off) runtime.setEnabled(false);
-	if (!apiKeyFromEnvironment("anthropic"))
-		console.warn("[warn] CLAUDE_API_KEY / ANTHROPIC_API_KEY is not set");
+	for (const provider of new Set([
+		settings.llm.main.provider ?? "anthropic",
+		settings.llm.background.provider ?? "anthropic",
+	]))
+		if (!apiKeyFromEnvironment(provider))
+			console.warn(`[warn] ${provider} API key is not set`);
 	const digest = settingsDigest(settings);
 	console.log(
 		dim(
@@ -201,7 +206,7 @@ async function main() {
 	});
 	console.log(
 		dim(
-			`commands: /idle /state /todos /done /ask /off /on /quit | auto idle ${
+			`commands: /idle /state /todos /done /ask /off /on /feedback useful|intrusive|missed [note] /quit | auto idle ${
 				args.idleSec > 0 && args.maxUnanswered > 0
 					? `${args.idleSec}s (retry ${args.idleSec * 2}s, ${args.idleSec * 4}s; max unanswered ${args.maxUnanswered})`
 					: "off"
@@ -220,6 +225,7 @@ async function main() {
 	let background: AbortController | null = null;
 	let backgroundHalted = false;
 	let closed = false;
+	let lastIntervention: string | null = null;
 	/** Lines read by readline but not handled yet (a pasted burst, input typed during a reply). */
 	let queuedLines = 0;
 	const chatAbort = new AbortController();
@@ -333,6 +339,7 @@ async function main() {
 			// The main model must know what it said, or the next reply contradicts it.
 			if (text !== "") conversation.addAssistant(text);
 			planner.proactiveSpoke(Date.now());
+			lastIntervention = ticket.id;
 			record({
 				type: "proactive",
 				trigger,
@@ -488,6 +495,7 @@ async function main() {
 	rl.on("close", shutdown);
 
 	const turn = async (text: string) => {
+		const turnStarted = performance.now();
 		abortBackground();
 		generation++;
 		planner.enter();
@@ -549,7 +557,12 @@ async function main() {
 					return;
 				}
 				conversation.addAssistant(reply);
-				record({ type: "reply", text: reply, emotion: result.emotion ?? null });
+				record({
+					type: "reply",
+					text: reply,
+					emotion: result.emotion ?? null,
+					latencyMs: performance.now() - turnStarted,
+				});
 				out(result.emotion ? `${result.emotion} ${reply}` : reply);
 				runtime.observe({
 					id: `r${n}`,
@@ -636,6 +649,24 @@ async function main() {
 						`[エラー] ${error instanceof Error ? error.message : String(error)}`,
 					);
 				}
+			}
+		} else if (line === "/feedback" || line.startsWith("/feedback ")) {
+			const feedback = parseFeedback(line);
+			if (!feedback)
+				console.log("usage: /feedback useful|intrusive|missed [note]");
+			else if (feedback.rating !== "missed" && lastIntervention === null)
+				console.log("まだ評価できる自発的な介入がありません。");
+			else {
+				record({
+					type: "feedback",
+					...feedback,
+					target: feedback.rating === "missed" ? null : lastIntervention,
+				});
+				console.log(
+					logPath === null
+						? "記録は無効です。保存するにはログを有効にしてください。"
+						: "評価を記録しました。",
+				);
 			}
 		} else if (line === "/off") {
 			runtime.setEnabled(false);

@@ -35,6 +35,11 @@ export const findDue = (
 	now: number,
 	flags: DueFlags,
 ): Due => {
+	const current = new Set(
+		state.intents.filter(isOpenIntent).map((i) => reviewKey(i.id, i.reviewAt)),
+	);
+	for (const key of flags.review)
+		if (!current.has(key)) flags.review.delete(key);
 	const reviewIntentIds = state.intents
 		.filter(
 			(i) =>

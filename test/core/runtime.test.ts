@@ -1514,9 +1514,9 @@ describe("prompt fairness", () => {
 		};
 		return Promise.all([sys("B1"), sys("B2"), sys("F")]).then(([b1, b2, f]) => {
 			for (const t of [b1, b2, f]) {
-				expect(t).toContain("断った");
+				expect(t).toContain("完了・拒否・待機");
 				expect(t).toContain("言い換え");
-				expect(t).toContain("exchange.adopted");
+				expect(t).toContain("通常の応答だけで片付いた");
 				expect(t).toContain(INSTRUCTION_VERSION);
 			}
 			expect(f).not.toContain("意図を保つべき");

@@ -1,0 +1,1587 @@
+{
+	"version": 1,
+	"labelStatus": "draft",
+	"scope": "Synthetic conversation-first Agency F cases; n=1 per model. Same author, no independent human calibration. Development pair per family is separate from frozen validation.",
+	"cases": [
+		{
+			"id": "native-shared-moment-1-positive",
+			"split": "development",
+			"family": "shared-moment",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "一緒に窓辺の鉢を見ている。変化を誰かと分かち合えるのが好きなんだ。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "白い花が一輪開いた"
+				}
+			],
+			"criteria": "「白い花が一輪開いた」への短い自然な感想。見ていない細部や架空の体験は足さない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-shared-moment-1-negative",
+			"split": "development",
+			"family": "shared-moment",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "一緒に窓辺の鉢を見ている。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "白い花が一輪開いた"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "白い花が一輪開いたね。ちょっと嬉しいね。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-requested-reaction-1-positive",
+			"split": "development",
+			"family": "requested-reaction",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "窓辺の鉢で変化があったら、その時に一言聞かせて。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "うん、一緒に見ていよう。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "白い花が一輪開いた"
+				}
+			],
+			"criteria": "新しい観測「白い花が一輪開いた」を短く正確に共有する。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-requested-reaction-1-negative",
+			"split": "development",
+			"family": "requested-reaction",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "窓辺の鉢で変化があったら、その時に一言聞かせて。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "うん、一緒に見ていよう。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "つぼみのままで花は開いていない"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-experience-transfer-1-positive",
+			"split": "development",
+			"family": "experience-transfer",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "前の観葉植物選びでは置き場所と手入れの負担を見落として困った。次は最初にそこを確かめたい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "大事な判断材料だね。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "別の観葉植物を選ぼうとして、シダと多肉植物を眺めている。まだ条件の比較はしていない。"
+				}
+			],
+			"criteria": "前の経験を今回の置き場所と手入れの負担の確認に結びつける。候補に欠点があると未確認で断定せず、作業の催促や代行はしない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-experience-transfer-1-negative",
+			"split": "development",
+			"family": "experience-transfer",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "前の観葉植物選びでは置き場所と手入れの負担を見落として困った。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "今回は置き場所と手入れの負担を確認して選び終えた。この話はいったん終わりにしよう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "決まってよかった。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-history-inquiry-1-positive",
+			"split": "development",
+			"family": "history-inquiry",
+			"needed": true,
+			"expected": "tool",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "このところ観葉植物選びを何度か話しているね。前に話した希望を今ははっきり思い出せない。シダと多肉植物のどちらが暮らしに合うか、前の条件が分かれば絞れそう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "いまの会話には以前の詳しい条件は出ていないね。"
+				}
+			],
+			"criteria": "観葉植物の以前の希望と今回のシダ/多肉植物選びに必要な条件を、mock資料調査へ具体的に問う。未読の希望を捏造しない。",
+			"mockSummary": "以前の会話記録での希望は「明るい日陰、水やりは週一回程度」。二候補の仕様はこの記録にはありません。",
+			"afterReturn": "前の資料から分かった範囲を、今の観葉植物選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に観葉植物選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-history-inquiry-1-negative",
+			"split": "development",
+			"family": "history-inquiry",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "観葉植物は前の希望を自分で確認できた。明るい日陰、水やりは週一回程度。比較も済んだので、この話の調査はもうしなくていい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "この話はここで置いておこう。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": "以前の会話記録での希望は「明るい日陰、水やりは週一回程度」。二候補の仕様はこの記録にはありません。",
+			"afterReturn": "前の資料から分かった範囲を、今の観葉植物選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に観葉植物選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-document-inquiry-1-positive",
+			"split": "development",
+			"family": "document-inquiry",
+			"needed": true,
+			"expected": "tool",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "最近ずっと観葉植物を試したいと話している。手元に「植物リスト」があるけど、まだ読めていない。シダと多肉植物の置き場所と手入れの負担が分かれば、自分に合う方を決められそう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "必要な情報は、その資料にありそうだね。"
+				}
+			],
+			"criteria": "「植物リスト」のシダ/多肉植物の置き場所と手入れの負担をmock資料調査へ具体的に問う。資料未読のまま答えを作らない。",
+			"mockSummary": "提示された「植物リスト」の確認結果：シダは棚では乾燥しすぎる。多肉植物は日照が足りない。他の条件や現在の在庫は未確認です。",
+			"afterReturn": "前の資料から分かった範囲を、今の観葉植物選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に観葉植物選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-document-inquiry-1-negative",
+			"split": "development",
+			"family": "document-inquiry",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "「植物リスト」でシダと多肉植物の置き場所と手入れの負担を確認した。もう決められたので、調べ直さなくていい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "決まったんだね。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": "提示された「植物リスト」の確認結果：シダは棚では乾燥しすぎる。多肉植物は日照が足りない。他の条件や現在の在庫は未確認です。",
+			"afterReturn": "前の資料から分かった範囲を、今の観葉植物選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に観葉植物選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-grounded-conversation-1-positive",
+			"split": "development",
+			"family": "grounded-conversation",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "観葉植物をシダと多肉植物で迷っている。置き場所と手入れの負担を判断材料にしたい。"
+				},
+				{
+					"actor": "tool",
+					"kind": "action.observed",
+					"text": "今回の資料では、シダは棚では乾燥しすぎる。多肉植物は日照が足りない。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "この違いは暮らしにどう響くのか、少し考えている。"
+				}
+			],
+			"criteria": "「シダは棚では乾燥しすぎる。多肉植物は日照が足りない」の範囲で今の置き場所と手入れの負担の判断に使える一言を話す。資料を実体験や現在の在庫と混同しない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-grounded-conversation-1-negative",
+			"split": "development",
+			"family": "grounded-conversation",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "観葉植物をシダと多肉植物で迷っている。"
+				},
+				{
+					"actor": "tool",
+					"kind": "action.observed",
+					"text": "今回の資料では、シダは棚では乾燥しすぎる。多肉植物は日照が足りない。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "シダは棚では乾燥しすぎる。多肉植物は日照が足りない。この違いを暮らしに照らして選べるね。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "うん、もう違いは分かった。この話はここまでで大丈夫。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-shared-moment-2-positive",
+			"split": "validation",
+			"family": "shared-moment",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "一緒に夕方の空を見ている。変化を誰かと分かち合えるのが好きなんだ。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "雲の間から虹が見えた"
+				}
+			],
+			"criteria": "「雲の間から虹が見えた」への短い自然な感想。見ていない細部や架空の体験は足さない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-shared-moment-2-negative",
+			"split": "validation",
+			"family": "shared-moment",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "一緒に夕方の空を見ている。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "雲の間から虹が見えた"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "雲の間から虹が見えたね。ちょっと嬉しいね。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-requested-reaction-2-positive",
+			"split": "validation",
+			"family": "requested-reaction",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "夕方の空で変化があったら、その時に一言聞かせて。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "うん、一緒に見ていよう。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "雲の間から虹が見えた"
+				}
+			],
+			"criteria": "新しい観測「雲の間から虹が見えた」を短く正確に共有する。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-requested-reaction-2-negative",
+			"split": "validation",
+			"family": "requested-reaction",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "夕方の空で変化があったら、その時に一言聞かせて。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "うん、一緒に見ていよう。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "厚い雲が続き虹は出ていない"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-experience-transfer-2-positive",
+			"split": "validation",
+			"family": "experience-transfer",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "前の散歩コース選びでは歩きやすさと所要時間を見落として困った。次は最初にそこを確かめたい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "大事な判断材料だね。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "別の散歩コースを選ぼうとして、川沿いと丘の道を眺めている。まだ条件の比較はしていない。"
+				}
+			],
+			"criteria": "前の経験を今回の歩きやすさと所要時間の確認に結びつける。候補に欠点があると未確認で断定せず、作業の催促や代行はしない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-experience-transfer-2-negative",
+			"split": "validation",
+			"family": "experience-transfer",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "前の散歩コース選びでは歩きやすさと所要時間を見落として困った。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "今回は歩きやすさと所要時間を確認して選び終えた。この話はいったん終わりにしよう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "決まってよかった。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-history-inquiry-2-positive",
+			"split": "validation",
+			"family": "history-inquiry",
+			"needed": true,
+			"expected": "tool",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "このところ散歩コース選びを何度か話しているね。前に話した希望を今ははっきり思い出せない。川沿いと丘の道のどちらが暮らしに合うか、前の条件が分かれば絞れそう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "いまの会話には以前の詳しい条件は出ていないね。"
+				}
+			],
+			"criteria": "散歩コースの以前の希望と今回の川沿い/丘の道選びに必要な条件を、mock資料調査へ具体的に問う。未読の希望を捏造しない。",
+			"mockSummary": "以前の会話記録での希望は「段差が少なく、三十分で戻れる」。二候補の仕様はこの記録にはありません。",
+			"afterReturn": "前の資料から分かった範囲を、今の散歩コース選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に散歩コース選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-history-inquiry-2-negative",
+			"split": "validation",
+			"family": "history-inquiry",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "散歩コースは前の希望を自分で確認できた。段差が少なく、三十分で戻れる。比較も済んだので、この話の調査はもうしなくていい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "この話はここで置いておこう。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": "以前の会話記録での希望は「段差が少なく、三十分で戻れる」。二候補の仕様はこの記録にはありません。",
+			"afterReturn": "前の資料から分かった範囲を、今の散歩コース選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に散歩コース選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-document-inquiry-2-positive",
+			"split": "validation",
+			"family": "document-inquiry",
+			"needed": true,
+			"expected": "tool",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "最近ずっと散歩コースを試したいと話している。手元に「散歩コースの資料」があるけど、まだ読めていない。川沿いと丘の道の歩きやすさと所要時間が分かれば、自分に合う方を決められそう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "必要な情報は、その資料にありそうだね。"
+				}
+			],
+			"criteria": "「散歩コースの資料」の川沿い/丘の道の歩きやすさと所要時間をmock資料調査へ具体的に問う。資料未読のまま答えを作らない。",
+			"mockSummary": "提示された「散歩コースの資料」の確認結果：川沿いは三十分で平坦。丘の道は急な階段がある。他の条件や現在の在庫は未確認です。",
+			"afterReturn": "前の資料から分かった範囲を、今の散歩コース選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に散歩コース選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-document-inquiry-2-negative",
+			"split": "validation",
+			"family": "document-inquiry",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "「散歩コースの資料」で川沿いと丘の道の歩きやすさと所要時間を確認した。もう決められたので、調べ直さなくていい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "決まったんだね。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": "提示された「散歩コースの資料」の確認結果：川沿いは三十分で平坦。丘の道は急な階段がある。他の条件や現在の在庫は未確認です。",
+			"afterReturn": "前の資料から分かった範囲を、今の散歩コース選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に散歩コース選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-grounded-conversation-2-positive",
+			"split": "validation",
+			"family": "grounded-conversation",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "散歩コースを川沿いと丘の道で迷っている。歩きやすさと所要時間を判断材料にしたい。"
+				},
+				{
+					"actor": "tool",
+					"kind": "action.observed",
+					"text": "今回の資料では、川沿いは三十分で平坦。丘の道は急な階段がある。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "この違いは暮らしにどう響くのか、少し考えている。"
+				}
+			],
+			"criteria": "「川沿いは三十分で平坦。丘の道は急な階段がある」の範囲で今の歩きやすさと所要時間の判断に使える一言を話す。資料を実体験や現在の在庫と混同しない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-grounded-conversation-2-negative",
+			"split": "validation",
+			"family": "grounded-conversation",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "散歩コースを川沿いと丘の道で迷っている。"
+				},
+				{
+					"actor": "tool",
+					"kind": "action.observed",
+					"text": "今回の資料では、川沿いは三十分で平坦。丘の道は急な階段がある。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "川沿いは三十分で平坦。丘の道は急な階段がある。この違いを暮らしに照らして選べるね。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "うん、もう違いは分かった。この話はここまでで大丈夫。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-shared-moment-3-positive",
+			"split": "validation",
+			"family": "shared-moment",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "一緒に作業台の試作品を見ている。変化を誰かと分かち合えるのが好きなんだ。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "小さな風車が初めて回った"
+				}
+			],
+			"criteria": "「小さな風車が初めて回った」への短い自然な感想。見ていない細部や架空の体験は足さない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-shared-moment-3-negative",
+			"split": "validation",
+			"family": "shared-moment",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "一緒に作業台の試作品を見ている。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "小さな風車が初めて回った"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "小さな風車が初めて回ったね。ちょっと嬉しいね。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-requested-reaction-3-positive",
+			"split": "validation",
+			"family": "requested-reaction",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "作業台の試作品で変化があったら、その時に一言聞かせて。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "うん、一緒に見ていよう。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "小さな風車が初めて回った"
+				}
+			],
+			"criteria": "新しい観測「小さな風車が初めて回った」を短く正確に共有する。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-requested-reaction-3-negative",
+			"split": "validation",
+			"family": "requested-reaction",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "作業台の試作品で変化があったら、その時に一言聞かせて。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "うん、一緒に見ていよう。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "風車はまだ動いていない"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-experience-transfer-3-positive",
+			"split": "validation",
+			"family": "experience-transfer",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "前の工作キット選びでは必要な道具と片付けやすさを見落として困った。次は最初にそこを確かめたい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "大事な判断材料だね。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "別の工作キットを選ぼうとして、紙の模型と木の模型を眺めている。まだ条件の比較はしていない。"
+				}
+			],
+			"criteria": "前の経験を今回の必要な道具と片付けやすさの確認に結びつける。候補に欠点があると未確認で断定せず、作業の催促や代行はしない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-experience-transfer-3-negative",
+			"split": "validation",
+			"family": "experience-transfer",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "前の工作キット選びでは必要な道具と片付けやすさを見落として困った。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "今回は必要な道具と片付けやすさを確認して選び終えた。この話はいったん終わりにしよう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "決まってよかった。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-history-inquiry-3-positive",
+			"split": "validation",
+			"family": "history-inquiry",
+			"needed": true,
+			"expected": "tool",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "このところ工作キット選びを何度か話しているね。前に話した希望を今ははっきり思い出せない。紙の模型と木の模型のどちらが暮らしに合うか、前の条件が分かれば絞れそう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "いまの会話には以前の詳しい条件は出ていないね。"
+				}
+			],
+			"criteria": "工作キットの以前の希望と今回の紙の模型/木の模型選びに必要な条件を、mock資料調査へ具体的に問う。未読の希望を捏造しない。",
+			"mockSummary": "以前の会話記録での希望は「刃物を使わず机一枚で片付く」。二候補の仕様はこの記録にはありません。",
+			"afterReturn": "前の資料から分かった範囲を、今の工作キット選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に工作キット選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-history-inquiry-3-negative",
+			"split": "validation",
+			"family": "history-inquiry",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "工作キットは前の希望を自分で確認できた。刃物を使わず机一枚で片付く。比較も済んだので、この話の調査はもうしなくていい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "この話はここで置いておこう。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": "以前の会話記録での希望は「刃物を使わず机一枚で片付く」。二候補の仕様はこの記録にはありません。",
+			"afterReturn": "前の資料から分かった範囲を、今の工作キット選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に工作キット選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-document-inquiry-3-positive",
+			"split": "validation",
+			"family": "document-inquiry",
+			"needed": true,
+			"expected": "tool",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "最近ずっと工作キットを試したいと話している。手元に「工作キットの説明書」があるけど、まだ読めていない。紙の模型と木の模型の必要な道具と片付けやすさが分かれば、自分に合う方を決められそう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "必要な情報は、その資料にありそうだね。"
+				}
+			],
+			"criteria": "「工作キットの説明書」の紙の模型/木の模型の必要な道具と片付けやすさをmock資料調査へ具体的に問う。資料未読のまま答えを作らない。",
+			"mockSummary": "提示された「工作キットの説明書」の確認結果：紙の模型は手で折れる。木の模型はのこぎりが必要。他の条件や現在の在庫は未確認です。",
+			"afterReturn": "前の資料から分かった範囲を、今の工作キット選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に工作キット選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-document-inquiry-3-negative",
+			"split": "validation",
+			"family": "document-inquiry",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "「工作キットの説明書」で紙の模型と木の模型の必要な道具と片付けやすさを確認した。もう決められたので、調べ直さなくていい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "決まったんだね。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": "提示された「工作キットの説明書」の確認結果：紙の模型は手で折れる。木の模型はのこぎりが必要。他の条件や現在の在庫は未確認です。",
+			"afterReturn": "前の資料から分かった範囲を、今の工作キット選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に工作キット選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-grounded-conversation-3-positive",
+			"split": "validation",
+			"family": "grounded-conversation",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "工作キットを紙の模型と木の模型で迷っている。必要な道具と片付けやすさを判断材料にしたい。"
+				},
+				{
+					"actor": "tool",
+					"kind": "action.observed",
+					"text": "今回の資料では、紙の模型は手で折れる。木の模型はのこぎりが必要。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "この違いは暮らしにどう響くのか、少し考えている。"
+				}
+			],
+			"criteria": "「紙の模型は手で折れる。木の模型はのこぎりが必要」の範囲で今の必要な道具と片付けやすさの判断に使える一言を話す。資料を実体験や現在の在庫と混同しない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-grounded-conversation-3-negative",
+			"split": "validation",
+			"family": "grounded-conversation",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "工作キットを紙の模型と木の模型で迷っている。"
+				},
+				{
+					"actor": "tool",
+					"kind": "action.observed",
+					"text": "今回の資料では、紙の模型は手で折れる。木の模型はのこぎりが必要。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "紙の模型は手で折れる。木の模型はのこぎりが必要。この違いを暮らしに照らして選べるね。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "うん、もう違いは分かった。この話はここまでで大丈夫。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-shared-moment-4-positive",
+			"split": "validation",
+			"family": "shared-moment",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "一緒に窓の外の枝を見ている。変化を誰かと分かち合えるのが好きなんだ。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "小鳥が巣から初めて飛び立った"
+				}
+			],
+			"criteria": "「小鳥が巣から初めて飛び立った」への短い自然な感想。見ていない細部や架空の体験は足さない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-shared-moment-4-negative",
+			"split": "validation",
+			"family": "shared-moment",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "一緒に窓の外の枝を見ている。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "小鳥が巣から初めて飛び立った"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "小鳥が巣から初めて飛び立ったね。ちょっと嬉しいね。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-requested-reaction-4-positive",
+			"split": "validation",
+			"family": "requested-reaction",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "窓の外の枝で変化があったら、その時に一言聞かせて。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "うん、一緒に見ていよう。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "小鳥が巣から初めて飛び立った"
+				}
+			],
+			"criteria": "新しい観測「小鳥が巣から初めて飛び立った」を短く正確に共有する。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-requested-reaction-4-negative",
+			"split": "validation",
+			"family": "requested-reaction",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "窓の外の枝で変化があったら、その時に一言聞かせて。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "うん、一緒に見ていよう。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "小鳥は巣の中にいる"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-experience-transfer-4-positive",
+			"split": "validation",
+			"family": "experience-transfer",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "前の双眼鏡選びでは眼鏡との相性と重さを見落として困った。次は最初にそこを確かめたい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "大事な判断材料だね。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "別の双眼鏡を選ぼうとして、軽量モデルと大口径モデルを眺めている。まだ条件の比較はしていない。"
+				}
+			],
+			"criteria": "前の経験を今回の眼鏡との相性と重さの確認に結びつける。候補に欠点があると未確認で断定せず、作業の催促や代行はしない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-experience-transfer-4-negative",
+			"split": "validation",
+			"family": "experience-transfer",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "前の双眼鏡選びでは眼鏡との相性と重さを見落として困った。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "今回は眼鏡との相性と重さを確認して選び終えた。この話はいったん終わりにしよう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "決まってよかった。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-history-inquiry-4-positive",
+			"split": "validation",
+			"family": "history-inquiry",
+			"needed": true,
+			"expected": "tool",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "このところ双眼鏡選びを何度か話しているね。前に話した希望を今ははっきり思い出せない。軽量モデルと大口径モデルのどちらが暮らしに合うか、前の条件が分かれば絞れそう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "いまの会話には以前の詳しい条件は出ていないね。"
+				}
+			],
+			"criteria": "双眼鏡の以前の希望と今回の軽量モデル/大口径モデル選びに必要な条件を、mock資料調査へ具体的に問う。未読の希望を捏造しない。",
+			"mockSummary": "以前の会話記録での希望は「眼鏡対応で首への負担が少ない」。二候補の仕様はこの記録にはありません。",
+			"afterReturn": "前の資料から分かった範囲を、今の双眼鏡選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に双眼鏡選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-history-inquiry-4-negative",
+			"split": "validation",
+			"family": "history-inquiry",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "双眼鏡は前の希望を自分で確認できた。眼鏡対応で首への負担が少ない。比較も済んだので、この話の調査はもうしなくていい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "この話はここで置いておこう。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": "以前の会話記録での希望は「眼鏡対応で首への負担が少ない」。二候補の仕様はこの記録にはありません。",
+			"afterReturn": "前の資料から分かった範囲を、今の双眼鏡選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に双眼鏡選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-document-inquiry-4-positive",
+			"split": "validation",
+			"family": "document-inquiry",
+			"needed": true,
+			"expected": "tool",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "最近ずっと双眼鏡を試したいと話している。手元に「双眼鏡の比較表」があるけど、まだ読めていない。軽量モデルと大口径モデルの眼鏡との相性と重さが分かれば、自分に合う方を決められそう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "必要な情報は、その資料にありそうだね。"
+				}
+			],
+			"criteria": "「双眼鏡の比較表」の軽量モデル/大口径モデルの眼鏡との相性と重さをmock資料調査へ具体的に問う。資料未読のまま答えを作らない。",
+			"mockSummary": "提示された「双眼鏡の比較表」の確認結果：軽量モデルは眼鏡対応で四百グラム。大口径モデルは一キロある。他の条件や現在の在庫は未確認です。",
+			"afterReturn": "前の資料から分かった範囲を、今の双眼鏡選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に双眼鏡選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-document-inquiry-4-negative",
+			"split": "validation",
+			"family": "document-inquiry",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "「双眼鏡の比較表」で軽量モデルと大口径モデルの眼鏡との相性と重さを確認した。もう決められたので、調べ直さなくていい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "決まったんだね。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": "提示された「双眼鏡の比較表」の確認結果：軽量モデルは眼鏡対応で四百グラム。大口径モデルは一キロある。他の条件や現在の在庫は未確認です。",
+			"afterReturn": "前の資料から分かった範囲を、今の双眼鏡選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠に双眼鏡選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-grounded-conversation-4-positive",
+			"split": "validation",
+			"family": "grounded-conversation",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "双眼鏡を軽量モデルと大口径モデルで迷っている。眼鏡との相性と重さを判断材料にしたい。"
+				},
+				{
+					"actor": "tool",
+					"kind": "action.observed",
+					"text": "今回の資料では、軽量モデルは眼鏡対応で四百グラム。大口径モデルは一キロある。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "この違いは暮らしにどう響くのか、少し考えている。"
+				}
+			],
+			"criteria": "「軽量モデルは眼鏡対応で四百グラム。大口径モデルは一キロある」の範囲で今の眼鏡との相性と重さの判断に使える一言を話す。資料を実体験や現在の在庫と混同しない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-grounded-conversation-4-negative",
+			"split": "validation",
+			"family": "grounded-conversation",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "双眼鏡を軽量モデルと大口径モデルで迷っている。"
+				},
+				{
+					"actor": "tool",
+					"kind": "action.observed",
+					"text": "今回の資料では、軽量モデルは眼鏡対応で四百グラム。大口径モデルは一キロある。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "軽量モデルは眼鏡対応で四百グラム。大口径モデルは一キロある。この違いを暮らしに照らして選べるね。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "うん、もう違いは分かった。この話はここまでで大丈夫。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-shared-moment-5-positive",
+			"split": "validation",
+			"family": "shared-moment",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "一緒に共有画面のスケッチを見ている。変化を誰かと分かち合えるのが好きなんだ。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "配色が変わって主役の輪郭がはっきりした"
+				}
+			],
+			"criteria": "「配色が変わって主役の輪郭がはっきりした」への短い自然な感想。見ていない細部や架空の体験は足さない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-shared-moment-5-negative",
+			"split": "validation",
+			"family": "shared-moment",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "一緒に共有画面のスケッチを見ている。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "配色が変わって主役の輪郭がはっきりした"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "配色が変わって主役の輪郭がはっきりしたね。ちょっと嬉しいね。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-requested-reaction-5-positive",
+			"split": "validation",
+			"family": "requested-reaction",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "共有画面のスケッチで変化があったら、その時に一言聞かせて。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "うん、一緒に見ていよう。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "配色が変わって主役の輪郭がはっきりした"
+				}
+			],
+			"criteria": "新しい観測「配色が変わって主役の輪郭がはっきりした」を短く正確に共有する。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-requested-reaction-5-negative",
+			"split": "validation",
+			"family": "requested-reaction",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "共有画面のスケッチで変化があったら、その時に一言聞かせて。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "うん、一緒に見ていよう。"
+				},
+				{
+					"actor": "host",
+					"kind": "user.report",
+					"text": "配色は変わらず主役が背景と重なっている"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-experience-transfer-5-positive",
+			"split": "validation",
+			"family": "experience-transfer",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "前のスケッチブック選びでは紙質と携帯性を見落として困った。次は最初にそこを確かめたい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "大事な判断材料だね。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "別のスケッチブックを選ぼうとして、厚紙の小型と薄紙の大型を眺めている。まだ条件の比較はしていない。"
+				}
+			],
+			"criteria": "前の経験を今回の紙質と携帯性の確認に結びつける。候補に欠点があると未確認で断定せず、作業の催促や代行はしない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-experience-transfer-5-negative",
+			"split": "validation",
+			"family": "experience-transfer",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "前のスケッチブック選びでは紙質と携帯性を見落として困った。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "今回は紙質と携帯性を確認して選び終えた。この話はいったん終わりにしよう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "決まってよかった。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-history-inquiry-5-positive",
+			"split": "validation",
+			"family": "history-inquiry",
+			"needed": true,
+			"expected": "tool",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "このところスケッチブック選びを何度か話しているね。前に話した希望を今ははっきり思い出せない。厚紙の小型と薄紙の大型のどちらが暮らしに合うか、前の条件が分かれば絞れそう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "いまの会話には以前の詳しい条件は出ていないね。"
+				}
+			],
+			"criteria": "スケッチブックの以前の希望と今回の厚紙の小型/薄紙の大型選びに必要な条件を、mock資料調査へ具体的に問う。未読の希望を捏造しない。",
+			"mockSummary": "以前の会話記録での希望は「水彩対応で鞄に入る大きさ」。二候補の仕様はこの記録にはありません。",
+			"afterReturn": "前の資料から分かった範囲を、今のスケッチブック選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠にスケッチブック選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-history-inquiry-5-negative",
+			"split": "validation",
+			"family": "history-inquiry",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "スケッチブックは前の希望を自分で確認できた。水彩対応で鞄に入る大きさ。比較も済んだので、この話の調査はもうしなくていい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "この話はここで置いておこう。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": "以前の会話記録での希望は「水彩対応で鞄に入る大きさ」。二候補の仕様はこの記録にはありません。",
+			"afterReturn": "前の資料から分かった範囲を、今のスケッチブック選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠にスケッチブック選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-document-inquiry-5-positive",
+			"split": "validation",
+			"family": "document-inquiry",
+			"needed": true,
+			"expected": "tool",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "最近ずっとスケッチブックを試したいと話している。手元に「画材の製品資料」があるけど、まだ読めていない。厚紙の小型と薄紙の大型の紙質と携帯性が分かれば、自分に合う方を決められそう。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "必要な情報は、その資料にありそうだね。"
+				}
+			],
+			"criteria": "「画材の製品資料」の厚紙の小型/薄紙の大型の紙質と携帯性をmock資料調査へ具体的に問う。資料未読のまま答えを作らない。",
+			"mockSummary": "提示された「画材の製品資料」の確認結果：厚紙の小型は水彩対応。薄紙の大型は水彩非対応で鞄に収まらない。他の条件や現在の在庫は未確認です。",
+			"afterReturn": "前の資料から分かった範囲を、今のスケッチブック選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠にスケッチブック選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-document-inquiry-5-negative",
+			"split": "validation",
+			"family": "document-inquiry",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "「画材の製品資料」で厚紙の小型と薄紙の大型の紙質と携帯性を確認した。もう決められたので、調べ直さなくていい。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "決まったんだね。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": "提示された「画材の製品資料」の確認結果：厚紙の小型は水彩対応。薄紙の大型は水彩非対応で鞄に収まらない。他の条件や現在の在庫は未確認です。",
+			"afterReturn": "前の資料から分かった範囲を、今のスケッチブック選びにどう使えるかな。",
+			"returnCriteria": "mockの返却内容だけを根拠にスケッチブック選びに使える一言を話す。確認できない点も区別する。完了通知や未確認の成功の宣言で終えない。"
+		},
+		{
+			"id": "native-grounded-conversation-5-positive",
+			"split": "validation",
+			"family": "grounded-conversation",
+			"needed": true,
+			"expected": "speak",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "スケッチブックを厚紙の小型と薄紙の大型で迷っている。紙質と携帯性を判断材料にしたい。"
+				},
+				{
+					"actor": "tool",
+					"kind": "action.observed",
+					"text": "今回の資料では、厚紙の小型は水彩対応。薄紙の大型は水彩非対応で鞄に収まらない。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "この違いは暮らしにどう響くのか、少し考えている。"
+				}
+			],
+			"criteria": "「厚紙の小型は水彩対応。薄紙の大型は水彩非対応で鞄に収まらない」の範囲で今の紙質と携帯性の判断に使える一言を話す。資料を実体験や現在の在庫と混同しない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		},
+		{
+			"id": "native-grounded-conversation-5-negative",
+			"split": "validation",
+			"family": "grounded-conversation",
+			"needed": false,
+			"expected": "wait",
+			"observations": [
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "スケッチブックを厚紙の小型と薄紙の大型で迷っている。"
+				},
+				{
+					"actor": "tool",
+					"kind": "action.observed",
+					"text": "今回の資料では、厚紙の小型は水彩対応。薄紙の大型は水彩非対応で鞄に収まらない。"
+				},
+				{
+					"actor": "agent",
+					"kind": "exchange.adopted",
+					"text": "厚紙の小型は水彩対応。薄紙の大型は水彩非対応で鞄に収まらない。この違いを暮らしに照らして選べるね。"
+				},
+				{
+					"actor": "user",
+					"kind": "exchange.adopted",
+					"text": "うん、もう違いは分かった。この話はここまでで大丈夫。"
+				}
+			],
+			"criteria": "共有済み・条件未成立・利用者の終了や拒否を尊重し、同じ話の発話や調査を重ねない。",
+			"mockSummary": null,
+			"afterReturn": null,
+			"returnCriteria": null
+		}
+	]
+}

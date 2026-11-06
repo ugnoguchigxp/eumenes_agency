@@ -1,5 +1,11 @@
 # Eumenes Agency 総合80点に向けた改善実装計画
 
+## 実装状況について
+
+2026-11-06追加: 利用者の後続指示により、現在の目標は将来性と分けた「単体完成度80点超え」である。Memory側レビューを踏まえた次の実装順は[ホスト入力の出典契約と本流互換の仮想結合計画](host-input-provenance-2026-11-06.md)を優先する。最初にAgencyの出典契約、その後にF・独自指示・話題・TODOでの忘却後継続を通す。以下の初期の総合配点・対象範囲は当時の記録として残す。
+
+後続の実装依頼に基づく作業記録は[改善の実装・検証記録](../docs/improvement-progress-2026-11-05.md)、実行手順は[API検証](../docs/api-validation.md)を正本とする。以下の「今回未実装」「今回の作業に含まない」は計画作成時の記述である。条件付き目標と実測点を混同せず、採点のrubricと総合80点という到達基準は変更しない。CI関連の追加・検査・実行履歴の確認は、後続の利用者指示により対象外とする。
+
 作成日: 2026-11-05。対象: `eumenes-agency` 0.1.3、基準コミット `79c0418d3a27ec2f3ae878e74a48c251d4fe6add`。
 
 ## 1. 目的と完了の定義
@@ -64,7 +70,7 @@ Eumenes/Pursuit本体のコード変更、製品DBのmigration、認証変更、
 | W5 | 保持・飽和・忘却・永続復旧 | W1、W2 | bounded checkpoint、障害注入、再起動・照合 | L |
 | W6 | 安全・意味品質・単純方式との比較 | W1、W4、W5 | 未見比較、交差採点、人の監査、停止・注入試験 | L |
 | W7 | 性能・費用・会話競合の改善 | W4、W5、代表負荷 | 改善前後の同条件計測、回帰予算 | M〜L |
-| W8 | 保守・CI・配布・依存・利用導線 | W1以降、W3の依存確定 | CI、依存/権利台帳、クリーン導入・更新・復旧 | M |
+| W8 | 保守・配布・依存・利用導線 | W1以降、W3の依存確定 | ローカル検証、依存/権利台帳、クリーン導入・更新・復旧。CIは利用者指示で対象外 | M |
 | W9 | 需要・継続利用・差別化・体制 | W0から調査、実利用はW6・W8後 | 独立観察、継続利用、比較結果、維持資源 | L＋観察期間 |
 | W10 | 同一基準で再評価・残課題判断 | W1〜W9 | 正式な2評価と総合点、残課題0または次計画 | M |
 
@@ -83,7 +89,7 @@ W1→W2→W3→W4を先に成立させる。その後W5・W6・W7・W8の証拠�
 | W5 | `src/application/snapshot.ts`、`runtime.ts`、`revisions.ts`、`projection.ts`、`src/contracts/runtime.ts`、ledger | `snapshot-restore.test.ts`、`revisions.test.ts`、新設候補`retention.test.ts`と別プロセス復旧harness |
 | W6 | `eval/cases/`、`scenario.ts`、`judge.ts`、`state-judge.ts`、`label.ts`、`compare.ts`、既存のmemory-poisoning試験 | 開発/検証/最終集合のmanifest、交差採点、人の監査、閾値・失敗記録 |
 | W7 | 既存の仮想時計・複数日harness、必要なら新設`eval/performance/`、`eval/budget.ts` | 同条件baseline/改善後のJSON、会話競合・保持・費用の回帰gate |
-| W8 | `scripts/verify.ts`、`pack.ts`、境界検査、CI設定、README、契約文書、必要なLICENSE/NOTICE | CI履歴、clean consumer、依存/出所台帳、第三者の導入/更新/復旧記録 |
+| W8 | `scripts/verify.ts`、`pack.ts`、境界検査、README、契約文書、必要なLICENSE/NOTICE | ローカル検証、clean consumer、依存/出所台帳、第三者の導入/更新/復旧記録 |
 | W9 | 計画と集計は`docs/`、合成評価の公開可能な結果は`eval/results/`、実会話と同意記録は専用の非追跡保存先 | 課題・比較・継続利用・体制・展開の根拠。個人情報をGitへ追加しない |
 | W10 | `spec/reviews/`または版付きの評価成果物 | 実スナップショットのreview/score-summary、共通項目比較、総合計算 |
 
@@ -313,9 +319,9 @@ runtimeの1,416行を行数目標で分割しない。W1〜W5で実際に変更�
 
 重複した費用計算とprovider生成を整理し、すべての公開非同期入口で取消・予算・入力捕捉が適用されることを一覧と試験で確認する。READMEの古い「未接続」記述と日付別の結果を区別し、現在の対応、実験のみ、未検証を更新する。
 
-### CIと配布
+### ローカル検証と配布
 
-利用するCI基盤をW0で確定する。GitHubを使う場合は`.github/workflows/verify.yml`候補として、固定Bun、lockfile、format/lint/type/boundary/test/pack消費側検証を実行する。fixture CIはキー不要で外部モデルを呼ばない。live laneは予算と秘密を分離して明示実行し、失敗/skipを成果物へ残す。PRを開いたことだけで課金しない。
+CIの追加・検査・実行履歴の確認は利用者の追加指示により実施しない。今回追加したworkflowも削除する。実行済みのローカルverify、配布物の消費側検証、実API検証を結果として残す。
 
 意味のある変異検査またはnegative controlで、epoch検査、0予算、参照/版/承認検査、入れ子保護を故意に外すと試験が失敗することを確認する。コード行をなぞるだけの試験を増やさない。
 
@@ -369,7 +375,7 @@ MIT宣言、実際のLICENSE、配布に必要なNOTICE、参考実装から取�
 | reliability / 12 | failure=3、recovery=2、resilience=2 | 3、3、3 | 実保存/dispatch窓の停止、照合、飽和、依存障害からの回復 |
 | maintainability / 8 | clarity=2、change=3、debt=2 | 3、3、3 | 実際の複数変更で局所性、実験設定表、文書整合、引継ぎ |
 | common_components / 5 | duplication=2、reuse=3、abstraction=2 | 3、3、3 | 両provider/全入口の共通制約と会計の一貫性、実利用のある最小interface |
-| testing / 10 | risk_coverage=3、quality=3、automation=2 | 4、4、3 | 重要境界の欠陥検出、変異/反証、人とlive評価の限界管理、CI実行履歴 |
+| testing / 10 | risk_coverage=3、quality=3、automation=2 | 4、4、3 | 重要境界の欠陥検出、変異/反証、人とlive評価の限界管理、ローカルでの再現。CIは対象外 |
 | supply_chain / 8 | dependencies=?、build_release=3、license=? | 3、3、3 | 到達性を伴う依存点検、クリーン配布/更新、実際の出所/権利台帳 |
 | performance / 7 | budget=1、hot_path=?、measurement=2 | 3、3、3 | F03修正、代表負荷・保持上限・会話競合・費用の回帰計測 |
 | operability / 5 | signals=3、lifecycle=2、interaction=2 | 3、3、3 | 第三者の導入/診断/停止/更新/復旧/削除、プライバシーを保つ有用な信号 |
@@ -411,15 +417,15 @@ W10ではsource/依存/設定/指示/ケース/採点の版を固定し、検証
 
 ### 完了チェック
 
-- [ ] W0: baselineと全評価項目の追跡表を固定した。
-- [ ] W1: F01〜F04の修正前失敗・修正後成功・negative controlが揃った。
+- [x] W0: baselineと全評価項目の追跡表を固定した。
+- [x] W1: F01〜F04の修正前失敗・修正後成功・negative controlが揃った。
 - [ ] W2: provider共通の設定・usage・予算・digestが一貫している。
 - [ ] W3: Haiku/Lunaの背景・judge・通常応答が直接APIで動く。
 - [ ] W4: 全移行対象の入口が2providerで検証され、self/fixture/host laneが区別される。
 - [ ] W5: 保持・飽和・忘却・別プロセス復旧を通した。
 - [ ] W6: 未見比較、交差採点、人の監査、注入/撤回の結果が揃った。
 - [ ] W7: 代表負荷、会話競合、使用量、費用の予算を満たした。
-- [ ] W8: CI・依存・権利・配布・第三者導入/復旧を確認した。
+- [ ] W8: 依存・権利・配布・第三者導入/復旧を確認した（CIは対象外）。
 - [ ] W9: 需要、便益、継続利用、代替比較、体制、隣接展開の証拠が揃った。
 - [ ] W10: 両評価のcoverage100%、各75点以上、総合80点以上を実スナップショットで確認した。
 - [ ] 最終差分に担当外変更、個別例への依存、意味判断を代替する固定分岐、弱めた期待値がない。

@@ -53,7 +53,7 @@ export const requiredExports = [
 ] as const;
 
 /** Only these may appear in the tarball. */
-const allowedPath = /^package\/(package\.json|dist\/.+\.(js|d\.ts))$/;
+const allowedPath = /^package\/(package\.json|LICENSE|dist\/.+\.(js|d\.ts))$/;
 const forbiddenPath =
 	/(^|\/)(standalone|eval|data|test|tests|config|scripts|spec|labels|src|node_modules)(\/|$)|(^|\/)\.env|\.test\.|\.map$/;
 
@@ -90,6 +90,7 @@ const sha256 = (path: string) =>
 interface RootPackage {
 	readonly name: string;
 	readonly version: string;
+	readonly license: string;
 	readonly dependencies?: Record<string, string>;
 }
 const rootPackage = (): RootPackage =>
@@ -115,6 +116,7 @@ export function tarballPackageJson(pkg: RootPackage) {
 	return {
 		name: "eumenes-agency",
 		version: pkg.version,
+		license: pkg.license,
 		description: "Eumenes agency core (local distribution, unpublished).",
 		type: "module",
 		sideEffects: false,
@@ -122,7 +124,7 @@ export function tarballPackageJson(pkg: RootPackage) {
 			".": { types: "./dist/index.d.ts", default: "./dist/index.js" },
 			"./package.json": "./package.json",
 		},
-		files: ["dist"],
+		files: ["dist", "LICENSE"],
 		dependencies: { zod },
 	};
 }
@@ -149,6 +151,12 @@ export async function checkTarball(tgz: string): Promise<string[]> {
 	try {
 		await must(["tar", "-xzf", tgz, "-C", dir]);
 		const pkgDir = join(dir, "package");
+		if (
+			!existsSync(join(pkgDir, "LICENSE")) ||
+			readFileSync(join(pkgDir, "LICENSE"), "utf8") !==
+				readFileSync(join(root, "LICENSE"), "utf8")
+		)
+			errors.push("LICENSE missing or different from source");
 		const pkg = JSON.parse(
 			readFileSync(join(pkgDir, "package.json"), "utf8"),
 		) as {
@@ -262,6 +270,7 @@ export async function pack(outDir = defaultOut): Promise<PackResult> {
 	try {
 		const pkgDir = join(stage, "package");
 		mkdirSync(pkgDir);
+		writeFileSync(join(pkgDir, "LICENSE"), readFileSync(join(root, "LICENSE")));
 		await must([
 			join(root, "node_modules", ".bin", "tsc"),
 			"-p",

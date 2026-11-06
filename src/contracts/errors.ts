@@ -49,3 +49,13 @@ export class ObservationConflictError extends Error {
 		this.name = "ObservationConflictError";
 	}
 }
+
+/** Input was not accepted. Hosts retain it in their durable queue; nothing is silently dropped. */
+export class ObservationCapacityError extends Error {
+	constructor(
+		readonly reasonCode: "count" | "observation_bytes" | "total_bytes",
+	) {
+		super(`observation_backpressured:${reasonCode}`);
+		this.name = "ObservationCapacityError";
+	}
+}

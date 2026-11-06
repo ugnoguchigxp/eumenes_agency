@@ -133,7 +133,7 @@ describe("hostTopics", () => {
 		);
 		expect(prompt).toContain("記憶にある話題か自分の関心から");
 		expect(prompt).toContain("迷っても speak を選ぶ");
-		expect(prompt).not.toContain("価値が低い、または迷うなら wait。");
+		expect(prompt).not.toContain("根拠のない行動や実施済みの内容なら wait。");
 		// turn_end keeps the conservative closing line
 		const t = await run({
 			notes: [matterNote],
@@ -141,7 +141,9 @@ describe("hostTopics", () => {
 			topics,
 			trigger: "turn_end",
 		});
-		expect(t.select?.prompt).toContain("価値が低い、または迷うなら wait。");
+		expect(t.select?.prompt).toContain(
+			"根拠のない行動や実施済みの内容なら wait。",
+		);
 		expect(t.select?.prompt).not.toContain("迷っても speak");
 		// no topics presented: no section, rule text still there
 		const none = await run({ notes: [matterNote], hostTopics: true });

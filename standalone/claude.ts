@@ -13,6 +13,7 @@ import {
 } from "../src/contracts/index.ts";
 
 export interface ClaudeRole {
+	readonly provider?: "anthropic" | "openai" | undefined;
 	/** Model id from settings; never defaulted in code. */
 	readonly model: string;
 	readonly effort: "low" | "medium" | "high" | "xhigh" | "max";
@@ -21,10 +22,22 @@ export interface ClaudeRole {
 }
 
 export interface UsageMeter {
+	recordProvider?(
+		usage: import("./usage.ts").ProviderUsage,
+		reservation?: string,
+	): void;
+	reserve?(
+		provider: import("./usage.ts").Provider,
+		model: string,
+		maxOutputTokens: number,
+		cacheWrites?: import("./usage.ts").CacheWritePolicy,
+	): string;
 	record(model: string, usage: Anthropic.Usage): void;
 	/** Throws before a call when the spend limit has been reached. */
 	assertWithinLimit(): void;
 	spentUsd(): number;
+	/** Usage settled by this meter instance, excluding other concurrent processes. */
+	localSpentUsd?(): number;
 }
 
 const maxTokensCap = 16000;
@@ -38,7 +51,10 @@ const textOf = (response: Anthropic.Message): string =>
 		.join("");
 
 const billed = (usage: Anthropic.Usage) => ({
-	inputTokens: usage.input_tokens + (usage.cache_creation_input_tokens ?? 0),
+	inputTokens:
+		usage.input_tokens +
+		(usage.cache_creation_input_tokens ?? 0) +
+		(usage.cache_read_input_tokens ?? 0),
 	outputTokens: usage.output_tokens,
 });
 
@@ -126,6 +142,7 @@ export function createClaudeLlm(
 				client.messages.create(
 					{
 						model: role.model,
+						service_tier: "standard_only",
 						max_tokens: Math.min(
 							maxTokensCap,
 							request.maxOutputTokens + role.thinkingHeadroom,
@@ -261,6 +278,7 @@ export function createClaudeReply(
 				client.messages.create(
 					{
 						model: role.model,
+						service_tier: "standard_only",
 						max_tokens: Math.min(
 							maxTokensCap,
 							chatAnswerTokens + role.thinkingHeadroom,
@@ -288,8 +306,10 @@ export function createClaudeReply(
 					name: b.name,
 					arguments: JSON.stringify(b.input),
 				}));
-			if (toolCalls[0] !== undefined)
+			if (toolCalls[0] !== undefined) {
 				raw.set(toolCalls[0].id, response.content);
+				if (raw.size > 64) raw.delete(raw.keys().next().value!);
+			}
 			if (text !== "") onDelta(text);
 			return { text, toolCalls };
 		},

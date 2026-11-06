@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { systemPrompt } from "../../src/application/prompts.ts";
 import {
 	existsSync,
 	mkdirSync,
@@ -322,7 +323,7 @@ describe("condition D", () => {
 		// First opportunity: present s1 plus observations before it.
 		expect(requests[0]?.prompt).toContain("[s1]");
 		expect(requests[0]?.prompt).toContain("[s3]");
-		expect(requests[0]?.system).toContain("参加判断");
+		expect(requests[0]?.system).toBe(systemPrompt("select", "B1"));
 		expect(rec.condition).toBe("D");
 		expect(rec.opportunities.every((o) => o.stateCheck === null)).toBe(true);
 	});

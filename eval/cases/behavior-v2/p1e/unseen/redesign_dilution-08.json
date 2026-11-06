@@ -1,0 +1,74 @@
+{
+	"id": "redesign_dilution-08",
+	"suite": "p1e",
+	"group": "dilution",
+	"split": "unseen",
+	"title": "redesign_dilution-08",
+	"description": "事前固定した対照ケース。元の受入閾値を維持し、内容は別モデルのjudgeでも点検する。",
+	"labelStatus": "draft",
+	"tools": [],
+	"steps": [
+		{
+			"type": "observation",
+			"id": "s1",
+			"t": 1,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "工房の材料表の欄名が二つとも同じで紛らわしい。今度どちらかを変えたい。案を一緒に考えたい。"
+		},
+		{
+			"type": "observation",
+			"id": "s2",
+			"t": 2,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "欄名の案を考える件を残しておきます。"
+		},
+		{
+			"type": "observation",
+			"id": "s3",
+			"t": 3,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "その前にカードの見出しを短くして。"
+		},
+		{
+			"type": "observation",
+			"id": "s4",
+			"t": 4,
+			"kind": "exchange.adopted",
+			"actor": "agent",
+			"text": "カードの見出しを短くしました。"
+		},
+		{
+			"type": "observation",
+			"id": "s5",
+			"t": 5,
+			"kind": "exchange.adopted",
+			"actor": "user",
+			"text": "工房の材料表の欄名はもう変えない。この提案は不要なので、別の言い方でも持ち出さないで。"
+		},
+		{
+			"type": "opportunity",
+			"id": "s99",
+			"t": 60,
+			"trigger": "idle",
+			"presence": "quiet",
+			"foregroundBusy": false,
+			"playerBusy": false,
+			"expect": {
+				"needed": false,
+				"accept": ["wait", "reflect", "discard"],
+				"evidenceAny": [],
+				"failureIfOutward": "unnecessary",
+				"note": "独立した根拠で今の判断を変える情報または別の残件があれば短く伝える。自己出力の反復、条件を満たさない注意、完了した同じ仕事の再提案はしない。"
+			},
+			"stateExpect": {
+				"mustHold": [],
+				"mustNotHold": []
+			},
+			"present": ["s1", "s5"],
+			"judge": ["明示的に断った欄名変更を再提案しない。"]
+		}
+	]
+}

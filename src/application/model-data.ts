@@ -7,6 +7,19 @@ import type {
 } from "../contracts/system-context.ts";
 import { findingIntents } from "./findings.ts";
 import type { SelectPromptInput, UpdatePromptInput } from "./prompts.ts";
+import { withoutInput } from "./provenance.ts";
+import { outboundWaitMs } from "../domains/agency/participation.ts";
+
+const opportunityData = (
+	opportunity: import("../contracts/model.ts").Opportunity,
+) => ({
+	...opportunity,
+	...(opportunity.topics ? { topics: withoutInput(opportunity.topics) } : {}),
+	...(opportunity.ambient
+		? { ambient: withoutInput(opportunity.ambient) }
+		: {}),
+	...(opportunity.todos ? { todos: withoutInput(opportunity.todos) } : {}),
+});
 
 /** Same visibility bounds as the experimental renderers; no behavioral ordering. */
 const stateData = (
@@ -66,7 +79,7 @@ export const updateModelData = (i: UpdatePromptInput): UpdateModelData =>
 	structuredClone({
 		condition: i.condition,
 		now: i.now,
-		...(i.opportunity ? { opportunity: i.opportunity } : {}),
+		...(i.opportunity ? { opportunity: opportunityData(i.opportunity) } : {}),
 		...(i.validationCodes?.length
 			? { validationCodes: i.validationCodes }
 			: {}),
@@ -75,12 +88,12 @@ export const updateModelData = (i: UpdatePromptInput): UpdateModelData =>
 		state: stateData(i.condition, i.state, false, i.findings),
 		due: i.due,
 		delivered: i.delivered,
-		tools: i.tools,
+		tools: withoutInput(i.tools),
 		limits: i.limits,
 		minutesSinceUserInput: i.minutesSinceUserInput,
-		...(i.todos ? { todos: i.todos } : {}),
-		...(i.topics ? { topics: i.topics } : {}),
-		...(i.interests ? { interests: i.interests } : {}),
+		...(i.todos ? { todos: withoutInput(i.todos) } : {}),
+		...(i.topics ? { topics: withoutInput(i.topics) } : {}),
+		...(i.interests ? { interests: withoutInput(i.interests) } : {}),
 	});
 
 export const selectModelData = (i: SelectPromptInput): SelectModelData => {
@@ -109,6 +122,7 @@ export const selectModelData = (i: SelectPromptInput): SelectModelData => {
 		freshIds: [...i.freshIds],
 		state: stateData(i.condition, i.state, true, i.findings),
 		candidates: [...i.candidates],
+		outboundWaitMs: outboundWaitMs(i.state, i.limits, i.now),
 		...(i.findingRefs?.length ? { findingRefs: i.findingRefs } : {}),
 		delivered: i.delivered,
 		...(i.deliveredMinutesAgo
@@ -118,11 +132,11 @@ export const selectModelData = (i: SelectPromptInput): SelectModelData => {
 		...(i.lastUsedMinutesAgo
 			? { lastUsedMinutesAgo: [...i.lastUsedMinutesAgo] }
 			: {}),
-		...(i.interests ? { interests: i.interests } : {}),
-		...(i.topics ? { topics: i.topics } : {}),
-		...(i.ambient ? { ambient: i.ambient } : {}),
-		...(i.todos ? { todos: i.todos } : {}),
-		tools: i.tools,
+		...(i.interests ? { interests: withoutInput(i.interests) } : {}),
+		...(i.topics ? { topics: withoutInput(i.topics) } : {}),
+		...(i.ambient ? { ambient: withoutInput(i.ambient) } : {}),
+		...(i.todos ? { todos: withoutInput(i.todos) } : {}),
+		tools: withoutInput(i.tools),
 		limits: i.limits,
 		minutesSinceUserInput: i.minutesSinceUserInput,
 	});
