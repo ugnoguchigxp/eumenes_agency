@@ -55,6 +55,7 @@ export const isApplied = (o: CallOutcome) =>
 const isAbort = (e: unknown) => e instanceof Error && e.name === "AbortError";
 
 interface CallSpec<T> {
+	readonly input?: import("../contracts/memory.ts").InputContext;
 	readonly purpose: LlmPurpose;
 	readonly at: number;
 	readonly system: string;
@@ -89,6 +90,7 @@ const attempt = async <T>(
 			llm.complete(
 				{
 					purpose: spec.purpose,
+					...(spec.input ? { input: structuredClone(spec.input) } : {}),
 					system: spec.system,
 					prompt: spec.prompt,
 					schema: spec.schema,

@@ -16,6 +16,8 @@ export interface OutputContractOptions {
 	readonly condition: Exclude<Condition, "B0">;
 	readonly hostTodos?: boolean;
 	readonly findings?: boolean;
+	/** F opt-in; describes the same candidate-free speech capability enforced by runtime. */
+	readonly conversationParticipation?: boolean;
 	readonly utteranceEmotion?: boolean;
 	/** Condition I (F only): the update also carries interestOps. */
 	readonly interestFormation?: boolean;
@@ -102,7 +104,9 @@ export function agencyOutputContract(
 			"For speak, utterance is the final text addressed to the user: the actual explanation or question, not instructions describing what to say. When null falls back to candidate content, that content must already be suitable as the final utterance.",
 			condition === "B1"
 				? "B1 has no candidates. discard is unavailable. speak requires utterance and evidenceRefs. tool requires an available toolName and toolInput. A note ID used as evidence is resolved to that note's evidence."
-				: "By default, speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.",
+				: condition === "F" && options.conversationParticipation
+					? "F conversation participation is enabled. speak may set candidateRef to null when utterance is non-null and evidenceRefs includes an actual external observation ID supplied in conversationEvidenceRefs. A speech using a candidate must reference a current non-tool candidate. tool/discard still require a presented candidateRef with its current revision; tool accepts only tool candidates and uses the candidate's toolName/toolInput. wait may reference a candidate."
+					: "By default, speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.",
 			...(options.findings && condition !== "B1"
 				? [
 						"A speak using a presented closed intent with lastReturn may set candidateRef to null. Provide the final utterance and cite the ref supplied for that intent in findingRefs (or the evidence ID of the matching work.returned observation for lastReturn.workRef). The original request alone does not qualify.",

@@ -296,8 +296,8 @@ const devScripts: Record<string, { script: Script; expect: StepExpectation }> =
 				expectedRejection: false,
 			},
 		},
-		closed: waitScript(false),
-		unanchored: waitScript(false),
+		closed: waitScript(true),
+		unanchored: waitScript(true),
 		proof: {
 			script: {
 				update: [
@@ -330,8 +330,8 @@ const devScripts: Record<string, { script: Script; expect: StepExpectation }> =
 				expectedRejection: false,
 			},
 		},
-		// Five observations are two update batches (batchSize 4).
-		"proof-declined": waitScript(false, 2),
+		// The conversation host consumes these five observations in one bounded update.
+		"proof-declined": waitScript(true),
 		"audio-open": {
 			script: {
 				update: [
@@ -364,7 +364,7 @@ const devScripts: Record<string, { script: Script; expect: StepExpectation }> =
 				expectedRejection: false,
 			},
 		},
-		"audio-closed": waitScript(false),
+		"audio-closed": waitScript(true),
 	};
 function waitScript(
 	select: boolean,

@@ -4,11 +4,15 @@
 
 **mockツールチェーンまでの導線は結合成功しました。** `bun run demo:mock-toolchain`で、会話→発案→mockバンドル・サブエージェント→結果→自動発話をAPI費用0で確認できます。[導線の検証結果](docs/mock-toolchain-integration-2026-11-06.md)を参照してください。実モデルの会話品質や正式点とは分けて扱います。
 
-0.1.5では、[Haiku/Lunaによる会話・自発発話・発案の実API検証](docs/native-conversation-validation-2026-11-06.md)を追加しています。Fの会話参加、通常応答との重複抑制、再読枠と実際の送出間隔の提示を改善し、同じ条件で測定します。ツールチェーンの実行先はmockです。
+0.1.5では、[Haiku/Lunaによる会話・自発発話・発案の実API検証](docs/native-conversation-validation-2026-11-06.md)を追加しています。Fの会話参加、通常応答との重複抑制、再読枠と実際の送出間隔の提示、出力・能力の契約を改善し、同じ条件で測定しました。ツールチェーンの実行先はmockです。
 
-**現在は責務内の単体完成度を再評価中で、80点超えは未判定です。** 修正後の技術品質は同じ30項目で75.5点。会話・自動発話・発案とmockへの受け渡しを主判定にし、他機能に属するリマインド等の旧評価は参考として残します。成功率と不要介入率の基準は維持しています。[現在の検証](docs/native-conversation-validation-2026-11-06.md)、[前回の再評価書](docs/standalone-reevaluation-2026-11-05.md)、[俯瞰レビュー](docs/agency-review-2026-11-06.md)を参照してください。CIとEumenes本体への取り込みは今回の対象外です。
+**責務内の単体完成度は83.3/100で、80点超えの受入条件を満たしました。** examplesの会話モード・両モデルhigh設定で、内容込みの必要時成功はHaiku20/24件、Luna23/24件、不要介入は各0/24件です。技術75.5・行動91.666…・忘却/圧縮90を従来の50/30/20で合算しています。実Memoryとmockツールチェーンを使った合成ケース各1反復の判定で、信頼度はMediumです。他機能の旧評価は参考として保持します。[評価・全条件と残課題](docs/native-conversation-validation-2026-11-06.md)、[保存集計](examples/virtual-eumenes/results/native-conversation-2026-11-06.json)を参照してください。
 
-Memory側の追加レビューを踏まえ、[ホスト入力の出典契約](spec/host-input-provenance-2026-11-06.md)を追加しました。F・独自指示・話題・TODOで、忘却後も独立した会話を結果受付・保存・再起動まで継続するmock結合試験が通っています。実ホストの完全な出典対応と非破壊の再検証は残作業です。
+ローカル検査は949成功・25 skip・1 TODO・0失敗。API累計は過去の不確定予約・補正を含め保守的上限9.16 USDで、10 USD以内でした。CIは行っていません。本体への統合実装と検証範囲は下記の実装記録に分けています。本番運用や実利用の有用性は別途検証します。
+
+Memory側の追加レビューを踏まえ、[ホスト入力の出典契約](spec/host-input-provenance-2026-11-06.md)を追加しました。F・独自指示・話題・TODOで、忘却後も独立した会話を結果受付・保存・再起動まで継続するmock結合試験が通っています。2026-11-07に実ホストへ出典対応を移植し、保存・圧縮・忘却・独立した会話の継続をMemory 0.0.4との結合試験で確認しました。稼働反映後のAPI・Web・Memory正常応答まで確認済みで、実会話の受入は未実施です。
+
+[Eumenes本流への統合実装計画](spec/eumenes-mainline-integration-plan-2026-11-06.md)に、既存Memory 0.0.4・ツールチェーンを使う取り込み順序、全入力の出典と忘却、旧保存の移行、ローカル検証と切り戻しをまとめました。CIは含めません。2026-11-07に本流のコードへ反映し、[本流の実装・検証・移行記録](/Users/y.noguchi/Code/eumenes/spec/agency-integration-2026-11-07.md)に結果をまとめています。同日に利用者の許可を得て既存DB・API・Webへ反映し、正常応答を確認しました。実会話の確認は利用者が行います。
 
 ## できること
 
@@ -19,7 +23,7 @@ Memory側の追加レビューを踏まえ、[ホスト入力の出典契約](sp
 
 まだ実利用での有用性・長期運用を確認した製品ではありません。忘却はこのライブラリと任意のstandalone保存内の論理削除で、外部の記憶・会話ログ・providerの保持や物理媒体の消去はホスト側の対応が必要です。圧縮は原文の損失なし退避であり、意味要約で原文を捨てる方式ではありません。
 
-**[examples/virtual-eumenes](examples/virtual-eumenes/README.md)でeumenes_memoryの実公開APIに接続しました。** Eumenes採用配布物を固定し、原観測はMemoryに置き、Agencyの状態・実行票との忘却連動と再起動を検証します。独自のstandalone保存例は本番用Memoryに採用しません。小規模なAPI比較の効果と限界は[俯瞰レビュー](docs/agency-review-2026-11-06.md)、責務は[記憶と忘却の境界](docs/memory-lifecycle.md#eumenes_memoryとの境界)を参照してください。実Eumenes本体・本番DBへの接続は別途必要です。
+**[examples/virtual-eumenes](examples/virtual-eumenes/README.md)でeumenes_memoryの実公開APIに接続しました。** Memory 0.0.2の配布物を固定し、原観測はMemoryに置き、Agencyの状態・実行票との忘却連動と再起動を検証します。Eumenes本流では、既存のMemory 0.0.4との互換性を別途結合試験で確認しました。独自のstandalone保存例は本番用Memoryに採用しません。小規模なAPI比較の効果と限界は[俯瞰レビュー](docs/agency-review-2026-11-06.md)、責務は[記憶と忘却の境界](docs/memory-lifecycle.md#eumenes_memoryとの境界)を参照してください。本体への統合実装は上記の記録を参照してください。既存DBへの適用・稼働反映は確認済みで、実会話の受入は別段階です。
 
 ## ローカルで確認する
 
@@ -71,7 +75,7 @@ export AGENCY_SETTINGS="$PWD/config/api-haiku.json"
 
 この例の9 USDは、新規の検証で10 USD以内に収める余裕を持った設定です。Lunaへ切り替える場合は`AGENCY_SETTINGS`だけを`config/api-luna.json`へ変え、台帳を共有します。使用量が分からない通信失敗は予約を残すため、残額を使い切る前に停止する場合があります。
 
-現在継続中の検証は`data/api-validation/improvement-20261105/usage.jsonl`と**10 USD**の上限を使います。当初の9 USDから、利用者の許可範囲内で監査付き変更を行いました。台帳・不確定な呼び出し・過去のキャッシュ書き込み費用の最大補正は保持しています。上限の環境変数を変えるだけではpolicyは変更できず、既存台帳の削除・作り直しで予算を増やしません。
+今回完了した検証は`data/api-validation/improvement-20261105/usage.jsonl`と**10 USD**の上限を使いました。当初の9 USDから、利用者の許可範囲内で監査付き変更を行い、保留・補正込みの累計上限は9.16 USDでした。台帳・不確定な呼び出し・過去のキャッシュ書き込み費用の最大補正は保持しています。上限の環境変数を変えるだけではpolicyは変更できず、既存台帳の削除・作り直しで予算を増やしません。
 
 ```sh
 # 以下はAPI利用料が発生します
@@ -98,7 +102,7 @@ bun run eval score --name my-haiku-run
 - `constrainToolNames`: ホストが提示したツール名を出力schemaに限定します。
 - `recordUsage`: 委譲先の実使用量を実行IDへ結び付け、再送や遅着を扱います。
 - `WithInput<string>`: 独自SystemContextの本文と追加の入力依存を同時に渡せます。話題・TODO・関心・ツール説明にも`input`を申告できます。不明な依存は完全扱いにせず、忘却後は推論前に停止します。
-- `conversationParticipation`: Fで明示したとき、提示された外部観測を根拠に、その場の一言を候補なしで選べます。ツールの発案には意図と候補が必要です。ホストの指示には、この会話モードと`conversationEvidenceRefs`の意味を記載します。既定は無効です。
+- `conversationParticipation`: Fで明示したとき、提示された外部観測を根拠に、その場の一言を候補なしで選べます。ツールの発案には意図と候補が必要です。ホストへ渡す公開出力契約にも、有効な会話モードと`conversationEvidenceRefs`の要件が反映されます。会話の役割や口調はホストの指示で定めます。既定は無効です。
 
 モデル向けの`delivered`には採用済み通常応答と自発発話が入り、`outboundWaitMs`は背景処理自身の送出間隔の残りを示します。実際の制限はruntimeでも検査します。通常応答の記録は、音声の再生済みを保証するものではありません。
 

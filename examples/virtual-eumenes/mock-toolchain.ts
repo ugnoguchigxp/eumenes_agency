@@ -57,7 +57,7 @@ export class MockToolchain {
 		return this.bundles
 			.filter((b) => !b.requiresApproval && !this.disabled.has(b.revisionId))
 			.map(({ revisionId, title, description }) => ({
-				id: revisionId,
+				revisionId,
 				title,
 				description,
 			}));
@@ -67,7 +67,16 @@ export class MockToolchain {
 			name: "delegate",
 			requiresApproval: false,
 			input: { sources: [], complete: true },
-			description: `読み取り調査をホストへ依頼する。toolInputはrevisionIdとquestionを持つJSON文字列。利用可能なmock能力: ${JSON.stringify(this.catalog())}`,
+			description: JSON.stringify({
+				purpose: "読み取り調査をホストへ依頼する。実行先はmockのみ。",
+				toolInput: {
+					encoding: "JSON string",
+					schema: z.toJSONSchema(argumentsSchema),
+				},
+				revisionSelection:
+					"availableCapabilitiesのrevisionId文字列をそのまま指定する。candidateRef.revisionの数値とは別の識別子である。",
+				availableCapabilities: this.catalog(),
+			}),
 		};
 	}
 	disable(revisionId: string) {

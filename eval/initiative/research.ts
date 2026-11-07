@@ -21,7 +21,7 @@ export async function createResearchFixture(host: string, now: number) {
 		revisionId: "catalog1",
 		title: "公開資料調査",
 		summary: "公開資料の読み取り調査",
-		minImpact: "read",
+		minImpact: "none",
 	};
 	const entry = { revisionId: card.revisionId, runtime: { route: "web" } };
 	// The inert worker only counts starts; nothing is executed or sent.

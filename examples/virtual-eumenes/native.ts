@@ -61,7 +61,7 @@ export async function playNativeCase(c: NativeCase, llm: LlmPort) {
 			revisionId: "mock-reference@1",
 			title: "記録と手元資料の確認",
 			description:
-				"以前の会話の記録、利用者が提示した手元の資料を読み、具体的な対象と問いに沿って確認する読み取り調査。mockのみ。外部の検索や実行はしない。",
+				"以前の会話の記録と、会話で名前が挙がった手元の資料を読む能力。ホストがこのmockへ読み取り接続済みなので、再添付や追加承認は不要。具体的な対象と問いに沿い、確認できた内容または記載がない旨を返す。mockのみ。外部の検索や実行はしない。",
 			requiresApproval: false,
 			subagent: {
 				async run() {

@@ -52,6 +52,87 @@ const build = async () => {
 	return m;
 };
 
+test("tool receipt observation remains byte-stable across runtime restoration", async () => {
+	const llm = fakeLlm();
+	const config = {
+		condition: "B1" as const,
+		systemContext: "experimental" as const,
+		hostTopics: true,
+		llm,
+		tools: [{ name: "lookup", description: "lookup", requiresApproval: false }],
+		budget: { ...defaultBudget, minIntervalMs: 0 },
+	};
+	const rt = createAgencyRuntime(config);
+	rt.observe(obsInput("o1", "user.report", "user", 1, "測定が不安定"));
+	llm.push(
+		"update",
+		b1Proposal([
+			{
+				op: "note.add",
+				localId: "n",
+				text: "測定の原因を確認する",
+				evidenceRefs: ["o1"],
+			},
+		]),
+	);
+	llm.push(
+		"select",
+		participation({
+			action: "tool",
+			toolName: "lookup",
+			toolInput: "測定の原因",
+			evidenceRefs: ["n1"],
+		}),
+	);
+	const chosen = await rt.decide(
+		opportunity("p", 10, { trigger: "idle" }),
+		signal(),
+	);
+	expect(chosen.decision.ticket).not.toBeNull();
+	rt.recordResult({
+		ticketId: chosen.decision.ticket!.id,
+		status: "succeeded",
+		at: 11,
+		resultText: "確認した結果",
+	});
+	const snapshot = rt.snapshot();
+	const restored = createAgencyRuntime({ ...config, restore: snapshot });
+	expect(JSON.stringify(restored.snapshot().observations)).toBe(
+		JSON.stringify(snapshot.observations),
+	);
+});
+
+test("legacy speech receipts still recover their delivery status", async () => {
+	const m = await build();
+	m.llm.push(
+		"select",
+		participation({
+			action: "speak",
+			utterance: "比較の結果が分かりました",
+			evidenceRefs: ["n1"],
+		}),
+	);
+	const chosen = await m.rt.decide(opportunity("p", 20), signal());
+	expect(chosen.decision.ticket).not.toBeNull();
+	m.rt.recordResult({
+		ticketId: chosen.decision.ticket!.id,
+		status: "succeeded",
+		at: 21,
+		resultText: "比較の結果が分かりました",
+	});
+	const legacy = m.rt.snapshot();
+	for (const o of legacy.observations)
+		if (o.kind === "delivery.observed")
+			delete (o as { deliveryStatus?: unknown }).deliveryStatus;
+	for (const [, o] of legacy.continuity?.receipts ?? [])
+		delete (o as { deliveryStatus?: unknown }).deliveryStatus;
+	expect(
+		make("B1", legacy)
+			.rt.snapshot()
+			.observations.find((o) => o.kind === "delivery.observed")?.deliveryStatus,
+	).toBe("succeeded");
+});
+
 describe("full snapshot restore", () => {
 	test("restored and original runtimes continue with identical state and model input", async () => {
 		const a = await build();

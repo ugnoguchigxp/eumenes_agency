@@ -10,18 +10,26 @@ bun run demo:mock-toolchain
 
 F・Eumenesの指示資産・実Memoryを使い、モデルの判断と実行先だけをmockにします。`mock-toolchain.ts`が能力revisionと入力を照合してmockバンドル・サブエージェントへ渡し、返った結果からAgencyが会話を続けます。実ツール・外部サービス・有料APIは呼びません。Agencyの担当は発案と受渡しで、実行基盤はこの例のホスト側に置いています。
 
-`scene.ts`は無料の台本試験と実API検証で同じ配線を使います。0.1.5ではFの`conversationParticipation`を有効にし、コピーした本流指示を基準として、仮想ホストの会話用指示を別に版管理しています。指示assetの元ファイルは改変していません。
+`scene.ts`は無料の台本試験と実API検証で同じ配線を使います。0.1.5ではFの`conversationParticipation`を有効にします。現在の会話用指示は、元の信頼境界・personaと有効な公開出力契約を再利用し、用途別の全文として構成しています。元のEumenes指示assetと`mockHostSystem`は比較用に保持しています。
+
+mock能力の説明には、ホストの実際のZod入力検証から生成したJSON Schemaと、同じ名前の`revisionId`を渡します。資料は固定fixtureをmockへ接続済みとする全ケース共通の契約で、実ファイルや外部の検索を行いません。誤った識別子を補正せず、受渡し時に拒否します。
 
 Haiku/Lunaで同じ合成ケースを測る入口は`native.ts`です。実行先はmockのままで、判断は実モデルが行います。[検証方法と結果](../../docs/native-conversation-validation-2026-11-06.md)を参照してください。
 
 ```sh
 # API料金が発生します。既存の累計台帳と上記の設定を指定して実行します。
+export AGENCY_API_LEDGER="$PWD/data/api-validation/improvement-20261105/usage.jsonl"
+export AGENCY_API_LIMIT_USD=10
+export AGENCY_SETTINGS="$PWD/config/api-haiku-f-high.json"
+export AGENCY_NATIVE_TIMEOUT_MS=180000
 bun run eval:conversation:api generate my-conversation-run development
 # 生成時と同じ設定の llm.judge で、相手providerが内容を点検します。
 bun run eval:conversation:api judge my-conversation-run development configured-01
 ```
 
 この入口は今回の継続検証の台帳パスと承認済みpolicyを要求し、既存台帳がない場合やrun名の再利用は拒否します。現在のpolicyは10 USDです。採点タグを付けると過去の採点を残したまま別ファイルへ記録し、同じタグの上書きも拒否します。`validation`は別の48件ですが、開封後の再比較を新しい未見試行とは呼びません。調査後の会話には固定の利用者の問い掛けがあり、通常応答モデル自体や質問なしの自動完了通知の評価と混同しません。
+
+Lunaでは`AGENCY_SETTINGS`を`config/api-luna-f-high.json`へ切り替え、生成と採点で同じ設定を使います。現在の品質評価はhigh/6000設定です。low設定の結果を同じ品質として扱いません。再実行の料金も同じ累計へ加算し、既存の不確定予約を含めて残額が足りなければ送信前に停止します。
 
 Eumenes採用のMemory 0.0.2 / schema 8配布物を`vendor/manifest.json`のSHA-256で固定しています。rootの開発用依存であり、Agency coreの配布物には含めません。MemoryはMITで、ライセンスは固定tgz内にあります。
 

@@ -1,8 +1,14 @@
 import { z } from "zod";
 
+/** Serialize with the package's schema implementation; hosts may use a different Zod release. */
+export const llmOutputJsonSchema = <T>(schema: z.ZodType<T>) =>
+	z.toJSONSchema(schema);
+
 export type LlmPurpose = "update" | "select" | "respond";
 
 export interface LlmRequest<T> {
+	/** Exact dependencies captured for this call. Host validation only; never add to model messages. */
+	readonly input?: import("./memory.ts").InputContext;
 	readonly purpose: LlmPurpose;
 	readonly system: string;
 	readonly prompt: string;

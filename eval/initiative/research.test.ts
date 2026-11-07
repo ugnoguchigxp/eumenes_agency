@@ -19,7 +19,9 @@ test.skipIf(!existsSync(resolve(host, "api/application/agency/research.ts")))(
 	async () => {
 		const research = await createResearchFixture(host, 100);
 		try {
-			expect(research.tools[0]?.description).toContain('"id":"catalog1"');
+			expect(research.tools[0]?.description).toContain(
+				'"revisionId":"catalog1"',
+			);
 			for (const [input, problem] of [
 				["{}", "agency_delegation_invalid"],
 				[

@@ -64,6 +64,78 @@ const seed = (condition: Condition) =>
 		: proposal([intentAddOp("g"), candidateAddOp("k", "g")]);
 
 describe("SystemContext contracts and configuration (partial)", () => {
+	test("the host can validate uncited input dependencies without sending metadata to the model", async () => {
+		const { rt, llm } = make("F", {
+			conversationParticipation: true,
+			systemContext: {
+				update: {
+					value: "host update",
+					input: { sources: ["opaque-uncited-source"], complete: true },
+				},
+				select: {
+					value: "host select",
+					input: { sources: ["opaque-uncited-source"], complete: true },
+				},
+			},
+		});
+		rt.observe(user());
+		llm.push("update", proposal());
+		llm.push("select", participation());
+		await rt.decide(opportunity("p", 60000), signal());
+		expect(llm.requests).toHaveLength(2);
+		for (const request of llm.requests) {
+			expect(request.input).toEqual({
+				sources: ["o1", "opaque-uncited-source"],
+				complete: true,
+			});
+			expect(request.system + request.prompt).not.toContain(
+				"opaque-uncited-source",
+			);
+		}
+	});
+	test("the host receives the enabled F conversation contract, while default F and B2 retain candidate requirements", async () => {
+		for (const [condition, enabled] of [
+			["F", false],
+			["B2", true],
+		] as const) {
+			const contract = agencyOutputContract("select", {
+				condition,
+				conversationParticipation: enabled,
+			});
+			expect(contract.description).not.toContain("conversationEvidenceRefs");
+			expect(contract.description).toContain(
+				"require a presented candidateRef",
+			);
+		}
+		let description = "";
+		const { rt, llm } = make("F", {
+			conversationParticipation: true,
+			systemContext: {
+				update: { value: "update", input: { sources: [], complete: true } },
+				select: ({ outputContract }) => {
+					description = outputContract.description;
+					return { value: description, input: { sources: [], complete: true } };
+				},
+			},
+		});
+		rt.observe(user());
+		llm.push("update", proposal());
+		llm.push(
+			"select",
+			participation({
+				action: "speak",
+				utterance: "A grounded response.",
+				evidenceRefs: ["o1"],
+			}),
+		);
+		const result = await rt.decide(opportunity("p", 60000), signal());
+		expect(result.decision.ticket?.action).toBe("speak");
+		expect(description).toContain("conversationEvidenceRefs");
+		expect(description).toContain(
+			"tool/discard still require a presented candidateRef",
+		);
+		expect(llm.requests.at(-1)!.system).toBe(description);
+	});
 	test("output contracts expose the exact schemas without behavioral instructions", () => {
 		for (const condition of ["B1", "B2", "F"] as const) {
 			const update = agencyOutputContract("update", {

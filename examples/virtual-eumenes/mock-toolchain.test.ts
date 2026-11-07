@@ -59,6 +59,39 @@ test("conversation -> Agency idea -> toolchain -> bundle -> subagent -> result -
 	expect(result.utterance).toContain("明るい日陰");
 });
 
+test("the model-visible capability contract names and types the actual accepted revision", async () => {
+	const scene = createMockScene();
+	try {
+		const metadata = JSON.parse(scene.chain.capability().description);
+		expect(metadata.toolInput.schema.properties.revisionId.type).toBe("string");
+		const revision = metadata.availableCapabilities[0].revisionId;
+		expect(typeof revision).toBe("string");
+		const ticket = await idea(scene, revision);
+		expect(scene.chain.handoff(scene.host, ticket, MIN).accepted).toBe(true);
+		const result = await scene.chain.finish(scene.host, ticket.id, 2 * MIN);
+		expect(result.accepted).toBe(true);
+		expect(
+			scene.chain.events.find((e) => e.stage === "bundle.started")?.revisionId,
+		).toBe(revision);
+	} finally {
+		scene.close();
+	}
+});
+
+test("a numeric candidate revision is never coerced into a bundle identifier", async () => {
+	const scene = createMockScene();
+	try {
+		// The API can emit any JSON inside toolInput; emulate the observed numeric value.
+		const ticket = await idea(scene, 0 as unknown as string);
+		expect(scene.chain.handoff(scene.host, ticket, MIN).accepted).toBe(false);
+		expect(scene.chain.events.some((e) => e.stage === "subagent.started")).toBe(
+			false,
+		);
+	} finally {
+		scene.close();
+	}
+});
+
 test("the validated request reaches the mock subagent once and its return reaches the next Agency prompt", async () => {
 	const calls: { question: string; acceptance: string }[] = [];
 	const scene = createMockScene({

@@ -200,6 +200,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		condition: condition === "B0" ? ("B2" as const) : condition,
 		hostTodos,
 		findings: deps.findings === true,
+		conversationParticipation: conversation,
 		interestFormation,
 		utteranceEmotion: emotionMode,
 		...(deps.constrainToolNames
@@ -238,7 +239,11 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 		deps.restore?.observations
 			? {
 					observations: deps.restore.observations.map((o) => {
-						const status = o.deliveryStatus ?? legacyStatuses.get(o.id);
+						const status =
+							o.deliveryStatus ??
+							(o.kind === "delivery.observed"
+								? legacyStatuses.get(o.id)
+								: undefined);
 						return status ? { ...o, deliveryStatus: status } : o;
 					}),
 					cursor: deps.restore.cursor!,
@@ -639,6 +644,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			{
 				purpose: "update",
 				at,
+				input: callInput,
 				system: resolvedSystem.value,
 				prompt,
 				schema: updateContract.schema,
@@ -1119,6 +1125,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
 			{
 				purpose: "select",
 				at: opp.at,
+				input: selectionInput,
 				system: resolvedSystem.value,
 				prompt,
 				schema: selectContract.schema,
