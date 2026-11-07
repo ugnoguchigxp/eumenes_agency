@@ -15,7 +15,14 @@ export {
 	type SpeechBlock,
 	type SpeechGate,
 } from "./pacing.ts";
-export { alwaysOnSystem, thinkData, type ThinkDataInput } from "./prompt.ts";
+export {
+	alwaysOnOutputContract,
+	alwaysOnSystem,
+	alwaysOnSystemParts,
+	thinkData,
+	type AlwaysOnSystemParts,
+	type ThinkDataInput,
+} from "./prompt.ts";
 export {
 	createAlwaysOnAgent,
 	type AlwaysOnAgent,

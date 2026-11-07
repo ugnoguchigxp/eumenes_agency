@@ -50,6 +50,17 @@ export const requiredExports = [
 	"ttsUtteranceStyle",
 	"INSTRUCTION_VERSION",
 	"HOST_RULES_VERSION",
+	// always-on (spec/always-on-agency-design-2026-11-07.md, docs/always-on-eumenes-handoff-2026-11-07.md)
+	"createAlwaysOnAgent",
+	"createHeartbeat",
+	"createHeartbeatScheduler",
+	"defaultHeartbeat",
+	"alwaysOnSystem",
+	"alwaysOnSystemParts",
+	"alwaysOnOutputContract",
+	"thinkSchema",
+	"speechIntervals",
+	"ALWAYS_ON_VERSION",
 ] as const;
 
 /** Only these may appear in the tarball. */

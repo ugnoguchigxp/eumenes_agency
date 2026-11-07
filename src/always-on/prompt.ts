@@ -20,8 +20,13 @@ import type { AlwaysOnTool } from "./contracts.ts";
  * rules the checks taught us. A shorter, terser version (always-on-18) made the agent clearly
  * less active (docs/always-on-progress-2026-11-07.md): keep the motivating sentences.
  */
-const role = [
+/** Who the agent is: the part a host replaces with its own persona. */
+const persona = [
 	"あなたは利用者のパーソナルエージェントです。利用者といつも一緒に過ごし、常に考えています。目的は、相手をよく知り、相手が喜ぶこと・興味を持つことを考えて届けることです。",
+];
+
+/** What this call is and what the data means: keep it when replacing the persona. */
+const frame = [
 	"この呼び出しは「考える1回」です。今の状況を見て独り言を一つ考え、必要なら行動を一つ選びます。利用者の発言への返事は、あなた自身の口から別の仕組みで出ています。who が agent_reply の観測はあなたが返した言葉、agent_own はあなたが自分から話しかけた言葉です。",
 	"you.myFavorites はあなた自身の好きなもので、利用者の好みではありません。話すときも自分の好みとして話します。話題は相手のこと（user.facts、相手の最近の話）を優先し、自分の好きなものの話は、この会話でまだしていないときか、相手が乗ってきたときだけにします。",
 ];
@@ -80,19 +85,70 @@ const pace = [
 	"出力は指定された JSON だけです。",
 ];
 
-/** The built-in instructions (no host data inside). */
-export const alwaysOnSystem = (): string =>
-	[
+/** The built-in instructions, by part. A host replaces `persona` with its own and keeps the rest. */
+export interface AlwaysOnSystemParts {
+	readonly persona: string;
+	readonly frame: string;
+	readonly thinking: string;
+	readonly speaking: string;
+	readonly knowing: string;
+	readonly preparing: string;
+	readonly userPace: string;
+	readonly safety: string;
+	readonly pace: string;
+}
+
+export const alwaysOnSystemParts = (): AlwaysOnSystemParts => ({
+	persona: persona.join("\n"),
+	frame: frame.join("\n"),
+	thinking: thinking.join("\n"),
+	speaking: speaking.join("\n"),
+	knowing: knowing.join("\n"),
+	preparing: preparing.join("\n"),
+	userPace: userPace.join("\n"),
+	safety: safety.join("\n"),
+	pace: pace.join("\n"),
+});
+
+/**
+ * The built-in instructions (no host data inside). `parts` replaces named parts; the safety part
+ * should be kept, since code does not re-check what the model is told to ignore.
+ */
+export const alwaysOnSystem = (
+	parts: Partial<AlwaysOnSystemParts> = {},
+): string => {
+	const p = { ...alwaysOnSystemParts(), ...parts };
+	return [
 		`（always-on 指示版: ${ALWAYS_ON_VERSION}）`,
-		...role,
-		...thinking,
-		...speaking,
-		...knowing,
-		...preparing,
-		...userPace,
-		...safety,
-		...pace,
+		p.persona,
+		p.frame,
+		p.thinking,
+		p.speaking,
+		p.knowing,
+		p.preparing,
+		p.userPace,
+		p.safety,
+		p.pace,
 	].join("\n");
+};
+
+/**
+ * What the think output means and what code enforces, for hosts that write their own
+ * instructions in full. Field names are the wire names of `thinkSchema`.
+ */
+export const alwaysOnOutputContract = {
+	version: ALWAYS_ON_VERSION,
+	description: [
+		"Return one JSON object: thought, drive, userOps, stockOps, pace, action, next. Nullable fields stay present.",
+		"thought: the agent's inner monologue for this tick (never delivered, never evidence). drive: know_user | delight | curiosity | presence | care | rest.",
+		"userOps (max 4): fact.add {aspect, basis, text, reason, evidenceRefs}; fact.update / fact.retract {id}; gap.add {text=question, reason}; gap.answer / gap.decline {id}. A stated/observed fact, and changing, retracting or closing anything the user said, must cite a user observation shown as new=true; a hypothesis needs no evidence.",
+		"stockOps (max 2): idea.add / question.add {text, targets}; stock.drop {id}. Findings are created by the host from returned work, never by the model.",
+		"pace: none | mute_speech | mute_prepare | mute_all | unmute, with minutes (or null) and a new user observation as evidence.",
+		"action.kind: wait | speak | ask | prepare. speak/ask need utterance; prepare needs toolName (an offered tool) and toolInput. evidenceRefs may cite shown observation ids and interest:, fact:, gap:, stock: ids; prepare must cite at least one.",
+		"Code refuses: unknown refs, speech when speech.allowed is false, a second question while one is unanswered, a literal repeat of an earlier own utterance, tools that are not read/create without approval, a preparation already running, and any action from a tick that new input made stale.",
+		"next: soon | normal | later (the host keeps it within 10 s .. 10 min).",
+	].join("\n"),
+} as const;
 
 const SAID_SHOWN = 8;
 /** Material already shared is shown as one line; unshared findings in full up to this. */
@@ -119,6 +175,8 @@ export interface ThinkDataInput {
 	readonly state: AlwaysOnState;
 	readonly observations: readonly Observation[];
 	readonly interests: readonly { readonly id: string; readonly text: string }[];
+	/** What the host's memory knows about the user (read-only). */
+	readonly known?: readonly { readonly id: string; readonly text: string }[];
 	readonly speech: SpeechGate;
 	readonly prepare: "stopped" | "muted" | null;
 	/** Only the tools the agent may use on its own. */
@@ -184,6 +242,18 @@ export function thinkData(input: ThinkDataInput): {
 			used: s.usedAt !== null,
 		})),
 		user: {
+			...(input.known?.length
+				? {
+						// Data label only: the built-in instructions stay byte-identical without it.
+						fromMemory: {
+							note: "ホストの記憶にある相手の情報。facts と同じく話題選びや準備に使い、memory:<id> で参照する。書き換えはできない。",
+							items: input.known.map((k) => ({
+								id: `memory:${k.id}`,
+								text: k.text,
+							})),
+						},
+					}
+				: {}),
 			facts: state.facts.map((f) => ({
 				id: `fact:${f.id}`,
 				aspect: f.aspect,

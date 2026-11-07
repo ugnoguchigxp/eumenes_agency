@@ -8,7 +8,7 @@ import type { DeliveryStatus, ObservationInput } from "../contracts/model.ts";
 import type { CallOutcome } from "../contracts/runtime.ts";
 
 /** Bump when the built-in instructions or the think contract change. */
-export const ALWAYS_ON_VERSION = "always-on-21";
+export const ALWAYS_ON_VERSION = "always-on-22";
 
 /** The one user setting: the shortest gap between the agent's own utterances. */
 export const speechIntervals = [10, 60, 600] as const;
@@ -97,6 +97,15 @@ export interface AlwaysOnTool {
 	readonly description: string;
 	readonly effect: ToolEffect;
 	readonly requiresApproval: boolean;
+	/** Where the host's description came from (e.g. a capability catalog revision). */
+	readonly input?: import("../contracts/memory.ts").InputContext;
+}
+
+/** One of the persona's own interests; `input` names the host records it came from. */
+export interface AlwaysOnInterest {
+	readonly id: string;
+	readonly text: string;
+	readonly input?: import("../contracts/memory.ts").InputContext;
 }
 
 /** Material prepared for a later conversation. */
@@ -295,7 +304,18 @@ export interface AlwaysOnReceipt {
 	readonly at: number;
 }
 
-export type TickSkip = "busy" | "stopped" | "aborted" | "failed";
+/**
+ * forgotten_input: a host input (instructions, interests, tools) depends on something forgotten.
+ * incomplete_input: a host input does not name all it depends on, and something has been
+ * forgotten, so the tick cannot prove it uses none of it. Both stop before any model call.
+ */
+export type TickSkip =
+	| "busy"
+	| "stopped"
+	| "aborted"
+	| "failed"
+	| "forgotten_input"
+	| "incomplete_input";
 
 export interface TickOutcome {
 	readonly tickId: string;

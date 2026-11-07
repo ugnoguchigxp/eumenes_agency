@@ -6,7 +6,14 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { runRespond } from "../../src/index.ts";
+import { alwaysOnSystem, runRespond } from "../../src/index.ts";
+
+/**
+ * `--host-owned`: the instructions come from a host that replaces the persona with its own
+ * (as Eumenes would) and names its source, instead of the built-in text.
+ */
+export const HOST_PERSONA =
+	"あなたは Eumenes（エウメネス）です。利用者専用のパーソナルエージェントとして、家でも出先でもいつも一緒に過ごし、常に考えています。目的は、相手をよく知り、相手が喜ぶこと・興味を持つことを考えて届けることです。落ち着いていて親しみのある話し方をします。";
 import {
 	createProviderLlm,
 	createProviderReply,
@@ -157,7 +164,9 @@ export const scenarios: readonly Scenario[] = [
 ];
 
 if (import.meta.main) {
-	const [name, ...wanted] = process.argv.slice(2);
+	const argv = process.argv.slice(2);
+	const hostOwned = argv.includes("--host-owned");
+	const [name, ...wanted] = argv.filter((a) => a !== "--host-owned");
 	if (!name) throw new Error("usage: live.ts <run-name> [scenario...]");
 	const settings = loadSettings(
 		resolve(process.env.AGENCY_SETTINGS ?? "config/api-haiku.json"),
@@ -213,7 +222,20 @@ if (import.meta.main) {
 		});
 		const result = await simulate({
 			preparer,
-			deps: { llm: thinkLlm, interests, clock, tools: preparer.tools },
+			deps: {
+				llm: thinkLlm,
+				interests,
+				clock,
+				tools: preparer.tools,
+				...(hostOwned
+					? {
+							system: () => ({
+								value: alwaysOnSystem({ persona: HOST_PERSONA }),
+								input: { sources: ["persona:eumenes@1"], complete: true },
+							}),
+						}
+					: {}),
+			},
 			minutes: s.minutes,
 			turns: s.turns,
 			reply: async (agent) => {
@@ -293,6 +315,7 @@ if (import.meta.main) {
 				.flatMap((e) => e.rejected)
 				.filter((r) => r.includes(":")),
 			usd: meter.spentUsd() - spentBefore,
+			instructions: hostOwned ? "host-owned" : "built-in",
 			model: settings.llm.background.model,
 		};
 		writeFileSync(

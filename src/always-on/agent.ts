@@ -19,6 +19,7 @@ import {
 	speechIntervals,
 	THOUGHTS_KEPT,
 	thinkSchema,
+	type AlwaysOnInterest,
 	type AlwaysOnObservationInput,
 	type AlwaysOnReceipt,
 	type AlwaysOnSnapshot,
@@ -56,10 +57,12 @@ export interface AlwaysOnDeps {
 	/** Host-owned instructions for the think call; default: the built-in ones. */
 	readonly system?: () => WithInput<string>;
 	/** The persona's own interests (e.g. a favourite character), cited as `interest:<id>`. */
-	readonly interests?: readonly {
-		readonly id: string;
-		readonly text: string;
-	}[];
+	readonly interests?: readonly AlwaysOnInterest[];
+	/**
+	 * What the host's memory already knows about the user, read at each tick (e.g. Eumenes' State
+	 * items). Shown read-only, cited as `memory:<id>`; forgetting that ref drops what came from it.
+	 */
+	readonly known?: () => readonly AlwaysOnInterest[];
 	/** Tools the host can run for preparation. Only read/create without approval are usable. */
 	readonly tools?: readonly AlwaysOnTool[];
 	readonly speechIntervalSec?: SpeechIntervalSec;
@@ -148,9 +151,10 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 	};
 
 	const interestRefs = new Set(interests.map((x) => `interest:${x.id}`));
-	const knownRefs = (shown: readonly string[]) =>
+	const knownRefs = (shown: readonly string[], extra: readonly string[]) =>
 		new Set([
 			...shown,
+			...extra,
 			...interestRefs,
 			...state.facts.map((f) => `fact:${f.id}`),
 			...state.gaps.map((g) => `gap:${g.id}`),
@@ -189,6 +193,8 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 		at: number,
 		tickId: string,
 		shown: readonly string[],
+		inputs: readonly string[],
+		memoryRefs: readonly string[],
 		host: TickHost,
 		stale: boolean,
 	): {
@@ -210,16 +216,17 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 		const user = applyUserOps(state, out.userOps, {
 			at,
 			shown: shownObs,
-			extraRefs: interestRefs,
+			extraRefs: new Set([...interestRefs, ...memoryRefs]),
 			seenSeq,
+			inputs,
 			nextId,
 		});
-		const known = knownRefs(shown);
+		const known = knownRefs(shown, memoryRefs);
 		const stock = applyStockOps(state, out.stockOps, {
 			at,
 			known: (r) => known.has(r),
 			nextId,
-			inputs: shown,
+			inputs,
 		});
 		const pace = applyPace(out.pace, at, fromNewUser);
 		// A retracted fact takes what was prepared for it along.
@@ -236,7 +243,7 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 			at,
 			text: out.thought,
 			drive: out.drive,
-			inputs: [...shown],
+			inputs: [...inputs],
 		};
 		state.thoughts.push(thought);
 		if (state.thoughts.length > THOUGHTS_KEPT)
@@ -250,7 +257,7 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 		const before = rejected.length;
 		const refuse = (code: string) => rejected.push(code);
 		const refs = [...new Set(a.evidenceRefs)];
-		const knownNow = knownRefs(shown);
+		const knownNow = knownRefs(shown, memoryRefs);
 		// A thought may outlive new input; an action may not.
 		if (stale) refuse("stale");
 		if (refs.some((r) => !knownNow.has(r))) refuse("unknown_ref");
@@ -281,7 +288,7 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 				toolInput: input,
 				drive: out.drive,
 				evidenceRefs: refs,
-				inputs: [...shown],
+				inputs: [...inputs],
 				at,
 			};
 			issued.set(ticket.id, ticket);
@@ -290,7 +297,7 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 				toolName: tool!.name,
 				toolInput: input,
 				refs,
-				inputs: [...shown],
+				inputs: [...inputs],
 				at,
 			});
 			return { thought, ticket, applied, rejected };
@@ -329,7 +336,7 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 			toolInput: null,
 			drive: out.drive,
 			evidenceRefs: refs,
-			inputs: [...shown],
+			inputs: [...inputs],
 			at,
 		};
 		issued.set(ticket.id, ticket);
@@ -382,6 +389,27 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 			const before = host();
 			if (before.busy) return { ...base, skipped: "busy" };
 			pruneStock(state, now);
+			const known = (deps.known?.() ?? []).filter(
+				(x) => x.id !== "" && x.text.trim() !== "",
+			);
+			const memoryRefs = known.map((x) => `memory:${x.id}`);
+			// Host inputs (instructions, interests, tools, memory) are dependencies like observations.
+			const system = deps.system
+				? deps.system()
+				: { value: alwaysOnSystem(), input: { sources: [], complete: true } };
+			const hostInputs = [
+				system.input,
+				...interests.map((x) => x.input),
+				...known.map((x) => x.input),
+				...tools.map((t) => t.input),
+			].filter((x) => x !== undefined);
+			const hostSources = [
+				...new Set([...hostInputs.flatMap((x) => x.sources), ...memoryRefs]),
+			];
+			if (hostSources.some((r) => forgotten.has(r)))
+				return { ...base, skipped: "forgotten_input" };
+			if (forgotten.size > 0 && hostInputs.some((x) => !x.complete))
+				return { ...base, skipped: "incomplete_input" };
 			// Tickets the host never answered are not kept forever.
 			for (const [id, t] of issued)
 				if (t.at + PREPARING_TTL_MS <= now) issued.delete(id);
@@ -392,13 +420,12 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 				state,
 				observations,
 				interests,
+				known,
 				tools: tools.filter(autonomous),
 				speech: speechGate(state.pacing, intervalMs, now, before.busy),
 				prepare: prepareGate(state.pacing, now),
 			});
-			const system = deps.system
-				? deps.system()
-				: { value: alwaysOnSystem(), input: { sources: [], complete: true } };
+			const inputs = [...shown, ...hostSources];
 			const call = await callModel(
 				deps.llm,
 				unlimited,
@@ -406,8 +433,8 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 					purpose: "think",
 					at: now,
 					input: {
-						sources: [...system.input.sources, ...shown],
-						complete: system.input.complete,
+						sources: inputs,
+						complete: hostInputs.every((x) => x.complete),
 					},
 					system: system.value,
 					prompt,
@@ -433,13 +460,15 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 				rejectCodes: [],
 			};
 			// Forgotten while the call was out: nothing from it is kept.
-			if (shown.some((id) => forgotten.has(id)))
+			if (inputs.some((id) => forgotten.has(id)))
 				return { ...base, skipped: "aborted", call: outcome };
 			const settled = settle(
 				call.value,
 				now,
 				tickId,
 				shown,
+				inputs,
+				memoryRefs,
 				host(),
 				epoch !== startEpoch || signal.aborted,
 			);

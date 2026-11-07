@@ -25,6 +25,8 @@ export interface UserOpContext {
 	readonly extraRefs: ReadonlySet<string>;
 	/** Observations with a higher seq are new to this tick (no earlier tick has read them). */
 	readonly seenSeq: number;
+	/** Everything the tick depended on (shown observations and host input sources). */
+	readonly inputs: readonly string[];
 	readonly nextId: (prefix: string) => string;
 }
 
@@ -56,7 +58,7 @@ export function applyUserOps(
 			: !fromNewUser(refs)
 				? "already_read"
 				: null;
-	const inputs = [...ctx.shown.keys()];
+	const inputs = [...ctx.inputs];
 	for (const op of ops) {
 		const refuse = (code: string) => rejected.push(`${op.op}:${code}`);
 		const refs = [...new Set(op.evidenceRefs)];
