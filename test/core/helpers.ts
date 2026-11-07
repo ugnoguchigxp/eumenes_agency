@@ -58,6 +58,7 @@ export const fakeLlm = (): FakeLlm => {
 		update: [],
 		select: [],
 		respond: [],
+		think: [],
 	};
 	const requests: LlmRequest<unknown>[] = [];
 	return {

@@ -41,3 +41,4 @@ export {
 } from "./application/mock-tool-port.ts";
 
 export { buildProjection as projectAgencyState } from "./application/projection.ts";
+export * from "./always-on/index.ts";

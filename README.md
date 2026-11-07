@@ -14,6 +14,19 @@ Memory側の追加レビューを踏まえ、[ホスト入力の出典契約](sp
 
 [Eumenes本流への統合実装計画](spec/eumenes-mainline-integration-plan-2026-11-06.md)に、既存Memory 0.0.4・ツールチェーンを使う取り込み順序、全入力の出典と忘却、旧保存の移行、ローカル検証と切り戻しをまとめました。CIは含めません。2026-11-07に本流のコードへ反映し、[本流の実装・検証・移行記録](/Users/y.noguchi/Code/eumenes/spec/agency-integration-2026-11-07.md)に結果をまとめています。同日に利用者の許可を得て既存DB・API・Webへ反映し、正常応答を確認しました。実会話の確認は利用者が行います。
 
+## 常に考え、頼まれなくても動くエージェント（always-on）
+
+2026-11-07から、このプロジェクトの標準の会話は always-on です（[設計](spec/always-on-agency-design-2026-11-07.md)、[実装と検証の記録](docs/always-on-progress-2026-11-07.md)）。利用者が黙っていても考え続け、相手を知るための質問、好みに合わせた黙っての準備（調べる・作る）、準備した結果の共有を自分から行います。「静かにして」と言われたら、その間は話しかけません。
+
+```sh
+bun run agency                  # always-on の対話CLI（Haiku、費用は記録のみで上限なし）
+bun run agency --interval 60    # 話しかけの最短間隔: 10（既定）/ 60 / 600 秒
+bun run eval:always-on          # API 0件: 沈黙中に何回動けるかを旧方式と比較
+bun run eval:always-on:api <run-name> [scenario...]  # Haikuで7つのシナリオを仮想時計で再生
+```
+
+準備の実行先は `examples/virtual-eumenes/always-on-mock.ts` のmockで、実在の検索やサービスは使いません。ライブラリとしては `createAlwaysOnAgent` を使います。既存の `createAgencyRuntime` と旧CLI（`bun run agency:legacy`）は、過去の評価を再現するために変更せず残しています。
+
 ## できること
 
 - ユーザー・ツール・ホストから観測を受け取り、LLMが記憶を更新し、発言やツール利用の候補を選びます。意味や状況の判断はLLM、参照・権限・予算・状態の整合性はコードで扱います。

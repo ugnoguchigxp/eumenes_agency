@@ -4,7 +4,7 @@ import { z } from "zod";
 export const llmOutputJsonSchema = <T>(schema: z.ZodType<T>) =>
 	z.toJSONSchema(schema);
 
-export type LlmPurpose = "update" | "select" | "respond";
+export type LlmPurpose = "update" | "select" | "respond" | "think";
 
 export interface LlmRequest<T> {
 	/** Exact dependencies captured for this call. Host validation only; never add to model messages. */

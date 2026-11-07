@@ -16,7 +16,8 @@
 		"format:check": "oxfmt --check",
 		"check:boundaries": "bun scripts/check-boundaries.ts",
 		"test": "bun test ./src ./test ./standalone ./eval ./examples",
-		"agency": "zsh -l scripts/api-entry.zsh standalone/cli.ts",
+		"agency": "zsh -l scripts/api-entry.zsh standalone/always-on.ts",
+		"agency:legacy": "zsh -l scripts/api-entry.zsh standalone/cli.ts",
 		"eval": "zsh -l scripts/api-entry.zsh eval/main.ts",
 		"eval:initiative": "zsh -l scripts/api-entry.zsh eval/initiative/run.ts",
 		"pack": "bun scripts/pack.ts",
@@ -28,7 +29,9 @@
 		"eval:synergy": "bun examples/virtual-eumenes/measure.ts",
 		"eval:synergy:api": "zsh -l scripts/api-entry.zsh examples/virtual-eumenes/live.ts",
 		"demo:mock-toolchain": "bun examples/virtual-eumenes/mock-demo.ts",
-		"eval:conversation:api": "zsh -l scripts/api-entry.zsh examples/virtual-eumenes/native.ts"
+		"eval:conversation:api": "zsh -l scripts/api-entry.zsh examples/virtual-eumenes/native.ts",
+		"eval:always-on": "bun eval/always-on/silence.ts",
+		"eval:always-on:api": "zsh -l scripts/api-entry.zsh eval/always-on/live.ts"
 	},
 	"dependencies": {
 		"zod": "4.6.7"
