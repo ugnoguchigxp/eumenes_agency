@@ -96,9 +96,8 @@ describe("acceptance scenarios (fixed)", () => {
 						],
 						stockOps: [
 							{
-								op: "stock.add",
+								op: "idea.add",
 								id: null,
-								kind: "idea",
 								text: "辛いラーメンの話を振る",
 								targets: ["fact:f2"],
 							},

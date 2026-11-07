@@ -147,7 +147,18 @@ export function createClaudeLlm(
 							maxTokensCap,
 							request.maxOutputTokens + role.thinkingHeadroom,
 						),
-						system: request.system,
+						// always-on ticks reuse one fixed instruction text: cache it for an hour, which
+						// outlasts the 10-minute heartbeat ceiling. Other purposes are sent as before.
+						system:
+							request.purpose === "think"
+								? [
+										{
+											type: "text",
+											text: request.system,
+											cache_control: { type: "ephemeral", ttl: "1h" },
+										},
+									]
+								: request.system,
 						messages: [{ role: "user", content: request.prompt }],
 						output_config: {
 							effort: role.effort,

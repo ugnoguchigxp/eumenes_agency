@@ -50,13 +50,12 @@ describe("review fixes", () => {
 								text: "辛いラーメンが好き",
 								reason: "言っていた",
 							}),
-							op({ op: "gap.add", text: "担々麺は好き？", reason: "-" }),
+							op({ op: "gap.add", text: "担々麺は好き？" }),
 						],
 						stockOps: [
 							{
-								op: "stock.add",
+								op: "idea.add",
 								id: null,
-								kind: "idea",
 								text: "辛いラーメンの話を振る",
 								targets: [],
 							},
@@ -246,9 +245,8 @@ describe("review fixes", () => {
 					return wait({
 						userOps: [
 							op({
-								op: "gap.close",
+								op: "gap.decline",
 								id: "g2",
-								status: "declined",
 								evidenceRefs: [`u${n}`],
 							}),
 						],

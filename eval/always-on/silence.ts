@@ -225,7 +225,6 @@ export async function simulateAlwaysOn(
 						toolName: null,
 						toolInput: null,
 						evidenceRefs: [],
-						reason: "-",
 					},
 					next: "normal",
 				}
@@ -241,7 +240,6 @@ export async function simulateAlwaysOn(
 						toolName: null,
 						toolInput: null,
 						evidenceRefs: [],
-						reason: "-",
 					},
 					next: "normal",
 				};

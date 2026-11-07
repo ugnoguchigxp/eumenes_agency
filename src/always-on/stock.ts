@@ -55,7 +55,7 @@ export function applyStockOps(
 			continue;
 		}
 		const text = op.text?.trim() ?? "";
-		if (op.kind === null || text === "") {
+		if (text === "") {
 			refuse("missing_field");
 			continue;
 		}
@@ -67,7 +67,7 @@ export function applyStockOps(
 		const id = ctx.nextId("s");
 		state.stock.push({
 			id,
-			kind: op.kind,
+			kind: op.op === "idea.add" ? "idea" : "question",
 			text,
 			targets: [...new Set(op.targets)],
 			sourceRefs: [],
@@ -76,7 +76,7 @@ export function applyStockOps(
 			freshUntil: ctx.at + IDEA_FRESH_MS,
 			usedAt: null,
 		});
-		applied.push(`stock.add ${id}`);
+		applied.push(`${op.op} ${id}`);
 	}
 	return { applied, rejected };
 }

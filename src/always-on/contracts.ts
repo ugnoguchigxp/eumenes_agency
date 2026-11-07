@@ -8,7 +8,7 @@ import type { DeliveryStatus, ObservationInput } from "../contracts/model.ts";
 import type { CallOutcome } from "../contracts/runtime.ts";
 
 /** Bump when the built-in instructions or the think contract change. */
-export const ALWAYS_ON_VERSION = "always-on-16";
+export const ALWAYS_ON_VERSION = "always-on-21";
 
 /** The one user setting: the shortest gap between the agent's own utterances. */
 export const speechIntervals = [10, 60, 600] as const;
@@ -192,9 +192,12 @@ export const emptyAlwaysOnState = (): AlwaysOnState => ({
 });
 
 export const THOUGHTS_KEPT = 20;
-export const THOUGHTS_SHOWN = 8;
+export const THOUGHTS_SHOWN = 4;
 export const OBSERVATIONS_KEPT = 200;
-export const OBSERVATIONS_SHOWN = 30;
+export const OBSERVATIONS_SHOWN = 20;
+/** The newest observations are shown in full; older ones are cut to OLDER_CHARS. */
+export const OBSERVATIONS_FULL = 8;
+export const OLDER_CHARS = 160;
 
 const ref = z.string().min(1).max(64);
 
@@ -203,12 +206,13 @@ export const userOpKinds = [
 	"fact.update",
 	"fact.retract",
 	"gap.add",
-	"gap.close",
+	"gap.answer",
+	"gap.decline",
 ] as const;
 /** One change to the user model. Flat wire shape: unused fields are null. */
 export const userOpSchema = z.strictObject({
 	op: z.enum(userOpKinds),
-	/** fact.update / fact.retract / gap.close: the existing id (`fact:f1` or `f1`). */
+	/** fact.update / fact.retract / gap.answer / gap.decline: the existing id (`fact:f1` or `f1`). */
 	id: ref.nullable(),
 	aspect: z.enum(factAspects).nullable(),
 	basis: z.enum(factBases).nullable(),
@@ -216,17 +220,15 @@ export const userOpSchema = z.strictObject({
 	text: z.string().max(300).nullable(),
 	/** hypothesis: why it is guessed; gap.add: why it would help to know. */
 	reason: z.string().max(300).nullable(),
-	/** gap.close only. */
-	status: z.enum(["answered", "declined"]).nullable(),
 	evidenceRefs: z.array(ref).max(6),
 });
 export type UserOp = z.infer<typeof userOpSchema>;
 
 export const stockOpSchema = z.strictObject({
-	op: z.enum(["stock.add", "stock.drop"]),
+	/** idea.add / question.add: the agent's own material; stock.drop removes an item. */
+	op: z.enum(["idea.add", "question.add", "stock.drop"]),
 	/** stock.drop: `stock:s1` or `s1`. */
 	id: ref.nullable(),
-	kind: z.enum(["idea", "question"]).nullable(),
 	text: z.string().max(300).nullable(),
 	targets: z.array(ref).max(4),
 });
@@ -253,7 +255,6 @@ export const thinkSchema = z.strictObject({
 		toolName: z.string().max(64).nullable(),
 		toolInput: z.string().max(1000).nullable(),
 		evidenceRefs: z.array(ref).max(8),
-		reason: z.string().max(300),
 	}),
 	next: z.enum(nextPaces),
 });

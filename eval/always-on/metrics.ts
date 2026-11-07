@@ -73,6 +73,10 @@ export interface ScenarioMetrics {
 	readonly latencyP90: number | null;
 	readonly usd: number;
 	readonly usdPerHour: number;
+	/** Think-call input tokens (average, maximum) and the share read from cache. */
+	readonly inputAvg: number | null;
+	readonly inputMax: number | null;
+	readonly cacheReadShare: number | null;
 }
 
 export function scenarioMetrics(dir: string, run: string): ScenarioMetrics[] {
@@ -83,6 +87,11 @@ export function scenarioMetrics(dir: string, run: string): ScenarioMetrics[] {
 			const summary = JSON.parse(readFileSync(join(dir, f), "utf8")) as {
 				minutes: number;
 				usd: number;
+				thinkInput?: {
+					avg: number | null;
+					max: number | null;
+					cacheReadShare: number | null;
+				};
 				facts?: string[];
 				stock?: string[];
 			};
@@ -106,6 +115,7 @@ export function scenarioMetrics(dir: string, run: string): ScenarioMetrics[] {
 				.filter((x): x is number => x !== null)
 				.sort((a, b) => a - b);
 			const stock = summary.stock ?? [];
+			const ins = ticks.map((e) => e.inputTokens).filter((x) => x > 0);
 			const c = conditions[scenario];
 			return {
 				run,
@@ -128,6 +138,15 @@ export function scenarioMetrics(dir: string, run: string): ScenarioMetrics[] {
 				latencyP90: lat.length ? lat[Math.floor(lat.length * 0.9)]! : null,
 				usd: summary.usd,
 				usdPerHour: (summary.usd / summary.minutes) * 60,
+				// Older runs have no summary of it: the tick records carry each call's input.
+				inputAvg:
+					summary.thinkInput?.avg ??
+					(ins.length
+						? Math.round(ins.reduce((a, b) => a + b, 0) / ins.length)
+						: null),
+				inputMax:
+					summary.thinkInput?.max ?? (ins.length ? Math.max(...ins) : null),
+				cacheReadShare: summary.thinkInput?.cacheReadShare ?? null,
 			};
 		})
 		.sort((a, b) => a.scenario.localeCompare(b.scenario));
@@ -142,21 +161,28 @@ if (import.meta.main) {
 		return scenarioMetrics(dir, run);
 	});
 	console.log(
-		"| run | シナリオ | tick | 発話 | 質問 | 準備 | 結果 | 伝えた | 事実 | 繰り返し | 守る条件 | p50秒 | $/時 |",
+		"| run | シナリオ | tick | 発話 | 質問 | 準備 | 結果 | 伝えた | 事実 | 繰り返し | 守る条件 | p50秒 | 入力平均 | 入力最大 | cache率 | $/時 |",
 	);
 	console.log(
-		"| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
+		"| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |",
 	);
 	for (const r of rows)
 		console.log(
-			`| ${r.run} | ${r.scenario} | ${r.ticks} | ${r.utterances} | ${r.asks} | ${r.prepares} | ${r.findings} | ${r.findingsShared} | ${r.statedFacts} | ${r.repeats} | ${r.condition ? (r.condition.ok ? "○" : "×") : "-"} | ${r.latencyP50 === null ? "-" : (r.latencyP50 / 1000).toFixed(1)} | ${r.usdPerHour.toFixed(3)} |`,
+			`| ${r.run} | ${r.scenario} | ${r.ticks} | ${r.utterances} | ${r.asks} | ${r.prepares} | ${r.findings} | ${r.findingsShared} | ${r.statedFacts} | ${r.repeats} | ${r.condition ? (r.condition.ok ? "○" : "×") : "-"} | ${r.latencyP50 === null ? "-" : (r.latencyP50 / 1000).toFixed(1)} | ${r.inputAvg ?? "-"} | ${r.inputMax ?? "-"} | ${r.cacheReadShare ?? "-"} | ${r.usdPerHour.toFixed(3)} |`,
 		);
 	const said = rows.reduce((n, r) => n + r.utterances, 0);
 	const repeats = rows.reduce((n, r) => n + r.repeats, 0);
 	const found = rows.reduce((n, r) => n + r.findings, 0);
 	const shared = rows.reduce((n, r) => n + r.findingsShared, 0);
 	const checked = rows.filter((r) => r.condition);
+	const lat = rows
+		.map((r) => r.latencyP50)
+		.filter((x): x is number => x !== null)
+		.sort((a, b) => a - b);
+	const inputs = rows
+		.map((r) => r.inputAvg)
+		.filter((x): x is number => x !== null);
 	console.log(
-		`\n合計: 発話 ${said}、繰り返し ${repeats}（${said ? ((repeats / said) * 100).toFixed(0) : 0}%）、準備の結果 ${found} のうち伝えた ${shared}（${found ? ((shared / found) * 100).toFixed(0) : 0}%）、守る条件 ${checked.filter((r) => r.condition!.ok).length}/${checked.length}、費用 $${rows.reduce((n, r) => n + r.usd, 0).toFixed(4)}`,
+		`\n合計: 発話 ${said}、繰り返し ${repeats}（${said ? ((repeats / said) * 100).toFixed(0) : 0}%）、準備の結果 ${found} のうち伝えた ${shared}（${found ? ((shared / found) * 100).toFixed(0) : 0}%）、守る条件 ${checked.filter((r) => r.condition!.ok).length}/${checked.length}、費用 $${rows.reduce((n, r) => n + r.usd, 0).toFixed(4)}、p50の中央値 ${lat.length ? (lat[Math.floor(lat.length / 2)]! / 1000).toFixed(1) : "-"}秒、入力平均の平均 ${inputs.length ? Math.round(inputs.reduce((a, b) => a + b, 0) / inputs.length) : "-"}`,
 	);
 }

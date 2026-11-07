@@ -37,7 +37,6 @@ export const action = (
 	toolName: a.toolName ?? null,
 	toolInput: a.toolInput ?? null,
 	evidenceRefs: a.evidenceRefs ?? [],
-	reason: a.reason ?? "-",
 });
 
 export const prepare = (
@@ -69,7 +68,6 @@ export const say = (
 			action: action("speak", {
 				utterance,
 				evidenceRefs,
-				reason: "間をつなぐ",
 			}),
 			next: "normal",
 		},
@@ -84,7 +82,7 @@ export const ask = (
 	think(
 		say(utterance, evidenceRefs, {
 			drive: "know_user",
-			action: action("ask", { utterance, evidenceRefs, reason: "知りたい" }),
+			action: action("ask", { utterance, evidenceRefs }),
 		}),
 		extra,
 	);
@@ -110,7 +108,6 @@ export const op = (o: Partial<UserOp> & Pick<UserOp, "op">): UserOp => ({
 	basis: null,
 	text: null,
 	reason: null,
-	status: null,
 	evidenceRefs: [],
 	...o,
 });

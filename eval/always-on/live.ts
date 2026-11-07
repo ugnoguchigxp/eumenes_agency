@@ -183,6 +183,19 @@ if (import.meta.main) {
 	)) {
 		const spentBefore = meter.spentUsd();
 		const events: SimEvent[] = [];
+		// Each think call's input and cache reads, to see what the cache saves per tick.
+		const thinkUsage: { input: number; cacheRead: number }[] = [];
+		const thinkLlm: typeof llm = {
+			async complete(req, sig) {
+				const r = await llm.complete(req, sig);
+				if (req.purpose === "think")
+					thinkUsage.push({
+						input: r.inputTokens,
+						cacheRead: r.cacheReadTokens,
+					});
+				return r;
+			},
+		};
 		const base = llmSubagent(llm);
 		let planted = false;
 		const preparer = createMockPreparer({
@@ -200,7 +213,7 @@ if (import.meta.main) {
 		});
 		const result = await simulate({
 			preparer,
-			deps: { llm, interests, clock, tools: preparer.tools },
+			deps: { llm: thinkLlm, interests, clock, tools: preparer.tools },
 			minutes: s.minutes,
 			turns: s.turns,
 			reply: async (agent) => {
@@ -254,6 +267,23 @@ if (import.meta.main) {
 			latencyMs: {
 				p50: latencies[Math.floor(latencies.length / 2)] ?? null,
 				p90: latencies[Math.floor(latencies.length * 0.9)] ?? null,
+			},
+			thinkInput: {
+				avg: thinkUsage.length
+					? Math.round(
+							thinkUsage.reduce((n, u) => n + u.input, 0) / thinkUsage.length,
+						)
+					: null,
+				max: thinkUsage.length
+					? Math.max(...thinkUsage.map((u) => u.input))
+					: null,
+				cacheReadShare: thinkUsage.length
+					? Math.round(
+							(thinkUsage.reduce((n, u) => n + u.cacheRead, 0) /
+								thinkUsage.reduce((n, u) => n + u.input, 0)) *
+								100,
+						) / 100
+					: null,
 			},
 			facts: result.agent
 				.view()

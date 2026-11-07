@@ -209,16 +209,14 @@ describe("preparation", () => {
 				wait({
 					stockOps: [
 						{
-							op: "stock.add",
+							op: "idea.add",
 							id: null,
-							kind: "idea",
 							text: "モンハンの新作の話を振ってみたい",
 							targets: ["u1"],
 						},
 						{
-							op: "stock.add",
+							op: "question.add",
 							id: null,
-							kind: "question",
 							text: "好きな武器は？",
 							targets: ["nope"],
 						},
@@ -229,8 +227,8 @@ describe("preparation", () => {
 		});
 		agent.observe(user("u1", 0, "モンハン好き"));
 		const out = await agent.tick(10_000, idle, signal());
-		expect(out.applied).toEqual([expect.stringMatching(/^stock\.add s/)]);
-		expect(out.rejected).toEqual(["stock.add:unknown_ref"]);
+		expect(out.applied).toEqual([expect.stringMatching(/^idea\.add s/)]);
+		expect(out.rejected).toEqual(["question.add:unknown_ref"]);
 		expect(agent.view().stock.map((s) => s.kind)).toEqual(["idea"]);
 	});
 
@@ -241,9 +239,8 @@ describe("preparation", () => {
 					? wait({
 							stockOps: [
 								{
-									op: "stock.add",
+									op: "idea.add",
 									id: null,
-									kind: "idea",
 									text: "今夜の話題",
 									targets: [],
 								},

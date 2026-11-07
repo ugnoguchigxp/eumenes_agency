@@ -148,8 +148,8 @@ export function applyUserOps(
 		} else {
 			const id = op.id === null ? "" : bare(op.id, "gap");
 			const gap = state.gaps.find((g) => g.id === id && g.status === "open");
-			if (!gap || op.status === null) {
-				refuse(gap ? "missing_field" : "unknown_gap");
+			if (!gap) {
+				refuse("unknown_gap");
 				continue;
 			}
 			const missing = userWords(refs);
@@ -157,10 +157,10 @@ export function applyUserOps(
 				refuse(missing);
 				continue;
 			}
-			gap.status = op.status;
+			gap.status = op.op === "gap.answer" ? "answered" : "declined";
 			gap.evidence = [...new Set([...gap.evidence, ...refs])];
 			gap.inputs = [...new Set([...(gap.inputs ?? []), ...inputs])];
-			applied.push(`gap.close ${id}`);
+			applied.push(`${op.op} ${id}`);
 		}
 	}
 	// Open questions stay; declined ones say what not to ask again; answered ones are in facts.

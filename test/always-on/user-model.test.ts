@@ -125,9 +125,8 @@ describe("user model", () => {
 				return wait({
 					userOps: [
 						op({
-							op: "gap.close",
+							op: "gap.answer",
 							id: "gap:g2",
-							status: "answered",
 							evidenceRefs: ["u1"],
 						}),
 						op({
@@ -152,7 +151,7 @@ describe("user model", () => {
 		agent.observe(user("u1", 15_000, "だいたいゲームしてるかな"));
 		const second = await agent.tick(25_000, idle, signal());
 		expect(second.applied).toEqual([
-			"gap.close g2",
+			"gap.answer g2",
 			expect.stringMatching(/^fact\.add f/),
 		]);
 		expect(agent.view().gaps[0]).toMatchObject({
@@ -188,17 +187,16 @@ describe("user model", () => {
 				if (n === 1)
 					return wait({
 						userOps: [
-							op({ op: "gap.add", text: "好きな音楽", reason: "-" }),
-							op({ op: "gap.add", text: "家族構成", reason: "-" }),
+							op({ op: "gap.add", text: "好きな音楽" }),
+							op({ op: "gap.add", text: "家族構成" }),
 						],
 					});
 				if (n === 2) return ask("どんな音楽が好き？", ["gap:g2"]);
 				return wait({
 					userOps: [
 						op({
-							op: "gap.close",
+							op: "gap.decline",
 							id: "g3",
-							status: "declined",
 							evidenceRefs: ["u1"],
 						}),
 					],
