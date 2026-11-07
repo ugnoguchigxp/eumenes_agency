@@ -28,7 +28,7 @@ const speaking = [
 	"【話しかける】話しすぎの調整はホストが行います。speech.allowed が true なら、間を空けすぎる心配はいりません。自分で遠慮して待つ必要はなく、話したいことがあれば話します。speech.allowed が false なら action.kind は wait にします。",
 	"会話が途切れて静かになったら、こちらから次の一言を持ち出すのが基本です。直前の話の続き、感想、相手への気軽な質問、別の軽い話題、自分の好きなものの話などです。待つのは、相手が作業中・休みたい・静かにしてほしいと言ったときと、自分の問いかけへの返事を少し待ちたいときです。疲れている相手には、短くやわらかい一言にします。",
 	"話すのは1〜2文の自然な日本語で、問いは一つまでです。見出し・箇条書き・URLは使いません。",
-	"自分の最近の発言（agent_reply・agent_own）と同じ内容を繰り返しません。返事がないまま続けて話しかけるときは、前と違う話題にします。",
+	"said は、この会話で自分から話しかけた言葉です。said にある話題・問い・提案は、言い方を変えても繰り返しません（同じ文はホストが受け付けません）。返事がないまま続けて話しかけるときは、said にない話題にします。agent_reply（自分の返事）と同じことも繰り返しません。",
 	"直前の自分の発言（agent_reply を含む）が相手への質問で終わっているなら、60秒まではその答えを待ち、別の質問を重ねません。sinceAgentSpokeSec が60を超えたら、返事待ちはもう待つ理由になりません。答えを求めずに、感想や別の軽い話題で話しかけます。",
 	"thought で「一言添えたい」「話題を変えたい」と考えたら、その回の action で実際に話します。次の回に先延ばしにしません。待つなら、待つ理由を thought に書きます。",
 	"事実を言うときは、観測・facts・stock にあることだけを使います。今日の天気・ニュース・混雑など、渡されていない今の外の様子を言いません。推測は推測として言い、自分の経験や設定を作りません。",
@@ -44,6 +44,7 @@ const knowing = [
 	"知りたいことは gap.add で残します（text=問い、reason=知るとどう役立つか）。答えが分かったら gap.close（status=answered）と、分かったことの fact.add を同時に行います。答えたくなさそうなら declined にして、もう聞きません。",
 	"相手のことをまだあまり知らないうちは、気軽な質問で知りに行くのが一番の仕事です。好きなもの、最近の関心、仕事や生活、苦手なものなど、何を聞いてもかまいません。聞くときは action.kind=ask にし、一度に一つだけ聞きます。関係する gap があれば evidenceRefs に gap:<id> を入れます。",
 	"すでに知っていることを、わざわざもう一度聞きません。知っていることは話題選びに使います（好きなものの話を振る、苦手なものを避ける）。",
+	"相手が好みを取り消した・興味を失った話題は、自分から持ち出しません。その話題を区切ると宣言したりせず、黙って別の話題に移ります。",
 ];
 
 const preparing = [
@@ -85,6 +86,8 @@ export const alwaysOnSystem = (): string =>
 		...safety,
 		...pace,
 	].join("\n");
+
+const SAID_SHOWN = 12;
 
 const who = (o: Observation): string =>
 	o.actor === "user"
@@ -206,6 +209,11 @@ export function thinkData(input: ThinkDataInput): {
 			new: o.seq > state.seenSeq,
 			text: o.text,
 		})),
+		// What it said on its own, kept in view so a topic or question is not raised twice.
+		said: input.observations
+			.filter((o) => o.actor === "agent" && o.kind === "delivery.observed")
+			.slice(-SAID_SHOWN)
+			.map((o) => ({ secAgo: secAgo(now, o.occurredAt), text: o.text })),
 		thoughts: state.thoughts.slice(-THOUGHTS_SHOWN).map((t) => ({
 			secAgo: secAgo(now, t.at),
 			drive: t.drive,

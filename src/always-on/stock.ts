@@ -115,3 +115,28 @@ export const pruneStock = (state: AlwaysOnState, now: number) => {
 		(p) => p.at + PREPARING_TTL_MS > now,
 	);
 };
+
+/**
+ * What a retracted fact was for goes with it (S7): stock aimed at it and preparations asked for
+ * it. Refs to items that no longer exist are orphans; only fact/gap/stock refs can vanish.
+ */
+export const dropOrphans = (state: AlwaysOnState): string[] => {
+	const exists = new Set([
+		...state.facts.map((f) => `fact:${f.id}`),
+		...state.gaps.map((g) => `gap:${g.id}`),
+		...state.stock.map((s) => `stock:${s.id}`),
+	]);
+	const orphan = (refs: readonly string[]) =>
+		refs.some((r) => /^(fact|gap|stock):/.test(r) && !exists.has(r));
+	const dropped = [
+		...state.stock
+			.filter((s) => orphan(s.targets))
+			.map((s) => `stock.drop ${s.id}`),
+		...state.preparing
+			.filter((p) => orphan(p.refs))
+			.map((p) => `prepare.drop ${p.ticketId}`),
+	];
+	state.stock = state.stock.filter((s) => !orphan(s.targets));
+	state.preparing = state.preparing.filter((p) => !orphan(p.refs));
+	return dropped;
+};

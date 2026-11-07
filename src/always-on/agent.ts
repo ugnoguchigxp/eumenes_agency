@@ -40,7 +40,7 @@ import {
 import { prepareGate, speechGate } from "./pacing.ts";
 import { alwaysOnSystem, thinkData } from "./prompt.ts";
 import { applyUserOps } from "./user-model.ts";
-import { addFinding, applyStockOps, pruneStock } from "./stock.ts";
+import { addFinding, applyStockOps, dropOrphans, pruneStock } from "./stock.ts";
 import { forgetDerived } from "./forgetting.ts";
 
 /** No budget gate (spec §3.9): the heartbeat alone sets the frequency. */
@@ -101,6 +101,10 @@ export interface AlwaysOnAgent {
 	view(): AlwaysOnView;
 	snapshot(): AlwaysOnSnapshot;
 }
+
+/** Text compared for literal repeats: whitespace and punctuation do not make a sentence new. */
+const normalize = (text: string) =>
+	text.replace(/[\s、。，．,.!?！？…・「」『』（）()〜~ー-]/gu, "");
 
 const autonomous = (t: AlwaysOnTool) =>
 	!t.requiresApproval && (t.effect === "read" || t.effect === "create");
@@ -218,7 +222,14 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 			inputs: shown,
 		});
 		const pace = applyPace(out.pace, at, fromNewUser);
-		const applied = [...user.applied, ...stock.applied, ...pace.applied];
+		// A retracted fact takes what was prepared for it along.
+		const orphans = dropOrphans(state);
+		const applied = [
+			...user.applied,
+			...stock.applied,
+			...orphans,
+			...pace.applied,
+		];
 		const rejected = [...user.rejected, ...stock.rejected, ...pace.rejected];
 		const thought: Thought = {
 			id: nextId("th"),
@@ -286,6 +297,18 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 		}
 		const utterance = (a.utterance ?? "").trim();
 		if (utterance === "") refuse("empty_utterance");
+		// The same sentence again is never new: refused before it reaches the user (S8).
+		const same = normalize(utterance);
+		if (
+			same !== "" &&
+			observations.some(
+				(o) =>
+					o.actor === "agent" &&
+					o.kind === "delivery.observed" &&
+					normalize(o.text) === same,
+			)
+		)
+			refuse("repeat");
 		// One question at a time: an unanswered question is not followed by another.
 		if (
 			a.kind === "ask" &&

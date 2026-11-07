@@ -22,7 +22,13 @@ export interface Funnel {
 	ticks: Record<string, number>;
 	/** always-on autonomous preparations started. */
 	prepares: number;
+	/** Own utterances the user answered within RESPONSE_MS (a real user only; not in scripted runs). */
+	answered: number;
+	/** `/feedback` entries by kind (useful / intrusive / missed). */
+	feedback: Record<string, number>;
 }
+
+export const RESPONSE_MS = 120_000;
 
 const bump = (m: Record<string, number>, key: string) => {
 	m[key] = (m[key] ?? 0) + 1;
@@ -38,10 +44,13 @@ export function funnel(logs: readonly string[]): Funnel {
 		idleBlocked: {},
 		ticks: {},
 		prepares: 0,
+		answered: 0,
+		feedback: {},
 	};
 	for (const text of logs) {
 		let first: number | null = null;
 		let last: number | null = null;
+		let pendingOwn: number | null = null;
 		for (const line of text.split("\n")) {
 			if (line.trim() === "") continue;
 			const e = JSON.parse(line) as Record<string, unknown>;
@@ -56,12 +65,26 @@ export function funnel(logs: readonly string[]): Funnel {
 					break;
 				case "user":
 					f.userTurns++;
+					if (
+						pendingOwn !== null &&
+						at !== null &&
+						at - pendingOwn <= RESPONSE_MS
+					)
+						f.answered++;
+					pendingOwn = null;
+					break;
+				case "speak":
+					pendingOwn = at;
+					break;
+				case "feedback":
+					bump(f.feedback, String(e["kind"]));
 					break;
 				case "decision":
 					bump(f.decisions, `${String(e["action"])}/${String(e["source"])}`);
 					break;
 				case "proactive":
 					f.ownUtterances++;
+					pendingOwn = at;
 					break;
 				case "idle_cycle":
 					bump(f.idleBlocked, String(e["blockedBy"] ?? "-"));

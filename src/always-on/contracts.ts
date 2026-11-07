@@ -8,7 +8,7 @@ import type { DeliveryStatus, ObservationInput } from "../contracts/model.ts";
 import type { CallOutcome } from "../contracts/runtime.ts";
 
 /** Bump when the built-in instructions or the think contract change. */
-export const ALWAYS_ON_VERSION = "always-on-14";
+export const ALWAYS_ON_VERSION = "always-on-16";
 
 /** The one user setting: the shortest gap between the agent's own utterances. */
 export const speechIntervals = [10, 60, 600] as const;
