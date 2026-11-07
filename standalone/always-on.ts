@@ -12,14 +12,15 @@
 import { emitKeypressEvents, createInterface } from "node:readline";
 import {
 	createAlwaysOnAgent,
-	createHeartbeat,
-	createHeartbeatScheduler,
-	defaultHeartbeat,
 	runRespond,
 	speechIntervals,
 	type SpeechIntervalSec,
-	type TickOutcome,
 } from "../src/index.ts";
+import {
+	createAlwaysOnSession,
+	tickAction,
+	type SessionEvent,
+} from "./always-on-session.ts";
 import { createChatLog, chatsDir, printAbove } from "./chat-loop.ts";
 import { createProviderLlm, createProviderReply } from "./providers.ts";
 import { loadSettings, settingsDigest } from "./settings.ts";
@@ -80,7 +81,6 @@ export function parseAlwaysOnArgs(
 }
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
-const TYPING_IDLE_MS = 4_000;
 
 async function main() {
 	const args = parseAlwaysOnArgs(process.argv.slice(2), new Date());
@@ -123,63 +123,71 @@ async function main() {
 
 	let showThoughts = args.thoughts;
 	let closed = false;
-	let n = 0;
 	const sessionStart = meter.spentUsd();
 	const rl = createInterface({ input: process.stdin, output: process.stdout });
 	rl.setPrompt("> ");
 	const out = (text: string) => {
 		if (!closed) printAbove(rl, process.stdout, text);
 	};
-	const heartbeat = createHeartbeat(defaultHeartbeat, Date.now());
-	heartbeat.event(Date.now());
 
-	// Typing pauses the heartbeat: the agent never talks over the user.
-	let typing: ReturnType<typeof setTimeout> | null = null;
-	const typingDone = () => {
-		if (typing === null) return;
-		clearTimeout(typing);
-		typing = null;
-		heartbeat.leave(Date.now());
-		scheduler.rearm();
+	const show = (e: SessionEvent) => {
+		switch (e.type) {
+			case "user":
+				log.write({ type: "user", text: e.text });
+				return;
+			case "reply":
+				log.write({ type: "reply", text: e.text, latencyMs: e.latencyMs });
+				return out(e.text);
+			case "tick": {
+				const o = e.outcome;
+				log.write({
+					type: "tick",
+					action: tickAction(o),
+					chosen: o.chosen,
+					skipped: o.skipped,
+					drive: o.thought?.drive ?? null,
+					thought: o.thought?.text ?? null,
+					text: o.ticket?.utterance ?? null,
+					applied: o.applied,
+					rejected: o.rejected,
+					next: o.next,
+					latencyMs: o.call?.latencyMs ?? null,
+					inputTokens: o.call?.inputTokens ?? 0,
+					outputTokens: o.call?.outputTokens ?? 0,
+				});
+				if (o.call && o.skipped === "failed")
+					out(dim(`  [思考エラー] ${o.call.code}`));
+				if (showThoughts && o.thought)
+					out(
+						dim(
+							`  💭 [${o.thought.drive}] ${o.thought.text}${o.rejected.length ? ` (${o.rejected.join(",")})` : ""}`,
+						),
+					);
+				return;
+			}
+			case "speak":
+				log.write({ type: "speak", action: e.action, text: e.text });
+				return out(`\n[自分から] ${e.text}`);
+			case "prepare":
+				log.write({
+					type: "prepare",
+					toolName: e.toolName,
+					toolInput: e.toolInput,
+					accepted: e.accepted,
+				});
+				return out(dim(`  [準備] ${e.toolName}: ${e.toolInput}`));
+			case "prepared":
+				log.write({ type: "prepared", status: e.status, text: e.text });
+				return out(dim(`  [準備完了] ${e.text}`));
+			case "error":
+				log.write({ type: "error", where: e.where, message: e.message });
+				return out(dim(`  [${e.where}エラー] ${e.message}`));
+		}
 	};
-	const typed = () => {
-		if (typing === null) {
-			heartbeat.enter();
-			scheduler.rearm();
-		} else clearTimeout(typing);
-		typing = setTimeout(typingDone, TYPING_IDLE_MS);
-	};
-	let replying = false;
-	const busy = () => ({ busy: typing !== null || replying });
 
-	const showTick = (o: TickOutcome) => {
-		log.write({
-			type: "tick",
-			action: o.skipped ? "skipped" : o.ticket ? "speak" : "wait",
-			chosen: o.chosen,
-			skipped: o.skipped,
-			drive: o.thought?.drive ?? null,
-			thought: o.thought?.text ?? null,
-			text: o.ticket?.utterance ?? null,
-			rejected: o.rejected,
-			next: o.next,
-			latencyMs: o.call?.latencyMs ?? null,
-			inputTokens: o.call?.inputTokens ?? 0,
-			outputTokens: o.call?.outputTokens ?? 0,
-		});
-		if (o.call && o.skipped === "failed")
-			out(dim(`  [思考エラー] ${o.call.code}`));
-		if (showThoughts && o.thought)
-			out(
-				dim(
-					`  💭 [${o.thought.drive}] ${o.thought.text}${o.rejected.length ? ` (${o.rejected.join(",")})` : ""}`,
-				),
-			);
-	};
-
-	let inFlight: AbortController | null = null;
-	const scheduler = createHeartbeatScheduler({
-		heartbeat,
+	const session = createAlwaysOnSession({
+		agent,
+		preparer,
 		now: Date.now,
 		setTimer: (fn, ms) => {
 			const h = setTimeout(fn, ms);
@@ -187,108 +195,19 @@ async function main() {
 			return h;
 		},
 		clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
-		run: async () => {
-			if (closed) return null;
-			inFlight = new AbortController();
-			try {
-				const o = await agent.tick(Date.now(), busy, inFlight.signal);
-				showTick(o);
-				if (o.ticket?.action === "prepare" && !closed) {
-					const ticket = o.ticket;
-					const accepted = preparer.start(ticket, Date.now());
-					agent.recordResult({
-						ticketId: ticket.id,
-						status: accepted ? "succeeded" : "failed",
-						at: Date.now(),
-					});
-					log.write({
-						type: "prepare",
-						toolName: ticket.toolName,
-						toolInput: ticket.toolInput,
-						accepted,
-					});
-					out(dim(`  [準備] ${ticket.toolName}: ${ticket.toolInput}`));
-					const done = setTimeout(async () => {
-						for (const r of await preparer.due(Date.now())) {
-							agent.workReturned(r);
-							log.write({
-								type: "prepared",
-								status: r.status,
-								text: r.summary,
-							});
-							out(dim(`  [準備完了] ${r.summary}`));
-						}
-						heartbeat.event(Date.now());
-						scheduler.rearm();
-					}, 60_000);
-					done.unref?.();
-				} else if (o.ticket && !closed) {
-					out(`\n[自分から] ${o.ticket.utterance}`);
-					agent.recordResult({
-						ticketId: o.ticket.id,
-						status: "succeeded",
-						at: Date.now(),
-					});
-					log.write({ type: "speak", text: o.ticket.utterance });
-				}
-				return o.skipped ? null : { next: o.next, wakeAt: o.wakeAt };
-			} catch (e) {
-				out(
-					dim(`  [思考エラー] ${e instanceof Error ? e.message : String(e)}`),
-				);
-				return null;
-			} finally {
-				inFlight = null;
-			}
-		},
+		emit: show,
+		reply: async (a) =>
+			(
+				await runRespond({
+					messages: replyMessages(a, interests),
+					chat,
+					tools: noTools,
+					emotion: false,
+					signal: new AbortController().signal,
+					onDelta: () => undefined,
+				})
+			).text,
 	});
-
-	const reply = async (text: string) => {
-		n++;
-		agent.invalidate();
-		agent.observe({
-			id: `u${n}`,
-			kind: "exchange.adopted",
-			actor: "user",
-			occurredAt: Date.now(),
-			text,
-		});
-		log.write({ type: "user", text });
-		replying = true;
-		heartbeat.enter();
-		const started = performance.now();
-		try {
-			const r = await runRespond({
-				messages: replyMessages(agent, interests),
-				chat,
-				tools: noTools,
-				emotion: false,
-				signal: new AbortController().signal,
-				onDelta: () => undefined,
-			});
-			if (r.text === "") return out(dim("  (返答なし)"));
-			agent.observe({
-				id: `r${n}`,
-				kind: "exchange.adopted",
-				actor: "agent",
-				occurredAt: Date.now(),
-				text: r.text,
-			});
-			log.write({
-				type: "reply",
-				text: r.text,
-				latencyMs: performance.now() - started,
-			});
-			out(r.text);
-		} catch (e) {
-			out(dim(`  [返答エラー] ${e instanceof Error ? e.message : String(e)}`));
-		} finally {
-			replying = false;
-			heartbeat.leave(Date.now());
-			heartbeat.event(Date.now());
-			scheduler.rearm();
-		}
-	};
 
 	const command = async (line: string): Promise<boolean> => {
 		const [cmd, ...rest] = line.split(/\s+/);
@@ -296,32 +215,27 @@ async function main() {
 		if (cmd === "/thoughts") {
 			showThoughts = !showThoughts;
 			out(dim(`  thoughts ${showThoughts ? "on" : "off"}`));
-		} else if (cmd === "/tick") void scheduler.fireNow();
+		} else if (cmd === "/tick") void session.tickNow();
 		else if (cmd === "/quiet") {
 			const minutes = Number(rest[0] ?? "30");
 			if (!Number.isFinite(minutes) || minutes <= 0) {
 				out(dim("  usage: /quiet [分（正の数）]"));
 				return true;
 			}
-			agent.mute(Date.now() + minutes * 60_000);
+			session.mute(minutes);
 			out(
 				dim(`  ${minutes}分間、自分からは話しかけません（考えるのは続けます）`),
 			);
 		} else if (cmd === "/stop") {
-			agent.setStopped(true);
-			heartbeat.stop();
-			inFlight?.abort();
+			session.stop();
 			out(dim("  停止しました（/resume で再開）"));
 		} else if (cmd === "/resume") {
-			agent.setStopped(false);
-			agent.mute(null);
-			heartbeat.resume(Date.now());
-			scheduler.rearm();
+			session.resume();
 			out(dim("  再開しました"));
 		} else if (cmd === "/state") {
 			const v = agent.view();
 			const lines = [
-				`observations ${v.observations} / thoughts ${v.thoughts.length} / unanswered ${v.pacing.unanswered} / next tick ${heartbeat.status().intervalSec}s / spend this session $${(meter.spentUsd() - sessionStart).toFixed(4)}`,
+				`observations ${v.observations} / thoughts ${v.thoughts.length} / unanswered ${v.pacing.unanswered} / next tick ${session.status().intervalSec}s / spend this session $${(meter.spentUsd() - sessionStart).toFixed(4)}`,
 				...v.facts.map(
 					(f) => `  fact ${f.id} [${f.basis}/${f.aspect}] ${f.text}`,
 				),
@@ -356,19 +270,18 @@ async function main() {
 	process.stdin.on(
 		"keypress",
 		(_s: string, key: { name?: string } | undefined) => {
-			if (key?.name !== "return" && key?.name !== "enter") typed();
+			if (key?.name !== "return" && key?.name !== "enter") session.typed();
 		},
 	);
 	let queue: Promise<unknown> = Promise.resolve();
 	rl.on("line", (raw) => {
 		const line = raw.trim();
-		typingDone();
 		queue = queue
 			.then(async () => {
 				if (line === "") return;
 				if (line.startsWith("/")) {
 					if (!(await command(line))) rl.close();
-				} else await reply(line);
+				} else await session.say(line);
 				rl.prompt(true);
 			})
 			// One failed line must not stop every later one.
@@ -378,8 +291,7 @@ async function main() {
 	});
 	rl.on("close", () => {
 		closed = true;
-		scheduler.dispose();
-		inFlight?.abort();
+		session.close();
 		log.write({
 			type: "end",
 			spentUsd: meter.spentUsd() - sessionStart,
@@ -392,7 +304,7 @@ async function main() {
 		process.exit(0);
 	});
 	rl.prompt();
-	scheduler.rearm();
+	session.start();
 }
 
 if (import.meta.main) await main();

@@ -25,6 +25,8 @@ bun run eval:always-on          # API 0件: 沈黙中に何回動けるかを旧
 bun run eval:always-on:api <run-name> [scenario...]  # Haikuで7つのシナリオを仮想時計で再生
 ```
 
+試すときは、黙っている時間を作ってみてください。独り言（💭）が薄く表示され、`/state` で知っていること・準備中のこと・準備した材料を確認できます。気になった発話には `/feedback useful` / `/feedback intrusive` / `/feedback missed`（メモも付けられる）を付けると、ログに残ります。ログは `data/chats/<日時>-always-on.jsonl` に保存され、`bun eval/always-on/funnel.ts data/chats/*-always-on.jsonl` で、自分からの発話・準備・返事のあった割合・フィードバックを集計できます。
+
 準備の実行先は `examples/virtual-eumenes/always-on-mock.ts` のmockで、実在の検索やサービスは使いません。ライブラリとしては `createAlwaysOnAgent` を使います。既存の `createAgencyRuntime` と旧CLI（`bun run agency:legacy`）は、過去の評価を再現するために変更せず残しています。
 
 ## できること
