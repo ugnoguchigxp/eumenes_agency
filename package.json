@@ -18,6 +18,7 @@
 		"test": "bun test ./src ./test ./standalone ./eval ./examples",
 		"agency": "zsh -l scripts/api-entry.zsh standalone/always-on.ts",
 		"agency:legacy": "zsh -l scripts/api-entry.zsh standalone/cli.ts",
+		"agenda": "zsh -l scripts/api-entry.zsh standalone/agenda.ts",
 		"eval": "zsh -l scripts/api-entry.zsh eval/main.ts",
 		"eval:initiative": "zsh -l scripts/api-entry.zsh eval/initiative/run.ts",
 		"pack": "bun scripts/pack.ts",
@@ -31,7 +32,8 @@
 		"demo:mock-toolchain": "bun examples/virtual-eumenes/mock-demo.ts",
 		"eval:conversation:api": "zsh -l scripts/api-entry.zsh examples/virtual-eumenes/native.ts",
 		"eval:always-on": "bun eval/always-on/silence.ts",
-		"eval:always-on:api": "zsh -l scripts/api-entry.zsh eval/always-on/live.ts"
+		"eval:always-on:api": "zsh -l scripts/api-entry.zsh eval/always-on/live.ts",
+		"eval:agenda:api": "zsh -l scripts/api-entry.zsh eval/agenda/live.ts"
 	},
 	"dependencies": {
 		"zod": "4.6.7"

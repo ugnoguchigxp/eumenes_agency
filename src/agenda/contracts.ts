@@ -1,0 +1,226 @@
+/**
+ * Contracts of the agenda agent (spec/always-on-agenda-design-2026-11-08.md): code keeps the list
+ * of things to do and decides when and which; the model reads words and writes content.
+ */
+import { z } from "zod";
+
+export const AGENDA_VERSION = "agenda-1";
+
+/** The one user setting: the shortest gap between the agent's own utterances (15 s, 1 min, 5 min). */
+export const speechIntervals = [15, 60, 300] as const;
+export type SpeechIntervalSec = (typeof speechIntervals)[number];
+export const defaultSpeechIntervalSec: SpeechIntervalSec = 15;
+
+/** After the agent asked something, this long for the answer before it speaks again. */
+export const QUESTION_WAIT_MS = 60_000;
+/**
+ * Unanswered speech backs off by doubling; once the next gap would exceed 10 minutes, it waits
+ * for the user. Not the shortest gap: that is the setting above.
+ */
+export const SPEECH_HOLD_MS = 600_000;
+/**
+ * While the user spoke this recently, the conversation is going on: only what ties into it
+ * (their words of the last TOPIC_RECENT_MS, or a note made from them) is said. A question about
+ * something else waits until the talk pauses.
+ */
+export const ENGAGED_MS = 180_000;
+export const TOPIC_RECENT_MS = 300_000;
+/** With nothing new for this long, the passing of time itself is new information. */
+export const IDLE_PLAN_MS = 3_600_000;
+/** A declined utterance is not picked again before this. */
+export const DECLINE_DEFER_MS = 600_000;
+/** A research the host refused to start is tried again after this. */
+export const RESEARCH_RETRY_MS = 60_000;
+/** A research the host never returns stops counting as running after this. */
+export const RESEARCH_TTL_MS = 6 * 3_600_000;
+/** When the user wants quiet but names no length. */
+export const DEFAULT_QUIET_MIN = 60;
+/** Recent words kept in the working memory (never saved). */
+export const SAID_KEPT = 60;
+
+/** Open items per kind: the state stays small; a plan beyond it adds nothing. */
+export const OPEN_LIMITS = { ask: 4, research: 6, talk: 4 } as const;
+/** Items one plan may add per kind. */
+export const PLAN_ADD_LIMITS = { ask: 2, research: 3, talk: 2 } as const;
+
+export const agendaKinds = ["ask", "research", "talk"] as const;
+export type AgendaKind = (typeof agendaKinds)[number];
+
+/** One thing to do. `refs` say what it rests on; forgetting any of them drops it. */
+export interface AgendaItem {
+	readonly id: string;
+	readonly kind: AgendaKind;
+	readonly text: string;
+	readonly refs: readonly string[];
+	readonly value: number;
+	readonly reason: string;
+	/** The user asked for it. */
+	readonly requested: boolean;
+	/**
+	 * The agent's own reply said it would do this (research started from the reply, asked for
+	 * or not): it is not dropped as a duplicate, and its result is reported when ready.
+	 */
+	readonly promised: boolean;
+	/** `talk`: the note it is about. */
+	readonly noteId: string | null;
+	status: "open" | "doing" | "done" | "dropped";
+	readonly createdAt: number;
+	deferUntil: number | null;
+	declines: number;
+	endedAt: number | null;
+	/** `research`: checked against the notes before it starts (null: not yet). */
+	checkedRequest?: string | null;
+	/** `research`: the note it became. */
+	resultNoteId?: string | null;
+	/** Why the utterance was last declined, and when (the plan learns from it). */
+	lastDecline?: { readonly reason: string; readonly at: number } | null;
+}
+
+/** Words in the conversation: the user's, the agent's reply, the agent's own speech. */
+/** A tool the reply called, with what it got back (kept so the next reply sees what it did). */
+export interface ReplyCall {
+	readonly name: string;
+	readonly arguments: string;
+	readonly content: string;
+}
+
+export interface Said {
+	readonly id: string;
+	readonly who: "user" | "reply" | "own";
+	readonly text: string;
+	readonly at: number;
+	readonly refs: readonly string[];
+	/** `reply`: the tools it called. */
+	readonly calls?: readonly ReplyCall[];
+}
+
+/** What the host's memory knows about the user (eumenes_memory), cited `memory:<id>`. */
+export interface KnownItem {
+	readonly id: string;
+	readonly text: string;
+}
+
+/** A note the researcher wrote (a Markdown document in the host's store), cited `note:<id>`. */
+export interface NoteRef {
+	readonly id: string;
+	readonly title: string;
+	readonly summary: string;
+	readonly at: number;
+	readonly refs: readonly string[];
+}
+
+/** The user's wish for quiet: speech only, or everything (research and planning too). */
+export type QuietScope = "speech" | "all";
+export interface Quiet {
+	speechUntil: number | null;
+	allUntil: number | null;
+}
+
+export type AgendaTicket =
+	| {
+			readonly id: string;
+			readonly kind: "research";
+			readonly itemId: string;
+			readonly text: string;
+			readonly requested: boolean;
+			readonly promised: boolean;
+			readonly refs: readonly string[];
+			readonly at: number;
+	  }
+	| {
+			readonly id: string;
+			readonly kind: "speak";
+			readonly itemId: string;
+			readonly itemKind: "ask" | "talk";
+			readonly utterance: string;
+			readonly noteId: string | null;
+			readonly refs: readonly string[];
+			readonly at: number;
+	  };
+
+export interface StepHost {
+	/** Typing, a reply being made or speech being read out: nothing is planned or said. */
+	readonly busy: boolean;
+}
+
+export interface CallRecord {
+	readonly purpose: "plan" | "check" | "compose";
+	readonly at: number;
+	readonly model: string;
+	readonly latencyMs: number;
+	readonly inputTokens: number;
+	readonly outputTokens: number;
+	/** Did the call change anything (a plan added or dropped, a compose produced speech)? */
+	readonly changed: boolean;
+	readonly code: "applied" | "stale" | "failed" | "aborted";
+}
+
+export interface PlanOutcome {
+	readonly added: readonly AgendaItem[];
+	readonly dropped: readonly string[];
+	readonly rejected: readonly string[];
+	readonly reasons: readonly string[];
+	readonly call: CallRecord;
+}
+
+export interface ComposeOutcome {
+	readonly itemId: string;
+	readonly declined: string | null;
+	readonly rejected: readonly string[];
+	readonly call: CallRecord;
+}
+
+/** Before a research starts: is its theme new, partly covered (narrowed) or already covered? */
+export interface CheckOutcome {
+	readonly itemId: string;
+	readonly verdict: "new" | "partial" | "covered" | "failed";
+	readonly coveredBy: string | null;
+	/** What is asked of the researcher (narrowed when partly covered). */
+	readonly request: string | null;
+	readonly reason: string;
+	readonly call: CallRecord;
+}
+
+export interface StepOutcome {
+	readonly at: number;
+	readonly skipped: "stopped" | null;
+	readonly plan: PlanOutcome | null;
+	readonly check: CheckOutcome | null;
+	readonly compose: ComposeOutcome | null;
+	readonly tickets: readonly AgendaTicket[];
+}
+
+// ------------------------------------------------------------------ model outputs
+
+export const planSchema = z.strictObject({
+	add: z
+		.array(
+			z.strictObject({
+				kind: z.enum(agendaKinds),
+				text: z.string(),
+				refs: z.array(z.string()).max(6),
+				value: z.number().int().min(1).max(5),
+				reason: z.string(),
+			}),
+		)
+		.max(7),
+	drop: z.array(z.strictObject({ id: z.string(), reason: z.string() })).max(8),
+});
+export type PlanOutput = z.infer<typeof planSchema>;
+
+export const checkSchema = z.strictObject({
+	verdict: z.enum(["new", "partial", "covered"]),
+	coveredBy: z.string().nullable(),
+	request: z.string().nullable(),
+	reason: z.string(),
+});
+export type CheckOutput = z.infer<typeof checkSchema>;
+
+/** Above this share of shared character pairs, a research is the same theme as an earlier one. */
+export const SAME_THEME_OVERLAP = 0.35;
+
+export const composeSchema = z.strictObject({
+	utterance: z.string().nullable(),
+	decline: z.string().nullable(),
+});
+export type ComposeOutput = z.infer<typeof composeSchema>;
