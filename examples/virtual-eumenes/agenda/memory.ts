@@ -107,28 +107,38 @@ const stewardSystem = [
 	"- 変えることがなければ ops は空にします。出力は指定された JSON だけです。",
 ].join("\n");
 
+/** One pass of the memory's writer over the latest exchange. */
+export interface StewardInput {
+	readonly said: readonly { id: string; who: string; text: string }[];
+	/** Words not seen in an earlier pass: only these can be evidence. */
+	readonly fresh: readonly string[];
+	readonly at: number;
+}
+export interface StewardResult {
+	changed: boolean;
+	applied: string[];
+	rejected: string[];
+	usage: {
+		latencyMs: number;
+		inputTokens: number;
+		outputTokens: number;
+	} | null;
+}
+/** The memory's writer (Eumenes' steward): this mock, or the real memory's (host-memory.ts). */
+export type Steward = (r: StewardInput) => Promise<StewardResult>;
+/** What the agent and the hosts read from the memory. */
+export interface MemoryReader {
+	known(): KnownItem[];
+}
+
 /** The steward's pass over one exchange. Returns whether the memory changed. */
 export function createMockSteward(input: {
 	readonly llm: LlmPort;
 	readonly memory: MockMemory;
 	/** Local time as the user would say it, so relative dates become dates. */
 	readonly clock?: (now: number) => string;
-}) {
-	return async (r: {
-		readonly said: readonly { id: string; who: string; text: string }[];
-		/** Words not seen in an earlier pass: only these can be evidence. */
-		readonly fresh: readonly string[];
-		readonly at: number;
-	}): Promise<{
-		changed: boolean;
-		applied: string[];
-		rejected: string[];
-		usage: {
-			latencyMs: number;
-			inputTokens: number;
-			outputTokens: number;
-		} | null;
-	}> => {
+}): Steward {
+	return async (r) => {
 		const userIds = new Set(
 			r.said.filter((s) => s.who === "user").map((s) => s.id),
 		);
@@ -199,4 +209,4 @@ export function createMockSteward(input: {
 		return { changed: applied.length > 0, applied, rejected, usage };
 	};
 }
-export type MockSteward = ReturnType<typeof createMockSteward>;
+export type MockSteward = Steward;

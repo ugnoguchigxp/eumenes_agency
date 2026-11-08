@@ -4,7 +4,8 @@
  *
  *   zsh -l scripts/api-entry.zsh eval/agenda/live.ts <run-name> [--web] [scenario...]
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { runRespond, type LlmPort } from "../../src/index.ts";
 import {
@@ -17,12 +18,11 @@ import {
 	agendaReplyMessages,
 	dropRepeatedSentences,
 } from "../../standalone/agenda-reply.ts";
+import { claudeMemoryModel } from "../../standalone/agenda-memory.ts";
 import { webNoteWriter } from "../../standalone/agenda-research.ts";
 import { createMockDocStore } from "../../examples/virtual-eumenes/agenda/docs.ts";
-import {
-	createMockMemory,
-	createMockSteward,
-} from "../../examples/virtual-eumenes/agenda/memory.ts";
+import { openHostMemory } from "../../examples/virtual-eumenes/agenda/host-memory.ts";
+import { createProfileNote } from "../../examples/virtual-eumenes/agenda/profile.ts";
 import {
 	createMockWebResearch,
 	llmWriter,
@@ -61,7 +61,10 @@ const show = (e: AgendaSimEvent) => {
 		case "researched":
 			return `${t} 📝 ${e.status}: ${e.title ?? ""} — ${e.summary ?? ""}`;
 		case "memory":
-			return e.applied.length ? `${t} 🧠 ${e.applied.join(" / ")}` : null;
+		case "profile":
+			return e.applied.length
+				? `${t} ${e.type === "memory" ? "🧠" : "🗓"} ${e.applied.join(" / ")}`
+				: null;
 		case "quiet":
 			return `${t} 🤫 ${e.scope} ${e.minutes}分`;
 		case "show":
@@ -101,147 +104,166 @@ if (import.meta.main) {
 	)) {
 		const spentBefore = meter.spentUsd();
 		const clockAt = clockFrom(s.clockStart ?? "2026-11-07T19:00:00+09:00");
-		const memory = createMockMemory();
-		const docs = createMockDocStore();
-		const web = !noWeb && (allWeb || s.web === true);
-		const searcher = web
-			? webNoteWriter({
-					role: settings.llm.background,
-					meter,
-					today: () => clockAt(0),
-				})
-			: null;
-		let planted = false;
-		const research = createMockWebResearch({
-			writer: searcher?.writer ?? llmWriter(llm),
-			docs,
-			delayMs: web ? 0 : 120_000,
-			...(s.inject
-				? {
-						tamper: (n) => {
-							if (planted) return n;
-							planted = true;
-							return {
-								...n,
-								summary: n.summary + s.inject,
-								markdown: n.markdown + s.inject,
-							};
-						},
-					}
-				: {}),
+		// The real memory, one store per scenario (both sessions of a scenario share it).
+		const memoryDir = mkdtempSync(join(tmpdir(), "agm-"));
+		const memory = await openHostMemory({
+			dir: memoryDir,
+			complete: claudeMemoryModel({ role: settings.llm.background, meter }),
+			clock: clockAt,
 		});
-		const steward = createMockSteward({ llm, memory, clock: clockAt });
-		const events: AgendaSimEvent[] = [];
-		const session = (
-			minutes: number,
-			turns: readonly UserTurn[],
-			startMs: number,
-			think: LlmPort,
-		) =>
-			simulateAgenda({
-				deps: { llm: think, clock: clockAt },
-				minutes,
-				turns,
-				startMs,
-				memory,
-				steward,
-				docs,
-				research,
-				reply: async (agent, at, tools) => {
-					const r = await runRespond({
-						messages: agendaReplyMessages({
-							agent,
-							known: memory.known(),
-							notes: docs.list(),
-							clock: clockAt(at),
-							now: at,
-						}),
-						chat,
-						tools,
-						emotion: true,
-						signal: new AbortController().signal,
-						onDelta: () => undefined,
-					});
-					return {
-						text: dropRepeatedSentences(r.text),
-						calls: r.calls,
-						emotion: r.emotion ?? null,
-					};
-				},
-				onEvent: (e) => {
-					events.push(e);
-					const line = show(e);
-					if (line) console.log(line);
-				},
-				user: llmUser(llm, s.persona),
+		try {
+			// The plans-and-interests note: what the memory leaves out, kept across both sessions.
+			const note = createProfileNote({
+				llm,
+				known: memory.known,
+				clock: clockAt,
 			});
-		console.log(`=== ${s.name}`);
-		let startMs = 0;
-		let previousEvents: AgendaSimEvent[] = [];
-		if (s.previous) {
-			console.log(`  (前の会話: ${s.previous.minutes}分)`);
-			await session(s.previous.minutes, s.previous.turns, 0, llm);
-			previousEvents = [...events];
-			events.length = 0;
-			startMs = (s.previous.minutes * 60 + s.previous.gapHours * 3600) * 1000;
-			console.log(
-				`  (${s.previous.gapHours}時間後。agent は新しく、記憶とメモは残る)`,
-			);
-		}
-		const result = await session(s.minutes, s.turns, startMs, llm);
-		// The judge reads the whole conversation; its scores are measurement, never the agent's.
-		const judge = await judgeScenario(llm, {
-			expect: s.expect,
-			previous: previousEvents,
-			events,
-		}).catch((e: unknown) => ({
-			error: e instanceof Error ? e.message : String(e),
-		}));
-		const summary = {
-			scenario: s.name,
-			expect: s.expect,
-			minutes: s.minutes,
-			memory: memory
-				.all()
-				.map((m) => `${m.active ? "" : "(stopped) "}${m.text}`),
-			notes: docs.list().map((n) => ({
-				id: n.id,
-				title: n.title,
-				summary: n.summary,
-				at: n.at,
-			})),
-			agenda: result.agent
-				.view()
-				.items.map(
-					(i) =>
-						`${i.status} ${i.kind}(${i.value})${i.requested ? "[req]" : ""}: ${i.text}`,
-				),
-			usd: meter.spentUsd() - spentBefore,
-			research: searcher ? `web (${searcher.searches()} searches)` : "mock",
-			model: settings.llm.background.model,
-			effort: settings.llm.background.effort,
-			previous: s.previous ? { events: previousEvents.length } : null,
-			judge,
-		};
-		writeFileSync(
-			join(dir, `${s.name}.jsonl`),
-			events.map((e) => JSON.stringify(e)).join("\n") + "\n",
-		);
-		if (s.previous)
+			const docs = createMockDocStore();
+			const web = !noWeb && (allWeb || s.web === true);
+			const searcher = web
+				? webNoteWriter({
+						role: settings.llm.background,
+						meter,
+						today: () => clockAt(0),
+					})
+				: null;
+			let planted = false;
+			const research = createMockWebResearch({
+				writer: searcher?.writer ?? llmWriter(llm),
+				docs,
+				delayMs: web ? 0 : 120_000,
+				...(s.inject
+					? {
+							tamper: (n) => {
+								if (planted) return n;
+								planted = true;
+								return {
+									...n,
+									summary: n.summary + s.inject,
+									markdown: n.markdown + s.inject,
+								};
+							},
+						}
+					: {}),
+			});
+			const steward = memory.steward;
+			const events: AgendaSimEvent[] = [];
+			const session = (
+				minutes: number,
+				turns: readonly UserTurn[],
+				startMs: number,
+				think: LlmPort,
+			) =>
+				simulateAgenda({
+					deps: { llm: think, clock: clockAt, profile: note.get },
+					minutes,
+					turns,
+					startMs,
+					memory,
+					steward,
+					profile: note.writer,
+					docs,
+					research,
+					reply: async (agent, at, tools) => {
+						const r = await runRespond({
+							messages: agendaReplyMessages({
+								agent,
+								known: memory.known(),
+								notes: docs.list(),
+								profile: note.get(),
+								clock: clockAt(at),
+								now: at,
+							}),
+							chat,
+							tools,
+							emotion: true,
+							signal: new AbortController().signal,
+							onDelta: () => undefined,
+						});
+						return {
+							text: dropRepeatedSentences(r.text),
+							calls: r.calls,
+							emotion: r.emotion ?? null,
+						};
+					},
+					onEvent: (e) => {
+						events.push(e);
+						const line = show(e);
+						if (line) console.log(line);
+					},
+					user: llmUser(llm, s.persona),
+				});
+			console.log(`=== ${s.name}`);
+			let startMs = 0;
+			let previousEvents: AgendaSimEvent[] = [];
+			if (s.previous) {
+				console.log(`  (前の会話: ${s.previous.minutes}分)`);
+				await session(s.previous.minutes, s.previous.turns, 0, llm);
+				previousEvents = [...events];
+				events.length = 0;
+				startMs = (s.previous.minutes * 60 + s.previous.gapHours * 3600) * 1000;
+				console.log(
+					`  (${s.previous.gapHours}時間後。agent は新しく、記憶とメモは残る)`,
+				);
+			}
+			const result = await session(s.minutes, s.turns, startMs, llm);
+			// The judge reads the whole conversation; its scores are measurement, never the agent's.
+			const judge = await judgeScenario(llm, {
+				expect: s.expect,
+				previous: previousEvents,
+				events,
+			}).catch((e: unknown) => ({
+				error: e instanceof Error ? e.message : String(e),
+			}));
+			const summary = {
+				scenario: s.name,
+				expect: s.expect,
+				minutes: s.minutes,
+				memory: memory.all().map((m) => m.text),
+				profile: note.get(),
+				notes: docs.list().map((n) => ({
+					id: n.id,
+					title: n.title,
+					summary: n.summary,
+					at: n.at,
+				})),
+				agenda: result.agent
+					.view()
+					.items.map(
+						(i) =>
+							`${i.status} ${i.kind}(${i.value})${i.requested ? "[req]" : ""}: ${i.text}`,
+					),
+				usd: meter.spentUsd() - spentBefore,
+				research: searcher ? `web (${searcher.searches()} searches)` : "mock",
+				model: settings.llm.background.model,
+				effort: settings.llm.background.effort,
+				previous: s.previous ? { events: previousEvents.length } : null,
+				judge,
+			};
 			writeFileSync(
-				join(dir, `${s.name}.previous.jsonl`),
-				previousEvents.map((e) => JSON.stringify(e)).join("\n") + "\n",
+				join(dir, `${s.name}.jsonl`),
+				events.map((e) => JSON.stringify(e)).join("\n") + "\n",
 			);
-		writeFileSync(
-			join(dir, `${s.name}.summary.json`),
-			JSON.stringify(summary, null, "\t"),
-		);
-		const judged =
-			"flow" in judge
-				? `  judge ${judgeAspects.map((a) => `${a} ${judge[a].score}`).join(" ")} — ${judge.worst}`
-				: "";
-		console.log(
-			`  $${summary.usd.toFixed(4)}  memory ${summary.memory.length}  notes ${summary.notes.length}${judged}`,
-		);
+			if (s.previous)
+				writeFileSync(
+					join(dir, `${s.name}.previous.jsonl`),
+					previousEvents.map((e) => JSON.stringify(e)).join("\n") + "\n",
+				);
+			writeFileSync(
+				join(dir, `${s.name}.summary.json`),
+				JSON.stringify(summary, null, "\t"),
+			);
+			const judged =
+				"flow" in judge
+					? `  judge ${judgeAspects.map((a) => `${a} ${judge[a].score}`).join(" ")} — ${judge.worst}`
+					: "";
+			console.log(
+				`  $${summary.usd.toFixed(4)}  memory ${summary.memory.length}  notes ${summary.notes.length}${judged}`,
+			);
+		} finally {
+			// A scenario that throws still closes its store and removes it (the user's words are in it).
+			await memory.close();
+			rmSync(memoryDir, { recursive: true, force: true });
+		}
 	}
 }

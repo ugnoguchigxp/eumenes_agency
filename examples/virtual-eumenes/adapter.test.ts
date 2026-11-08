@@ -364,14 +364,16 @@ test("a missing canonical source is a recovery error, never an inferred forget",
 	}
 });
 
-test("pinned artifact hash matches the Eumenes adopted manifest", async () => {
-	const manifest = JSON.parse(
-		readFileSync(join(import.meta.dir, "vendor/manifest.json"), "utf8"),
-	);
-	const hash = new Bun.CryptoHasher("sha256")
-		.update(readFileSync(join(import.meta.dir, "vendor", manifest.artifact)))
-		.digest("hex");
-	expect(hash).toBe(manifest.sha256);
+test("pinned artifact hashes match the Eumenes adopted manifests", async () => {
+	for (const name of ["manifest.json", "host-manifest.json"]) {
+		const manifest = JSON.parse(
+			readFileSync(join(import.meta.dir, "vendor", name), "utf8"),
+		);
+		const hash = new Bun.CryptoHasher("sha256")
+			.update(readFileSync(join(import.meta.dir, "vendor", manifest.artifact)))
+			.digest("hex");
+		expect(hash).toBe(manifest.sha256);
+	}
 });
 
 test("an archived observation stays pinned to its captured Memory revision", () => {

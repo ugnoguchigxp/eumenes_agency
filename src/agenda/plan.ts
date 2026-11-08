@@ -12,6 +12,7 @@ import {
 	type AgendaKind,
 	type PlanOutcome,
 } from "./contracts.ts";
+import { profileOf } from "./profile.ts";
 import { planData } from "./prompt.ts";
 import {
 	clock,
@@ -43,6 +44,7 @@ export async function plan(
 	const startGen = st.planGen;
 	const knownNow = known(st);
 	const notesNow = notes(st);
+	const profileNow = profileOf(st);
 	const researching = st.researching;
 	const prompt = planData({
 		now,
@@ -50,6 +52,7 @@ export async function plan(
 		said: st.said,
 		items: st.items,
 		known: knownNow,
+		profile: profileNow,
 		notes: notesNow,
 		researching: researching
 			? (st.items.find((i) => i.id === researching.ticket.itemId) ?? null)
@@ -88,6 +91,7 @@ export async function plan(
 	const refsKnown = new Set([
 		...st.said.map((s) => s.id),
 		...knownNow.map((k) => `memory:${k.id}`),
+		...profileNow.map((l) => `profile:${l.id}`),
 		...notesNow.map((x) => `note:${x.id}`),
 	]);
 	const userSaid = new Set(
@@ -132,13 +136,16 @@ export async function plan(
 			why("unknown_ref");
 			continue;
 		}
-		// Research rests on what the user said: their words, the memory of them, or a note that
-		// came from those. The agent's own words alone never start it.
+		// Research rests on what the user said: their words, the memory of them, their plans and
+		// interests, or a note that came from those. The agent's own words alone never start it.
 		if (
 			a.kind === "research" &&
 			!refs.some(
 				(r) =>
-					userSaid.has(r) || r.startsWith("memory:") || r.startsWith("note:"),
+					userSaid.has(r) ||
+					r.startsWith("memory:") ||
+					r.startsWith("profile:") ||
+					r.startsWith("note:"),
 			)
 		) {
 			why("needs_user_reason");

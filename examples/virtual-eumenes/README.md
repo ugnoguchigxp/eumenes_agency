@@ -31,7 +31,7 @@ bun run eval:conversation:api judge my-conversation-run development configured-0
 
 Lunaでは`AGENCY_SETTINGS`を`config/api-luna-f-high.json`へ切り替え、生成と採点で同じ設定を使います。現在の品質評価はhigh/6000設定です。low設定の結果を同じ品質として扱いません。再実行の料金も同じ累計へ加算し、既存の不確定予約を含めて残額が足りなければ送信前に停止します。
 
-Eumenes採用のMemory 0.0.2 / schema 8配布物を`vendor/manifest.json`のSHA-256で固定しています。rootの開発用依存であり、Agency coreの配布物には含めません。MemoryはMITで、ライセンスは固定tgz内にあります。
+Eumenesが導入しているMemory 0.0.4 / schema 8と、Memory host 0.1.0（CLI・MCP・自然文の計画と想起）の配布物を、`vendor/manifest.json`と`vendor/host-manifest.json`のSHA-256で固定しています（2026-11-09にEumenesの`vendor/`から取り込み）。rootの開発用依存であり、Agency coreの配布物には含めません。MemoryはMITで、ライセンスは固定tgz内にあります。
 
 ```sh
 bun install --frozen-lockfile

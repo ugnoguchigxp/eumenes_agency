@@ -111,7 +111,7 @@ export const topicOpenAt = (st: AgendaState, i: AgendaItem, now: number) => {
  */
 export const topicGone = (st: AgendaState, i: AgendaItem, now: number) =>
 	i.kind === "ask" &&
-	i.refs.some((r) => !r.startsWith("memory:") && !r.startsWith("note:")) &&
+	i.refs.some((r) => !/^(?:memory|profile|note):/u.test(r)) &&
 	!connected(st, i, now);
 
 /**

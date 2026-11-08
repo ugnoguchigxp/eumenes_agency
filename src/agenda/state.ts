@@ -24,6 +24,11 @@ export interface AgendaDeps {
 	readonly known?: () => readonly KnownItem[];
 	/** The researcher's notes in the host's document store, read at each call. */
 	readonly notes?: () => readonly NoteRef[];
+	/**
+	 * The user's plans-and-interests note (Markdown, profile.ts), read at each call: what the
+	 * memory leaves out (intentions, plans not settled, what the user is thinking about).
+	 */
+	readonly profile?: () => string;
 	/** A host persona replaces the built-in one; the rest of the instructions stays. */
 	readonly persona?: string;
 	readonly speechIntervalSec?: SpeechIntervalSec;

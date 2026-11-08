@@ -1,25 +1,19 @@
 /**
  * The agenda agent's conversation CLI (spec/always-on-agenda-design-2026-11-08.md) in a mock
- * Eumenes: the memory (eumenes_memory stand-in, written by a steward after each exchange) and the
- * researcher's notes (Markdown files) stay in data/agenda/; the agent's working memory does not.
+ * Eumenes with the real memory: eumenes_memory (the vendored Memory host; its own planner writes
+ * after each exchange) and the researcher's notes (Markdown files) stay in data/agenda/; the
+ * agent's working memory does not.
  * Cost is recorded in data/agenda/usage.jsonl and never capped.
  *
  *   zsh -l scripts/api-entry.zsh standalone/agenda.ts [--interval 15|60|300]
  *       [--no-plan] [--log PATH | --no-log]
  *       [--fresh] [--mock-research]
  *
- * Commands: /agenda /notes /show <id> /memory /stop /resume /quit
+ * Commands: /agenda /notes /show <id> /memory /profile /stop /resume /quit
  */
 import { emitKeypressEvents, createInterface } from "node:readline";
-import {
-	existsSync,
-	mkdirSync,
-	readFileSync,
-	renameSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
-import { dirname, resolve } from "node:path";
+import { rmSync } from "node:fs";
+import { resolve } from "node:path";
 import { runRespond } from "../src/index.ts";
 import {
 	createAgendaAgent,
@@ -31,25 +25,26 @@ import {
 	type AgendaSessionEvent,
 } from "./agenda-session.ts";
 import { agendaReplyMessages, dropRepeatedSentences } from "./agenda-reply.ts";
+import { claudeMemoryModel } from "./agenda-memory.ts";
 import { webNoteWriter } from "./agenda-research.ts";
 import { createChatLog, chatsDir, printAbove } from "./chat-loop.ts";
 import { createProviderLlm, createProviderReply } from "./providers.ts";
 import { loadSettings, settingsDigest } from "./settings.ts";
 import { openUncappedMeter } from "./always-on-host.ts";
 import { createMockDocStore } from "../examples/virtual-eumenes/agenda/docs.ts";
-import {
-	createMockMemory,
-	createMockSteward,
-	type MemoryItem,
-} from "../examples/virtual-eumenes/agenda/memory.ts";
+import { openHostMemory } from "../examples/virtual-eumenes/agenda/host-memory.ts";
+import { createProfileNote } from "../examples/virtual-eumenes/agenda/profile.ts";
 import {
 	createMockWebResearch,
 	llmWriter,
 } from "../examples/virtual-eumenes/agenda/research.ts";
 
 const dataDir = resolve(import.meta.dir, "../data/agenda");
-const memoryPath = resolve(dataDir, "memory.json");
+/** The memory's store (its own SQLite, journal and socket); data/agenda/memory.json was the mock's. */
+const memoryDir = resolve(dataDir, "memory-host");
 const notesDir = resolve(dataDir, "notes");
+/** The user's plans and interests (Markdown; the user may edit it while the CLI runs). */
+const profilePath = resolve(dataDir, "profile.md");
 
 interface Args {
 	readonly interval: SpeechIntervalSec;
@@ -115,16 +110,6 @@ const localTime = (now: number) =>
 		minute: "2-digit",
 	});
 
-const loadMemory = (): MemoryItem[] =>
-	existsSync(memoryPath)
-		? (JSON.parse(readFileSync(memoryPath, "utf8")) as MemoryItem[])
-		: [];
-const saveMemory = (items: readonly MemoryItem[]) => {
-	mkdirSync(dirname(memoryPath), { recursive: true });
-	writeFileSync(`${memoryPath}.tmp`, JSON.stringify(items, null, "\t"));
-	renameSync(`${memoryPath}.tmp`, memoryPath);
-};
-
 async function main() {
 	const args = parseAgendaArgs(process.argv.slice(2), new Date());
 	const settings = loadSettings(
@@ -136,10 +121,19 @@ async function main() {
 	const llm = createProviderLlm(settings.llm.background, meter);
 	const chat = createProviderReply(settings.llm.main, meter);
 	if (args.fresh) {
-		rmSync(memoryPath, { force: true });
+		rmSync(memoryDir, { recursive: true, force: true });
 		rmSync(notesDir, { recursive: true, force: true });
+		rmSync(profilePath, { force: true });
 	}
-	const memory = createMockMemory(loadMemory());
+	if (settings.llm.background.provider === "openai")
+		throw new Error(
+			"the memory's model runs on the Claude API: set llm.background to a Claude model",
+		);
+	const memory = await openHostMemory({
+		dir: memoryDir,
+		complete: claudeMemoryModel({ role: settings.llm.background, meter }),
+		clock: localTime,
+	});
 	const docs = createMockDocStore({ dir: notesDir });
 	const searcher = args.mockResearch
 		? null
@@ -153,7 +147,13 @@ async function main() {
 		docs,
 		delayMs: searcher ? 0 : 60_000,
 	});
-	const steward = createMockSteward({ llm, memory, clock: localTime });
+	const steward = memory.steward;
+	const note = createProfileNote({
+		llm,
+		known: memory.known,
+		clock: localTime,
+		path: profilePath,
+	});
 	const agent = createAgendaAgent({
 		llm,
 		speechIntervalSec: args.interval,
@@ -161,6 +161,7 @@ async function main() {
 		startedAt: Date.now(),
 		known: memory.known,
 		notes: docs.list,
+		profile: note.get,
 	});
 	const log = createChatLog(args.log, Date.now, (m) =>
 		console.warn(`[warn] log write failed: ${m}`),
@@ -297,9 +298,23 @@ async function main() {
 				});
 				return out(dim(`  📝 ${e.title ?? e.status}: ${e.summary ?? ""}`));
 			case "memory":
-				saveMemory(memory.all());
-				log.write({ type: "memory", applied: e.applied });
-				return showPlan ? out(dim(`  🧠 ${e.applied.join(" / ")}`)) : undefined;
+			case "profile": {
+				log.write({ type: e.type, applied: e.applied, rejected: e.rejected });
+				if (!showPlan) return undefined;
+				const mark = e.type === "memory" ? "🧠" : "🗓";
+				return out(
+					dim(
+						[
+							e.applied.length ? `  ${mark} ${e.applied.join(" / ")}` : null,
+							e.rejected.length
+								? `  ${mark} 見送り: ${e.rejected.join(" / ")}`
+								: null,
+						]
+							.filter((x) => x !== null)
+							.join("\n"),
+					),
+				);
+			}
 			case "quiet":
 				log.write({ type: "quiet", scope: e.scope, minutes: e.minutes });
 				return out(
@@ -321,6 +336,7 @@ async function main() {
 	const session = createAgendaSession({
 		agent,
 		steward,
+		profile: note.writer,
 		docs,
 		research,
 		now: Date.now,
@@ -337,6 +353,7 @@ async function main() {
 					agent: a,
 					known: memory.known(),
 					notes: docs.list(),
+					profile: note.get(),
 					clock: localTime(Date.now()),
 					now: Date.now(),
 				}),
@@ -400,6 +417,13 @@ async function main() {
 						: "  記憶はまだありません",
 				),
 			);
+		} else if (cmd === "/profile") {
+			const text = note.get().trim();
+			out(
+				text
+					? `\n──── 予定と関心（${profilePath}）\n${text}\n────`
+					: dim("  予定と関心のメモはまだありません"),
+			);
 		} else if (cmd === "/stop") {
 			session.stop();
 			out(dim("  停止しました（/resume で再開）"));
@@ -412,7 +436,7 @@ async function main() {
 
 	console.log(
 		dim(
-			`agenda / 調べもの: ${searcher ? "Web検索" : "mock"} / 記憶 ${memory.known().length}件・メモ ${docs.list().length}件 / 話しかけの最短間隔 ${args.interval}秒 / background ${settings.llm.background.model} (${settings.llm.background.effort}) / log ${args.log ?? "off"}\ncommands: /agenda /notes /show <id> /memory /plan /stop /resume /quit`,
+			`agenda / 調べもの: ${searcher ? "Web検索" : "mock"} / 記憶 ${memory.known().length}件・メモ ${docs.list().length}件 / 話しかけの最短間隔 ${args.interval}秒 / background ${settings.llm.background.model} (${settings.llm.background.effort}) / log ${args.log ?? "off"}\ncommands: /agenda /notes /show <id> /memory /profile /plan /stop /resume /quit`,
 		),
 	);
 	emitKeypressEvents(process.stdin, rl);
@@ -440,14 +464,20 @@ async function main() {
 	rl.on("close", () => {
 		closed = true;
 		session.close();
-		saveMemory(memory.all());
 		log.write({ type: "end", spentUsd: meter.spentUsd() - sessionStart });
 		console.log(
 			dim(
 				`\nspend this session $${(meter.spentUsd() - sessionStart).toFixed(4)}`,
 			),
 		);
-		process.exit(0);
+		// The exchange in progress (reply, memory, note) finishes first, though not for ever; then
+		// the store's owner closes its socket and database before the process ends.
+		void Promise.race([
+			queue,
+			new Promise((done) => setTimeout(done, 15_000).unref?.()),
+		])
+			.then(() => memory.close())
+			.finally(() => process.exit(0));
 	});
 	rl.prompt();
 	session.start();

@@ -13,6 +13,7 @@ import {
 	type StepHost,
 } from "./contracts.ts";
 import { speechQuiet } from "./pacing.ts";
+import { profileOf } from "./profile.ts";
 import { composeData } from "./prompt.ts";
 import {
 	clock,
@@ -68,6 +69,7 @@ export async function compose(
 				note,
 				said: st.said,
 				known: known(st),
+				profile: profileOf(st),
 				quietEndedSecAgo:
 					st.lastQuietEnd === null
 						? null

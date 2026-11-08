@@ -14,7 +14,7 @@ import type {
 import type { EmotionEmoji, ToolPort } from "../src/index.ts";
 import { createAgendaReplyTools, notesMentioned } from "./agenda-reply.ts";
 import type { MockDocStore } from "../examples/virtual-eumenes/agenda/docs.ts";
-import type { MockSteward } from "../examples/virtual-eumenes/agenda/memory.ts";
+import type { Steward } from "../examples/virtual-eumenes/agenda/memory.ts";
 import type { MockWebResearch } from "../examples/virtual-eumenes/agenda/research.ts";
 
 export type AgendaSessionEvent =
@@ -45,7 +45,11 @@ export type AgendaSessionEvent =
 			readonly title: string | null;
 			readonly summary: string | null;
 	  }
-	| { readonly type: "memory"; readonly applied: readonly string[] }
+	| {
+			readonly type: "memory" | "profile";
+			readonly applied: readonly string[];
+			readonly rejected: readonly string[];
+	  }
 	| {
 			readonly type: "quiet";
 			readonly scope: QuietScope;
@@ -65,7 +69,10 @@ export type AgendaSessionEvent =
 
 export interface AgendaSessionDeps {
 	readonly agent: AgendaAgent;
-	readonly steward: MockSteward | null;
+	/** The memory's writer, run after each exchange. */
+	readonly steward: Steward | null;
+	/** The plans-and-interests note's writer, run after the memory's (it leaves out what that holds). */
+	readonly profile?: Steward | null;
 	readonly docs: MockDocStore;
 	readonly research: MockWebResearch;
 	/** The normal reply; its tool calls go into the agent's record so the next reply sees them. */
@@ -311,22 +318,24 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 			}
 			// Research the reply asked for starts at once; planning waits for the memory (still busy).
 			void kick();
-			if (deps.steward) {
+			// The writers see the agent's own speech too: it is what the user answered.
+			const said = agent
+				.view()
+				.said.slice(-8)
+				.map((s) => ({ id: s.id, who: s.who, text: s.text }));
+			const fresh = said.filter((s) => !seen.has(s.id)).map((s) => s.id);
+			for (const s of said) seen.add(s.id);
+			for (const [type, writer] of [
+				["memory", deps.steward],
+				["profile", deps.profile ?? null],
+			] as const) {
+				if (!writer) continue;
 				try {
-					const said = agent
-						.view()
-						.said.slice(-8)
-						.filter((s) => s.who !== "own");
-					const fresh = said.filter((s) => !seen.has(s.id)).map((s) => s.id);
-					for (const s of said) seen.add(s.id);
-					const m = await deps.steward({
-						said: said.map((s) => ({ id: s.id, who: s.who, text: s.text })),
-						fresh,
-						at: now(),
-					});
-					if (m.applied.length) emit({ type: "memory", applied: m.applied });
+					const m = await writer({ said, fresh, at: now() });
+					if (m.applied.length || m.rejected.length)
+						emit({ type, applied: m.applied, rejected: m.rejected });
 				} catch (e) {
-					emit({ type: "error", where: "memory", message: message(e) });
+					emit({ type: "error", where: type, message: message(e) });
 				}
 			}
 			replying = false;

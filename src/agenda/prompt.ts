@@ -11,6 +11,7 @@ import type {
 	Said,
 } from "./contracts.ts";
 import { OPEN_LIMITS, PLAN_ADD_LIMITS } from "./contracts.ts";
+import type { ProfileLine } from "./profile.ts";
 import { emotionChoiceRules } from "../application/respond-system.ts";
 
 export const defaultPersona =
@@ -28,7 +29,7 @@ export function planSystem(persona: string = defaultPersona): string {
 		"",
 		"【やることの種類】",
 		`- ask: 相手に聞くこと（一度に${PLAN_ADD_LIMITS.ask}件まで足せる）。1件で聞くのは一つのことだけです（「AとB」のように二つ聞かない）。text には聞きたいことを書きます（言い回しは話すときに整えます）。`,
-		`- research: 調べもの（一度に${PLAN_ADD_LIMITS.research}件まで）。担当（web_research）が調べて、結論を Markdown のメモにまとめます。text には、何を調べ、何を結論にしてほしいかを一文で書きます。おすすめの一覧や下調べのまとめも、そう頼めば作られます。refs に、きっかけになった相手の言葉（会話の who=user の id）か記憶（memory:<id>）か、それを元にしたメモ（note:<id>）を必ず入れます。相手が言っていない話題（相手の予定や好みの推測）は調べません。`,
+		`- research: 調べもの（一度に${PLAN_ADD_LIMITS.research}件まで）。担当（web_research）が調べて、結論を Markdown のメモにまとめます。text には、何を調べ、何を結論にしてほしいかを一文で書きます。おすすめの一覧や下調べのまとめも、そう頼めば作られます。refs に、きっかけになった相手の言葉（会話の who=user の id）か記憶（memory:<id>）か予定・関心（profile:<id>）か、それを元にしたメモ（note:<id>）を必ず入れます。相手が言っていない話題（相手の予定や好みの推測）は調べません。`,
 		`- talk: 調べたメモをもとに、相手に話題を振ること（一度に${PLAN_ADD_LIMITS.talk}件まで）。refs に note:<id> を一つ入れます。`,
 		`一覧に置いておける数には上限があります（ask ${OPEN_LIMITS.ask}・research ${OPEN_LIMITS.research}・talk ${OPEN_LIMITS.talk}）。足すときは、価値の低いものを drop で外して入れ替えます。`,
 		"value は、相手にとっての価値（1〜5）です。reason には、なぜそれをするのかを一言で書きます。",
@@ -42,7 +43,8 @@ export function planSystem(persona: string = defaultPersona): string {
 		"- 「AとBのどちらが好きか」のような二択の質問にせず、相手が自由に答えられる聞き方にします。",
 		"",
 		"【先回りする】",
-		"- 相手がこれから考えそうなこと、聞きそうなことを先回りして research にします（予定があればその下調べ、関心のある話題の新しい動き、困っていることの解決の手がかり）。",
+		"- user.plans と user.interests は、相手が話した予定（未定のものも）と、いま気にしていることのメモです。記憶（user.memory）は確かな事実と好みだけで、予定は持ちません。",
+		"- 相手がこれから考えそうなこと、聞きそうなことを先回りして research にします（user.plans の予定の下調べ、user.interests の話題の新しい動き、困っていることの解決の手がかり）。予定で決まっていないこと（宿、同行者など）は、ask で聞くか、決めるのに役立つ下調べにします。",
 		"- notes・researchedBefore・researching と同じテーマの調べものは、言い方を変えても足しません（同じ結果を何度も受け取ることになります。ホストも似たテーマを断ります）。次に調べるなら、まだ扱っていない別の話題や観点にします。",
 		"- 相手が話した話題で、まだメモにない観点があれば research を足します。調べものは一度に一つずつ順に進むので、続けて調べたいことは待ちの列に入れておいてかまいません。",
 		"- 調べた結果を全部伝えようとはしません。メモは記録に残り、後の会話で使えます。talk にするのは、雑談のネタになりそうなもの、相手が喜びそう・驚きそうなものだけです。",
@@ -130,12 +132,26 @@ const secAgo = (now: number, at: number) =>
 const who = (s: Said) =>
 	s.who === "user" ? "user" : s.who === "reply" ? "agent_reply" : "agent_own";
 
+/** The note's lines by section (plans, interests), left out when the note is empty. */
+const plansAndInterests = <T>(
+	lines: readonly ProfileLine[],
+	show: (l: ProfileLine) => T,
+) =>
+	lines.length === 0
+		? {}
+		: {
+				plans: lines.filter((l) => l.section === "plans").map(show),
+				interests: lines.filter((l) => l.section === "interests").map(show),
+			};
+
 export interface PlanInput {
 	readonly now: number;
 	readonly clock: string | null;
 	readonly said: readonly Said[];
 	readonly items: readonly AgendaItem[];
 	readonly known: readonly KnownItem[];
+	/** The user's plans and interests (the note's lines, cited profile:<id>). */
+	readonly profile?: readonly ProfileLine[];
 	readonly notes: readonly NoteRef[];
 	readonly researching: AgendaItem | null;
 	readonly quiet: Quiet;
@@ -157,6 +173,10 @@ export function planData(input: PlanInput): string {
 		now: input.clock,
 		user: {
 			memory: input.known.map((k) => ({ id: `memory:${k.id}`, text: k.text })),
+			...plansAndInterests(input.profile ?? [], (l) => ({
+				id: `profile:${l.id}`,
+				text: l.text,
+			})),
 		},
 		conversation: input.said.slice(-PLAN_SAID).map((s) => ({
 			id: s.id,
@@ -240,6 +260,8 @@ export interface ComposeInput {
 	readonly note: NoteRef | null;
 	readonly said: readonly Said[];
 	readonly known: readonly KnownItem[];
+	/** The user's plans and interests (the note's lines). */
+	readonly profile?: readonly ProfileLine[];
 	/** The user's quiet period ended this long ago (null: none). */
 	readonly quietEndedSecAgo: number | null;
 }
@@ -263,7 +285,10 @@ export function composeData(input: ComposeInput): string {
 		note: input.note
 			? { title: input.note.title, summary: input.note.summary }
 			: null,
-		user: { memory: input.known.map((k) => k.text) },
+		user: {
+			memory: input.known.map((k) => k.text),
+			...plansAndInterests(input.profile ?? [], (l) => l.text),
+		},
 		...(input.quietEndedSecAgo !== null && input.quietEndedSecAgo < 3600
 			? { quiet: { endedSecAgo: input.quietEndedSecAgo } }
 			: {}),

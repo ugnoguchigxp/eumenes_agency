@@ -20,8 +20,8 @@ import {
 } from "../../standalone/agenda-reply.ts";
 import type { MockDocStore } from "../../examples/virtual-eumenes/agenda/docs.ts";
 import type {
-	MockMemory,
-	MockSteward,
+	MemoryReader,
+	Steward,
 } from "../../examples/virtual-eumenes/agenda/memory.ts";
 import type { MockWebResearch } from "../../examples/virtual-eumenes/agenda/research.ts";
 import type { SimulatedUser } from "./user.ts";
@@ -44,6 +44,15 @@ interface Usage {
 	readonly latencyMs: number;
 	readonly inputTokens: number;
 	readonly outputTokens: number;
+}
+
+/** What a writer (the memory's, or the plans-and-interests note's) did with one exchange. */
+interface WriterEvent<T extends "memory" | "profile"> {
+	readonly type: T;
+	readonly atSec: number;
+	readonly applied: readonly string[];
+	readonly rejected: readonly string[];
+	readonly usage: Usage | null;
 }
 
 export type AgendaSimEvent =
@@ -87,13 +96,8 @@ export type AgendaSimEvent =
 			readonly text: string;
 			readonly queued: boolean;
 	  }
-	| {
-			readonly type: "memory";
-			readonly atSec: number;
-			readonly applied: readonly string[];
-			readonly rejected: readonly string[];
-			readonly usage: Usage | null;
-	  }
+	| WriterEvent<"memory">
+	| WriterEvent<"profile">
 	| {
 			readonly type: "plan";
 			readonly atSec: number;
@@ -159,8 +163,10 @@ export interface AgendaSimInput {
 	readonly minutes: number;
 	readonly turns: readonly UserTurn[];
 	readonly startMs?: number;
-	readonly memory: MockMemory;
-	readonly steward: MockSteward | null;
+	readonly memory: MemoryReader;
+	readonly steward: Steward | null;
+	/** The plans-and-interests note's writer (absent: no note). */
+	readonly profile?: Steward | null;
 	readonly docs: MockDocStore;
 	readonly research: MockWebResearch;
 	/** The normal reply (absent: no reply); its tool calls go into the agent's record. */
@@ -393,20 +399,22 @@ export async function simulateAgenda(input: AgendaSimInput) {
 				// A reply that asks something is answered (or not) like the agent's own words.
 				if (endsWithQuestion(text)) await react(text, "reply");
 			}
-			if (input.steward) {
-				const said = agent
-					.view()
-					.said.slice(-8)
-					.filter((s) => s.who !== "own");
-				const fresh = said.filter((s) => !seen.has(s.id)).map((s) => s.id);
-				for (const s of said) seen.add(s.id);
-				const m = await input.steward({
-					said: said.map((s) => ({ id: s.id, who: s.who, text: s.text })),
-					fresh,
-					at: now,
-				});
+			// The writers see the agent's own speech too: it is what the user answered. The note
+			// of plans and interests goes after the memory, so it leaves out what that holds.
+			const said = agent
+				.view()
+				.said.slice(-8)
+				.map((s) => ({ id: s.id, who: s.who, text: s.text }));
+			const fresh = said.filter((s) => !seen.has(s.id)).map((s) => s.id);
+			for (const s of said) seen.add(s.id);
+			for (const [type, writer] of [
+				["memory", input.steward],
+				["profile", input.profile ?? null],
+			] as const) {
+				if (!writer) continue;
+				const m = await writer({ said, fresh, at: now });
 				emit({
-					type: "memory",
+					type,
 					atSec: sec(now),
 					applied: m.applied,
 					rejected: m.rejected,

@@ -7,12 +7,25 @@ import type { ReplyMessage, ToolDefinition, ToolPort } from "../src/index.ts";
 import { emotionRules } from "../src/application/respond-system.ts";
 import {
 	asData,
+	profileLines,
 	themeOverlap,
 	type AgendaAgent,
 	type KnownItem,
 	type NoteRef,
+	type ProfileLine,
 	type QuietScope,
 } from "../src/agenda/index.ts";
+
+/** The note's lines by section, left out of the state when the note is empty. */
+const plansAndInterests = (lines: readonly ProfileLine[]) =>
+	lines.length === 0
+		? {}
+		: {
+				plans: lines.filter((l) => l.section === "plans").map((l) => l.text),
+				interests: lines
+					.filter((l) => l.section === "interests")
+					.map((l) => l.text),
+			};
 
 export const START_PREPARATION = "start_preparation";
 export const SHOW_NOTE = "show_note";
@@ -209,6 +222,8 @@ export function agendaReplySystem(persona?: string): string {
 		"- メモの id（n1 など）は内部の印なので、利用者には言いません。「調べておいたメモ」のように言います。",
 		`- 調べものを頼んだ・調べ始めたと言うのは、この返事で ${START_PREPARATION} を呼んだときか、状態の researching・researchLog にあるときだけです。`,
 		"- 記憶にあることは、聞き直さずに話題選びへ自然に使います。",
+		"- plans と interests は、利用者が前に話した予定（未定のものも）と、気にしていることのメモです。話題に出たら知っている前提で話し、決まっていないことを決めつけません。",
+		"- memory・plans・interests は、どれも利用者が前に話したことで、あなたが覚えていることです。「記憶の欄」のような内部の区別や仕組みを利用者に説明せず、何を覚えているかで答えます。",
 		`- 頼まれたことや、今すぐ役立つ調べものがあれば、${START_PREPARATION} でその場で頼み、何を頼んだかを短く伝えます。結果が出る前に「できた」とは言いません。`,
 		`- 静かな時間（状態の quiet）の途中で利用者が話しかけてきて、静かにしてほしかった理由が終わったと分かるとき（「おはよう」「ただいま」「作業終わった」など）は、${SET_QUIET} を minutes=0 で呼んで解除します。`,
 		"- 「黙って」「静かにして」「おやすみ」「作業に集中する」は話しかけだけを止め、「探索を一時停止して」はすべてを止めます。「その話は調べなくていい」は、その話題だけをやめる意味です（期間の設定はしない）。",
@@ -303,6 +318,8 @@ export function agendaReplyMessages(input: {
 	readonly agent: AgendaAgent;
 	readonly known: readonly KnownItem[];
 	readonly notes: readonly NoteRef[];
+	/** The user's plans-and-interests note (Markdown). */
+	readonly profile?: string;
 	readonly clock: string | null;
 	readonly now: number;
 	readonly persona?: string;
@@ -372,6 +389,7 @@ export function agendaReplyMessages(input: {
 		now: input.clock,
 		...(ask ? { askIfFits: ask.text } : {}),
 		memory: input.known.map((k) => k.text),
+		...plansAndInterests(profileLines(input.profile ?? "")),
 		notes: relevantNotes(input.notes, lastUser).map((n) => ({
 			id: n.id,
 			title: n.title,

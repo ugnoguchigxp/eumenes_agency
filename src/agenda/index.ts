@@ -16,3 +16,12 @@ export {
 	planData,
 	planSystem,
 } from "./prompt.ts";
+export {
+	emptyProfile,
+	PROFILE_TITLE,
+	profileLines,
+	updateProfile,
+	type ProfileLine,
+	type ProfileSection,
+	type ProfileUpdate,
+} from "./profile.ts";
