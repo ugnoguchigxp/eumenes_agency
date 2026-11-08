@@ -134,8 +134,8 @@ describe.skipIf(!hasHost)("P0 baseline on the installed distribution", () => {
 		// R4: the installed dist is the artifact's package/dist file for file.
 		expect(d.checks.installedDistMatchesArtifact).toBe(true);
 		expect(d.artifactContents).toMatchObject({
-			artifactFiles: 98,
-			installedFiles: 98,
+			artifactFiles: 118,
+			installedFiles: 118,
 			missing: [],
 			extra: [],
 			changed: [],
@@ -929,8 +929,8 @@ describe("P0-A06 (R4): the installed dist must be the artifact's package/dist, f
 			installed,
 		);
 		expect(result).toEqual({
-			artifactFiles: 98,
-			installedFiles: 98,
+			artifactFiles: 118,
+			installedFiles: 118,
 			missing: [],
 			extra: [],
 			changed: [],

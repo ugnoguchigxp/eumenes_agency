@@ -1,6 +1,33 @@
-# always-on を Eumenes へ取り込むための引き継ぎ
+# Eumenes への依頼：always-on の取り込み
 
-2026-11-07。[設計書](../spec/always-on-agency-design-2026-11-07.md)の段階5の資料。このリポジトリで実装・検証した always-on を、Eumenes のAgencyホスト（`api/application/agency/`）へ取り込むときの対応表、手順、受入、未解決の点をまとめる。**Eumenes のコードはこの段階では変更していない。** 本書の内容は、Eumenes の現行コード（2026-11-07 時点、`createAgencyRuntime` の F 方式）を読んで書いた。
+**宛先: Eumenes のコーディングエージェント。** 本書は、そのまま渡して実装してもらう依頼文である。eumenes_agency（このリポジトリ）で実装・検証した always-on を、Eumenes のAgencyホスト（`api/application/agency/`）へ取り込む。eumenes_agency の作業では Eumenes のコードを変更しない。本書は、Eumenes の現行コード（2026-11-07 時点、`createAgencyRuntime` の F 方式、`docs/memory.md` の steward）を読んで書いた。背景は[設計書](../spec/always-on-agency-design-2026-11-07.md)、検証の結果は[進捗](always-on-progress-2026-11-07.md)にある。
+
+## 0. 依頼の要点
+
+- **目的**: 背景の判断を always-on に置き換え、Eumenes が「利用者が話すまで待つだけ」でなく、常に考え、頼まれていなくても準備し、良い間合いで自分から話すようにする。
+- **やること**: 5節の手順1〜7。各手順の終わりに、その手順の確認を行う。
+- **決めてあること**: 0.1節。ここは変えずに実装する。合わない点が見つかったら、実装で回避せず報告する。
+- **守ること**:
+  - 通常応答の経路、Memory と steward、ツールチェーンの実行、発話の配送、checkpoint、忘却の journal は、既存のものを使う。
+  - 同じ会話で旧runtimeと always-on を同時に動かさない。
+  - 設定で旧runtimeへ戻せるようにする。
+  - always-on の思考と準備に、呼び出し・費用の上限を入れない。
+
+## 0.1 決めてあること
+
+1. **推論は並列にする。** always-on の思考（purpose `think`）と準備の実行は、会話・steward・専門担当と別の接続で並列に動かす。
+   - ローカル推論（LARM）の1枠を取り合わない。
+   - steward の直列化（`concurrencyKey`、`larm_preempted` による取り消し、保守の待ち）を always-on に当てはめない。
+   - 利用者の呼び出しが始まっても、思考を取り消さない。
+   - 入力中・返事の生成中・読み上げ中に tick しない規則（`busy`）は残す。これは推論の資源のためではなく、利用者に話しかぶせないため。
+   - 新しい利用者の発言で古い思考の行動が拒否される仕組み（stale）は、always-on 側にある。
+2. **利用者についての事実の正本は steward の記憶。**
+   - steward の State を `known` で渡す（`memory:<id>` で引用される）。always-on はそれを話題選びや準備に使うが、書き換えない。
+   - always-on の user model は、知りたいこと（gap）、仮説、準備の材料、考えといった、自分から動くための作業メモとして使う。
+   - 現状の always-on は、`known` があっても、利用者の発言から事実（stated / observed）を自分でも記録する。そのため steward と二重に持つことになる。これをやめる変更は、eumenes_agency 側で行う予定で、まだ実装していない（4節の7）。
+3. **メモリー整理は steward のまま。**
+   - always-on に記憶の統合・停止・訂正をさせない。待ちの時間をその仕事で埋めることもしない。
+   - 理由: 整理は新しいことがあったときだけ走るべきもので、steward はすでにそう動いている。また always-on が自分から使ってよいのは、読み取りと新規作成だけである。
 
 ## 1. 何を置き換えるか
 
@@ -31,8 +58,17 @@ Eumenes の現行の背景処理は、会話ごとの `createAgencyRuntime`（F 
 | `utteranceEmotion`（読み上げの気持ち） | **出力がない**（4節の3） | |
 | `snapshot()` を AgencyStatePort に保存 | `agent.snapshot()`（`AlwaysOnSnapshot` version 1）とheartbeatの`checkpoint()` | 旧runtimeとは形が違うので、保存の列か種類を分ける。発行済みで未配送の発話票は保存されない |
 | `prepareForgetting` と Memory の forget journal | `agent.forget(refs)` | 観測ID、`memory:<id>`、ホスト入力の出所（`sources`）のどれでもよい。派生物は不動点まで連鎖して消える |
-| `createAgencyLlmPort`（purpose ごとの system 要求・出力上限・期限） | purpose が `"think"` の呼び出しが1種類だけ | Eumenes の LlmPort は purpose ごとに system を要求している（`llm-port.ts:99`）ので、`think` を受け付けるようにする |
+| `createAgencyLlmPort`（purpose ごとの system 要求・出力上限・期限） | purpose が `"think"` の呼び出しが1種類だけ | Eumenes の LlmPort は purpose ごとに system を要求している（`llm-port.ts:99`）ので、`think` を受け付けるようにする。接続は会話・stewardと別にし、並列に動かす（0.1節の1） |
 | 活動予算・呼び出し予算 | always-on 側では適用しない（設計の決定） | Eumenes の利用制限は、ホストが票を拒否する形で効かせる（3節） |
+
+## 2.1 通常応答も always-on の声にする（利用者の試用で判明、2026-11-07）
+
+利用者のCLI試用で、通常応答が旧来の汎用指示のままだった。そのため「ツールは見えていない」「確かめられない」と答え、背景で準備が進んでいるのに、それを知らないまま返事をしていた（口と頭が別々の状態）。このリポジトリのCLIでは、次のように直した（`standalone/always-on-host.ts`）。Eumenes でも、通常応答の指示とデータに同じことを入れる。
+
+- 通常応答の指示: 自分は常に考えて自分から動くエージェントであること、使える準備の能力、頼まれたらその場で準備を始めること、「見えていない」で終わらせないこと、質問や選択肢で締めくくらないこと（`alwaysOnReplySystem`）。
+- 通常応答の参照資料に、エージェントの今の状態を渡す: 現在時刻、利用者について知っていること、準備中のこと（利用者が頼んだものか）、準備できた結果、直前の考え。
+- 通常応答のツール `start_preparation`: 利用者に頼まれたら、返事の中で `agent.requestPrepare(...)` を呼び、返った票をいつもの準備と同じく実行する（`createReplyTools`）。結果は、背景の思考が自分から伝える。
+- 記憶をセッションをまたいで残す: CLIは終了時と出来事のたびに `agent.snapshot()` を保存し、次の起動で戻す。Eumenes では既存のcheckpointに載せる（2節の対応表）。
 
 ## 3. 準備（prepare）とツールチェーンのつなぎ方
 
@@ -56,11 +92,12 @@ always-on の準備は、**ツール単位の1段**で選ぶ（`toolName` と `t
 4. **複数の会話**: 現行の `activeId`（表示中・最後に話した会話）に合わせ、heartbeat は表示中の会話だけで回すのが簡単。表示していない会話は、準備だけ続けるか止めるかを決める必要がある。
 5. **prompt cache**: このリポジトリでは `standalone/claude.ts` で思考の指示文に1時間のcacheを付けた。Eumenes は自前の呼び出し経路を使うので、同じことを Eumenes 側で行う。入力の約7割がcacheから読まれ、費用は56%減った（[進捗](always-on-progress-2026-11-07.md)の「入力の縮小とprompt cache」）。
 6. **再起動**: 発行済みで未配送の発話票は保存されない。再起動後に古い発話を届けない、という意味では安全側。準備中のものは保存され、結果が返れば受け付ける。
+7. **事実の二重記録**（eumenes_agency 側の課題）: 0.1節の2のとおり、`known` を渡したときに always-on が自分で事実を記録しない変更が要る。この変更が入るまでは、always-on の facts と steward の記憶が並ぶ。どちらも同じ発言から作られるので、通常は食い違わない。ただし、入力が増える。
 
-## 5. 取り込みの手順（案）
+## 5. 手順
 
 1. このリポジトリで `bun run pack` を実行し、配布物を Eumenes の `vendor/agency/` に置いて依存を更新する。always-on の名前は pack の検査で必須にしてある（`scripts/pack.ts` の `requiredExports`）。
-2. Eumenes の LlmPort に purpose `think` を足す。system の差し替えと prompt cache もここで行う。
+2. Eumenes の LlmPort に purpose `think` を足す。system の差し替えと prompt cache もここで行う。接続は会話・stewardと別にし、利用者の呼び出しと並列に動くことを確かめる（0.1節の1）。
 3. 会話ごとに `createAlwaysOnAgent` と heartbeat を作る。feed の観測、返事、配送の結果、返った仕事を、2節の対応表どおりにつなぐ。
 4. 準備は3節のAから始める。読み取り調査1つと独立成果物の生成1つ程度に絞る。
 5. checkpoint に `AlwaysOnSnapshot` を保存し、再起動のあと `restore` で戻す。

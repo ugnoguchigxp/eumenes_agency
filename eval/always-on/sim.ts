@@ -10,8 +10,10 @@ import {
 	type AlwaysOnAgent,
 	type AlwaysOnDeps,
 	type TickOutcome,
+	type ToolPort,
 } from "../../src/index.ts";
 import type { MockPreparer } from "../../examples/virtual-eumenes/always-on-mock.ts";
+import { createReplyTools } from "../../standalone/always-on-host.ts";
 
 export interface UserTurn {
 	readonly atSec: number;
@@ -47,11 +49,17 @@ export interface SimInput {
 	readonly deps: AlwaysOnDeps;
 	readonly minutes: number;
 	readonly turns?: readonly UserTurn[];
-	/** The normal reply to a user turn (absent: no reply is made). */
-	readonly reply?: (agent: AlwaysOnAgent, atMs: number) => Promise<string>;
+	/** The normal reply to a user turn (absent: no reply is made); `tools` starts preparations. */
+	readonly reply?: (
+		agent: AlwaysOnAgent,
+		atMs: number,
+		tools: ToolPort,
+	) => Promise<string>;
 	readonly onEvent?: (e: SimEvent) => void;
 	/** Runs prepare tickets (absent: every preparation is refused by the host). */
 	readonly preparer?: MockPreparer;
+	/** Virtual time the session starts at (a later session of a restored agent starts later). */
+	readonly startMs?: number;
 }
 
 export interface SimResult {
@@ -65,26 +73,28 @@ export interface SimResult {
 
 export async function simulate(input: SimInput): Promise<SimResult> {
 	const agent = createAlwaysOnAgent(input.deps);
-	const heartbeat = createHeartbeat(defaultHeartbeat, 0);
-	const end = input.minutes * 60_000;
+	const start = input.startMs ?? 0;
+	const heartbeat = createHeartbeat(defaultHeartbeat, start);
+	const end = start + input.minutes * 60_000;
 	const turns = [...(input.turns ?? [])].sort((a, b) => a.atSec - b.atSec);
 	const events: SimEvent[] = [];
 	const emit = (e: SimEvent) => {
 		events.push(e);
 		input.onEvent?.(e);
 	};
-	let now = 0;
+	let now = start;
 	let n = 0;
+	const stamp = start.toString(36);
 	let ticks = 0;
 	let utterances = 0;
 	let prepares = 0;
 	let lastTick: number | null = null;
-	heartbeat.event(0);
+	heartbeat.event(start);
 	for (;;) {
 		const delay = heartbeat.delayMs(now);
 		const tickAt = delay === null ? Number.POSITIVE_INFINITY : now + delay;
 		const turn = turns[0];
-		const turnAt = turn ? turn.atSec * 1000 : Number.POSITIVE_INFINITY;
+		const turnAt = turn ? start + turn.atSec * 1000 : Number.POSITIVE_INFINITY;
 		const jobAt = input.preparer?.nextAt() ?? Number.POSITIVE_INFINITY;
 		if (Math.min(tickAt, turnAt, jobAt) > end) break;
 		if (jobAt <= Math.min(tickAt, turnAt)) {
@@ -93,7 +103,7 @@ export async function simulate(input: SimInput): Promise<SimResult> {
 				agent.workReturned(r);
 				emit({
 					type: "prepared",
-					atSec: now / 1000,
+					atSec: (now - start) / 1000,
 					status: r.status,
 					text: r.summary,
 				});
@@ -107,23 +117,52 @@ export async function simulate(input: SimInput): Promise<SimResult> {
 			n++;
 			agent.invalidate();
 			agent.observe({
-				id: `u${n}`,
+				id: `u${stamp}.${n}`,
 				kind: "exchange.adopted",
 				actor: "user",
 				occurredAt: now,
 				text: turn.text,
 			});
-			emit({ type: "user", atSec: now / 1000, text: turn.text });
+			emit({ type: "user", atSec: (now - start) / 1000, text: turn.text });
 			if (input.reply) {
-				const text = await input.reply(agent, now);
+				const tools = createReplyTools({
+					agent,
+					tools: input.deps.tools ?? [],
+					now: () => now,
+					start: (ticket) => {
+						const accepted = input.preparer?.start(ticket, now) ?? false;
+						if (accepted) prepares++;
+						agent.recordResult({
+							ticketId: ticket.id,
+							status: accepted ? "succeeded" : "failed",
+							at: now,
+						});
+						emit({
+							type: "tick",
+							atSec: (now - start) / 1000,
+							action: "prepare",
+							applied: [],
+							drive: "requested",
+							thought: null,
+							text: `${ticket.toolName}: ${ticket.toolInput}（返事から）`,
+							rejected: [],
+							next: "normal",
+							latencyMs: null,
+							code: null,
+							inputTokens: 0,
+							outputTokens: 0,
+						});
+					},
+				});
+				const text = await input.reply(agent, now, tools);
 				agent.observe({
-					id: `r${n}`,
+					id: `r${stamp}.${n}`,
 					kind: "exchange.adopted",
 					actor: "agent",
 					occurredAt: now,
 					text,
 				});
-				emit({ type: "reply", atSec: now / 1000, text });
+				emit({ type: "reply", atSec: (now - start) / 1000, text });
 			}
 			heartbeat.event(now);
 			continue;
@@ -154,7 +193,7 @@ export async function simulate(input: SimInput): Promise<SimResult> {
 		}
 		emit({
 			type: "tick",
-			atSec: now / 1000,
+			atSec: (now - start) / 1000,
 			action: out.skipped ? "skipped" : (out.ticket?.action ?? "wait"),
 			applied: out.applied,
 			drive: out.thought?.drive ?? null,
@@ -178,6 +217,6 @@ export async function simulate(input: SimInput): Promise<SimResult> {
 		ticks,
 		utterances,
 		prepares,
-		lastTickSec: lastTick === null ? null : lastTick / 1000,
+		lastTickSec: lastTick === null ? null : (lastTick - start) / 1000,
 	};
 }

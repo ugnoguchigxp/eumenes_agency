@@ -9,9 +9,12 @@ import {
 	defaultHeartbeat,
 	type AlwaysOnAgent,
 	type AlwaysOnTicket,
+	type AlwaysOnTool,
 	type TickOutcome,
+	type ToolPort,
 } from "../src/index.ts";
 import type { MockPreparer } from "../examples/virtual-eumenes/always-on-mock.ts";
+import { createReplyTools } from "./always-on-host.ts";
 
 export type SessionEvent =
 	| { readonly type: "user"; readonly text: string }
@@ -45,9 +48,14 @@ export type SessionEvent =
 
 export interface SessionDeps {
 	readonly agent: AlwaysOnAgent;
-	/** The normal reply to what the user just said (the agent's record holds the conversation). */
-	readonly reply: (agent: AlwaysOnAgent) => Promise<string>;
-	readonly preparer: Pick<MockPreparer, "start" | "due" | "nextAt">;
+	/**
+	 * The normal reply to what the user just said (the agent's record holds the conversation).
+	 * `tools` lets the reply start a preparation the user asks for.
+	 */
+	readonly reply: (agent: AlwaysOnAgent, tools: ToolPort) => Promise<string>;
+	readonly preparer: Pick<MockPreparer, "start" | "due" | "nextAt"> & {
+		readonly tools: readonly AlwaysOnTool[];
+	};
 	readonly now: () => number;
 	readonly setTimer: (fn: () => void, ms: number) => unknown;
 	readonly clearTimer: (handle: unknown) => void;
@@ -73,6 +81,8 @@ export function createAlwaysOnSession(deps: SessionDeps) {
 	let inFlight: AbortController | null = null;
 	let jobsTimer: unknown = null;
 	let n = 0;
+	// Observation ids stay unique when the agent was restored from an earlier session.
+	const stamp = now().toString(36);
 	const busy = () => ({ busy: typing !== null || replying });
 
 	/** One timer for the earliest preparation result still out. */
@@ -132,6 +142,14 @@ export function createAlwaysOnSession(deps: SessionDeps) {
 		agent.recordResult({ ticketId: ticket.id, status: "succeeded", at: now() });
 	};
 
+	/** The reply's tool: a preparation the user asks for starts at once. */
+	const replyTools = createReplyTools({
+		agent,
+		tools: deps.preparer.tools,
+		now,
+		start: deliver,
+	});
+
 	const scheduler = createHeartbeatScheduler({
 		heartbeat,
 		now,
@@ -183,7 +201,7 @@ export function createAlwaysOnSession(deps: SessionDeps) {
 			n++;
 			agent.invalidate();
 			agent.observe({
-				id: `u${n}`,
+				id: `u${stamp}.${n}`,
 				kind: "exchange.adopted",
 				actor: "user",
 				occurredAt: now(),
@@ -194,10 +212,10 @@ export function createAlwaysOnSession(deps: SessionDeps) {
 			heartbeat.enter();
 			const started = now();
 			try {
-				const reply = await deps.reply(agent);
+				const reply = await deps.reply(agent, replyTools);
 				if (closed || reply === "") return;
 				agent.observe({
-					id: `r${n}`,
+					id: `r${stamp}.${n}`,
 					kind: "exchange.adopted",
 					actor: "agent",
 					occurredAt: now(),

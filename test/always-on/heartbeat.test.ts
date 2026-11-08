@@ -147,3 +147,21 @@ describe("speech pacing", () => {
 		);
 	});
 });
+
+test("the scheduler exposes its final backoff checkpoint after the tick", async () => {
+	const heartbeat = createHeartbeat(defaultHeartbeat, 0);
+	const saved: unknown[] = [];
+	const scheduler = createHeartbeatScheduler({
+		heartbeat,
+		now: () => 10_000,
+		setTimer: () => 1,
+		clearTimer: () => {},
+		run: async () => ({ next: "later", wakeAt: null }),
+		onSettled: () => {
+			saved.push(heartbeat.checkpoint());
+		},
+	});
+	await scheduler.fireNow();
+	expect(saved).toEqual([{ anchor: 10_000, intervalMs: 40_000 }]);
+	scheduler.dispose();
+});

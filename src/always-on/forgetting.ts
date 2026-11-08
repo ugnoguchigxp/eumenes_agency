@@ -35,9 +35,7 @@ export function forgetDerived(
 				mark(`stock:${s.id}`, [s.targets, s.sourceRefs, s.inputs]) || changed;
 		for (const p of state.preparing)
 			changed = mark(`prepare:${p.ticketId}`, [p.refs, p.inputs]) || changed;
-		for (const o of observations)
-			if (o.actor === "agent" || o.actor === "tool" || o.actor === "host")
-				changed = mark(o.id, [o.refs]) || changed;
+		for (const o of observations) changed = mark(o.id, [o.refs]) || changed;
 	}
 	state.facts = state.facts.filter((f) => !gone.has(`fact:${f.id}`));
 	state.gaps = state.gaps.filter((g) => !gone.has(`gap:${g.id}`));

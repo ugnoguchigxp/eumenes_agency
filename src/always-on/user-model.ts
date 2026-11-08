@@ -18,6 +18,8 @@ const bare = (id: string, prefix: string) =>
 	id.startsWith(`${prefix}:`) ? id.slice(prefix.length + 1) : id;
 
 export interface UserOpContext {
+	/** Host memory owns facts; this model keeps hypotheses and gaps only. */
+	readonly hostOwnsFacts?: boolean;
 	readonly at: number;
 	/** Observations shown to this tick, by id. */
 	readonly shown: ReadonlyMap<string, Observation>;
@@ -67,6 +69,16 @@ export function applyUserOps(
 			continue;
 		}
 		const text = op.text?.trim() ?? "";
+		if (
+			ctx.hostOwnsFacts &&
+			((op.op === "fact.add" && op.basis !== "hypothesis") ||
+				(op.op === "fact.update" &&
+					op.basis !== null &&
+					op.basis !== "hypothesis"))
+		) {
+			refuse("host_owned_fact");
+			continue;
+		}
 		if (op.op === "fact.add") {
 			if (op.aspect === null || op.basis === null || text === "") {
 				refuse("missing_field");

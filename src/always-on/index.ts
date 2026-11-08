@@ -1,4 +1,5 @@
 export * from "./contracts.ts";
+export { prepareAlwaysOnForgetting } from "./snapshot.ts";
 export {
 	createHeartbeat,
 	createHeartbeatScheduler,

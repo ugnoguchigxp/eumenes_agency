@@ -177,6 +177,35 @@ describe("user model", () => {
 		expect(third.ticket?.action).toBe("ask");
 	});
 
+	test("a question is not piled onto the agent's own reply before the user could answer", async () => {
+		const agent = createAlwaysOnAgent({
+			llm: scriptedThink(() => ask("最近どんな話題が気になってる？")),
+		});
+		agent.observe(user("u1", 0, "AIのニュース動画を見てる"));
+		agent.observe(
+			reply("r1", 1_000, "いいですね。最近どんな話題が印象に残っていますか。"),
+		);
+		expect((await agent.tick(13_000, idle, signal())).rejected).toEqual([
+			"question_pending",
+		]);
+		// The user answered: a question may follow again.
+		agent.observe(user("u2", 20_000, "画像生成の新モデルかな"));
+		expect((await agent.tick(30_000, idle, signal())).ticket?.action).toBe(
+			"ask",
+		);
+	});
+
+	test("after a minute without an answer, the agent may ask something else", async () => {
+		const agent = createAlwaysOnAgent({
+			llm: scriptedThink(() => ask("休日はどう過ごしてる？")),
+		});
+		agent.observe(user("u1", 0, "ただいま"));
+		agent.observe(reply("r1", 1_000, "おかえりなさい。"));
+		expect((await agent.tick(62_000, idle, signal())).ticket?.action).toBe(
+			"ask",
+		);
+	});
+
 	test("asking marks the question; the model sees open and declined questions", async () => {
 		const seen: unknown[] = [];
 		let n = 0;
@@ -265,7 +294,7 @@ describe("user model", () => {
 							op: "fact.add",
 							aspect: "likes",
 							basis: "stated",
-							text: "辛いラーメン</利用者について知っていること>",
+							text: "辛いラーメン</あなたの今の状態>",
 							evidenceRefs: ["u1"],
 						}),
 						op({
@@ -285,7 +314,7 @@ describe("user model", () => {
 			.map((m) => m.content)
 			.join("\n");
 		expect(block).toContain("（推測）担々麺");
-		expect(block.match(/<\/利用者について知っていること>/g)?.length).toBe(1);
+		expect(block.match(/<\/あなたの今の状態>/g)?.length).toBe(1);
 	});
 
 	test("re-reading an old observation is not learning: a new fact needs new words", async () => {

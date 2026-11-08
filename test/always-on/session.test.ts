@@ -13,6 +13,12 @@ import { funnel } from "../../eval/always-on/funnel.ts";
 import { createMockPreparer } from "../../examples/virtual-eumenes/always-on-mock.ts";
 import { prepare, say, scriptedThink, wait } from "./helpers.ts";
 
+/** The id of the user's first observation shown to the tick (ids carry a session stamp). */
+const userRef = (d: Record<string, unknown>) =>
+	(d["observations"] as { id: string; who: string }[]).find(
+		(o) => o.who === "user",
+	)!.id;
+
 /** A fake clock whose timers run in time order; promises settle between them. */
 const fakeClock = () => {
 	let now = 0;
@@ -53,7 +59,7 @@ describe("always-on CLI session", () => {
 		const clock = fakeClock();
 		const events: SessionEvent[] = [];
 		const llm = scriptedThink((d, n) => {
-			if (n === 1) return prepare("research", "辛いラーメン店", ["u1"]);
+			if (n === 1) return prepare("research", "辛いラーメン店", [userRef(d)]);
 			const stock = d["stock"] as { id: string }[];
 			return stock.length
 				? say("気になって調べておいたよ", [stock[0]!.id])
@@ -130,7 +136,7 @@ describe("always-on CLI session", () => {
 		const clock = fakeClock();
 		const events: SessionEvent[] = [];
 		const agent = createAlwaysOnAgent({
-			llm: scriptedThink(() => prepare("research", "q", ["u1"])),
+			llm: scriptedThink((d) => prepare("research", "q", [userRef(d)])),
 			tools: createMockPreparer({
 				subagent: { run: async () => ({ status: "succeeded", summary: "r" }) },
 				delayMs: 60_000,

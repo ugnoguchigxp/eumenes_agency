@@ -5,11 +5,16 @@
  *
  *   zsh -l scripts/api-entry.zsh standalone/always-on.ts [--interval 10|60|600]
  *       [--interest TEXT]... [--no-interest] [--no-thoughts] [--log PATH | --no-log]
+ *       [--state PATH] [--fresh] [--mock-research]
+ *
+ * The agent (what it knows about the user, its thoughts, prepared material) is saved in
+ * data/always-on/state.json and comes back next time; --fresh starts over.
  *
  * Commands: /thoughts /tick /quiet [min] /stop /resume /state
  *           /feedback useful|intrusive|missed [note] /quit
  */
 import { emitKeypressEvents, createInterface } from "node:readline";
+import { resolve } from "node:path";
 import {
 	createAlwaysOnAgent,
 	runRespond,
@@ -25,17 +30,28 @@ import { createChatLog, chatsDir, printAbove } from "./chat-loop.ts";
 import { createProviderLlm, createProviderReply } from "./providers.ts";
 import { loadSettings, settingsDigest } from "./settings.ts";
 import { defaultInterestText, toStandingInterests } from "./persona.ts";
-import { noTools, openUncappedMeter, replyMessages } from "./always-on-host.ts";
+import {
+	alwaysOnStatePath,
+	loadAgentState,
+	openUncappedMeter,
+	replyMessages,
+	saveAgentState,
+} from "./always-on-host.ts";
 import {
 	createMockPreparer,
 	llmSubagent,
 } from "../examples/virtual-eumenes/always-on-mock.ts";
+import { webResearcher, webTools } from "./always-on-research.ts";
 
 export interface AlwaysOnArgs {
 	readonly interval: SpeechIntervalSec;
 	readonly interests: readonly string[];
 	readonly thoughts: boolean;
 	readonly log: string | null;
+	readonly state: string;
+	readonly fresh: boolean;
+	/** Use the offline mock instead of real web search for preparations. */
+	readonly mockResearch: boolean;
 }
 
 export function parseAlwaysOnArgs(
@@ -46,6 +62,9 @@ export function parseAlwaysOnArgs(
 	const interests: string[] = [];
 	let noInterest = false;
 	let thoughts = true;
+	let state = alwaysOnStatePath;
+	let fresh = false;
+	let mockResearch = false;
 	let log: string | null =
 		`${chatsDir}/${now.toISOString().replace(/[:.]/g, "-")}-always-on.jsonl`;
 	for (let i = 0; i < argv.length; i++) {
@@ -66,6 +85,9 @@ export function parseAlwaysOnArgs(
 		else if (arg === "--no-thoughts") thoughts = false;
 		else if (arg === "--log") log = value();
 		else if (arg === "--no-log") log = null;
+		else if (arg === "--state") state = value();
+		else if (arg === "--fresh") fresh = true;
+		else if (arg === "--mock-research") mockResearch = true;
 		else throw new Error(`unknown argument: ${arg}`);
 	}
 	return {
@@ -77,36 +99,55 @@ export function parseAlwaysOnArgs(
 				: [defaultInterestText],
 		thoughts,
 		log,
+		state,
+		fresh,
+		mockResearch,
 	};
 }
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
+const localTime = (now: number) =>
+	new Date(now).toLocaleString("ja-JP", {
+		weekday: "short",
+		month: "numeric",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
 
 async function main() {
 	const args = parseAlwaysOnArgs(process.argv.slice(2), new Date());
-	const settings = loadSettings();
+	// always-on thinks at effort "high" (background, so it never delays the reply); the reply
+	// stays at "medium". AGENCY_SETTINGS overrides.
+	const settings = loadSettings(
+		process.env.AGENCY_SETTINGS
+			? undefined
+			: resolve(import.meta.dir, "../config/always-on.json"),
+	);
 	const meter = openUncappedMeter(settings);
 	const llm = createProviderLlm(settings.llm.background, meter);
 	const chat = createProviderReply(settings.llm.main, meter);
 	const interests = toStandingInterests(args.interests);
 	// Preparation runs on the examples mock: no real search or service is used.
-	const preparer = createMockPreparer({
-		subagent: llmSubagent(llm),
-		delayMs: 60_000,
-	});
+	// Preparation searches the web for real (read-only); --mock-research keeps it offline.
+	const researcher = args.mockResearch
+		? null
+		: webResearcher({
+				model: settings.llm.background.model,
+				meter,
+				today: () => localTime(Date.now()),
+			});
+	const preparer = researcher
+		? createMockPreparer({ subagent: researcher, delayMs: 0, tools: webTools })
+		: createMockPreparer({ subagent: llmSubagent(llm), delayMs: 60_000 });
+	const restore = args.fresh ? null : loadAgentState(args.state);
 	const agent = createAlwaysOnAgent({
+		...(restore ? { restore } : {}),
 		llm,
 		interests,
 		tools: preparer.tools,
 		speechIntervalSec: args.interval,
-		clock: (now) =>
-			new Date(now).toLocaleString("ja-JP", {
-				weekday: "short",
-				month: "numeric",
-				day: "numeric",
-				hour: "2-digit",
-				minute: "2-digit",
-			}),
+		clock: localTime,
 	});
 	const log = createChatLog(args.log, Date.now, (m) =>
 		console.warn(`[warn] log write failed: ${m}`),
@@ -130,7 +171,26 @@ async function main() {
 		if (!closed) printAbove(rl, process.stdout, text);
 	};
 
+	// The mock's jobs do not outlive the process: what was still out ended with the last run.
+	for (const p of agent.view().preparing)
+		agent.workReturned({
+			ticketId: p.ticketId,
+			at: Date.now(),
+			status: "failed",
+			summary: "前回の終了で中断した",
+		});
+	const save = () => {
+		try {
+			saveAgentState(args.state, agent.snapshot());
+		} catch (e) {
+			console.warn(
+				`[warn] state save failed: ${e instanceof Error ? e.message : String(e)}`,
+			);
+		}
+	};
+
 	const show = (e: SessionEvent) => {
+		if (e.type !== "error") queueMicrotask(save);
 		switch (e.type) {
 			case "user":
 				log.write({ type: "user", text: e.text });
@@ -178,7 +238,12 @@ async function main() {
 				return out(dim(`  [準備] ${e.toolName}: ${e.toolInput}`));
 			case "prepared":
 				log.write({ type: "prepared", status: e.status, text: e.text });
-				return out(dim(`  [準備完了] ${e.text}`));
+				// The whole result is in the log and /state; the terminal shows its head.
+				return out(
+					dim(
+						`  [準備完了] ${e.text.length > 200 ? `${e.text.slice(0, 200).replace(/\s+/g, " ")}…` : e.text}`,
+					),
+				);
 			case "error":
 				log.write({ type: "error", where: e.where, message: e.message });
 				return out(dim(`  [${e.where}エラー] ${e.message}`));
@@ -196,12 +261,17 @@ async function main() {
 		},
 		clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
 		emit: show,
-		reply: async (a) =>
+		reply: async (a, tools) =>
 			(
 				await runRespond({
-					messages: replyMessages(a, interests),
+					messages: replyMessages(
+						a,
+						interests,
+						preparer.tools,
+						localTime(Date.now()),
+					),
 					chat,
-					tools: noTools,
+					tools,
 					emotion: false,
 					signal: new AbortController().signal,
 					onDelta: () => undefined,
@@ -235,7 +305,7 @@ async function main() {
 		} else if (cmd === "/state") {
 			const v = agent.view();
 			const lines = [
-				`observations ${v.observations} / thoughts ${v.thoughts.length} / unanswered ${v.pacing.unanswered} / next tick ${session.status().intervalSec}s / spend this session $${(meter.spentUsd() - sessionStart).toFixed(4)}`,
+				`observations ${v.observations} / thoughts ${v.thoughts.length} / unanswered ${v.pacing.unanswered} / next tick ${session.status().intervalSec}s / spend this session $${(meter.spentUsd() - sessionStart).toFixed(4)}${researcher ? ` + web search ${researcher.searches()} 回` : ""}`,
 				...v.facts.map(
 					(f) => `  fact ${f.id} [${f.basis}/${f.aspect}] ${f.text}`,
 				),
@@ -263,7 +333,7 @@ async function main() {
 
 	console.log(
 		dim(
-			`always-on / 話しかけの最短間隔 ${args.interval}秒 / 好きなもの ${args.interests.join(" | ") || "なし"} / background ${settings.llm.background.model} / log ${args.log ?? "off"}\ncommands: /thoughts /tick /quiet [分] /stop /resume /state /feedback useful|intrusive|missed /quit`,
+			`always-on / 調べもの: ${researcher ? "Web検索" : "mock"} / ${restore ? `前回の記憶あり（知っていること${agent.view().facts.length}件）` : "記憶なしで開始"} / 話しかけの最短間隔 ${args.interval}秒 / 好きなもの ${args.interests.join(" | ") || "なし"} / background ${settings.llm.background.model} / log ${args.log ?? "off"}\ncommands: /thoughts /tick /quiet [分] /stop /resume /state /feedback useful|intrusive|missed /quit`,
 		),
 	);
 	emitKeypressEvents(process.stdin, rl);
@@ -292,6 +362,7 @@ async function main() {
 	rl.on("close", () => {
 		closed = true;
 		session.close();
+		save();
 		log.write({
 			type: "end",
 			spentUsd: meter.spentUsd() - sessionStart,

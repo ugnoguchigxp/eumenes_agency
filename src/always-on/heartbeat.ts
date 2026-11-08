@@ -108,6 +108,8 @@ export interface HeartbeatSchedulerDeps {
 	 * Runs one tick; returns the model's wish for the next one and when the agent must think
 	 * again at the latest (null: nothing was decided).
 	 */
+	/** Persist the final scheduler checkpoint after its tick and wake adjustments. */
+	readonly onSettled?: () => void | Promise<void>;
 	readonly run: () => Promise<{
 		readonly next: NextPace;
 		readonly wakeAt: number | null;
@@ -150,7 +152,11 @@ export function createHeartbeatScheduler(deps: HeartbeatSchedulerDeps) {
 				heartbeat.ticked(now(), result?.next ?? "normal");
 			if (result?.wakeAt != null) heartbeat.wakeBy(now(), result.wakeAt);
 			running = false;
-			rearm();
+			try {
+				await deps.onSettled?.();
+			} finally {
+				rearm();
+			}
 		}
 	};
 	return {

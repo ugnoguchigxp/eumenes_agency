@@ -6,7 +6,7 @@
  */
 import type { Observation } from "../contracts/model.ts";
 import type { LlmPort } from "../contracts/ports.ts";
-import type { WithInput } from "../contracts/memory.ts";
+import type { WithInput, InputContext } from "../contracts/memory.ts";
 import { defaultBudget } from "../contracts/runtime.ts";
 import type { Budget } from "../application/budget.ts";
 import { callModel } from "../application/model-call.ts";
@@ -83,7 +83,7 @@ export interface AlwaysOnView {
 }
 
 export interface AlwaysOnAgent {
-	observe(input: AlwaysOnObservationInput): Observation;
+	observe(input: AlwaysOnObservationInput, context?: InputContext): Observation;
 	/** One heartbeat tick: at most one model call. `host` is read again before acting. */
 	tick(
 		now: number,
@@ -91,9 +91,23 @@ export interface AlwaysOnAgent {
 		signal: AbortSignal,
 	): Promise<TickOutcome>;
 	/** The host's delivery result for a ticket. Delivered speech becomes an observation. */
-	recordResult(receipt: AlwaysOnReceipt): Observation | null;
+	recordResult(
+		receipt: AlwaysOnReceipt,
+		deliveredTicket?: AlwaysOnTicket,
+	): Observation | null;
 	/** A preparation came back: its result becomes an observation and a finding. */
 	workReturned(result: AlwaysOnWorkReturn): Observation | null;
+	/**
+	 * The user asked for a preparation during the normal reply (the reply's tool). It rests on the
+	 * user's latest words; the same tool rules apply. The host runs the ticket as usual.
+	 */
+	requestPrepare(request: {
+		readonly toolName: string;
+		readonly toolInput: string;
+		readonly at: number;
+		readonly observationId?: string;
+		readonly input?: InputContext;
+	}): { readonly ticket: AlwaysOnTicket } | { readonly rejected: string };
 	/** New user input or a host change: a tick in flight may still think but not act. */
 	invalidate(): void;
 	/** User/host controls (not model decisions). */
@@ -104,6 +118,9 @@ export interface AlwaysOnAgent {
 	view(): AlwaysOnView;
 	snapshot(): AlwaysOnSnapshot;
 }
+
+/** After the agent spoke, the user gets this long to answer before it asks anything more. */
+const QUESTION_GAP_MS = 60_000;
 
 /** Text compared for literal repeats: whitespace and punctuation do not make a sentence new. */
 const normalize = (text: string) =>
@@ -134,6 +151,11 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 	let observations: Observation[] = restore
 		? structuredClone([...restore.observations])
 		: [];
+	const observationInputs = new Map(restore?.observationInputs ?? []);
+	if (deps.known) {
+		state.facts = state.facts.filter((f) => f.basis === "hypothesis");
+		dropOrphans(state);
+	}
 	const forgotten = new Set(restore?.forgotten ?? []);
 	let seq = restore?.seq ?? 0;
 	let epoch = 0;
@@ -148,6 +170,9 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 		observations.push(o);
 		if (observations.length > OBSERVATIONS_KEPT)
 			observations = observations.slice(-OBSERVATIONS_KEPT);
+		const retained = new Set(observations.map((x) => x.id));
+		for (const id of observationInputs.keys())
+			if (!retained.has(id)) observationInputs.delete(id);
 	};
 
 	const interestRefs = new Set(interests.map((x) => `interest:${x.id}`));
@@ -214,6 +239,7 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 				return o?.actor === "user" && o.seq > seenSeq;
 			});
 		const user = applyUserOps(state, out.userOps, {
+			hostOwnsFacts: deps.known !== undefined,
 			at,
 			shown: shownObs,
 			extraRefs: new Set([...interestRefs, ...memoryRefs]),
@@ -316,11 +342,21 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 			)
 		)
 			refuse("repeat");
-		// One question at a time: an unanswered question is not followed by another.
+		// One question at a time: an unanswered question is not followed by another, and a
+		// question is not piled onto what the agent just said before the user could answer.
+		const lastUserAt = Math.max(
+			-1,
+			...observations
+				.filter((o) => o.actor === "user")
+				.map((o) => o.occurredAt),
+		);
+		const lastAgentAt = state.pacing.lastAgentAt;
 		if (
 			a.kind === "ask" &&
-			state.pacing.lastOwnWasAsk &&
-			state.pacing.unanswered > 0
+			((state.pacing.lastOwnWasAsk && state.pacing.unanswered > 0) ||
+				(lastAgentAt !== null &&
+					at - lastAgentAt < QUESTION_GAP_MS &&
+					lastUserAt <= lastAgentAt))
 		)
 			refuse("question_pending");
 		const gate = speechGate(state.pacing, intervalMs, at, host.busy);
@@ -353,13 +389,27 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 	};
 
 	const agent: AlwaysOnAgent = {
-		observe(input) {
+		observe(input, context) {
 			const id = input.id ?? nextId("o");
 			if (forgotten.has(id))
 				throw new RangeError(`observation ${id} was forgotten`);
 			const existing = observations.find((o) => o.id === id);
 			if (existing) return existing;
-			const o: Observation = { ...structuredClone(input), id, seq: ++seq };
+			const refs = [
+				...new Set([...(input.refs ?? []), ...(context?.sources ?? [])]),
+			];
+			if (refs.some((r) => forgotten.has(r)))
+				throw new RangeError("forgotten observation input");
+			const o: Observation = {
+				...structuredClone(input),
+				...(refs.length ? { refs } : {}),
+				id,
+				seq: ++seq,
+			};
+			observationInputs.set(
+				id,
+				structuredClone(context ?? { sources: [id, ...refs], complete: true }),
+			);
 			append(o);
 			if (o.actor === "user") state.pacing.unanswered = 0;
 			if (o.actor === "agent")
@@ -367,6 +417,19 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 					state.pacing.lastAgentAt ?? 0,
 					o.occurredAt,
 				);
+			// A host can replay a verified delivery after restore without replaying the proposal.
+			if (
+				o.actor === "agent" &&
+				o.kind === "delivery.observed" &&
+				o.deliveryStatus === "succeeded"
+			) {
+				state.pacing.lastOwnAt = o.occurredAt;
+				state.pacing.unanswered++;
+				for (const g of state.gaps)
+					if (o.refs?.includes(`gap:${g.id}`)) g.askedAt = o.occurredAt;
+				for (const s of state.stock)
+					if (o.refs?.includes(`stock:${s.id}`)) s.usedAt = o.occurredAt;
+			}
 			if (o.actor === "user" || o.actor === "tool") epoch++;
 			return o;
 		},
@@ -396,7 +459,17 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 			// Host inputs (instructions, interests, tools, memory) are dependencies like observations.
 			const system = deps.system
 				? deps.system()
-				: { value: alwaysOnSystem(), input: { sources: [], complete: true } };
+				: {
+						value: alwaysOnSystem(
+							deps.known
+								? {
+										knowing:
+											"利用者についての事実はuser.fromMemoryが正本です。自分ではstated/observedのfactsを記録しません。userOpsは仮説（hypothesis）と、知りたいこと（gap）の作業メモだけに使います。仮説は事実として扱わず、本人の訂正と拒否に従います。",
+									}
+								: {},
+						),
+						input: { sources: [], complete: true },
+					};
 			const hostInputs = [
 				system.input,
 				...interests.map((x) => x.input),
@@ -414,7 +487,12 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 			for (const [id, t] of issued)
 				if (t.at + PREPARING_TTL_MS <= now) issued.delete(id);
 			const startEpoch = epoch;
-			const { prompt, shown } = thinkData({
+			const {
+				prompt,
+				shown,
+				input: visibleInput,
+			} = thinkData({
+				observationInputs,
 				now,
 				clock: deps.clock ? deps.clock(now) : null,
 				state,
@@ -425,7 +503,11 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 				speech: speechGate(state.pacing, intervalMs, now, before.busy),
 				prepare: prepareGate(state.pacing, now),
 			});
-			const inputs = [...shown, ...hostSources];
+			const inputs = [...new Set([...visibleInput.sources, ...hostSources])];
+			if (inputs.some((r) => forgotten.has(r)))
+				return { ...base, skipped: "forgotten_input" };
+			if (forgotten.size > 0 && !visibleInput.complete)
+				return { ...base, skipped: "incomplete_input" };
 			const call = await callModel(
 				deps.llm,
 				unlimited,
@@ -434,7 +516,8 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 					at: now,
 					input: {
 						sources: inputs,
-						complete: hostInputs.every((x) => x.complete),
+						complete:
+							visibleInput.complete && hostInputs.every((x) => x.complete),
 					},
 					system: system.value,
 					prompt,
@@ -460,7 +543,7 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 				rejectCodes: [],
 			};
 			// Forgotten while the call was out: nothing from it is kept.
-			if (inputs.some((id) => forgotten.has(id)))
+			if (signal.aborted || inputs.some((id) => forgotten.has(id)))
 				return { ...base, skipped: "aborted", call: outcome };
 			const settled = settle(
 				call.value,
@@ -487,10 +570,25 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 			};
 		},
 
-		recordResult(receipt) {
-			const ticket = issued.get(receipt.ticketId);
+		recordResult(receipt, deliveredTicket) {
+			// After restore the host may reconcile a persisted ticket with a real, identified delivery.
+			const recovered =
+				receipt.status === "succeeded" &&
+				receipt.observationId &&
+				deliveredTicket?.action !== "prepare" &&
+				deliveredTicket?.id === receipt.ticketId
+					? deliveredTicket
+					: undefined;
+			const ticket = issued.get(receipt.ticketId) ?? recovered;
 			if (!ticket) return null;
 			issued.delete(receipt.ticketId);
+			if (
+				[...ticket.inputs, ...ticket.evidenceRefs].some((r) =>
+					forgotten.has(r),
+				) ||
+				ticket.at + PREPARING_TTL_MS <= receipt.at
+			)
+				return null;
 			if (ticket.action === "prepare") {
 				// Accepted or unknown: it stays preparing until its result returns or it expires.
 				if (receipt.status !== "failed") return null;
@@ -508,24 +606,76 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 			}
 			if (receipt.status !== "succeeded") return null;
 			const o = agent.observe({
+				...(receipt.observationId ? { id: receipt.observationId } : {}),
 				kind: "delivery.observed",
 				actor: "agent",
 				occurredAt: receipt.at,
-				text: ticket.utterance ?? "",
+				text: receipt.text ?? ticket.utterance ?? "",
 				causationId: ticket.id,
 				deliveryStatus: "succeeded",
 				// What it said rests on what it cited and was shown: forgetting follows it here.
 				refs: [...ticket.evidenceRefs, ...ticket.inputs],
 			});
-			state.pacing.lastOwnAt = receipt.at;
-			state.pacing.unanswered++;
 			state.pacing.lastOwnWasAsk = ticket.action === "ask";
-			for (const g of state.gaps)
-				if (ticket.evidenceRefs.includes(`gap:${g.id}`)) g.askedAt = receipt.at;
-			for (const s of state.stock)
-				if (ticket.evidenceRefs.includes(`stock:${s.id}`))
-					s.usedAt = receipt.at;
 			return o;
+		},
+
+		requestPrepare(request) {
+			if (state.pacing.stopped) return { rejected: "stopped" };
+			const tool = tools.find((t) => t.name === request.toolName);
+			if (!tool) return { rejected: "unknown_tool" };
+			if (!autonomous(tool)) return { rejected: "tool_not_autonomous" };
+			const input = request.toolInput.trim();
+			if (input === "") return { rejected: "empty_input" };
+			const asked = [...observations].reverse().find((o) => o.actor === "user");
+			if (!asked) return { rejected: "needs_user_request" };
+			if (request.observationId && request.observationId !== asked.id)
+				return { rejected: "stale_user_request" };
+			const requestedInput = [
+				observationInputs.get(asked.id) ?? {
+					sources: [asked.id],
+					complete: true,
+				},
+				tool.input ?? { sources: [], complete: true },
+				request.input ?? { sources: [], complete: true },
+			];
+			const sources = [
+				...new Set([asked.id, ...requestedInput.flatMap((x) => x.sources)]),
+			];
+			if (
+				sources.some((r) => forgotten.has(r)) ||
+				(forgotten.size > 0 && requestedInput.some((x) => !x.complete))
+			)
+				return { rejected: "forgotten_input" };
+			if (
+				state.preparing.some(
+					(p) => p.toolName === tool.name && p.toolInput === input,
+				)
+			)
+				return { rejected: "duplicate_prepare" };
+			const ticket: AlwaysOnTicket = {
+				id: nextId("t"),
+				tickId: "reply",
+				action: "prepare",
+				utterance: null,
+				toolName: tool.name,
+				toolInput: input,
+				drive: "care",
+				evidenceRefs: [asked.id],
+				inputs: sources,
+				at: request.at,
+			};
+			issued.set(ticket.id, ticket);
+			state.preparing.push({
+				ticketId: ticket.id,
+				toolName: tool.name,
+				toolInput: input,
+				refs: [asked.id],
+				inputs: sources,
+				at: request.at,
+				requested: true,
+			});
+			return { ticket };
 		},
 
 		workReturned(result) {
@@ -533,6 +683,11 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 			if (!job) return null;
 			issued.delete(job.ticketId);
 			state.preparing = state.preparing.filter((p) => p !== job);
+			if (
+				job.at + PREPARING_TTL_MS <= result.at ||
+				[...job.refs, ...job.inputs].some((r) => forgotten.has(r))
+			)
+				return null;
 			const o = agent.observe({
 				kind: "work.returned",
 				actor: "tool",
@@ -565,7 +720,18 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 
 		forget(refs) {
 			for (const r of refs) forgotten.add(r);
-			observations = forgetDerived(state, observations, refs).observations;
+			const next = forgetDerived(state, observations, refs);
+			observations = next.observations;
+			for (const r of next.gone) forgotten.add(r);
+			for (const [id, ticket] of issued)
+				if (
+					[...ticket.inputs, ...ticket.evidenceRefs].some((r) =>
+						forgotten.has(r),
+					)
+				)
+					issued.delete(id);
+			for (const id of observationInputs.keys())
+				if (forgotten.has(id)) observationInputs.delete(id);
 			epoch++;
 		},
 
@@ -585,6 +751,7 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
 			observations: structuredClone(observations),
 			forgotten: [...forgotten],
 			seq,
+			observationInputs: structuredClone([...observationInputs]),
 		}),
 	};
 	return agent;

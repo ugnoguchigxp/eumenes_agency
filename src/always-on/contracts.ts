@@ -8,7 +8,7 @@ import type { DeliveryStatus, ObservationInput } from "../contracts/model.ts";
 import type { CallOutcome } from "../contracts/runtime.ts";
 
 /** Bump when the built-in instructions or the think contract change. */
-export const ALWAYS_ON_VERSION = "always-on-22";
+export const ALWAYS_ON_VERSION = "always-on-26";
 
 /** The one user setting: the shortest gap between the agent's own utterances. */
 export const speechIntervals = [10, 60, 600] as const;
@@ -134,6 +134,8 @@ export interface Preparing {
 	/** Observation ids the tick that asked for it was shown. */
 	readonly inputs: readonly string[];
 	readonly at: number;
+	/** The user asked for it (through the normal reply), rather than the agent on its own. */
+	readonly requested?: boolean;
 }
 
 export const STOCK_LIMIT = 16;
@@ -302,6 +304,9 @@ export interface AlwaysOnReceipt {
 	readonly ticketId: string;
 	readonly status: DeliveryStatus;
 	readonly at: number;
+	/** Actual delivered text/identity when voice output differs from the proposal. */
+	readonly observationId?: string;
+	readonly text?: string;
 }
 
 /**
@@ -342,6 +347,11 @@ export interface AlwaysOnSnapshot {
 	readonly observations: readonly import("../contracts/model.ts").Observation[];
 	readonly forgotten: readonly string[];
 	readonly seq: number;
+	/** Raw observation inputs, separate from model citations. */
+	readonly observationInputs?: readonly (readonly [
+		string,
+		import("../contracts/memory.ts").InputContext,
+	])[];
 }
 
 export type AlwaysOnObservationInput = Omit<ObservationInput, "id"> & {

@@ -80,14 +80,18 @@ interface Job {
 /** Runs prepare tickets: accepted at once, returned after `delayMs`. */
 export function createMockPreparer(input: {
 	readonly subagent: MockSubagent;
+	/** A result is handed back no earlier than this after the start (0: when it is ready). */
 	readonly delayMs: number;
+	/** The tools offered (default: the mock ones). A host with a real researcher names its own. */
+	readonly tools?: readonly AlwaysOnTool[];
 }) {
+	const tools = input.tools ?? alwaysOnMockTools;
 	const jobs: Job[] = [];
 	return {
-		tools: alwaysOnMockTools,
+		tools,
 		/** Accepts a prepare ticket; false for anything the mock does not run. */
 		start(ticket: AlwaysOnTicket, at: number): boolean {
-			const tool = alwaysOnMockTools.find((t) => t.name === ticket.toolName);
+			const tool = tools.find((t) => t.name === ticket.toolName);
 			if (ticket.action !== "prepare" || !tool || tool.requiresApproval)
 				return false;
 			// Settled at once: a failing subagent becomes a failed result, never an unhandled rejection.

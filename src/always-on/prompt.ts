@@ -4,6 +4,7 @@
  * replace the instructions (AlwaysOnDeps.system) and keep the same data and output contract.
  */
 import type { Observation } from "../contracts/model.ts";
+import type { InputContext } from "../contracts/memory.ts";
 import {
 	ALWAYS_ON_VERSION,
 	OBSERVATIONS_FULL,
@@ -38,7 +39,7 @@ const thinking = [
 
 const speaking = [
 	"【話しかける】話しすぎの調整はホストが行います。speech.allowed が true なら、間を空けすぎる心配はいりません。自分で遠慮して待つ必要はなく、話したいことがあれば話します。speech.allowed が false なら action.kind は wait にします。",
-	"会話が途切れて静かになったら、こちらから次の一言を持ち出すのが基本です。直前の話の続き、感想、相手への気軽な質問、別の軽い話題、自分の好きなものの話などです。待つのは、相手が作業中・休みたい・静かにしてほしいと言ったときと、自分の問いかけへの返事を少し待ちたいときです。疲れている相手には、短くやわらかい一言にします。",
+	"会話が途切れて静かになったら、こちらから次の一言を持ち出すのが基本です。直前の話への感想や自分の考え、それについて知っていること、準備したことの共有、別の軽い話題、自分の好きなものの話、相手への気軽な質問などです。待つのは、相手が作業中・休みたい・静かにしてほしいと言ったときと、自分の問いかけへの返事を少し待ちたいときです。疲れている相手には、短くやわらかい一言にします。",
 	"話すのは1〜2文の自然な日本語で、問いは一つまでです。見出し・箇条書き・URLは使いません。",
 	"said は、この会話で自分から話しかけた言葉です。said にある話題・問い・提案は、言い方を変えても繰り返しません（同じ文はホストが受け付けません）。返事がないまま続けて話しかけるときは、said にない話題にします。agent_reply（自分の返事）と同じことも繰り返しません。",
 	"直前の自分の発言（agent_reply を含む）が相手への質問で終わっているなら、60秒まではその答えを待ち、別の質問を重ねません。sinceAgentSpokeSec が60を超えたら、返事待ちはもう待つ理由になりません。答えを求めずに、感想や別の軽い話題で話しかけます。",
@@ -54,7 +55,8 @@ const knowing = [
 	"本人が言ったことは fact.add（basis=stated）で、evidenceRefs にその発言の観測 id を入れます。言い換えや訂正、好みの変化は fact.update、間違いだった・もう当てはまらないものは fact.retract にします（どちらも根拠の観測 id を入れる）。",
 	"推測は hypothesis として、根拠なしでも記録できます。推測は準備や質問のきっかけに使い、本人に事実として言いません。",
 	"知りたいことは gap.add で残します（text=問い、reason=知るとどう役立つか）。答えが分かったら gap.answer と、分かったことの fact.add を同時に行います。答えたくなさそうなら gap.decline にして、もう聞きません。",
-	"相手のことをまだあまり知らないうちは、気軽な質問で知りに行くのが一番の仕事です。好きなもの、最近の関心、仕事や生活、苦手なものなど、何を聞いてもかまいません。聞くときは action.kind=ask にし、一度に一つだけ聞きます。関係する gap があれば evidenceRefs に gap:<id> を入れます。",
+	"相手のことをまだあまり知らないうちは、知りに行く質問も大事です。好きなもの、最近の関心、仕事や生活、苦手なものなど、何を聞いてもかまいません。ただし質問ばかりにしません。相手が話してくれたことには、まず中身で応えます（感想、それについて知っていること、自分の考え、準備の提案や開始）。質問するのは、答えによって次に話すことや準備が変わるときだけで、一度に一つです。聞くときは action.kind=ask にし、関係する gap があれば evidenceRefs に gap:<id> を入れます。",
+	"相手が自分から挙げたことは、どれも関心がある前提で扱います。どれが好きか選ばせたり、優劣をつけさせたりする質問（「どちらが気になりますか」など）はしません。挙げられたものそれぞれに中身で応えます。相手がすでに答えたことや、自分の返事（agent_reply）で聞いたことを、言い方を変えて聞き直しません。",
 	"すでに知っていることを、わざわざもう一度聞きません。知っていることは話題選びに使います（好きなものの話を振る、苦手なものを避ける）。",
 	"相手が好みを取り消した・興味を失った話題は、自分から持ち出しません。その話題を区切ると宣言したりせず、黙って別の話題に移ります。",
 ];
@@ -170,6 +172,7 @@ const secAgo = (now: number, at: number) =>
 	Math.max(0, Math.round((now - at) / 1000));
 
 export interface ThinkDataInput {
+	readonly observationInputs?: ReadonlyMap<string, InputContext>;
 	readonly now: number;
 	readonly clock: string | null;
 	readonly state: AlwaysOnState;
@@ -187,6 +190,7 @@ export interface ThinkDataInput {
 export function thinkData(input: ThinkDataInput): {
 	readonly prompt: string;
 	readonly shown: readonly string[];
+	readonly input: InputContext;
 } {
 	const { now, state } = input;
 	const recent = input.observations.slice(-OBSERVATIONS_SHOWN);
@@ -232,6 +236,7 @@ export function thinkData(input: ThinkDataInput): {
 			input: p.toolInput,
 			for: p.refs,
 			secAgo: secAgo(now, p.at),
+			...(p.requested ? { requestedByUser: true } : {}),
 		})),
 		stock: state.stock.map((s) => ({
 			id: `stock:${s.id}`,
@@ -307,5 +312,39 @@ export function thinkData(input: ThinkDataInput): {
 			text: t.text,
 		})),
 	};
-	return { prompt: JSON.stringify(data), shown: recent.map((o) => o.id) };
+	// Capture every displayed dependency, even after its source left the recent window.
+	const said = input.observations
+		.filter((o) => o.actor === "agent" && o.kind === "delivery.observed")
+		.slice(-SAID_SHOWN);
+	const contexts = [...recent, ...said].map(
+		(o) =>
+			input.observationInputs?.get(o.id) ?? {
+				sources: [o.id, ...(o.refs ?? [])],
+				complete: true,
+			},
+	);
+	const derived = [
+		...state.facts,
+		...state.gaps.filter((g) => g.status !== "answered"),
+		...state.stock,
+		...state.preparing,
+		...state.thoughts.slice(-THOUGHTS_SHOWN),
+	];
+	return {
+		prompt: JSON.stringify(data),
+		shown: recent.map((o) => o.id),
+		input: {
+			sources: [
+				...new Set([
+					...recent.map((o) => o.id),
+					...said.map((o) => o.id),
+					...contexts.flatMap((c) => c.sources),
+					...derived.flatMap((x) => x.inputs ?? []),
+				]),
+			],
+			complete:
+				contexts.every((c) => c.complete) &&
+				derived.every((x) => Array.isArray(x.inputs)),
+		},
+	};
 }
