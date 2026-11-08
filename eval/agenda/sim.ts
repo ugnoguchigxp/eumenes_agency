@@ -6,13 +6,14 @@
  */
 import {
 	createAgendaAgent,
+	endsWithQuestion,
 	type AgendaAgent,
 	type AgendaDeps,
 	type AgendaTicket,
 	type QuietScope,
 	type ReplyCall,
 } from "../../src/agenda/index.ts";
-import type { ToolPort } from "../../src/index.ts";
+import type { EmotionEmoji, ToolPort } from "../../src/index.ts";
 import {
 	createAgendaReplyTools,
 	notesMentioned,
@@ -23,16 +24,20 @@ import type {
 	MockSteward,
 } from "../../examples/virtual-eumenes/agenda/memory.ts";
 import type { MockWebResearch } from "../../examples/virtual-eumenes/agenda/research.ts";
+import type { SimulatedUser } from "./user.ts";
 
 /** A reply's text and the tools it called (runRespond's result fits). */
 export interface ReplyOut {
 	readonly text: string;
 	readonly calls: readonly ReplyCall[];
+	readonly emotion?: EmotionEmoji | null;
 }
 
 export interface UserTurn {
 	readonly atSec: number;
 	readonly text: string;
+	/** Said in answer to the agent (the simulated user), not from the script. */
+	readonly reactive?: boolean;
 }
 
 interface Usage {
@@ -53,6 +58,16 @@ export type AgendaSimEvent =
 			readonly atSec: number;
 			readonly id: string;
 			readonly text: string;
+			readonly emotion?: EmotionEmoji | null;
+	  }
+	| {
+			/** What the simulated user made of being spoken to, and whether they answered. */
+			readonly type: "felt";
+			readonly atSec: number;
+			/** Spoken to on the agent's own, or asked at the end of a reply. */
+			readonly on: "speak" | "reply";
+			readonly feeling: string;
+			readonly replied: boolean;
 	  }
 	| {
 			readonly type: "quiet";
@@ -120,6 +135,7 @@ export type AgendaSimEvent =
 			readonly itemId: string;
 			readonly noteId: string | null;
 			readonly text: string;
+			readonly emotion?: EmotionEmoji | null;
 	  }
 	| {
 			readonly type: "research";
@@ -154,6 +170,8 @@ export interface AgendaSimInput {
 		tools: ToolPort,
 	) => Promise<string | ReplyOut>;
 	readonly onEvent?: (e: AgendaSimEvent) => void;
+	/** A user who answers the agent's own speech (absent: only the scripted turns). */
+	readonly user?: SimulatedUser;
 }
 
 export async function simulateAgenda(input: AgendaSimInput) {
@@ -199,8 +217,36 @@ export async function simulateAgenda(input: AgendaSimInput) {
 			itemId: t.itemId,
 			noteId: t.noteId,
 			text: t.utterance,
+			emotion: t.emotion,
 		});
 		agent.recordDelivery({ ticketId: t.id, at: now, status: "succeeded" });
+	};
+
+	/** The simulated user hears what the agent said and maybe answers a little later. */
+	const react = async (utterance: string, on: "speak" | "reply") => {
+		if (!input.user) return;
+		const history = events.flatMap((e) =>
+			e.type === "user" || e.type === "reply" || e.type === "speak"
+				? [{ who: e.type === "user" ? "user" : "agent", text: e.text }]
+				: [],
+		);
+		const r = await input.user({
+			atSec: sec(now),
+			clock: input.deps.clock ? input.deps.clock(now) : null,
+			utterance,
+			history,
+		});
+		if (!r) return;
+		emit({
+			type: "felt",
+			atSec: sec(now),
+			on,
+			feeling: r.feeling,
+			replied: r.text !== null,
+		});
+		if (r.text === null) return;
+		turns.push({ atSec: sec(now) + r.delaySec, text: r.text, reactive: true });
+		turns.sort((a, b) => a.atSec - b.atSec);
 	};
 
 	const step = async () => {
@@ -261,6 +307,8 @@ export async function simulateAgenda(input: AgendaSimInput) {
 			});
 		}
 		for (const t of out.tickets) handle(t);
+		for (const t of out.tickets)
+			if (t.kind === "speak") await react(t.utterance, "speak");
 		return out;
 	};
 
@@ -300,6 +348,10 @@ export async function simulateAgenda(input: AgendaSimInput) {
 		}
 		if (turn && turnAt <= now) {
 			turns.shift();
+			// The user said something of their own: answers they meant to give to older words lapse.
+			if (!turn.reactive)
+				for (let i = turns.length - 1; i >= 0; i--)
+					if (turns[i]!.reactive) turns.splice(i, 1);
 			n++;
 			const userId = `u${stamp}.${n}`;
 			agent.observe({ id: userId, who: "user", text: turn.text, at: now });
@@ -329,13 +381,17 @@ export async function simulateAgenda(input: AgendaSimInput) {
 					},
 				});
 				const out = await input.reply(agent, now, tools);
-				const { text, calls } =
-					typeof out === "string" ? { text: out, calls: [] } : out;
+				const { text, calls, emotion } =
+					typeof out === "string"
+						? { text: out, calls: [], emotion: null }
+						: { emotion: null, ...out };
 				const replyId = `r${stamp}.${n}`;
 				agent.observe({ id: replyId, who: "reply", text, at: now, calls });
 				for (const id of notesMentioned(text, input.docs.list()))
 					agent.noteUsed(id, now);
-				emit({ type: "reply", atSec: sec(now), id: replyId, text });
+				emit({ type: "reply", atSec: sec(now), id: replyId, text, emotion });
+				// A reply that asks something is answered (or not) like the agent's own words.
+				if (endsWithQuestion(text)) await react(text, "reply");
 			}
 			if (input.steward) {
 				const said = agent

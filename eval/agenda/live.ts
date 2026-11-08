@@ -28,6 +28,8 @@ import {
 	llmWriter,
 } from "../../examples/virtual-eumenes/agenda/research.ts";
 import { agendaScenarios } from "./scenarios.ts";
+import { judgeAspects, judgeScenario } from "./judge.ts";
+import { llmUser } from "./user.ts";
 import { simulateAgenda, type AgendaSimEvent, type UserTurn } from "./sim.ts";
 
 export const clockFrom = (start: string) => (now: number) =>
@@ -53,7 +55,7 @@ const show = (e: AgendaSimEvent) => {
 		case "compose":
 			return e.declined ? `${t} compose 見送り: ${e.declined}` : null;
 		case "speak":
-			return `${t} 🗣 ${e.kind}: ${e.text}`;
+			return `${t} 🗣 ${e.emotion ?? ""}${e.kind}: ${e.text}`;
 		case "research":
 			return `${t} 🔎 ${e.accepted ? "" : "(受付拒否) "}${e.requested ? "[頼まれた] " : ""}${e.text}`;
 		case "researched":
@@ -67,6 +69,10 @@ const show = (e: AgendaSimEvent) => {
 			return `${t} 📄 ${e.type} ${e.noteId} ${e.title}`;
 		case "asked":
 			return `${t} 🙋 返事が調べものを頼んだ${e.queued ? "（順番待ち）" : ""}: ${e.text}`;
+		case "reply":
+			return `${t} reply ${e.emotion ?? ""}: ${e.text}`;
+		case "felt":
+			return `${t} 👤${e.on === "reply" ? "（返事の質問へ）" : ""} ${e.replied ? "" : "（返事せず）"}${e.feeling}`;
 		default:
 			return `${t} ${e.type}: ${e.text}`;
 	}
@@ -74,9 +80,14 @@ const show = (e: AgendaSimEvent) => {
 
 if (import.meta.main) {
 	const argv = process.argv.slice(2);
-	const web = argv.includes("--web");
-	const [name, ...wanted] = argv.filter((a) => a !== "--web");
-	if (!name) throw new Error("usage: live.ts <run-name> [--web] [scenario...]");
+	// Web search: every scenario with --web, none with --mock-research, else the ones marked web.
+	const allWeb = argv.includes("--web");
+	const noWeb = argv.includes("--mock-research");
+	const [name, ...wanted] = argv.filter((a) => !a.startsWith("--"));
+	if (!name)
+		throw new Error(
+			"usage: live.ts <run-name> [--web | --mock-research] [scenario...]",
+		);
 	const settings = loadSettings(
 		resolve(process.env.AGENCY_SETTINGS ?? "config/always-on.json"),
 	);
@@ -92,9 +103,10 @@ if (import.meta.main) {
 		const clockAt = clockFrom(s.clockStart ?? "2026-11-07T19:00:00+09:00");
 		const memory = createMockMemory();
 		const docs = createMockDocStore();
+		const web = !noWeb && (allWeb || s.web === true);
 		const searcher = web
 			? webNoteWriter({
-					model: settings.llm.background.model,
+					role: settings.llm.background,
 					meter,
 					today: () => clockAt(0),
 				})
@@ -146,17 +158,22 @@ if (import.meta.main) {
 						}),
 						chat,
 						tools,
-						emotion: false,
+						emotion: true,
 						signal: new AbortController().signal,
 						onDelta: () => undefined,
 					});
-					return { text: dropRepeatedSentences(r.text), calls: r.calls };
+					return {
+						text: dropRepeatedSentences(r.text),
+						calls: r.calls,
+						emotion: r.emotion ?? null,
+					};
 				},
 				onEvent: (e) => {
 					events.push(e);
 					const line = show(e);
 					if (line) console.log(line);
 				},
+				user: llmUser(llm, s.persona),
 			});
 		console.log(`=== ${s.name}`);
 		let startMs = 0;
@@ -172,6 +189,14 @@ if (import.meta.main) {
 			);
 		}
 		const result = await session(s.minutes, s.turns, startMs, llm);
+		// The judge reads the whole conversation; its scores are measurement, never the agent's.
+		const judge = await judgeScenario(llm, {
+			expect: s.expect,
+			previous: previousEvents,
+			events,
+		}).catch((e: unknown) => ({
+			error: e instanceof Error ? e.message : String(e),
+		}));
 		const summary = {
 			scenario: s.name,
 			expect: s.expect,
@@ -196,6 +221,7 @@ if (import.meta.main) {
 			model: settings.llm.background.model,
 			effort: settings.llm.background.effort,
 			previous: s.previous ? { events: previousEvents.length } : null,
+			judge,
 		};
 		writeFileSync(
 			join(dir, `${s.name}.jsonl`),
@@ -210,8 +236,12 @@ if (import.meta.main) {
 			join(dir, `${s.name}.summary.json`),
 			JSON.stringify(summary, null, "\t"),
 		);
+		const judged =
+			"flow" in judge
+				? `  judge ${judgeAspects.map((a) => `${a} ${judge[a].score}`).join(" ")} — ${judge.worst}`
+				: "";
 		console.log(
-			`  $${summary.usd.toFixed(4)}  memory ${summary.memory.length}  notes ${summary.notes.length}`,
+			`  $${summary.usd.toFixed(4)}  memory ${summary.memory.length}  notes ${summary.notes.length}${judged}`,
 		);
 	}
 }

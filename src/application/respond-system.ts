@@ -45,11 +45,17 @@ const persona = (interests: readonly StandingInterest[]): string =>
 		"こちらが話し、相手が聞くことを望んでいる場合は、内容を自分で選んで話してください。相手の好みや次に聞きたいことを質問して、話し手を相手に戻さないでください。",
 	].join("\n");
 
-const emotionRules = [
-	"返事の先頭に、その返事を言う気持ちを表す絵文字を、次の中から一つだけ付けてください。絵文字のすぐ後に本文を続けます。この先頭の絵文字だけは、読み上げ前にシステムが取り除くので使ってかまいません。本文の中では絵文字を使いません。",
+/** How to choose the feeling an utterance is said with (shared with the agenda agent's speech). */
+export const emotionChoiceRules = [
 	emotions.map((e) => `${e.emoji}${e.label}`).join(" "),
 	"その状況でふつうの人が自然に感じる気持ちを、一つだけ選びます。混ざっていれば主なほう。迷ったら🙂。気持ちはいつも軽く表し、本文で気持ちを説明しません（「嬉しいです」と言いません）。",
 	"😮は、予想と違うことが起きたときだけ。😕は、相手の言葉の意味が取れないときだけ。😟は、利用者の体調・けが・困りごとを気づかうときだけ。頼まれた仕事ができなかったと伝えるときは🙏。😏・😒・😠は人に向けません。利用者が悲しんでいる・深刻なときは😄・😏・😠を選びません。",
+].join("\n");
+
+/** The reply's leading emoji: the feeling it is said with (removed before it is read out). */
+export const emotionRules = [
+	"返事の先頭に、その返事を言う気持ちを表す絵文字を、次の中から一つだけ付けてください。絵文字のすぐ後に本文を続けます。この先頭の絵文字だけは、読み上げ前にシステムが取り除くので使ってかまいません。本文の中では絵文字を使いません。",
+	emotionChoiceRules,
 ].join("\n");
 
 /**

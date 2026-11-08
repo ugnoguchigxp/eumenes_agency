@@ -1,80 +1,60 @@
 /**
  * The agenda agent (spec/always-on-agenda-design-2026-11-08.md). Code keeps the list of things to
- * do and decides when to plan, when to start research and when and which item to say. The model
- * is called only to plan (on new information) and to write the one utterance code picked.
- * Host-neutral: time comes in as arguments, nothing is stored outside the instance.
+ * do and decides when to plan, when to start research and when and which item to say; the model
+ * is called only to plan (plan.ts), to check a research theme (check.ts) and to write the one
+ * utterance code picked (compose.ts). The rules of timing live in pacing.ts, the state in
+ * state.ts. Host-neutral: time comes in as arguments, nothing is stored outside the instance.
  */
-import type { LlmPort } from "../contracts/ports.ts";
-import { defaultBudget } from "../contracts/runtime.ts";
-import type { Budget } from "../application/budget.ts";
-import { callModel } from "../application/model-call.ts";
 import {
-	checkSchema,
-	composeSchema,
+	ANSWER_WINDOW_MS,
 	DECLINE_DEFER_MS,
-	ENGAGED_MS,
-	TOPIC_RECENT_MS,
 	DEFAULT_QUIET_MIN,
 	defaultSpeechIntervalSec,
 	IDLE_PLAN_MS,
-	OPEN_LIMITS,
-	PLAN_ADD_LIMITS,
-	planSchema,
-	QUESTION_WAIT_MS,
 	RESEARCH_RETRY_MS,
 	RESEARCH_TTL_MS,
-	SAID_KEPT,
-	SAME_THEME_OVERLAP,
-	SPEECH_HOLD_MS,
 	speechIntervals,
 	type AgendaItem,
-	type AgendaKind,
 	type AgendaTicket,
-	type CallRecord,
 	type CheckOutcome,
 	type ComposeOutcome,
-	type KnownItem,
 	type NoteRef,
 	type PlanOutcome,
 	type Quiet,
 	type QuietScope,
 	type ReplyCall,
 	type Said,
-	type SpeechIntervalSec,
 	type StepHost,
 	type StepOutcome,
 } from "./contracts.ts";
+import { check } from "./check.ts";
+import { compose } from "./compose.ts";
 import {
-	checkData,
-	checkSystem,
-	composeData,
-	composeSystem,
-	planData,
-	planSystem,
-} from "./prompt.ts";
+	askBlocked,
+	endQuiet,
+	nextResearch,
+	paused,
+	replyAsk,
+	speakable,
+	speechOpenAt,
+	speechQuiet,
+	topicGone,
+	topicOpenAt,
+} from "./pacing.ts";
+import { plan } from "./plan.ts";
+import { checkSystem, composeSystem, planSystem } from "./prompt.ts";
+import {
+	createState,
+	makeItem,
+	nextId,
+	remember,
+	wantPlan,
+	type AgendaDeps,
+} from "./state.ts";
+import { declinesOffer, endsWithQuestion, normalize } from "./text.ts";
 
-/** No budget gate (spec §2): calls happen only on new information or a chosen utterance. */
-const unlimited: Budget = {
-	config: defaultBudget,
-	remaining: () => Number.MAX_SAFE_INTEGER,
-	check: () => "ok",
-	record: () => undefined,
-};
-
-export interface AgendaDeps {
-	readonly llm: LlmPort;
-	/** The host's memory of the user (eumenes_memory), read at each call. */
-	readonly known?: () => readonly KnownItem[];
-	/** The researcher's notes in the host's document store, read at each call. */
-	readonly notes?: () => readonly NoteRef[];
-	/** A host persona replaces the built-in one; the rest of the instructions stays. */
-	readonly persona?: string;
-	readonly speechIntervalSec?: SpeechIntervalSec;
-	/** Local time as the user would say it (the core has no clock or time zone). */
-	readonly clock?: (now: number) => string;
-	/** When the agent starts: planning is due at once, so it can go and learn about the user. */
-	readonly startedAt: number;
-}
+export type { AgendaDeps } from "./state.ts";
+export { normalize, themeOverlap } from "./text.ts";
 
 export interface AgendaView {
 	readonly items: readonly AgendaItem[];
@@ -97,6 +77,11 @@ export interface AgendaAgent {
 	}): void;
 	/** Something new the plan should see (an exchange was processed, the memory changed). */
 	infoChanged(at: number): void;
+	/**
+	 * The question the reply to the user's latest words may end with (null: none now). In a
+	 * conversation this is how the agent asks; if the reply ends in a question, the item is asked.
+	 */
+	askForReply(now: number): AgendaItem | null;
 	/** Plans, starts research and picks what to say, as the rules allow now. */
 	step(
 		now: number,
@@ -120,12 +105,12 @@ export interface AgendaAgent {
 		at: number;
 		status: "succeeded" | "failed";
 	}): void;
-	/**
-	 * The reply's tool: research on the user's latest words. What the user asked for goes first in
-	 * line and is reported when ready; what the reply started on its own is ordinary research.
-	 */
 	/** The reply read or showed this note: it has been talked about, no topic is made of it. */
 	noteUsed(noteId: string, at: number): void;
+	/**
+	 * The reply's tool: research on the user's latest words. What the user asked for goes first in
+	 * line and is reported when ready; what the reply started on its own is a promise kept too.
+	 */
 	requestResearch(r: {
 		text: string;
 		at: number;
@@ -143,727 +128,27 @@ export interface AgendaAgent {
 	view(): AgendaView;
 }
 
-/** Text compared for repeats: whitespace and punctuation do not make a sentence new. */
-export const normalize = (text: string) =>
-	text.replace(/[\s、。，．,.!?！？…・「」『』（）()〜~ー-]/gu, "");
-
-/** Words of a research request that say how, not what: they never make two themes alike. */
-const REQUEST_WORDS = [
-	"調べてほしい",
-	"まとめてほしい",
-	"調べて",
-	"まとめて",
-	"調べ",
-	"まとめ",
-	"てほしい",
-	"ほしい",
-	"一覧",
-	"結論",
-	"について",
-	"向けに",
-	"ための",
-	"など",
-	"こと",
-	"もの",
-	"整理",
-	"確認",
-	"情報",
-	"おすすめ",
-	"一文で",
-];
-const themeBigrams = (text: string) => {
-	let t = text.replace(/[\s、。！？!?…・「」『』（）()：:〜~ー-]/gu, "");
-	for (const w of REQUEST_WORDS) t = t.split(w).join("");
-	const out = new Set<string>();
-	for (let i = 0; i < t.length - 1; i++) out.add(t.slice(i, i + 2));
-	return out;
-};
-/** Shared character pairs over the smaller side: near 1 when one theme restates the other. */
-export const themeOverlap = (a: string, b: string) => {
-	const x = themeBigrams(a);
-	const y = themeBigrams(b);
-	if (x.size === 0 || y.size === 0) return 0;
-	let both = 0;
-	for (const g of x) if (y.has(g)) both++;
-	return both / Math.min(x.size, y.size);
-};
-
-/** Sentences long enough to be a statement or a question of their own, normalized. */
-const sentences = (text: string) =>
-	text
-		.split(/(?<=[。！？!?])/u)
-		.map(normalize)
-		.filter((x) => x.length >= 8);
-
-const endsWithQuestion = (text: string) => /[？?]\s*[」』）)]*\s*$/u.test(text);
-const questionMarks = (text: string) => (text.match(/[？?]/gu) ?? []).length;
-
 export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 	const intervalSec = deps.speechIntervalSec ?? defaultSpeechIntervalSec;
 	if (!speechIntervals.includes(intervalSec))
 		throw new RangeError("invalid speech interval");
-	const intervalMs = intervalSec * 1000;
-	const persona = deps.persona;
-	const planInstructions = planSystem(persona);
-	const composeInstructions = composeSystem(persona);
-	const checkInstructions = checkSystem();
-
-	let said: Said[] = [];
-	let items: AgendaItem[] = [];
-	const quiet: Quiet = { speechUntil: null, allUntil: null };
-	/** When the user's last quiet period ended (the words asking for it are still in view). */
-	let lastQuietEnd: number | null = null;
-	const forgotten = new Set<string>();
-	const issued = new Map<string, AgendaTicket>();
-	let researching: { ticket: AgendaTicket; at: number } | null = null;
-	let planDue = true;
-	/** Grows with every reason to plan; a plan that ran while it grew leaves the plan due. */
-	let planGen = 0;
-	const wantPlan = () => {
-		planDue = true;
-		planGen++;
-	};
-	let lastPlanAt: number | null = null;
-	let lastInfoAt = deps.startedAt;
-	let lastAgentAt: number | null = null;
-	let lastAgentAsked = false;
-	/** The agent asked on its own and the user has not spoken since. */
-	let ownAskPending = false;
-	let lastUserAt: number | null = null;
-	let unanswered = 0;
-	let stopped = false;
-	let epoch = 0;
-	let n = 0;
-	const nextId = (prefix: string) => `${prefix}${++n}`;
-
-	const known = () =>
-		(deps.known?.() ?? []).filter(
-			(k) =>
-				k.id !== "" && k.text.trim() !== "" && !forgotten.has(`memory:${k.id}`),
-		);
-	const notes = () =>
-		(deps.notes?.() ?? []).filter(
-			(x) =>
-				!forgotten.has(`note:${x.id}`) && !x.refs.some((r) => forgotten.has(r)),
-		);
-	const clock = (now: number) => (deps.clock ? deps.clock(now) : null);
-
-	const remember = (s: Said) => {
-		said.push(s);
-		if (said.length > SAID_KEPT) said = said.slice(-SAID_KEPT);
-	};
-
-	const paused = (now: number) =>
-		quiet.allUntil !== null && now < quiet.allUntil;
-	const speechQuiet = (now: number) =>
-		paused(now) || (quiet.speechUntil !== null && now < quiet.speechUntil);
-
-	/** Quiet periods that have ended: the plan sees the new situation. */
-	const endQuiet = (now: number) => {
-		if (quiet.allUntil !== null && now >= quiet.allUntil) {
-			lastQuietEnd = quiet.allUntil;
-			quiet.allUntil = null;
-			wantPlan();
-		}
-		if (quiet.speechUntil !== null && now >= quiet.speechUntil) {
-			lastQuietEnd = quiet.speechUntil;
-			quiet.speechUntil = null;
-			wantPlan();
-		}
-	};
-
-	/** The earliest time the agent may speak on its own (ignoring busy), or null when held. */
-	const speechOpenAt = (now: number): number | null => {
-		if (stopped) return null;
-		let at = now;
-		if (quiet.allUntil !== null && quiet.allUntil > at) at = quiet.allUntil;
-		if (quiet.speechUntil !== null && quiet.speechUntil > at)
-			at = quiet.speechUntil;
-		const gap = intervalMs * 2 ** unanswered;
-		// No talking to an empty room: past the hold, only the user's next words open it again.
-		if (unanswered > 0 && gap > Math.max(SPEECH_HOLD_MS, intervalMs))
-			return null;
-		if (lastAgentAt !== null) {
-			at = Math.max(at, lastAgentAt + (unanswered > 0 ? gap : intervalMs));
-			const waiting =
-				lastAgentAsked && (lastUserAt === null || lastUserAt <= lastAgentAt);
-			if (waiting) at = Math.max(at, lastAgentAt + QUESTION_WAIT_MS);
-		}
-		return at;
-	};
-
-	/**
-	 * Its own question waits for the user's next words: no other question before them, even with a
-	 * topic brought up in between.
-	 */
-	const askBlocked = () => ownAskPending;
-
-	const order = (a: AgendaItem, b: AgendaItem) =>
-		Number(b.requested || b.promised) - Number(a.requested || a.promised) ||
-		b.value - a.value ||
-		a.createdAt - b.createdAt;
-
-	/** The user is in the middle of a conversation (spoke a moment ago). */
-	const engaged = (now: number) =>
-		lastUserAt !== null && now - lastUserAt < ENGAGED_MS;
-	/**
-	 * Does the item tie into what is being talked about: the user's or the agent's words of the
-	 * last few minutes, or a note made from them? What the user asked for always does.
-	 */
-	const connected = (i: AgendaItem, now: number) => {
-		if (i.requested || i.promised) return true;
-		const recent = new Set(
-			said.filter((s) => now - s.at <= TOPIC_RECENT_MS).map((s) => s.id),
-		);
-		const fromRecent = (refs: readonly string[]) =>
-			refs.some((r) => recent.has(r));
-		if (fromRecent(i.refs)) return true;
-		const noteIds = [
-			...(i.noteId ? [i.noteId] : []),
-			...i.refs.flatMap((r) => (r.startsWith("note:") ? [r.slice(5)] : [])),
-		];
-		return notes().some((n) => noteIds.includes(n.id) && fromRecent(n.refs));
-	};
-	/** When an item may be said, as far as the flow of the conversation goes. */
-	const topicOpenAt = (i: AgendaItem, now: number) =>
-		!engaged(now) || connected(i, now) ? now : lastUserAt! + ENGAGED_MS;
-
-	const speakable = (now: number) =>
-		items
-			.filter(
-				(i) =>
-					i.status === "open" &&
-					(i.kind === "ask" || i.kind === "talk") &&
-					(i.deferUntil === null || i.deferUntil <= now) &&
-					!(i.kind === "ask" && askBlocked()) &&
-					topicOpenAt(i, now) <= now,
-			)
-			.sort(order);
-
-	const nextResearch = (now: number) =>
-		items
-			.filter(
-				(i) =>
-					i.status === "open" &&
-					i.kind === "research" &&
-					(i.deferUntil === null || i.deferUntil <= now),
-			)
-			.sort(order)[0] ?? null;
-
-	const record = (
-		purpose: CallRecord["purpose"],
-		at: number,
-		usage: {
-			model: string;
-			latencyMs: number;
-			inputTokens: number;
-			outputTokens: number;
-		} | null,
-		changed: boolean,
-		code: CallRecord["code"],
-	): CallRecord => ({
-		purpose,
-		at,
-		model: usage?.model ?? "",
-		latencyMs: usage?.latencyMs ?? 0,
-		inputTokens: usage?.inputTokens ?? 0,
-		outputTokens: usage?.outputTokens ?? 0,
-		changed,
-		code,
+	const st = createState(deps, intervalSec * 1000, {
+		plan: planSystem(deps.persona),
+		check: checkSystem(),
+		compose: composeSystem(deps.persona),
 	});
+	const researchingItem = () =>
+		st.researching
+			? (st.items.find((i) => i.id === st.researching!.ticket.itemId) ?? null)
+			: null;
 
-	const noteRef = (r: string) => (r.startsWith("note:") ? r.slice(5) : null);
-
-	const plan = async (
-		now: number,
-		signal: AbortSignal,
-	): Promise<PlanOutcome> => {
-		const startEpoch = epoch;
-		const startGen = planGen;
-		const knownNow = known();
-		const notesNow = notes();
-		const prompt = planData({
-			now,
-			clock: clock(now),
-			said,
-			items,
-			known: knownNow,
-			notes: notesNow,
-			researching: researching
-				? (items.find((i) => i.id === researching!.ticket.itemId) ?? null)
-				: null,
-			quiet,
-		});
-		const call = await callModel(
-			deps.llm,
-			unlimited,
-			{
-				purpose: "think",
-				at: now,
-				system: planInstructions,
-				prompt,
-				schema: planSchema,
-				maxOutputTokens: 1500,
-			},
-			signal,
-		);
-		if (!call.ok) {
-			const code = call.outcome.code === "aborted" ? "aborted" : "failed";
-			// A failed plan is not retried in a loop: the next new information plans again.
-			if (code === "failed") {
-				if (planGen === startGen) planDue = false;
-				lastPlanAt = now;
-			}
-			return {
-				added: [],
-				dropped: [],
-				rejected: [],
-				reasons: [],
-				call: record("plan", now, null, false, code),
-			};
-		}
-		// The user spoke while the plan was out: it may add what was just answered. Plan again.
-		if (epoch !== startEpoch)
-			return {
-				added: [],
-				dropped: [],
-				rejected: [],
-				reasons: [],
-				call: record("plan", now, call.usage, false, "stale"),
-			};
-		// What came while it was out (a returned note, a memory change) is planned on next.
-		if (planGen === startGen) planDue = false;
-		lastPlanAt = now;
-		const refsKnown = new Set([
-			...said.map((s) => s.id),
-			...knownNow.map((k) => `memory:${k.id}`),
-			...notesNow.map((x) => `note:${x.id}`),
-		]);
-		const userSaid = new Set(
-			said.filter((s) => s.who === "user").map((s) => s.id),
-		);
-		const rejected: string[] = [];
-		const reasons: string[] = [];
-		const dropped: string[] = [];
-		for (const d of call.value.drop) {
-			const item = items.find((i) => i.id === d.id && i.status === "open");
-			if (!item) {
-				rejected.push(`drop:${d.id}:not_open`);
-				continue;
-			}
-			item.status = "dropped";
-			item.endedAt = now;
-			dropped.push(item.id);
-			reasons.push(`drop ${item.id}: ${d.reason}`);
-		}
-		const added: AgendaItem[] = [];
-		const addedPer: Record<AgendaKind, number> = {
-			ask: 0,
-			research: 0,
-			talk: 0,
-		};
-		for (const a of call.value.add) {
-			const text = a.text.trim();
-			const refs = [...new Set(a.refs)];
-			const open = items.filter(
-				(i) =>
-					i.kind === a.kind && (i.status === "open" || i.status === "doing"),
-			).length;
-			const why = (code: string) => rejected.push(`${a.kind}:${code}`);
-			if (text === "") {
-				why("empty");
-				continue;
-			}
-			if (addedPer[a.kind] >= PLAN_ADD_LIMITS[a.kind]) {
-				why("too_many");
-				continue;
-			}
-			if (open >= OPEN_LIMITS[a.kind]) {
-				why("open_limit");
-				continue;
-			}
-			if (refs.some((r) => !refsKnown.has(r))) {
-				why("unknown_ref");
-				continue;
-			}
-			// Research rests on what the user said: their words, the memory of them, or a note that
-			// came from those. The agent's own words alone never start it.
-			if (
-				a.kind === "research" &&
-				!refs.some(
-					(r) =>
-						userSaid.has(r) || r.startsWith("memory:") || r.startsWith("note:"),
-				)
-			) {
-				why("needs_user_reason");
-				continue;
-			}
-			const noteIds = refs.map(noteRef).filter((x): x is string => x !== null);
-			if (a.kind === "talk" && noteIds.length !== 1) {
-				why("needs_one_note");
-				continue;
-			}
-			const noteId = a.kind === "talk" ? noteIds[0]! : null;
-			if (
-				noteId !== null &&
-				items.some(
-					(i) =>
-						i.kind === "talk" && i.noteId === noteId && i.status !== "dropped",
-				)
-			) {
-				why("note_already_talked");
-				continue;
-			}
-			const same = normalize(text);
-			if (
-				items.some(
-					(i) =>
-						i.kind === a.kind &&
-						i.status !== "dropped" &&
-						normalize(i.text) === same,
-				)
-			) {
-				why("duplicate");
-				continue;
-			}
-			// The same theme again brings the same result back: compare with every earlier
-			// research and every note (this session's or an earlier one's).
-			if (
-				a.kind === "research" &&
-				[
-					...items
-						.filter((i) => i.kind === "research")
-						.map((i) => i.checkedRequest ?? i.text),
-					...notesNow.map((x) => `${x.title}${x.summary}`),
-				].some((t) => themeOverlap(text, t) >= SAME_THEME_OVERLAP)
-			) {
-				why("same_theme");
-				continue;
-			}
-			const item: AgendaItem = {
-				id: nextId("a"),
-				kind: a.kind,
-				text,
-				refs,
-				value: a.value,
-				reason: a.reason,
-				requested: false,
-				promised: false,
-				noteId,
-				status: "open",
-				createdAt: now,
-				deferUntil: null,
-				declines: 0,
-				endedAt: null,
-			};
-			items.push(item);
-			added.push(item);
-			addedPer[a.kind]++;
-			reasons.push(`${item.kind} ${item.id}: ${a.reason}`);
-		}
-		return {
-			added,
-			dropped,
-			rejected,
-			reasons,
-			call: record(
-				"plan",
-				now,
-				call.usage,
-				added.length + dropped.length > 0,
-				"applied",
-			),
-		};
-	};
-
-	/** Is this research a new theme? Covered: dropped; partly covered: narrowed; new: as it is. */
-	const check = async (
-		item: AgendaItem,
-		now: number,
-		signal: AbortSignal,
-	): Promise<CheckOutcome> => {
-		const notesNow = notes();
-		const researchedBefore = items
-			.filter(
-				(i) => i.kind === "research" && i.id !== item.id && i.status !== "open",
-			)
-			.map((i) => i.checkedRequest ?? i.text);
-		const out = (
-			verdict: CheckOutcome["verdict"],
-			coveredBy: string | null,
-			request: string | null,
-			reason: string,
-			call: CallRecord,
-		): CheckOutcome => ({
-			itemId: item.id,
-			verdict,
-			coveredBy,
-			request,
-			reason,
-			call,
-		});
-		// What the user asked for is not second-guessed; with nothing to compare, there is no call.
-		if (
-			item.requested ||
-			(notesNow.length === 0 && researchedBefore.length === 0)
-		) {
-			item.checkedRequest = null;
-			return out(
-				"new",
-				null,
-				null,
-				item.requested ? "requested" : "nothing_to_compare",
-				record("check", now, null, false, "applied"),
-			);
-		}
-		const call = await callModel(
-			deps.llm,
-			unlimited,
-			{
-				purpose: "think",
-				at: now,
-				system: checkInstructions,
-				prompt: checkData({
-					now,
-					request: item.text,
-					notes: notesNow,
-					researchedBefore,
-				}),
-				schema: checkSchema,
-				maxOutputTokens: 400,
-			},
-			signal,
-		);
-		if (!call.ok) {
-			// An unchecked research is not started blind; it is tried again later.
-			item.deferUntil = now + RESEARCH_RETRY_MS;
-			return out(
-				"failed",
-				null,
-				null,
-				call.outcome.code,
-				record(
-					"check",
-					now,
-					null,
-					false,
-					call.outcome.code === "aborted" ? "aborted" : "failed",
-				),
-			);
-		}
-		const v = call.value;
-		const coveredBy =
-			v.coveredBy && notesNow.some((x) => `note:${x.id}` === v.coveredBy)
-				? v.coveredBy
-				: null;
-		// What the reply said it would look into and a note already covers: the promise is kept
-		// with that note instead of the same research again.
-		if (v.verdict === "covered" && item.promised && coveredBy === null) {
-			item.checkedRequest = null;
-			return out(
-				"new",
-				null,
-				null,
-				`promised: ${v.reason}`,
-				record("check", now, call.usage, true, "applied"),
-			);
-		}
-		if (v.verdict === "covered") {
-			item.status = "dropped";
-			item.endedAt = now;
-			const noteId = coveredBy!.slice(5);
-			if (
-				item.promised &&
-				!items.some(
-					(i) =>
-						i.kind === "talk" && i.noteId === noteId && i.status !== "dropped",
-				)
-			)
-				items.push({
-					id: nextId("a"),
-					kind: "talk",
-					text: "調べておくと言った件は、前に調べたメモにもうまとまっている",
-					refs: [coveredBy!, ...item.refs],
-					value: 5,
-					reason: "返事で調べておくと言ったことは、既存のメモで答えられる",
-					requested: false,
-					promised: true,
-					noteId,
-					status: "open",
-					createdAt: now,
-					deferUntil: null,
-					declines: 0,
-					endedAt: null,
-				});
-			return out(
-				"covered",
-				coveredBy,
-				null,
-				v.reason,
-				record("check", now, call.usage, true, "applied"),
-			);
-		}
-		const narrowed = v.verdict === "partial" ? (v.request?.trim() ?? "") : "";
-		item.checkedRequest = narrowed === "" ? null : narrowed;
-		return out(
-			narrowed === "" ? "new" : "partial",
-			null,
-			narrowed === "" ? null : narrowed,
-			v.reason,
-			record("check", now, call.usage, true, "applied"),
-		);
-	};
-
-	const compose = async (
-		item: AgendaItem,
-		now: number,
-		host: () => StepHost,
-		signal: AbortSignal,
-	): Promise<{ outcome: ComposeOutcome; ticket: AgendaTicket | null }> => {
-		const startEpoch = epoch;
-		const note =
-			item.noteId === null
-				? null
-				: (notes().find((x) => x.id === item.noteId) ?? null);
-		const done = (
-			declined: string | null,
-			rejected: string[],
-			call: CallRecord,
-			ticket: AgendaTicket | null,
-		) => ({ outcome: { itemId: item.id, declined, rejected, call }, ticket });
-		if (item.kind === "talk" && note === null) {
-			// The note is gone (deleted or forgotten): nothing to talk about.
-			item.status = "dropped";
-			item.endedAt = now;
-			return done(
-				"note_gone",
-				[],
-				record("compose", now, null, false, "applied"),
-				null,
-			);
-		}
-		const call = await callModel(
-			deps.llm,
-			unlimited,
-			{
-				purpose: "think",
-				at: now,
-				system: composeInstructions,
-				prompt: composeData({
-					now,
-					clock: clock(now),
-					item,
-					note,
-					said,
-					known: known(),
-					quietEndedSecAgo:
-						lastQuietEnd === null
-							? null
-							: Math.round((now - lastQuietEnd) / 1000),
-				}),
-				schema: composeSchema,
-				maxOutputTokens: 400,
-			},
-			signal,
-		);
-		if (!call.ok) {
-			item.deferUntil = now + DECLINE_DEFER_MS;
-			return done(
-				null,
-				[],
-				record(
-					"compose",
-					now,
-					null,
-					false,
-					call.outcome.code === "aborted" ? "aborted" : "failed",
-				),
-				null,
-			);
-		}
-		// New words or the user started typing while it was written: say nothing stale.
-		if (epoch !== startEpoch || host().busy || stopped || speechQuiet(now))
-			return done(
-				null,
-				[],
-				record("compose", now, call.usage, false, "stale"),
-				null,
-			);
-		const utterance = (call.value.utterance ?? "").trim();
-		const rejected: string[] = [];
-		if (utterance !== "") {
-			// Whole or in part: a sentence the agent already said is not said again.
-			const earlier = new Set(
-				said
-					.filter((s) => s.who !== "user")
-					.flatMap((s) => [normalize(s.text), ...sentences(s.text)]),
-			);
-			if (
-				earlier.has(normalize(utterance)) ||
-				sentences(utterance).some((x) => earlier.has(x))
-			)
-				rejected.push("repeat");
-			// One question per ask; a topic may open with "ご存じでしたか？" and still offer the note.
-			if (
-				questionMarks(utterance) > (item.kind === "ask" ? 1 : 2) ||
-				(item.kind === "ask" && /それと|あと、|ついでに/u.test(utterance))
-			)
-				rejected.push("too_many_questions");
-			// The user does not want to be made to pick one of two.
-			if (item.kind === "ask" && /どちら(?!も)|どっち/u.test(utterance))
-				rejected.push("either_or");
-		}
-		const declined =
-			utterance === ""
-				? call.value.decline?.trim() || "no_utterance"
-				: rejected.length
-					? rejected.join(",")
-					: null;
-		if (declined !== null) {
-			item.declines++;
-			item.lastDecline = { reason: declined, at: now };
-			if (item.declines >= 2) {
-				item.status = "dropped";
-				item.endedAt = now;
-			} else item.deferUntil = now + DECLINE_DEFER_MS;
-			// A question that does not fit now means questions do not: the others wait too.
-			if (item.kind === "ask")
-				for (const i of items)
-					if (i.kind === "ask" && i.status === "open" && i !== item)
-						i.deferUntil = Math.max(i.deferUntil ?? 0, now + DECLINE_DEFER_MS);
-			return done(
-				declined,
-				rejected,
-				record("compose", now, call.usage, false, "applied"),
-				null,
-			);
-		}
-		const ticket: AgendaTicket = {
-			id: nextId("t"),
-			kind: "speak",
-			itemId: item.id,
-			itemKind: item.kind === "ask" ? "ask" : "talk",
-			utterance,
-			noteId: item.noteId,
-			refs: [...item.refs],
-			at: now,
-		};
-		item.status = "doing";
-		issued.set(ticket.id, ticket);
-		return done(
-			null,
-			[],
-			record("compose", now, call.usage, true, "applied"),
-			ticket,
-		);
-	};
-
-	const agent: AgendaAgent = {
+	return {
 		observe(s) {
-			if (forgotten.has(s.id))
+			if (st.forgotten.has(s.id))
 				throw new RangeError(`said ${s.id} was forgotten`);
-			if (said.some((x) => x.id === s.id)) return;
-			remember({
+			if (st.said.some((x) => x.id === s.id)) return;
+			const before = st.said.at(-1);
+			remember(st, {
 				id: s.id,
 				who: s.who,
 				text: s.text,
@@ -872,21 +157,72 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				...(s.calls?.length ? { calls: structuredClone([...s.calls]) } : {}),
 			});
 			if (s.who === "user") {
-				lastUserAt = s.at;
-				unanswered = 0;
-				ownAskPending = false;
-				epoch++;
+				st.lastUserAt = s.at;
+				st.unanswered = 0;
+				st.ownAskPending = false;
+				st.offeredAsk = null;
+				st.epoch++;
+				// "Not now" to what the agent just asked or offered: it backs off, and the plan hears it.
+				if (
+					before &&
+					before.who !== "user" &&
+					s.at - before.at <= ANSWER_WINDOW_MS &&
+					endsWithQuestion(before.text) &&
+					declinesOffer(s.text)
+				) {
+					st.userDeclines = [
+						...st.userDeclines,
+						{ at: s.at, agentId: before.id, userId: s.id },
+					].slice(-4);
+					for (const i of st.items)
+						// What the user asked for, or the reply said it would look into, still comes.
+						if (
+							(i.kind === "ask" || i.kind === "talk") &&
+							i.status === "open" &&
+							!i.requested &&
+							!i.promised
+						)
+							i.deferUntil = Math.max(
+								i.deferUntil ?? 0,
+								s.at + DECLINE_DEFER_MS,
+							);
+				}
 			} else {
-				lastAgentAt = Math.max(lastAgentAt ?? 0, s.at);
-				lastAgentAsked = endsWithQuestion(s.text);
+				// The question offered to this reply is asked when the reply ends in one.
+				const offered = st.offeredAsk;
+				st.offeredAsk = null;
+				const item = offered
+					? st.items.find((i) => i.id === offered.itemId)
+					: undefined;
+				if (
+					item &&
+					item.status === "open" &&
+					offered!.userId ===
+						st.said.filter((x) => x.who === "user").at(-1)?.id &&
+					endsWithQuestion(s.text)
+				) {
+					item.status = "done";
+					item.endedAt = s.at;
+				}
+				st.lastAgentAt = Math.max(st.lastAgentAt ?? 0, s.at);
+				st.lastAgentAsked = endsWithQuestion(s.text);
 				// A reply that ended in a question waits for its answer like an own one.
-				if (lastAgentAsked) ownAskPending = true;
+				if (st.lastAgentAsked) st.ownAskPending = true;
 			}
 		},
 
 		infoChanged(at) {
-			wantPlan();
-			lastInfoAt = Math.max(lastInfoAt, at);
+			wantPlan(st);
+			st.lastInfoAt = Math.max(st.lastInfoAt, at);
+		},
+
+		// One reply at a time (the hosts serialize the user's turns): a second offer replaces the first.
+		askForReply(now) {
+			const item = replyAsk(st, now);
+			const user = st.said.filter((x) => x.who === "user").at(-1);
+			st.offeredAsk =
+				item && user ? { itemId: item.id, userId: user.id } : null;
+			return item ? structuredClone(item) : null;
 		},
 
 		async step(now, host, signal) {
@@ -897,53 +233,55 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				compose: null,
 				tickets: [] as AgendaTicket[],
 			};
-			if (stopped) return { ...base, skipped: "stopped" };
-			endQuiet(now);
-			if (researching && researching.at + RESEARCH_TTL_MS <= now) {
-				const item = items.find((i) => i.id === researching!.ticket.itemId);
+			if (st.stopped) return { ...base, skipped: "stopped" };
+			endQuiet(st, now);
+			if (st.researching && st.researching.at + RESEARCH_TTL_MS <= now) {
+				const item = researchingItem();
 				if (item) {
 					item.status = "dropped";
 					item.endedAt = now;
 				}
-				issued.delete(researching.ticket.id);
-				researching = null;
+				st.issued.delete(st.researching.ticket.id);
+				st.researching = null;
 			}
 			// With nothing new for an hour, the time of day itself is the news.
 			if (
-				!planDue &&
-				Math.max(lastPlanAt ?? deps.startedAt, lastInfoAt) + IDLE_PLAN_MS <= now
+				!st.planDue &&
+				Math.max(st.lastPlanAt ?? deps.startedAt, st.lastInfoAt) +
+					IDLE_PLAN_MS <=
+					now
 			)
-				wantPlan();
+				wantPlan(st);
 			const tickets: AgendaTicket[] = [];
 			let planned: PlanOutcome | null = null;
 			let composed: ComposeOutcome | null = null;
-			if (paused(now)) return { ...base, skipped: null };
-			if (planDue && !host().busy) planned = await plan(now, signal);
+			if (paused(st, now)) return { ...base, skipped: null };
+			if (st.planDue && !host().busy) planned = await plan(st, now, signal);
 			// Stopped while the plan was out: nothing is started or said.
-			if (stopped) return { ...base, plan: planned, skipped: "stopped" };
+			if (st.stopped) return { ...base, plan: planned, skipped: "stopped" };
 			// One research at a time (the researcher's limit), in order: asked for, value, oldest.
 			// Before it starts, its theme is checked against the notes: no result comes back twice.
 			let checked: CheckOutcome | null = null;
-			if (researching === null && !paused(now)) {
-				let next = nextResearch(now);
+			if (st.researching === null && !paused(st, now)) {
+				let next = nextResearch(st, now);
 				if (next && next.checkedRequest === undefined) {
-					checked = await check(next, now, signal);
+					checked = await check(st, next, now, signal);
 					if (checked.verdict === "covered" || checked.verdict === "failed")
 						next = null;
 				}
 				// Stopped, paused or forgotten while the check was out: nothing starts.
 				if (
 					next &&
-					(stopped ||
-						paused(now) ||
-						researching !== null ||
-						!items.includes(next) ||
+					(st.stopped ||
+						paused(st, now) ||
+						st.researching !== null ||
+						!st.items.includes(next) ||
 						next.status !== "open")
 				)
 					next = null;
 				if (next && next.checkedRequest !== undefined) {
 					const ticket: AgendaTicket = {
-						id: nextId("t"),
+						id: nextId(st, "t"),
 						kind: "research",
 						itemId: next.id,
 						text: next.checkedRequest ?? next.text,
@@ -953,22 +291,28 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 						at: now,
 					};
 					next.status = "doing";
-					issued.set(ticket.id, ticket);
-					researching = { ticket, at: now };
+					st.issued.set(ticket.id, ticket);
+					st.researching = { ticket, at: now };
 					tickets.push(ticket);
 				}
 			}
-			const open = speechOpenAt(now);
+			// A question about a talk that is over is not asked any more; its place in the list frees up.
+			for (const i of st.items)
+				if (i.status === "open" && topicGone(st, i, now)) {
+					i.status = "dropped";
+					i.endedAt = now;
+				}
+			const open = speechOpenAt(st, now);
 			if (
-				!stopped &&
+				!st.stopped &&
 				!host().busy &&
 				open !== null &&
 				open <= now &&
-				!speechQuiet(now)
+				!speechQuiet(st, now)
 			) {
-				const item = speakable(now)[0];
+				const item = speakable(st, now)[0];
 				if (item) {
-					const c = await compose(item, now, host, signal);
+					const c = await compose(st, item, now, host, signal);
 					composed = c.outcome;
 					if (c.ticket) tickets.push(c.ticket);
 				}
@@ -984,40 +328,40 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 		},
 
 		nextAt(now) {
-			if (stopped) return null;
+			if (st.stopped) return null;
+			if (paused(st, now)) return st.quiet.allUntil;
 			const times: number[] = [];
-			if (paused(now)) return quiet.allUntil;
-			if (quiet.speechUntil !== null && quiet.speechUntil > now)
-				times.push(quiet.speechUntil);
-			if (planDue) times.push(now);
+			if (st.quiet.speechUntil !== null && st.quiet.speechUntil > now)
+				times.push(st.quiet.speechUntil);
+			if (st.planDue) times.push(now);
 			times.push(
-				Math.max(lastPlanAt ?? deps.startedAt, lastInfoAt) + IDLE_PLAN_MS,
+				Math.max(st.lastPlanAt ?? deps.startedAt, st.lastInfoAt) + IDLE_PLAN_MS,
 			);
-			if (researching === null) {
-				const r = items.filter(
-					(i) => i.status === "open" && i.kind === "research",
-				);
-				for (const i of r) times.push(Math.max(now, i.deferUntil ?? now));
-			} else times.push(researching.at + RESEARCH_TTL_MS);
-			const open = speechOpenAt(now);
-			if (open !== null) {
-				const cands = items.filter(
-					(i) =>
+			if (st.researching === null) {
+				for (const i of st.items)
+					if (i.status === "open" && i.kind === "research")
+						times.push(Math.max(now, i.deferUntil ?? now));
+			} else times.push(st.researching.at + RESEARCH_TTL_MS);
+			const open = speechOpenAt(st, now);
+			if (open !== null)
+				for (const i of st.items)
+					if (
 						i.status === "open" &&
-						(i.kind === "talk" || (i.kind === "ask" && !askBlocked())),
-				);
-				for (const i of cands)
-					times.push(Math.max(open, i.deferUntil ?? open, topicOpenAt(i, now)));
-			}
+						(i.kind === "talk" ||
+							(i.kind === "ask" && !askBlocked(st) && !topicGone(st, i, now)))
+					)
+						times.push(
+							Math.max(open, i.deferUntil ?? open, topicOpenAt(st, i, now)),
+						);
 			return times.length ? Math.max(now, Math.min(...times)) : null;
 		},
 
 		researchStarted(ticketId, accepted, at) {
-			const t = issued.get(ticketId);
+			const t = st.issued.get(ticketId);
 			if (!t || t.kind !== "research" || accepted) return;
-			issued.delete(ticketId);
-			if (researching?.ticket.id === ticketId) researching = null;
-			const item = items.find((i) => i.id === t.itemId);
+			st.issued.delete(ticketId);
+			if (st.researching?.ticket.id === ticketId) st.researching = null;
+			const item = st.items.find((i) => i.id === t.itemId);
 			if (item && item.status === "doing") {
 				item.status = "open";
 				item.deferUntil = at + RESEARCH_RETRY_MS;
@@ -1025,18 +369,18 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 		},
 
 		researchReturned(r) {
-			const t = issued.get(r.ticketId);
+			const t = st.issued.get(r.ticketId);
 			if (!t || t.kind !== "research") return;
-			issued.delete(r.ticketId);
-			if (researching?.ticket.id === r.ticketId) researching = null;
-			const item = items.find((i) => i.id === t.itemId);
+			st.issued.delete(r.ticketId);
+			if (st.researching?.ticket.id === r.ticketId) st.researching = null;
+			const item = st.items.find((i) => i.id === t.itemId);
 			if (item) {
 				item.status = r.status === "succeeded" ? "done" : "dropped";
 				item.endedAt = r.at;
 				item.resultNoteId = r.note?.id ?? null;
 			}
-			wantPlan();
-			lastInfoAt = Math.max(lastInfoAt, r.at);
+			wantPlan(st);
+			st.lastInfoAt = Math.max(st.lastInfoAt, r.at);
 			// What the user asked for, or what the reply said it would look into, is reported when
 			// it is ready; the rest is knowledge to keep.
 			if (
@@ -1044,37 +388,33 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				r.note &&
 				item &&
 				(t.requested || t.promised) &&
-				!forgotten.has(`note:${r.note.id}`) &&
-				!t.refs.some((x) => forgotten.has(x))
-			) {
-				items.push({
-					id: nextId("a"),
-					kind: "talk",
-					text: t.requested
-						? `頼まれた調べもの「${r.note.title}」ができた`
-						: `調べておくと言った「${r.note.title}」がまとまった`,
-					refs: [`note:${r.note.id}`, ...t.refs],
-					value: 5,
-					reason: t.requested
-						? "利用者に頼まれた調べものの結果"
-						: "返事で調べておくと言ったことの結果",
-					requested: t.requested,
-					promised: true,
-					noteId: r.note.id,
-					status: "open",
-					createdAt: r.at,
-					deferUntil: null,
-					declines: 0,
-					endedAt: null,
-				});
-			}
+				!st.forgotten.has(`note:${r.note.id}`) &&
+				!t.refs.some((x) => st.forgotten.has(x))
+			)
+				st.items.push(
+					makeItem(st, {
+						kind: "talk",
+						text: t.requested
+							? `頼まれた調べもの「${r.note.title}」ができた`
+							: `調べておくと言った「${r.note.title}」がまとまった`,
+						refs: [`note:${r.note.id}`, ...t.refs],
+						value: 5,
+						reason: t.requested
+							? "利用者に頼まれた調べものの結果"
+							: "返事で調べておくと言ったことの結果",
+						requested: t.requested,
+						promised: true,
+						noteId: r.note.id,
+						createdAt: r.at,
+					}),
+				);
 		},
 
 		recordDelivery(r) {
-			const t = issued.get(r.ticketId);
+			const t = st.issued.get(r.ticketId);
 			if (!t || t.kind !== "speak") return;
-			issued.delete(r.ticketId);
-			const item = items.find((i) => i.id === t.itemId);
+			st.issued.delete(r.ticketId);
+			const item = st.items.find((i) => i.id === t.itemId);
 			if (r.status !== "succeeded") {
 				if (item && item.status === "doing") {
 					item.status = "open";
@@ -1089,34 +429,33 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			// Said, so it counts for pacing; forgotten meanwhile, so its words are not kept.
 			const gone =
 				!item ||
-				forgotten.has(t.itemId) ||
-				t.refs.some((x) => forgotten.has(x));
+				st.forgotten.has(t.itemId) ||
+				t.refs.some((x) => st.forgotten.has(x));
 			if (!gone)
-				remember({
-					id: nextId("s"),
+				remember(st, {
+					id: nextId(st, "s"),
 					who: "own",
 					text: t.utterance,
 					at: r.at,
 					refs: [...t.refs, t.itemId],
 				});
-			lastAgentAt = Math.max(lastAgentAt ?? 0, r.at);
-			lastAgentAsked = t.itemKind === "ask" || endsWithQuestion(t.utterance);
+			st.lastAgentAt = Math.max(st.lastAgentAt ?? 0, r.at);
+			st.lastAgentAsked = t.itemKind === "ask" || endsWithQuestion(t.utterance);
 			// Anything it asked on its own (a topic that ends "表示しましょうか？" too) waits for an answer.
-			if (t.itemKind === "ask" || endsWithQuestion(t.utterance))
-				ownAskPending = true;
-			unanswered++;
+			if (st.lastAgentAsked) st.ownAskPending = true;
+			st.unanswered++;
 		},
 
 		requestResearch(r) {
-			if (stopped) return { rejected: "stopped" };
+			if (st.stopped) return { rejected: "stopped" };
 			const requested = r.requested ?? true;
 			const text = r.text.trim();
 			if (text === "") return { rejected: "empty" };
-			const asked = [...said].reverse().find((s) => s.who === "user");
+			const asked = [...st.said].reverse().find((s) => s.who === "user");
 			if (!asked) return { rejected: "needs_user_request" };
 			const same = normalize(text);
 			if (
-				items.some(
+				st.items.some(
 					(i) =>
 						i.kind === "research" &&
 						(i.status === "open" || i.status === "doing") &&
@@ -1124,8 +463,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				)
 			)
 				return { rejected: "duplicate" };
-			const item: AgendaItem = {
-				id: nextId("a"),
+			const item = makeItem(st, {
 				kind: "research",
 				text,
 				refs: [asked.id],
@@ -1135,40 +473,32 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 					: "返事で始めた（利用者の言葉から）",
 				requested,
 				promised: true,
-				noteId: null,
-				status: "open",
 				createdAt: r.at,
-				deferUntil: null,
-				declines: 0,
-				endedAt: null,
-			};
-			items.push(item);
-			return { item, queued: researching !== null };
+			});
+			st.items.push(item);
+			return { item, queued: st.researching !== null };
 		},
 
 		noteUsed(noteId, at) {
-			for (const i of items)
+			for (const i of st.items)
 				if (i.kind === "talk" && i.noteId === noteId && i.status === "open") {
 					i.status = "done";
 					i.endedAt = at;
 				}
-			if (!items.some((i) => i.kind === "talk" && i.noteId === noteId))
-				items.push({
-					id: nextId("a"),
-					kind: "talk",
-					text: "返事で使った",
-					refs: [`note:${noteId}`],
-					value: 1,
-					reason: "返事で読んだ・表示した",
-					requested: false,
-					promised: false,
-					noteId,
-					status: "done",
-					createdAt: at,
-					deferUntil: null,
-					declines: 0,
-					endedAt: at,
-				});
+			if (!st.items.some((i) => i.kind === "talk" && i.noteId === noteId))
+				st.items.push(
+					makeItem(st, {
+						kind: "talk",
+						text: "返事で使った",
+						refs: [`note:${noteId}`],
+						value: 1,
+						reason: "返事で読んだ・表示した",
+						noteId,
+						status: "done",
+						createdAt: at,
+						endedAt: at,
+					}),
+				);
 		},
 
 		setQuiet(r) {
@@ -1177,67 +507,62 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				throw new RangeError("quiet needs minutes >= 0");
 			// Zero ends every quiet period, whichever scope was named, and the plan looks again.
 			if (minutes === 0) {
-				quiet.speechUntil = null;
-				quiet.allUntil = null;
-				wantPlan();
-				return { ...quiet };
+				st.quiet.speechUntil = null;
+				st.quiet.allUntil = null;
+				wantPlan(st);
+				return { ...st.quiet };
 			}
 			const until = r.at + minutes * 60_000;
-			if (r.scope === "all") quiet.allUntil = until;
-			else quiet.speechUntil = until;
-			return { ...quiet };
+			if (r.scope === "all") st.quiet.allUntil = until;
+			else st.quiet.speechUntil = until;
+			return { ...st.quiet };
 		},
 
 		setStopped(s) {
-			stopped = s;
-			epoch++;
+			st.stopped = s;
+			st.epoch++;
 		},
 
 		forget(refs) {
-			for (const r of refs) forgotten.add(r);
+			for (const r of refs) st.forgotten.add(r);
 			// Fixed point: words and items resting on forgotten refs go, and what rests on them.
+			const gone = (rs: readonly string[]) =>
+				rs.some((x) => st.forgotten.has(x));
 			for (;;) {
-				const before = said.length + items.length;
-				const gone = (rs: readonly string[]) =>
-					rs.some((x) => forgotten.has(x));
-				for (const s of said) if (gone(s.refs)) forgotten.add(s.id);
-				said = said.filter((s) => !forgotten.has(s.id));
-				for (const i of items)
+				const before = st.said.length + st.items.length;
+				for (const s of st.said) if (gone(s.refs)) st.forgotten.add(s.id);
+				st.said = st.said.filter((s) => !st.forgotten.has(s.id));
+				st.userDeclines = st.userDeclines.filter(
+					(d) => !st.forgotten.has(d.agentId) && !st.forgotten.has(d.userId),
+				);
+				for (const i of st.items)
 					if (
 						gone(i.refs) ||
-						(i.noteId !== null && forgotten.has(`note:${i.noteId}`))
+						(i.noteId !== null && st.forgotten.has(`note:${i.noteId}`))
 					)
-						forgotten.add(i.id);
-				items = items.filter((i) => !forgotten.has(i.id));
-				if (said.length + items.length === before) break;
+						st.forgotten.add(i.id);
+				st.items = st.items.filter((i) => !st.forgotten.has(i.id));
+				if (st.said.length + st.items.length === before) break;
 			}
-			if (
-				researching &&
-				!items.some((i) => i.id === researching!.ticket.itemId)
-			) {
-				issued.delete(researching.ticket.id);
-				researching = null;
+			if (st.researching && researchingItem() === null) {
+				st.issued.delete(st.researching.ticket.id);
+				st.researching = null;
 			}
 			// A forgotten research is not waited for; speech the host may already be saying is kept,
 			// so its delivery still counts for pacing (its words are not kept).
-			for (const [id, t] of issued)
-				if (t.kind === "research" && !items.some((i) => i.id === t.itemId))
-					issued.delete(id);
-			epoch++;
+			for (const [id, t] of st.issued)
+				if (t.kind === "research" && !st.items.some((i) => i.id === t.itemId))
+					st.issued.delete(id);
+			st.epoch++;
 		},
 
 		view: () => ({
-			items: structuredClone(items),
-			said: structuredClone(said),
-			quiet: { ...quiet },
-			researching: researching
-				? (structuredClone(
-						items.find((i) => i.id === researching!.ticket.itemId),
-					) ?? null)
-				: null,
-			planDue,
-			unanswered,
+			items: structuredClone(st.items),
+			said: structuredClone(st.said),
+			quiet: { ...st.quiet },
+			researching: structuredClone(researchingItem()),
+			planDue: st.planDue,
+			unanswered: st.unanswered,
 		}),
 	};
-	return agent;
 }

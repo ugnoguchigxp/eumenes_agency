@@ -1,5 +1,7 @@
 /**
- * Always-on conversation CLI (spec/always-on-agency-design-2026-11-07.md). The agent keeps
+ * Always-on conversation CLI (spec/always-on-agency-design-2026-11-07.md). Frozen since
+ * 2026-11-08: the standard CLI is the agenda agent (`bun run agency`, standalone/agenda.ts); this
+ * one stays as `bun run agency:always-on` and is not improved. The agent keeps
  * thinking on a heartbeat and may speak on its own; typing pauses it. Cost is recorded in
  * data/always-on/usage.jsonl and never capped.
  *

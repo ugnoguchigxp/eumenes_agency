@@ -11,7 +11,7 @@ import type {
 	ReplyCall,
 	StepOutcome,
 } from "../src/agenda/index.ts";
-import type { ToolPort } from "../src/index.ts";
+import type { EmotionEmoji, ToolPort } from "../src/index.ts";
 import { createAgendaReplyTools, notesMentioned } from "./agenda-reply.ts";
 import type { MockDocStore } from "../examples/virtual-eumenes/agenda/docs.ts";
 import type { MockSteward } from "../examples/virtual-eumenes/agenda/memory.ts";
@@ -23,12 +23,15 @@ export type AgendaSessionEvent =
 			readonly type: "reply";
 			readonly text: string;
 			readonly latencyMs: number;
+			/** The feeling the reply is said with (its leading emoji, removed from the text). */
+			readonly emotion: EmotionEmoji | null;
 	  }
 	| { readonly type: "step"; readonly outcome: StepOutcome }
 	| {
 			readonly type: "speak";
 			readonly kind: "ask" | "talk";
 			readonly text: string;
+			readonly emotion: EmotionEmoji | null;
 	  }
 	| {
 			readonly type: "research";
@@ -70,7 +73,12 @@ export interface AgendaSessionDeps {
 		agent: AgendaAgent,
 		tools: ToolPort,
 	) => Promise<
-		string | { readonly text: string; readonly calls: readonly ReplyCall[] }
+		| string
+		| {
+				readonly text: string;
+				readonly calls: readonly ReplyCall[];
+				readonly emotion?: EmotionEmoji | null;
+		  }
 	>;
 	readonly now: () => number;
 	readonly setTimer: (fn: () => void, ms: number) => unknown;
@@ -122,7 +130,12 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 		}
 		let delivered = true;
 		try {
-			emit({ type: "speak", kind: t.itemKind, text: t.utterance });
+			emit({
+				type: "speak",
+				kind: t.itemKind,
+				text: t.utterance,
+				emotion: t.emotion,
+			});
 		} catch (e) {
 			delivered = false;
 			emit({ type: "error", where: "speak", message: message(e) });
@@ -269,8 +282,13 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 				});
 				const out = await deps.reply(agent, tools);
 				if (closed) return;
-				const { text: reply, calls } =
-					typeof out === "string" ? { text: out, calls: [] } : out;
+				const {
+					text: reply,
+					calls,
+					emotion,
+				} = typeof out === "string"
+					? { text: out, calls: [], emotion: null }
+					: { emotion: null, ...out };
 				if (reply !== "") {
 					agent.observe({
 						id: `r${stamp}.${n}`,
@@ -281,7 +299,12 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 					});
 					for (const id of notesMentioned(reply, deps.docs.list()))
 						agent.noteUsed(id, now());
-					emit({ type: "reply", text: reply, latencyMs: now() - started });
+					emit({
+						type: "reply",
+						text: reply,
+						latencyMs: now() - started,
+						emotion,
+					});
 				}
 			} catch (e) {
 				emit({ type: "error", where: "reply", message: message(e) });

@@ -144,7 +144,7 @@ async function main() {
 	const searcher = args.mockResearch
 		? null
 		: webNoteWriter({
-				model: settings.llm.background.model,
+				role: settings.llm.background,
 				meter,
 				today: () => localTime(Date.now()),
 			});
@@ -200,8 +200,13 @@ async function main() {
 				log.write({ type: "user", text: e.text });
 				return;
 			case "reply":
-				log.write({ type: "reply", text: e.text, latencyMs: e.latencyMs });
-				return out(e.text);
+				log.write({
+					type: "reply",
+					text: e.text,
+					emotion: e.emotion,
+					latencyMs: e.latencyMs,
+				});
+				return out(`${e.emotion ? `${e.emotion} ` : ""}${e.text}`);
 			case "step": {
 				const o = e.outcome;
 				if (o.plan) {
@@ -264,8 +269,13 @@ async function main() {
 				return;
 			}
 			case "speak":
-				log.write({ type: "speak", kind: e.kind, text: e.text });
-				return out(`\n[自分から] ${e.text}`);
+				log.write({
+					type: "speak",
+					kind: e.kind,
+					text: e.text,
+					emotion: e.emotion,
+				});
+				return out(`\n[自分から] ${e.emotion ? `${e.emotion} ` : ""}${e.text}`);
 			case "research":
 				log.write({
 					type: "research",
@@ -332,11 +342,15 @@ async function main() {
 				}),
 				chat,
 				tools,
-				emotion: false,
+				emotion: true,
 				signal: new AbortController().signal,
 				onDelta: () => undefined,
 			});
-			return { text: dropRepeatedSentences(r.text), calls: r.calls };
+			return {
+				text: dropRepeatedSentences(r.text),
+				calls: r.calls,
+				emotion: r.emotion ?? null,
+			};
 		},
 	});
 

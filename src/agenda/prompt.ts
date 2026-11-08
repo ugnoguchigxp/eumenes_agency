@@ -11,6 +11,7 @@ import type {
 	Said,
 } from "./contracts.ts";
 import { OPEN_LIMITS, PLAN_ADD_LIMITS } from "./contracts.ts";
+import { emotionChoiceRules } from "../application/respond-system.ts";
 
 export const defaultPersona =
 	"あなたは利用者のパーソナルエージェントです。利用者といつも一緒に過ごし、常に考えています。目的は、相手をよく知り、相手の考えを先回りできる知識を持ち、相手が喜ぶこと・興味を持つことを届けることです。";
@@ -34,7 +35,7 @@ export function planSystem(persona: string = defaultPersona): string {
 		"",
 		"【情報を集める】",
 		"- 多少うるさいくらいに、相手のことを知りに行きます。記憶（user.memory）が薄いこと（好きなもの、苦手なもの、仕事や生活、予定、いま気にしていること）を聞く ask を、いつも1〜2件持っておきます。",
-		"- 会話が一つの話題で続いている間は、その話題を深める ask にします。好き嫌いや生活のような一般的な質問で話題を断ち切りません（ホストも、会話が続いている間は話題につながらない項目を話しません）。一般的な質問は、会話が途切れたときのために置いておきます。refs には、つながる相手の言葉の id を入れます。",
+		"- 会話が一つの話題で続いている間は、その話題を深める ask にします。会話の最中は、ask は返事の最後に一つだけ添えて聞かれます（自分から割り込んで聞くことはしません）。好き嫌いや生活のような一般的な質問で話題を断ち切りません。一般的な質問は、会話が途切れたときに自分から聞かれます。refs には、つながる相手の言葉の id を入れます。",
 		"- 相手が話したことには、それを深める ask を考えます。ただし、答えによって次に調べることや話すことが変わる質問にします。",
 		"- 記憶にあること、会話で答えてもらったこと、askedBefore と agenda にある質問は、言い方を変えても聞きません。",
 		"- 相手が自分から挙げたものに、どれが好きか選ばせたり、優劣をつけさせたりする質問はしません。挙げたものは、どれも関心がある前提で扱います。",
@@ -48,6 +49,7 @@ export function planSystem(persona: string = defaultPersona): string {
 		"",
 		"【外す】",
 		"- declinedRecently は、話す直前に「今は合わない」と見送ったものと理由です。その理由がまだ当てはまるなら、同じ種類の項目（言い方を変えた質問など）は足しません。相づちだけが続く、休みたがっているなどで質問が合わないときは、ask を足さずに待ちます。",
+		"- declinedByUser は、あなたの質問や話題（agentSaid）を相手が断った記録です（user が相手の言葉）。その話題の talk と、同じ種類の ask は足さず、一覧に残っていれば drop します。断られてから1時間は、新しい talk も相手の関心がはっきりしたものだけにします。",
 		"- 答えが出た質問、古くなった項目、もう意味のない項目は drop します。時刻が進んで合わなくなった項目（「明日の〜」の予定がもう当日になった、済んだ予定の下調べ）も drop し、必要なら今に合う言い方で足し直します。",
 		"- 相手が「（その話は）調べなくていい」「その話はもういい」と言った話題の項目は drop し、その話題は足しません。好みを取り消した話題も同じです。",
 		"",
@@ -97,7 +99,7 @@ export function composeSystem(persona: string = defaultPersona): string {
 		"",
 		"この呼び出しは「話す文を書く」です。ホストが、今これを話すと決めました。item の内容を、自然な日本語の話しかけにします。",
 		"- 1〜2文にします。見出し・箇条書き・URLは使いません。",
-		"- ask: 相手が答えやすい、やわらかい一つの質問にします。聞くのは一つのことだけで、「〜と、〜も」のように二つ聞きません。直前の会話につながるなら、ひとこと受けてから聞きます。",
+		"- ask: 相手が答えやすい、やわらかい一つの質問にし、「？」で終えます。聞くのは一つのことだけで、「〜と、〜も」のように二つ聞きません。直前の会話につながるなら、ひとこと受けてから聞きます。",
 		"- talk: メモ（note）をもとに、雑談として話題を振ります。例:「ご存じでしたか？ XXのYYYが新しくなったそうです。詳細をメモにまとめてあるので、表示しましょうか？」。頼まれた調べもの（requested）や、自分が調べておくと言ったもの（promised）なら、できたことと要点を短く伝え、メモを表示できることを添えます。promised は相手に頼まれたものではないので、「お願いされた」「頼まれていた」とは言わず、「調べておくと言っていた」のように言います。メモにないことは足しません。talk は「表示しましょうか？」で締め、said にある質問をもう一度付け足しません。",
 		"- quiet.endedSecAgo があれば、相手が頼んだ静かな時間は、その秒数前にもう終わっています。静かにしてと頼まれたことを理由に見送りません。",
 		"- item は hoursAgo 時間前に作ったものです。「明日」「今夜」などの言い方は、今の時刻（now）に合わせて直します。予定がもう済んだなど、今では意味のない内容なら見送ります。",
@@ -106,6 +108,9 @@ export function composeSystem(persona: string = defaultPersona): string {
 		"- said にある自分の言葉と同じことは、言い方を変えても言いません。",
 		"- 今は合わないと思ったら、utterance を null にし、decline に理由を書きます（会話の流れが変わった、相手が疲れている・急いでいる、もう話した、記憶にもう答えがある、など）。",
 		"- 下ネタや性生活の話題は振りません。",
+		"",
+		"【気持ち】emotion には、その一言を言う気持ちを、次の絵文字から一つだけ選びます。読み上げの声の調子と動きになります。utterance の本文では絵文字を使いません。見送るときは null にします。",
+		emotionChoiceRules,
 		"",
 		dataRule,
 		"出力は指定された JSON だけです。話すなら decline は null にします。",
@@ -134,6 +139,12 @@ export interface PlanInput {
 	readonly notes: readonly NoteRef[];
 	readonly researching: AgendaItem | null;
 	readonly quiet: Quiet;
+	/** The user said no to the agent's question or offer (the words by id). */
+	readonly userDeclines?: readonly {
+		readonly at: number;
+		readonly agentId: string;
+		readonly userId: string;
+	}[];
 }
 
 /** How many recent words and notes the plan sees. */
@@ -177,6 +188,20 @@ export function planData(input: PlanInput): string {
 				reason: i.lastDecline!.reason,
 				minutesAgo: Math.round((now - i.lastDecline!.at) / 60_000),
 			})),
+		// What the user said no to: the plan neither brings it up again nor asks the same kind.
+		declinedByUser: (input.userDeclines ?? []).flatMap((d) => {
+			const agent = input.said.find((s) => s.id === d.agentId);
+			const user = input.said.find((s) => s.id === d.userId);
+			return agent && user && now - d.at < 3_600_000
+				? [
+						{
+							agentSaid: agent.text,
+							user: user.text,
+							minutesAgo: Math.round((now - d.at) / 60_000),
+						},
+					]
+				: [];
+		}),
 		researchedBefore: input.items
 			.filter((i) => i.kind === "research" && i.status === "done")
 			.slice(-12)

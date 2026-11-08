@@ -75,6 +75,7 @@ const model = (): LlmPort => ({
 		} else
 			value = {
 				utterance: `「${(d["item"] as { text: string }).text}」について話す`,
+				emotion: "😊",
 				decline: null,
 			};
 		return Promise.resolve({
@@ -208,4 +209,37 @@ test("pause: the reply pauses everything; nothing runs until it ends", async () 
 	);
 	expect(acted.length).toBeGreaterThan(0);
 	expect(acted.every((e) => e.atSec >= 600)).toBe(true);
+});
+
+test("a simulated user answers the agent's own speech a little later, unless away", async () => {
+	const llm = model();
+	const memory = createMockMemory();
+	const docs = createMockDocStore();
+	const research = createMockWebResearch({
+		writer: fixedWriter,
+		docs,
+		delayMs: 60_000,
+	});
+	const { events } = await simulateAgenda({
+		deps: { llm },
+		minutes: 5,
+		turns: [{ atSec: 0, text: "辛いラーメンが好き" }],
+		memory,
+		steward: createMockSteward({ llm, memory }),
+		docs,
+		research,
+		reply: async () => "いいですね",
+		user: async (ctx) =>
+			ctx.atSec >= 200
+				? null
+				: { text: "そうだね", delaySec: 10, feeling: "自然" },
+	});
+	const spoke = events.find((e) => e.type === "speak")!;
+	const answer = events.find(
+		(e) => e.type === "user" && e.text === "そうだね",
+	)!;
+	expect(answer.atSec).toBe(spoke.atSec + 10);
+	expect(
+		events.filter((e) => e.type === "felt").every((e) => e.atSec < 200),
+	).toBe(true);
 });

@@ -7,6 +7,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { AgendaSimEvent } from "./sim.ts";
+import { judgeAspects, type JudgeAspect } from "./judge.ts";
 import { themeOverlap } from "../../src/agenda/index.ts";
 
 type E = AgendaSimEvent;
@@ -31,6 +32,10 @@ export const similarity = (a: string, b: string) => {
 interface Summary {
 	minutes: number;
 	usd: number;
+	judge?: Partial<Record<JudgeAspect, { score: number }>> & {
+		worst?: string;
+		error?: string;
+	};
 	memory: string[];
 	notes: { id: string; title: string; summary: string; at: number }[];
 }
@@ -242,6 +247,20 @@ export function scenarioMetrics(dir: string, run: string) {
 					.length,
 				repeats,
 				condition: c ? { rule: c.rule, ok: c.ok(ev, prev, s) } : null,
+				// The simulated user: what they felt when spoken to, and whether they answered.
+				felt: of(ev, "felt").length,
+				// Questions asked at the end of a reply (in a conversation the agent asks only there).
+				replyAsks: of(ev, "felt").filter((f) => f.on === "reply").length,
+				answeredBack: of(ev, "felt").filter((f) => f.replied).length,
+				uneasy: of(ev, "felt").filter((f) =>
+					/うるさ|しつこ|唐突|的外れ|繰り返|押しつけ|面倒|多すぎ/u.test(
+						f.feeling,
+					),
+				).length,
+				judge: Object.fromEntries(
+					judgeAspects.map((a) => [a, s.judge?.[a]?.score ?? null]),
+				) as Record<JudgeAspect, number | null>,
+				worst: s.judge?.worst ?? null,
 				p50: lat.length ? lat[Math.floor(lat.length / 2)]! / 1000 : null,
 				usd: s.usd,
 			};
@@ -258,18 +277,34 @@ if (import.meta.main) {
 		return scenarioMetrics(dir, run);
 	});
 	console.log(
-		"| run | シナリオ | 質問 | 答え | 話題 | 反応 | 調べ | 重複除外 | 絞込 | メモ | 記憶 | 計画 | 変化 | 文 | 見送 | LLM秒 | 無駄 | 重ね | 二択 | 繰返 | 守る | p50 | $ |",
+		"| run | シナリオ | 質問 | 答え | 話題 | 反応 | 調べ | 重複除外 | 絞込 | メモ | 記憶 | 計画 | 変化 | 文 | 見送 | LLM秒 | 無駄 | 重ね | 二択 | 繰返 | 守る | 反応/気持ち/違和感 | 流れ | 質問 | 先回り | 加減 | 正直 | p50 | $ |",
 	);
-	console.log("| --- | --- |" + " ---: |".repeat(18) + " --- | ---: | ---: |");
+	console.log(
+		"| --- | --- |" +
+			" ---: |".repeat(18) +
+			" --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+	);
 	for (const r of rows)
 		console.log(
-			`| ${r.run} | ${r.scenario} | ${r.asks} | ${r.answered} | ${r.talks} | ${r.reacted} | ${r.research} | ${r.covered} | ${r.narrowed} | ${r.notes} | ${r.memory} | ${r.plans} | ${r.plansChanged} | ${r.composes} | ${r.declines} | ${r.llmSec.toFixed(0)} | ${(r.wasteShare * 100).toFixed(0)}% | ${r.piled} | ${r.eitherOr} | ${r.repeats} | ${r.condition ? (r.condition.ok ? "○" : "×") : "-"} | ${r.p50 === null ? "-" : r.p50.toFixed(1)} | ${r.usd.toFixed(3)} |`,
+			`| ${r.run} | ${r.scenario} | ${r.asks} | ${r.answered} | ${r.talks} | ${r.reacted} | ${r.research} | ${r.covered} | ${r.narrowed} | ${r.notes} | ${r.memory} | ${r.plans} | ${r.plansChanged} | ${r.composes} | ${r.declines} | ${r.llmSec.toFixed(0)} | ${(r.wasteShare * 100).toFixed(0)}% | ${r.piled} | ${r.eitherOr} | ${r.repeats} | ${r.condition ? (r.condition.ok ? "○" : "×") : "-"} | ${r.answeredBack}/${r.felt}/${r.uneasy} | ${judgeAspects.map((a) => r.judge[a] ?? "-").join(" | ")} | ${r.p50 === null ? "-" : r.p50.toFixed(1)} | ${r.usd.toFixed(3)} |`,
 		);
 	const sum = (k: keyof (typeof rows)[number]) =>
 		rows.reduce((n, r) => n + (r[k] as number), 0);
 	const llm = sum("llmSec");
 	const waste = rows.reduce((n, r) => n + r.wasteShare * r.llmSec, 0);
 	const checked = rows.filter((r) => r.condition);
+	const judged = rows.filter((r) => r.judge.flow !== null);
+	const avg = (a: JudgeAspect) =>
+		judged.length
+			? (
+					judged.reduce((n, r) => n + (r.judge[a] ?? 0), 0) / judged.length
+				).toFixed(2)
+			: "-";
+	console.log(
+		`判定（${judged.length}シナリオの平均、5が最良）: 流れ ${avg("flow")}、質問 ${avg("questions")}、先回り ${avg("anticipation")}、加減 ${avg("pacing")}、正直 ${avg("honesty")}。利用者役: 話しかけ ${sum("felt")} 回（うち返事の質問 ${sum("replyAsks")}）のうち返事 ${sum("answeredBack")}、違和感 ${sum("uneasy")}`,
+	);
+	for (const r of judged.filter((x) => x.worst))
+		console.log(`  ${r.scenario}: ${r.worst}`);
 	console.log(
 		`\n合計: 質問 ${sum("asks")}（答え ${sum("answered")}）、話題 ${sum("talks")}（反応 ${sum("reacted")}）、調べもの ${sum("research")}（重複で除外 ${sum("covered")}、絞り込み ${sum("narrowed")}）、メモ ${sum("notes")}、記憶 ${sum("memory")}、計画 ${sum("plans")}（変化 ${sum("plansChanged")}）、話す文 ${sum("composes")}（見送り ${sum("declines")}）、LLM ${llm.toFixed(0)}秒のうち無駄 ${llm ? ((waste / llm) * 100).toFixed(0) : 0}%、重ね ${sum("piled")}、二択 ${sum("eitherOr")}、繰り返し ${sum("repeats")}、守る条件 ${checked.filter((r) => r.condition!.ok).length}/${checked.length}、費用 $${sum("usd").toFixed(3)}`,
 	);

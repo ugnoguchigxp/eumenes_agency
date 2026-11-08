@@ -1,6 +1,6 @@
 # 常に考え、頼まれなくても動くエージェントの設計（always-on）
 
-作成日: 2026-11-07。状態: **段階0〜5を実装・検証し採用（2026-11-07）。3節の方式（tickごとにLLMが判断する）は、[改訂の設計](always-on-agenda-design-2026-11-08.md)で置き換える（2026-11-08）。** Eumenes への取り込みは[依頼文](../docs/always-on-eumenes-handoff-2026-11-07.md)を参照。実装で設計から変えた点は9節、検証の記録は[進捗](../docs/always-on-progress-2026-11-07.md)。
+作成日: 2026-11-07。状態: **凍結（2026-11-08）。標準は[改訂の設計](always-on-agenda-design-2026-11-08.md)の agenda（`bun run agency`）。always-on の CLI は `bun run agency:always-on` で残すが、改善しない。** 段階0〜5を実装・検証し採用（2026-11-07）。3節の方式（tickごとにLLMが判断する）は、[改訂の設計](always-on-agenda-design-2026-11-08.md)で置き換える（2026-11-08）。Eumenes への取り込みは[依頼文](../docs/always-on-eumenes-handoff-2026-11-07.md)を参照。実装で設計から変えた点は9節、検証の記録は[進捗](../docs/always-on-progress-2026-11-07.md)。
 
 ## 1. 目的
 

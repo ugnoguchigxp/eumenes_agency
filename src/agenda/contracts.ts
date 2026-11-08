@@ -3,6 +3,7 @@
  * of things to do and decides when and which; the model reads words and writes content.
  */
 import { z } from "zod";
+import { emotionEmojis, type EmotionEmoji } from "../contracts/emotion.ts";
 
 export const AGENDA_VERSION = "agenda-1";
 
@@ -19,16 +20,19 @@ export const QUESTION_WAIT_MS = 60_000;
  */
 export const SPEECH_HOLD_MS = 600_000;
 /**
- * While the user spoke this recently, the conversation is going on: only what ties into it
- * (their words of the last TOPIC_RECENT_MS, or a note made from them) is said. A question about
- * something else waits until the talk pauses.
+ * While the user spoke this recently, the conversation is going on: only a topic that ties into
+ * it (their words of the last TOPIC_RECENT_MS, or a note made from them) is said, and the agent
+ * asks nothing on its own; what it wants to know goes at the end of a reply (one question in two
+ * replies). Its own questions wait until the talk pauses.
  */
 export const ENGAGED_MS = 180_000;
 export const TOPIC_RECENT_MS = 300_000;
 /** With nothing new for this long, the passing of time itself is new information. */
 export const IDLE_PLAN_MS = 3_600_000;
-/** A declined utterance is not picked again before this. */
+/** A declined utterance is not picked again before this; nor is anything after the user said no. */
 export const DECLINE_DEFER_MS = 600_000;
+/** The user's words this soon after the agent's question or offer are taken as the answer to it. */
+export const ANSWER_WINDOW_MS = 600_000;
 /** A research the host refused to start is tried again after this. */
 export const RESEARCH_RETRY_MS = 60_000;
 /** A research the host never returns stops counting as running after this. */
@@ -133,6 +137,8 @@ export type AgendaTicket =
 			readonly itemId: string;
 			readonly itemKind: "ask" | "talk";
 			readonly utterance: string;
+			/** The feeling it is said with (voice tone, motion); null: the host decides. */
+			readonly emotion: EmotionEmoji | null;
 			readonly noteId: string | null;
 			readonly refs: readonly string[];
 			readonly at: number;
@@ -221,6 +227,8 @@ export const SAME_THEME_OVERLAP = 0.35;
 
 export const composeSchema = z.strictObject({
 	utterance: z.string().nullable(),
+	/** The feeling the utterance is said with (null when declining). */
+	emotion: z.enum(emotionEmojis).nullable(),
 	decline: z.string().nullable(),
 });
 export type ComposeOutput = z.infer<typeof composeSchema>;

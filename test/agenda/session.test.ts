@@ -108,6 +108,7 @@ const model: LlmPort = {
 			value = {
 				utterance:
 					"ご存じでしたか？ 新しい店ができたそうです。メモを表示しましょうか？",
+				emotion: "😮",
 				decline: null,
 			};
 		return Promise.resolve({
