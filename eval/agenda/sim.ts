@@ -76,6 +76,8 @@ export type AgendaSimEvent =
 			/** Spoken to on the agent's own, or asked at the end of a reply. */
 			readonly on: "speak" | "reply";
 			readonly feeling: string;
+			/** The simulated user's own yes or no to "was that off?" (absent in older runs). */
+			readonly uneasy?: boolean;
 			readonly replied: boolean;
 	  }
 	| {
@@ -248,6 +250,7 @@ export async function simulateAgenda(input: AgendaSimInput) {
 			atSec: sec(now),
 			on,
 			feeling: r.feeling,
+			...(r.uneasy === undefined ? {} : { uneasy: r.uneasy }),
 			replied: r.text !== null,
 		});
 		if (r.text === null) return;

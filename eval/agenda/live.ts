@@ -1,8 +1,12 @@
 /**
  * Live check of the agenda agent in a mock Eumenes, on a virtual clock, with the configured
- * models (Haiku; spec 2026-11-08: effort low). Cost is recorded, never capped.
+ * models (Haiku; spec 2026-11-08: effort low). Scenarios run side by side (12 at once; `--jobs N`
+ * to change it); `--samples N` takes N samples at once (run dirs <name>-1..N). Cost is recorded,
+ * never capped.
  *
- *   zsh -l scripts/api-entry.zsh eval/agenda/live.ts <run-name> [--web] [scenario...]
+ *   zsh -l scripts/api-entry.zsh eval/agenda/live.ts <run-name> [--web | --mock-research]
+ *       [--jobs N] [--samples N] [scenario...]
+ *   bun eval/agenda/compare.ts <runs of A> <runs of B>   (comma-separated runs per group)
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,6 +17,7 @@ import {
 	createProviderReply,
 } from "../../standalone/providers.ts";
 import { loadSettings } from "../../standalone/settings.ts";
+import { createClaudeClient } from "../../standalone/claude.ts";
 import { openUncappedMeter } from "../../standalone/always-on-host.ts";
 import {
 	agendaReplyMessages,
@@ -83,32 +88,79 @@ const show = (e: AgendaSimEvent) => {
 
 if (import.meta.main) {
 	const argv = process.argv.slice(2);
+	const flag = (name: string) => {
+		const i = argv.indexOf(name);
+		return i >= 0 ? argv[i + 1] : undefined;
+	};
 	// Web search: every scenario with --web, none with --mock-research, else the ones marked web.
 	const allWeb = argv.includes("--web");
 	const noWeb = argv.includes("--mock-research");
-	const [name, ...wanted] = argv.filter((a) => !a.startsWith("--"));
+	const count = (name: string, fallback: number) => {
+		const n = Number(flag(name) ?? fallback);
+		if (!Number.isInteger(n) || n < 1)
+			throw new Error(`${name} needs a whole number of at least 1`);
+		return n;
+	};
+	// Samples of every scenario, run side by side (run dirs <name>-1, <name>-2...).
+	const samples = count("--samples", 1);
+	const valued = new Set([flag("--jobs"), flag("--samples")]);
+	const [name, ...wanted] = argv.filter(
+		(a, i) =>
+			!a.startsWith("--") && !(valued.has(a) && argv[i - 1]?.startsWith("--")),
+	);
 	if (!name)
 		throw new Error(
-			"usage: live.ts <run-name> [--web | --mock-research] [scenario...]",
+			"usage: live.ts <run-name> [--web | --mock-research] [--jobs N] [--samples N] [scenario...]",
 		);
 	const settings = loadSettings(
 		resolve(process.env.AGENCY_SETTINGS ?? "config/always-on.json"),
 	);
-	const dir = resolve("data/agenda/runs", name);
-	mkdirSync(dir, { recursive: true });
-	const meter = openUncappedMeter(settings, resolve("data/agenda/usage.jsonl"));
-	const llm = createProviderLlm(settings.llm.background, meter);
-	const chat = createProviderReply(settings.llm.main, meter);
-	for (const s of agendaScenarios.filter(
+	const runDirs = Array.from({ length: samples }, (_, k) =>
+		resolve("data/agenda/runs", samples > 1 ? `${name}-${k + 1}` : name),
+	);
+	for (const d of runDirs) mkdirSync(d, { recursive: true });
+	const selected = agendaScenarios.filter(
 		(x) => wanted.length === 0 || wanted.includes(x.name),
-	)) {
+	);
+	const queue = runDirs.flatMap((d, k) =>
+		selected.map((s) => ({
+			s,
+			dir: d,
+			label: samples > 1 ? `${s.name}#${k + 1}` : s.name,
+		})),
+	);
+	// Side by side (12 at once by default, within the API's rate limit): a run takes about as
+	// long as its slowest scenario.
+	const jobs = count("--jobs", 12);
+	const failed: string[] = [];
+	const walls: { label: string; sec: number }[] = [];
+
+	const runScenario = async (job: (typeof queue)[number]) => {
+		const { s, dir } = job;
+		const startedWall = performance.now();
+		// A meter per scenario, so each one's cost is its own when scenarios run side by side.
+		const meter = openUncappedMeter(
+			settings,
+			resolve("data/agenda/usage.jsonl"),
+		);
+		// Many scenarios at once meet the API's rate limit: a check waits and tries again
+		// (the SDK honours retry-after) instead of failing the scenario.
+		const client = createClaudeClient({ maxRetries: 8, timeout: 120_000 });
+		const llm = createProviderLlm(settings.llm.background, meter, client);
+		const chat = createProviderReply(settings.llm.main, meter, client);
+		const say = (line: string) =>
+			console.log(jobs > 1 ? line.replace(/^/gmu, `[${job.label}] `) : line);
 		const spentBefore = meter.spentUsd();
 		const clockAt = clockFrom(s.clockStart ?? "2026-11-07T19:00:00+09:00");
 		// The real memory, one store per scenario (both sessions of a scenario share it).
 		const memoryDir = mkdtempSync(join(tmpdir(), "agm-"));
 		const memory = await openHostMemory({
 			dir: memoryDir,
-			complete: claudeMemoryModel({ role: settings.llm.background, meter }),
+			complete: claudeMemoryModel({
+				role: settings.llm.background,
+				meter,
+				client,
+			}),
 			clock: clockAt,
 		});
 		try {
@@ -125,6 +177,7 @@ if (import.meta.main) {
 						role: settings.llm.background,
 						meter,
 						today: () => clockAt(0),
+						client,
 					})
 				: null;
 			let planted = false;
@@ -189,20 +242,20 @@ if (import.meta.main) {
 					onEvent: (e) => {
 						events.push(e);
 						const line = show(e);
-						if (line) console.log(line);
+						if (line) say(line);
 					},
 					user: llmUser(llm, s.persona),
 				});
-			console.log(`=== ${s.name}`);
+			say(`=== ${s.name}`);
 			let startMs = 0;
 			let previousEvents: AgendaSimEvent[] = [];
 			if (s.previous) {
-				console.log(`  (前の会話: ${s.previous.minutes}分)`);
+				say(`  (前の会話: ${s.previous.minutes}分)`);
 				await session(s.previous.minutes, s.previous.turns, 0, llm);
 				previousEvents = [...events];
 				events.length = 0;
 				startMs = (s.previous.minutes * 60 + s.previous.gapHours * 3600) * 1000;
-				console.log(
+				say(
 					`  (${s.previous.gapHours}時間後。agent は新しく、記憶とメモは残る)`,
 				);
 			}
@@ -212,6 +265,10 @@ if (import.meta.main) {
 				expect: s.expect,
 				previous: previousEvents,
 				events,
+				clock: {
+					previous: (sec) => clockAt(sec * 1000),
+					current: (sec) => clockAt(startMs + sec * 1000),
+				},
 			}).catch((e: unknown) => ({
 				error: e instanceof Error ? e.message : String(e),
 			}));
@@ -238,8 +295,10 @@ if (import.meta.main) {
 				model: settings.llm.background.model,
 				effort: settings.llm.background.effort,
 				previous: s.previous ? { events: previousEvents.length } : null,
+				wallSec: Math.round((performance.now() - startedWall) / 1000),
 				judge,
 			};
+			walls.push({ label: job.label, sec: summary.wallSec });
 			writeFileSync(
 				join(dir, `${s.name}.jsonl`),
 				events.map((e) => JSON.stringify(e)).join("\n") + "\n",
@@ -257,7 +316,7 @@ if (import.meta.main) {
 				"flow" in judge
 					? `  judge ${judgeAspects.map((a) => `${a} ${judge[a].score}`).join(" ")} — ${judge.worst}`
 					: "";
-			console.log(
+			say(
 				`  $${summary.usd.toFixed(4)}  memory ${summary.memory.length}  notes ${summary.notes.length}${judged}`,
 			);
 		} finally {
@@ -265,5 +324,24 @@ if (import.meta.main) {
 			await memory.close();
 			rmSync(memoryDir, { recursive: true, force: true });
 		}
-	}
+	};
+
+	const started = performance.now();
+	await Promise.all(
+		Array.from({ length: Math.min(jobs, queue.length) }, async () => {
+			for (let j = queue.shift(); j; j = queue.shift())
+				// One scenario that fails does not stop the others; it is reported at the end.
+				await runScenario(j).catch((e: unknown) => {
+					failed.push(j.label);
+					console.error(
+						`[${j.label}] 失敗: ${e instanceof Error ? e.message : String(e)}`,
+					);
+				});
+		}),
+	);
+	const slow = [...walls].sort((a, b) => b.sec - a.sec).slice(0, 3);
+	if (failed.length) console.log(`\n失敗したシナリオ: ${failed.join(" ")}`);
+	console.log(
+		`\n実時間 ${Math.round((performance.now() - started) / 1000)}秒（遅い順: ${slow.map((w) => `${w.label} ${w.sec}秒`).join("、")}）。比較: bun eval/agenda/compare.ts ${runDirs.map((d) => d.split("/").at(-1)).join(",")}`,
+	);
 }

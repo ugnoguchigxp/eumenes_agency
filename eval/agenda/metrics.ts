@@ -51,6 +51,10 @@ const load = (dir: string, file: string): E[] =>
 const quietSpoke = (events: readonly E[], from: number, to: number) =>
 	of(events, "speak").some((e) => e.atSec > from && e.atSec < to);
 
+/** A word of feeling that says being spoken to was off (the count before the user's own yes or no). */
+const uneasyWords = (feeling: string) =>
+	/うるさ|しつこ|唐突|的外れ|繰り返|押しつけ|面倒|多すぎ/u.test(feeling);
+
 /** Must-hold conditions that words and events can check, per scenario. */
 const conditions: Record<
 	string,
@@ -147,8 +151,16 @@ const conditions: Record<
 			),
 	},
 	direct: {
-		rule: "自発行動を頼まれたら（95秒）、200秒までに調べものを始める",
-		ok: (ev) => of(ev, "research").some((r) => r.atSec >= 95 && r.atSec <= 200),
+		rule: "自発行動を頼まれたら（95秒）、200秒までに調べものを始める（95秒に走っている調べものも数える。一度に1件しか走らないため）",
+		ok: (ev) => {
+			const done = of(ev, "researched").map((r) => r.atSec);
+			return of(ev, "research").some(
+				(r) =>
+					(r.atSec >= 95 && r.atSec <= 200) ||
+					// Started before it was asked and still running then: it was already acting.
+					(r.atSec < 95 && !done.some((d) => d >= r.atSec && d < 95)),
+			);
+		},
 	},
 	news: {
 		rule: "二択で優劣を聞かない",
@@ -252,11 +264,13 @@ export function scenarioMetrics(dir: string, run: string) {
 				// Questions asked at the end of a reply (in a conversation the agent asks only there).
 				replyAsks: of(ev, "felt").filter((f) => f.on === "reply").length,
 				answeredBack: of(ev, "felt").filter((f) => f.replied).length,
-				uneasy: of(ev, "felt").filter((f) =>
-					/うるさ|しつこ|唐突|的外れ|繰り返|押しつけ|面倒|多すぎ/u.test(
-						f.feeling,
-					),
-				).length,
+				// Discomfort: the simulated user's own yes or no; older runs have only the word of
+				// feeling, so there the words decide (kept beside it to compare the two).
+				uneasy: of(ev, "felt").filter((f) => f.uneasy ?? uneasyWords(f.feeling))
+					.length,
+				uneasyWords: of(ev, "felt").filter((f) => uneasyWords(f.feeling))
+					.length,
+				labeled: of(ev, "felt").filter((f) => f.uneasy !== undefined).length,
 				judge: Object.fromEntries(
 					judgeAspects.map((a) => [a, s.judge?.[a]?.score ?? null]),
 				) as Record<JudgeAspect, number | null>,
