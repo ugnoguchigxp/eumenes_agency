@@ -339,6 +339,34 @@ describe("agenda agent", () => {
 		expect(agent.nextAt(1)).toBe(600_000);
 	});
 
+	test("a result it did not ask for (research Eumenes ran for the user elsewhere) is received as a note", async () => {
+		const notes: NoteRef[] = [];
+		const m = scripted({
+			plan: (d) =>
+				(d["notes"] as unknown[]).length > 0
+					? plan(add("talk", "届いた調べものの話", ["note:n1"], 4))
+					: plan(),
+		});
+		const agent = make({ llm: m.llm, notes: () => notes });
+		const first = await agent.step(0, idle, sig());
+		expect(first.tickets).toEqual([]);
+		// The agent researches nothing itself: the host saved a report from web_research or
+		// pursuit and says something new came in.
+		notes.push({
+			id: "n1",
+			title: "箱根・強羅の宿の候補",
+			summary: "12月の土曜に空きのある宿が3件",
+			at: 5_000,
+			refs: [],
+		});
+		agent.infoChanged(5_000);
+		const at = agent.nextAt(5_000);
+		expect(at).not.toBeNull();
+		const out = await agent.step(at!, idle, sig());
+		expect(m.count("plan")).toBe(2);
+		expect(out.tickets).toMatchObject([{ kind: "speak", itemKind: "talk" }]);
+	});
+
 	test("a topic that ends in a question waits for the answer before any question", async () => {
 		const note: NoteRef = {
 			id: "n1",

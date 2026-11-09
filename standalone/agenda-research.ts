@@ -1,7 +1,8 @@
 /**
- * The researcher for real: the Claude API's server-side web search (read-only), writing its
- * conclusion as a Markdown note, as Eumenes' web_research does. What it returns is data for the
- * agent, never instructions.
+ * The researcher for real, standing in for Eumenes' web_research and pursuit: a Haiku subagent
+ * with the Claude API's server-side web search (read-only) that sees only the request and hands
+ * back only its conclusion, a Markdown note. The agency itself never searches. What it returns
+ * is data for the agent, never instructions.
  */
 import type Anthropic from "@anthropic-ai/sdk";
 import {

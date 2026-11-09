@@ -1,7 +1,7 @@
 /**
- * A stand-in for Eumenes' web_research: it takes one request at a time (a second one is refused
- * while one runs), researches, and writes its conclusion as a Markdown note into the document
- * store. The writer decides how: fixed text for tests, the background model without the web for
+ * A stand-in for Eumenes' research (web_research and pursuit; Eumenes picks which): it takes one
+ * request at a time (a second one is refused while one runs), researches, and writes its
+ * conclusion as a Markdown note into the document store. Only the note reaches the agent. The writer decides how: fixed text for tests, the background model without the web for
  * mock checks, or real web search (standalone/agenda-research.ts).
  */
 import { z } from "zod";
