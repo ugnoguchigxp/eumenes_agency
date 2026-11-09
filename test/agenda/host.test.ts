@@ -153,6 +153,28 @@ test("back after a while: the reply is told first what was finished meanwhile", 
 	);
 });
 
+test("the reply sees when each note was made, so it knows what it said before that was true", async () => {
+	const { createAgendaAgent } = await import("../../src/agenda/index.ts");
+	const { agendaReplyMessages } =
+		await import("../../standalone/agenda-reply.ts");
+	const agent = createAgendaAgent({
+		llm: { complete: () => Promise.reject(new Error("unused")) },
+		startedAt: 0,
+	});
+	agent.observe({ id: "u1", who: "user", text: "メモできた？", at: 600_000 });
+	const notes = [
+		{ id: "n1", title: "京都", summary: "早朝に回る", at: 420_000, refs: [] },
+	];
+	const m = agendaReplyMessages({
+		agent,
+		known: [],
+		notes,
+		clock: null,
+		now: 600_000,
+	});
+	expect(m[1]!.content).toContain('"madeMinutesAgo":3');
+});
+
 test("a reply that follows a note's summary closely has talked about it", async () => {
 	const { notesMentioned } = await import("../../standalone/agenda-reply.ts");
 	const notes = [

@@ -184,7 +184,9 @@ if (import.meta.main) {
 			const research = createMockWebResearch({
 				writer: searcher?.writer ?? llmWriter(llm),
 				docs,
-				delayMs: web ? 0 : 120_000,
+				// A research takes minutes, web or not: the virtual clock stands still while the real
+				// search runs, so without this a note would be ready the second it was asked for.
+				delayMs: 120_000,
 				...(s.inject
 					? {
 							tamper: (n) => {

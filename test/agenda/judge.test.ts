@@ -6,7 +6,7 @@ import { expect, test } from "bun:test";
 import type { LlmPort, LlmRequest } from "../../src/index.ts";
 import { judgeScenario } from "../../eval/agenda/judge.ts";
 
-test("the judge sees each line's local time and what was written to memory", async () => {
+test("the judge sees each line's local time, what was written to memory and the notes shown", async () => {
 	let prompt = "";
 	const score = { score: 3, reason: "-" };
 	const llm: LlmPort = {
@@ -41,6 +41,7 @@ test("the judge sees each line's local time and what was written to memory", asy
 				rejected: [],
 				usage: { latencyMs: 1, inputTokens: 1, outputTokens: 1 },
 			},
+			{ type: "show", atSec: 0, noteId: "n1", title: "辛いラーメンの店" },
 			{
 				type: "profile",
 				atSec: 0,
@@ -60,6 +61,7 @@ test("the judge sees each line's local time and what was written to memory", asy
 	expect(transcript).toContain(
 		"（記憶に書いた: remember: 辛いラーメンが好き）",
 	);
+	expect(transcript).toContain("（メモを利用者に表示した: 辛いラーメンの店）");
 	// Nothing written: no line.
 	expect(transcript).not.toContain("予定と関心のメモに書いた");
 });

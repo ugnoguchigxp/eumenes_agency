@@ -58,6 +58,10 @@ const line = (
 			return `${t} エージェントが自分から（${e.kind === "ask" ? "質問" : "話題"}）: ${e.text}`;
 		case "research":
 			return `${t} （調べものを頼んだ: ${e.text}）`;
+		case "read":
+			return `${t} （メモを読んだ: ${e.title}）`;
+		case "show":
+			return `${t} （メモを利用者に表示した: ${e.title}）`;
 		case "researched":
 			return `${t} （メモができた: ${e.title ?? e.status}）`;
 		case "memory":

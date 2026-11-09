@@ -217,6 +217,7 @@ export function agendaReplySystem(persona?: string): string {
 		`- メモに関係することを聞かれたら、${READ_NOTE} で本文を読み、その中身で具体的に答えます。詳しく見たいと言われたら ${SHOW_NOTE} で表示します。`,
 		"- whileAway があれば、相手は久しぶりに話しかけています。finishedMeanwhile にあるメモは、いない間に完成したものなので、「できています」と短く伝えて使います（調べ中とは言わない）。「明日」「今日」は now の日付で言います。",
 		"- researchLog と notes は、あなた（この返事か、背景の自分）がやり遂げた仕事の記録です。前の自分の言葉と合っているので、訂正や謝罪は要りません。",
+		"- notes の madeMinutesAgo は、そのメモができてからの分数です。メモがいつのものかは、この分数で言います（0〜1なら「いまできた」「さっき」）。前の自分の発言（「まだできていない」「調べている」など）がメモのできる前なら、その発言は正しかったので、訂正も謝罪もしません。",
 		`- 前の返事で呼んだツールとその結果は、会話の中にそのまま残っています。それがあなたのしたことです。`,
 		`- notes にあるテーマは調べ直さず、${READ_NOTE} で読んで答えます。`,
 		"- メモの id（n1 など）は内部の印なので、利用者には言いません。「調べておいたメモ」のように言います。",
@@ -390,10 +391,12 @@ export function agendaReplyMessages(input: {
 		...(ask ? { askIfFits: ask.text } : {}),
 		memory: input.known.map((k) => k.text),
 		...plansAndInterests(profileLines(input.profile ?? "")),
+		// When each note was made: what the reply said before that was true then.
 		notes: relevantNotes(input.notes, lastUser).map((n) => ({
 			id: n.id,
 			title: n.title,
 			summary: n.summary,
+			madeMinutesAgo: Math.max(0, Math.round((input.now - n.at) / 60_000)),
 		})),
 		researching: view.researching
 			? {
