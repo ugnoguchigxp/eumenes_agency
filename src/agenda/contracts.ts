@@ -7,30 +7,19 @@ import { emotionEmojis, type EmotionEmoji } from "../contracts/emotion.ts";
 
 export const AGENDA_VERSION = "agenda-1";
 
-/** The one user setting: the shortest gap between the agent's own utterances (15 s, 1 min, 5 min). */
-export const speechIntervals = [15, 60, 300] as const;
+/**
+ * The one user setting: the shortest gap between the agent's own utterances (10 s, 1 min, 5 min).
+ * It talks about once in ten seconds by default (user, 2026-11-09).
+ */
+export const speechIntervals = [10, 60, 300] as const;
 export type SpeechIntervalSec = (typeof speechIntervals)[number];
-export const defaultSpeechIntervalSec: SpeechIntervalSec = 15;
-
-/** After the agent asked something, this long for the answer before it speaks again. */
-export const QUESTION_WAIT_MS = 60_000;
-/**
- * Unanswered speech backs off by doubling; once the next gap would exceed 10 minutes, it waits
- * for the user. Not the shortest gap: that is the setting above.
- */
-export const SPEECH_HOLD_MS = 600_000;
-/**
- * While the user spoke this recently, the conversation is going on: only a topic that ties into
- * it (their words of the last TOPIC_RECENT_MS, or a note made from them) is said, and the agent
- * asks nothing on its own; what it wants to know goes at the end of a reply (one question in two
- * replies). Its own questions wait until the talk pauses.
- */
-export const ENGAGED_MS = 180_000;
+export const defaultSpeechIntervalSec: SpeechIntervalSec = 10;
+/** Words this long after the user's previous ones start a conversation anew: a reply may end in
+ * any question, not only one tied to the talk. */
+export const FRESH_TALK_MS = 180_000;
 export const TOPIC_RECENT_MS = 300_000;
 /** With nothing new for this long, the passing of time itself is new information. */
 export const IDLE_PLAN_MS = 3_600_000;
-/** A declined utterance is not picked again before this; nor is anything after the user said no. */
-export const DECLINE_DEFER_MS = 600_000;
 /** The user's words this soon after the agent's question or offer are taken as the answer to it. */
 export const ANSWER_WINDOW_MS = 600_000;
 /** A research the host refused to start is tried again after this. */
@@ -74,6 +63,8 @@ export interface AgendaItem {
 	endedAt: number | null;
 	/** `research`: checked against the notes before it starts (null: not yet). */
 	checkedRequest?: string | null;
+	/** Work handed to a toolchain found through find_toolchain (the user said yes): its name. */
+	delegatedTo?: string;
 	/** `research`: the note it became. */
 	resultNoteId?: string | null;
 	/** Why the utterance was last declined, and when (the plan learns from it). */
@@ -130,6 +121,8 @@ export type AgendaTicket =
 			readonly promised: boolean;
 			readonly refs: readonly string[];
 			readonly at: number;
+			/** Work for this toolchain (found through find_toolchain) instead of research. */
+			readonly delegatedTo?: string;
 	  }
 	| {
 			readonly id: string;
@@ -150,7 +143,7 @@ export interface StepHost {
 }
 
 export interface CallRecord {
-	readonly purpose: "plan" | "check" | "compose";
+	readonly purpose: "plan" | "check" | "ask_check" | "compose";
 	readonly at: number;
 	readonly model: string;
 	readonly latencyMs: number;
@@ -187,11 +180,21 @@ export interface CheckOutcome {
 	readonly call: CallRecord;
 }
 
+/** A question not asked: in meaning, asked already or answered already (wording aside). */
+export interface AskRepeat {
+	readonly itemId: string;
+	readonly text: string;
+	readonly verdict: "asked" | "answered";
+	readonly reason: string;
+}
+
 export interface StepOutcome {
 	readonly at: number;
 	readonly skipped: "stopped" | null;
 	readonly plan: PlanOutcome | null;
 	readonly check: CheckOutcome | null;
+	/** Questions dropped as repeats (checked when planned and before they are asked). */
+	readonly repeats: readonly AskRepeat[];
 	readonly compose: ComposeOutcome | null;
 	readonly tickets: readonly AgendaTicket[];
 }
@@ -222,8 +225,23 @@ export const checkSchema = z.strictObject({
 });
 export type CheckOutput = z.infer<typeof checkSchema>;
 
-/** Above this share of shared character pairs, a research is the same theme as an earlier one. */
-export const SAME_THEME_OVERLAP = 0.35;
+export const askCheckSchema = z.strictObject({
+	verdicts: z.array(
+		z.strictObject({
+			id: z.string(),
+			verdict: z.enum(["new", "asked", "answered"]),
+			reason: z.string(),
+		}),
+	),
+});
+export type AskCheckOutput = z.infer<typeof askCheckSchema>;
+
+/**
+ * Above this share of shared character pairs, a research is the same theme as an earlier one
+ * without asking: only near copies. A new angle on a theme (the glycine in milk after its
+ * tryptophan, 0.39) goes on to the check, which reads meaning (user, 2026-11-09).
+ */
+export const SAME_THEME_OVERLAP = 0.6;
 
 export const composeSchema = z.strictObject({
 	utterance: z.string().nullable(),

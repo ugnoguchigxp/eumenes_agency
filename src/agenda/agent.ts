@@ -7,12 +7,12 @@
  */
 import {
 	ANSWER_WINDOW_MS,
-	DECLINE_DEFER_MS,
 	DEFAULT_QUIET_MIN,
 	defaultSpeechIntervalSec,
 	IDLE_PLAN_MS,
 	RESEARCH_RETRY_MS,
 	RESEARCH_TTL_MS,
+	TOPIC_RECENT_MS,
 	speechIntervals,
 	type AgendaItem,
 	type AgendaTicket,
@@ -25,12 +25,16 @@ import {
 	type ReplyCall,
 	type Said,
 	type StepHost,
+	type AskRepeat,
 	type StepOutcome,
 } from "./contracts.ts";
 import { check } from "./check.ts";
 import { compose } from "./compose.ts";
 import {
 	askBlocked,
+	canDig,
+	connected,
+	holdsElsewhere,
 	endQuiet,
 	nextResearch,
 	paused,
@@ -39,10 +43,15 @@ import {
 	speechOpenAt,
 	speechQuiet,
 	topicGone,
-	topicOpenAt,
 } from "./pacing.ts";
 import { plan } from "./plan.ts";
-import { checkSystem, composeSystem, planSystem } from "./prompt.ts";
+import { checkAsks } from "./ask-check.ts";
+import {
+	askCheckSystem,
+	checkSystem,
+	composeSystem,
+	planSystem,
+} from "./prompt.ts";
 import {
 	createState,
 	makeItem,
@@ -116,6 +125,8 @@ export interface AgendaAgent {
 		at: number;
 		/** The user asked for it (absent: yes). */
 		requested?: boolean;
+		/** Work for a toolchain found through find_toolchain instead of research (the user said yes). */
+		delegatedTo?: string;
 	}):
 		| { readonly item: AgendaItem; readonly queued: boolean }
 		| { readonly rejected: string };
@@ -136,6 +147,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 		plan: planSystem(deps.persona),
 		check: checkSystem(),
 		compose: composeSystem(deps.persona),
+		askCheck: askCheckSystem(),
 	});
 	const researchingItem = () =>
 		st.researching
@@ -157,6 +169,14 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				...(s.calls?.length ? { calls: structuredClone([...s.calls]) } : {}),
 			});
 			if (s.who === "user") {
+				// The user talking ends a quiet for speech: they are here (user, 2026-11-09: after
+				// "そろそろ寝よう" set seven hours of quiet, six more minutes of talk got no word of
+				// its own). Asked for again, the reply sets it again; a pause of everything stays.
+				if (st.quiet.speechUntil !== null && s.at < st.quiet.speechUntil) {
+					st.quiet.speechUntil = null;
+					st.lastQuietEnd = s.at;
+					wantPlan(st);
+				}
 				st.lastUserAt = s.at;
 				st.unanswered = 0;
 				st.ownAskPending = false;
@@ -170,22 +190,11 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 					endsWithQuestion(before.text) &&
 					declinesOffer(s.text)
 				) {
+					// The plan hears it and leaves that topic; nothing else is held back.
 					st.userDeclines = [
 						...st.userDeclines,
 						{ at: s.at, agentId: before.id, userId: s.id },
 					].slice(-4);
-					for (const i of st.items)
-						// What the user asked for, or the reply said it would look into, still comes.
-						if (
-							(i.kind === "ask" || i.kind === "talk") &&
-							i.status === "open" &&
-							!i.requested &&
-							!i.promised
-						)
-							i.deferUntil = Math.max(
-								i.deferUntil ?? 0,
-								s.at + DECLINE_DEFER_MS,
-							);
 				}
 			} else {
 				// The question offered to this reply is asked when the reply ends in one.
@@ -230,6 +239,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				at: now,
 				plan: null,
 				check: null,
+				repeats: [] as AskRepeat[],
 				compose: null,
 				tickets: [] as AgendaTicket[],
 			};
@@ -256,7 +266,21 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			let planned: PlanOutcome | null = null;
 			let composed: ComposeOutcome | null = null;
 			if (paused(st, now)) return { ...base, skipped: null };
+			// Nothing that may be said now: this very step digs (not the next one).
+			if (canDig(st, now)) {
+				st.dig = true;
+				wantPlan(st);
+			}
 			if (st.planDue && !host().busy) planned = await plan(st, now, signal);
+			// New questions are checked at once: one asked or answered already, in meaning, goes
+			// before it is offered to a reply or asked on its own.
+			const repeats: AskRepeat[] = [];
+			const checkedNow = new Set<string>();
+			if (planned && !st.stopped) {
+				const fresh = planned.added.filter((i) => i.kind === "ask");
+				for (const i of fresh) checkedNow.add(i.id);
+				repeats.push(...(await checkAsks(st, fresh, now, signal)).repeats);
+			}
 			// Stopped while the plan was out: nothing is started or said.
 			if (st.stopped) return { ...base, plan: planned, skipped: "stopped" };
 			// One research at a time (the researcher's limit), in order: asked for, value, oldest.
@@ -289,6 +313,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 						promised: next.promised,
 						refs: [...next.refs],
 						at: now,
+						...(next.delegatedTo ? { delegatedTo: next.delegatedTo } : {}),
 					};
 					next.status = "doing";
 					st.issued.set(ticket.id, ticket);
@@ -310,18 +335,36 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				open <= now &&
 				!speechQuiet(st, now)
 			) {
-				const item = speakable(st, now)[0];
-				if (item) {
+				// A question is checked again right before it is asked (the user may have answered
+				// it meanwhile); a repeat goes and the next item is said instead.
+				for (let tries = 0; tries < 3 && !st.stopped; tries++) {
+					const item = speakable(st, now)[0];
+					if (!item) break;
+					if (item.kind === "ask" && !checkedNow.has(item.id)) {
+						checkedNow.add(item.id);
+						const r = await checkAsks(st, [item], now, signal);
+						if (r.repeats.length) {
+							repeats.push(...r.repeats);
+							continue;
+						}
+					}
 					const c = await compose(st, item, now, host, signal);
 					composed = c.outcome;
 					if (c.ticket) tickets.push(c.ticket);
+					break;
 				}
+			}
+			// Nothing left to say and nothing on the way: the next plan digs into an interest.
+			if (canDig(st, now)) {
+				st.dig = true;
+				wantPlan(st);
 			}
 			return {
 				at: now,
 				skipped: null,
 				plan: planned,
 				check: checked,
+				repeats,
 				compose: composed,
 				tickets,
 			};
@@ -334,6 +377,8 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			if (st.quiet.speechUntil !== null && st.quiet.speechUntil > now)
 				times.push(st.quiet.speechUntil);
 			if (st.planDue) times.push(now);
+			// Nothing that may be said (topics from elsewhere wait while the talk goes on): dig now.
+			if (canDig(st, now)) times.push(now);
 			times.push(
 				Math.max(st.lastPlanAt ?? deps.startedAt, st.lastInfoAt) + IDLE_PLAN_MS,
 			);
@@ -351,7 +396,14 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 							(i.kind === "ask" && !askBlocked(st) && !topicGone(st, i, now)))
 					)
 						times.push(
-							Math.max(open, i.deferUntil ?? open, topicOpenAt(st, i, now)),
+							Math.max(
+								open,
+								i.deferUntil ?? open,
+								// A topic from elsewhere, while the talk goes on: when the talk is over.
+								holdsElsewhere(st, now) && !connected(st, i, now)
+									? st.lastUserAt! + TOPIC_RECENT_MS
+									: open,
+							),
 						);
 			return times.length ? Math.max(now, Math.min(...times)) : null;
 		},
@@ -381,30 +433,60 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			}
 			wantPlan(st);
 			st.lastInfoAt = Math.max(st.lastInfoAt, r.at);
-			// What the user asked for, or what the reply said it would look into, is reported when
-			// it is ready; the rest is knowledge to keep.
-			if (
+			const usable =
 				r.status === "succeeded" &&
 				r.note &&
 				item &&
-				(t.requested || t.promised) &&
 				!st.forgotten.has(`note:${r.note.id}`) &&
-				!t.refs.some((x) => st.forgotten.has(x))
+				!t.refs.some((x) => st.forgotten.has(x));
+			// Research it started from the user's words (digging into the talk) is said when it is
+			// ready, as what was asked for is: it is the next thing to say about what they talk
+			// about, not left to the plan to pick (user, 2026-11-09: "最後詰まって話が振れなく").
+			// Unless the reply has used the note already.
+			if (
+				usable &&
+				!t.requested &&
+				!t.promised &&
+				t.refs.some((x) =>
+					st.said.some((s) => s.id === x && s.who === "user"),
+				) &&
+				!st.items.some(
+					(i) =>
+						i.kind === "talk" &&
+						i.noteId === r.note!.id &&
+						i.status !== "dropped",
+				)
 			)
 				st.items.push(
 					makeItem(st, {
 						kind: "talk",
-						text: t.requested
-							? `頼まれた調べもの「${r.note.title}」ができた`
-							: `調べておくと言った「${r.note.title}」がまとまった`,
-						refs: [`note:${r.note.id}`, ...t.refs],
+						text: `話の流れで調べた「${r.note!.title}」の要点`,
+						refs: [`note:${r.note!.id}`, ...t.refs],
+						value: 4,
+						reason: "話の流れで調べたことの結果",
+						noteId: r.note!.id,
+						createdAt: r.at,
+					}),
+				);
+			// What the user asked for, or what the reply said it would look into, is reported when
+			// it is ready; the rest is knowledge to keep.
+			if (usable && (t.requested || t.promised))
+				st.items.push(
+					makeItem(st, {
+						kind: "talk",
+						text: t.delegatedTo
+							? `頼まれた「${r.note!.title}」ができた`
+							: t.requested
+								? `頼まれた調べもの「${r.note!.title}」ができた`
+								: `調べておくと言った「${r.note!.title}」がまとまった`,
+						refs: [`note:${r.note!.id}`, ...t.refs],
 						value: 5,
 						reason: t.requested
 							? "利用者に頼まれた調べものの結果"
 							: "返事で調べておくと言ったことの結果",
 						requested: t.requested,
 						promised: true,
-						noteId: r.note.id,
+						noteId: r.note!.id,
 						createdAt: r.at,
 					}),
 				);
@@ -474,6 +556,10 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				requested,
 				promised: true,
 				createdAt: r.at,
+				// Work for a toolchain is no research: nothing to check against the notes.
+				...(r.delegatedTo
+					? { delegatedTo: r.delegatedTo, checkedRequest: null }
+					: {}),
 			});
 			st.items.push(item);
 			return { item, queued: st.researching !== null };

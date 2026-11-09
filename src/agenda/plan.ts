@@ -21,6 +21,7 @@ import {
 	notes,
 	record,
 	unlimited,
+	wantPlan,
 	type AgendaState,
 } from "./state.ts";
 import { normalize, themeOverlap } from "./text.ts";
@@ -42,6 +43,9 @@ export async function plan(
 ): Promise<PlanOutcome> {
 	const startEpoch = st.epoch;
 	const startGen = st.planGen;
+	// This plan digs (nothing was left to say); a new dig needs a new reason.
+	const digging = st.dig;
+	st.dig = false;
 	const knownNow = known(st);
 	const notesNow = notes(st);
 	const profileNow = profileOf(st);
@@ -59,6 +63,8 @@ export async function plan(
 			: null,
 		quiet: st.quiet,
 		userDeclines: st.userDeclines,
+		nothingToSay: digging,
+		refusedLastDig: digging ? st.refusedLastDig : [],
 	});
 	const call = await callModel(
 		st.deps.llm,
@@ -98,6 +104,7 @@ export async function plan(
 		st.said.filter((s) => s.who === "user").map((s) => s.id),
 	);
 	const rejected: string[] = [];
+	const refused: { kind: string; text: string; why: string }[] = [];
 	const reasons: string[] = [];
 	const dropped: string[] = [];
 	for (const d of call.value.drop) {
@@ -119,7 +126,10 @@ export async function plan(
 		const open = st.items.filter(
 			(i) => i.kind === a.kind && (i.status === "open" || i.status === "doing"),
 		).length;
-		const why = (code: string) => rejected.push(`${a.kind}:${code}`);
+		const why = (code: string) => {
+			rejected.push(`${a.kind}:${code}`);
+			refused.push({ kind: a.kind, text: a.text.trim(), why: code });
+		};
 		if (text === "") {
 			why("empty");
 			continue;
@@ -152,11 +162,17 @@ export async function plan(
 			continue;
 		}
 		const noteIds = refs.map(noteRef).filter((x): x is string => x !== null);
-		if (a.kind === "talk" && noteIds.length !== 1) {
+		// A topic rests on one note, or, without one, on the user's words it answers: the agent's
+		// own thought or what it knows about what the user is talking about.
+		if (
+			a.kind === "talk" &&
+			(noteIds.length > 1 ||
+				(noteIds.length === 0 && !refs.some((r) => userSaid.has(r))))
+		) {
 			why("needs_one_note");
 			continue;
 		}
-		const noteId = a.kind === "talk" ? noteIds[0]! : null;
+		const noteId = a.kind === "talk" ? (noteIds[0] ?? null) : null;
 		if (
 			noteId !== null &&
 			st.items.some(
@@ -206,6 +222,21 @@ export async function plan(
 		added.push(item);
 		addedPer[a.kind]++;
 		reasons.push(`${item.kind} ${item.id}: ${a.reason}`);
+	}
+	// A dig: no other until something new comes. One whose every proposal was refused (a theme
+	// researched already, say) digs once more at once, shown what was refused and why: running
+	// out of things to say is not decided on one try (user, 2026-11-09: "判定が浅すぎ").
+	if (digging) {
+		st.dugAt = now;
+		if (added.length === 0 && refused.length > 0 && !st.digRetried) {
+			st.digRetried = true;
+			st.refusedLastDig = refused;
+			st.dig = true;
+			wantPlan(st);
+		} else {
+			st.digRetried = false;
+			st.refusedLastDig = [];
+		}
 	}
 	return {
 		added,

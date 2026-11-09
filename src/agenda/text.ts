@@ -57,6 +57,20 @@ export const sentences = (text: string) =>
 		.map(normalize)
 		.filter((x) => x.length >= 8);
 
+/**
+ * The text without its sentences already in `said` (normalized, as `sentences` reads them): what
+ * is new in it, or "" when nothing is.
+ */
+export const withoutSaid = (text: string, said: ReadonlySet<string>) =>
+	text
+		.split(/(?<=[。！？!?])/u)
+		.filter((x) => {
+			const n = normalize(x);
+			return n === "" || n.length < 8 || !said.has(n);
+		})
+		.join("")
+		.trim();
+
 /** Ends in a question: "？", or a polite question closed with "。" (ありますか。表示しましょうか。). */
 export const endsWithQuestion = (text: string) =>
 	/(?:[？?]|(?:です|ます|ません|でしょう|ましょう|ました|でした)か[。．]?)\s*[」』）)]*\s*$/u.test(

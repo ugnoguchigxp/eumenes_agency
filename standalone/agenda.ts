@@ -5,7 +5,7 @@
  * agent's working memory does not.
  * Cost is recorded in data/agenda/usage.jsonl and never capped.
  *
- *   zsh -l scripts/api-entry.zsh standalone/agenda.ts [--interval 15|60|300]
+ *   zsh -l scripts/api-entry.zsh standalone/agenda.ts [--interval 10|60|300]
  *       [--no-plan] [--log PATH | --no-log]
  *       [--fresh] [--mock-research]
  *
@@ -17,6 +17,7 @@ import { resolve } from "node:path";
 import { runRespond } from "../src/index.ts";
 import {
 	createAgendaAgent,
+	defaultSpeechIntervalSec,
 	speechIntervals,
 	type SpeechIntervalSec,
 } from "../src/agenda/index.ts";
@@ -37,6 +38,7 @@ import { createProfileNote } from "../examples/virtual-eumenes/agenda/profile.ts
 import {
 	createMockWebResearch,
 	llmWriter,
+	mockToolchainWork,
 } from "../examples/virtual-eumenes/agenda/research.ts";
 
 const dataDir = resolve(import.meta.dir, "../data/agenda");
@@ -55,7 +57,7 @@ interface Args {
 }
 
 export function parseAgendaArgs(argv: readonly string[], now: Date): Args {
-	let interval: SpeechIntervalSec = 15;
+	let interval: SpeechIntervalSec = defaultSpeechIntervalSec;
 	let showPlan = true;
 	let fresh = false;
 	let mockResearch = false;
@@ -72,7 +74,7 @@ export function parseAgendaArgs(argv: readonly string[], now: Date): Args {
 		if (arg === "--interval") {
 			const n = Number(value());
 			if (!speechIntervals.includes(n as SpeechIntervalSec))
-				throw new Error("usage: --interval 15|60|300（秒）");
+				throw new Error("usage: --interval 10|60|300（秒）");
 			interval = n as SpeechIntervalSec;
 		} else if (arg === "--no-plan") showPlan = false;
 		else if (arg === "--log") log = value();
@@ -142,8 +144,13 @@ async function main() {
 				meter,
 				today: () => localTime(Date.now()),
 			});
+	// Work delegated to a toolchain goes to its mock (Eumenes runs the real toolchain).
+	const researchWriter = searcher?.writer ?? llmWriter(llm);
 	const research = createMockWebResearch({
-		writer: searcher?.writer ?? llmWriter(llm),
+		writer: (request, delegatedTo) =>
+			delegatedTo
+				? mockToolchainWork(request, delegatedTo)
+				: researchWriter(request),
 		docs,
 		delayMs: searcher ? 0 : 60_000,
 	});
@@ -256,6 +263,21 @@ async function main() {
 							),
 						);
 				}
+				for (const r of o.repeats) {
+					log.write({
+						type: "ask_repeat",
+						itemId: r.itemId,
+						text: r.text,
+						verdict: r.verdict,
+						reason: r.reason,
+					});
+					if (showPlan)
+						out(
+							dim(
+								`  💭 聞かない（${r.verdict === "asked" ? "もう聞いた" : "もう答えがある"}）: ${r.text} — ${r.reason}`,
+							),
+						);
+				}
 				if (o.compose) {
 					log.write({
 						type: "compose",
@@ -283,10 +305,11 @@ async function main() {
 					text: e.text,
 					requested: e.requested,
 					accepted: e.accepted,
+					...(e.delegatedTo ? { delegatedTo: e.delegatedTo } : {}),
 				});
 				return out(
 					dim(
-						`  🔎 ${e.requested ? "[頼まれた] " : ""}${e.text}${e.accepted ? "" : "（受付拒否）"}`,
+						`  ${e.delegatedTo ? `🛠 ${e.delegatedTo}:` : "🔎"} ${e.requested ? "[頼まれた] " : ""}${e.text}${e.accepted ? "" : "（受付拒否）"}`,
 					),
 				);
 			case "researched":

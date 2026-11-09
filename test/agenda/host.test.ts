@@ -175,6 +175,147 @@ test("the reply sees when each note was made, so it knows what it said before th
 	expect(m[1]!.content).toContain('"madeMinutesAgo":3');
 });
 
+test("the reply always sees the note behind a topic the agent brought up itself", async () => {
+	const { createAgendaAgent } = await import("../../src/agenda/index.ts");
+	const { agendaReplyMessages } =
+		await import("../../standalone/agenda-reply.ts");
+	const notes = Array.from({ length: 9 }, (_, k) => ({
+		id: `n${k + 1}`,
+		title: `メモ${k + 1}`,
+		summary: `要約${k + 1}`,
+		at: k * 1_000,
+		refs: [],
+	}));
+	const agent = createAgendaAgent({
+		startedAt: 0,
+		notes: () => notes,
+		llm: {
+			complete: <T>(req: {
+				system: string;
+				schema: { parse: (v: unknown) => T };
+			}) =>
+				Promise.resolve({
+					value: req.schema.parse(
+						req.system.includes("この呼び出しは「計画」")
+							? {
+									add: [
+										{
+											kind: "talk",
+											text: "口パクの話",
+											refs: ["note:n1"],
+											value: 3,
+											reason: "r",
+										},
+									],
+									drop: [],
+								}
+							: {
+									utterance: "口パクのメモがあります。",
+									emotion: "🙂",
+									decline: null,
+								},
+					),
+					model: "scripted",
+					inputTokens: 1,
+					outputTokens: 1,
+					cacheReadTokens: 0,
+					latencyMs: 1,
+				}),
+		},
+	});
+	const out = await agent.step(
+		10_000,
+		() => ({ busy: false }),
+		new AbortController().signal,
+	);
+	const t = out.tickets.find((x) => x.kind === "speak")!;
+	agent.recordDelivery({ ticketId: t.id, at: 10_000, status: "succeeded" });
+	agent.observe({ id: "u1", who: "user", text: "興味ないです", at: 20_000 });
+	const m = agendaReplyMessages({
+		agent,
+		known: [],
+		notes,
+		clock: null,
+		now: 20_000,
+	});
+	// n1 is the oldest of nine, and the user's words share nothing with it: it is in view only
+	// because the agent itself brought it up.
+	expect(m[1]!.content).toContain('"id":"n1"');
+});
+
+test("Eumenes' way of handing work over: find a toolchain that fits, delegate to it, a TODO comes back", async () => {
+	const { createAgendaAgent } = await import("../../src/agenda/index.ts");
+	const { createAgendaReplyTools } =
+		await import("../../standalone/agenda-reply.ts");
+	const { mockToolchainWork } =
+		await import("../../examples/virtual-eumenes/agenda/research.ts");
+	const agent = createAgendaAgent({
+		llm: { complete: () => Promise.reject(new Error("unused")) },
+		startedAt: 0,
+	});
+	agent.observe({ id: "u1", who: "user", text: "いいね、作ってみて", at: 0 });
+	const tools = createAgendaReplyTools({
+		agent,
+		read: () => null,
+		now: () => 0,
+	});
+	const call = async (name: string, args: unknown) =>
+		JSON.parse(
+			(
+				await tools.call(
+					{ id: "c", name, arguments: JSON.stringify(args) },
+					new AbortController().signal,
+				)
+			).content as string,
+		) as Record<string, unknown>;
+	// The mocked catalog always has one that fits what is asked.
+	const found = await call("find_toolchain", {
+		query: "ジョギングの距離を記録するアプリを作る",
+	});
+	const [toolchain] = found["candidates"] as {
+		toolchain: string;
+		description: string;
+	}[];
+	expect(toolchain!.description).toContain(
+		"ジョギングの距離を記録するアプリを作る",
+	);
+	// A toolchain it has not found is not one to hand work to.
+	expect(
+		await call("delegate", {
+			mode: "execute",
+			toolchain: "video.generate",
+			request: "x",
+			impact: "y",
+		}),
+	).toMatchObject({ status: "error", error: "unknown_toolchain" });
+	// What the user has not said yes to waits for their word.
+	expect(
+		await call("delegate", {
+			mode: "confirm",
+			toolchain: toolchain!.toolchain,
+			request: "ジョギングの距離を記録するアプリ",
+			impact: "アプリが届く",
+		}),
+	).toMatchObject({ status: "error", error: "needs_user_confirmation" });
+	const done = await call("delegate", {
+		mode: "execute",
+		toolchain: toolchain!.toolchain,
+		request: "ジョギングの距離を記録するアプリ",
+		impact: "アプリが届く",
+	});
+	expect(done).toMatchObject({ status: "accepted", revision: 1 });
+	expect(agent.view().items.find((i) => i.id === done["todo"])).toMatchObject({
+		kind: "research",
+		delegatedTo: toolchain!.toolchain,
+		requested: true,
+	});
+	// The work is mocked: a note that says what was done.
+	expect(
+		(await mockToolchainWork("ジョギングの距離を記録するアプリ", "mock.x"))
+			.summary,
+	).toContain("（mock）mock.x");
+});
+
 test("a reply that follows a note's summary closely has talked about it", async () => {
 	const { notesMentioned } = await import("../../standalone/agenda-reply.ts");
 	const notes = [

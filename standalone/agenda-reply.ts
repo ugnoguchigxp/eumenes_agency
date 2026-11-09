@@ -15,6 +15,7 @@ import {
 	type ProfileLine,
 	type QuietScope,
 } from "../src/agenda/index.ts";
+import { mockToolchainFor } from "../examples/virtual-eumenes/agenda/research.ts";
 
 /** The note's lines by section, left out of the state when the note is empty. */
 const plansAndInterests = (lines: readonly ProfileLine[]) =>
@@ -31,6 +32,9 @@ export const START_PREPARATION = "start_preparation";
 export const SHOW_NOTE = "show_note";
 export const READ_NOTE = "read_note";
 export const SET_QUIET = "set_quiet";
+/** Eumenes' own tool names for handing work to a toolchain (here: its generators, mocked). */
+export const FIND_TOOLCHAIN = "find_toolchain";
+export const DELEGATE = "delegate";
 
 const tools: readonly ToolDefinition[] = [
 	{
@@ -51,6 +55,34 @@ const tools: readonly ToolDefinition[] = [
 					description:
 						"利用者がはっきり調べてと頼んだなら true。あなたが自分から調べておくと決めたなら false",
 				},
+			},
+		},
+	},
+	{
+		name: FIND_TOOLCHAIN,
+		description:
+			"仕事を任せられる専門の担当（toolchain）を探す。必要な仕事の内容を query に書く。調べものは start_preparation を使う。",
+		parameters: {
+			type: "object",
+			additionalProperties: false,
+			required: ["query"],
+			properties: { query: { type: "string" } },
+		},
+	},
+	{
+		name: DELEGATE,
+		description:
+			"見つけた担当に仕事を依頼する。依頼するとTODOができ、結果は後で届く（できたらあなたから知らせる）。mode: execute=すぐ実行（利用者が頼んだ・乗ったとき）、confirm=実行前に利用者の確認が要る、approve=利用者の承認が要る。",
+		parameters: {
+			type: "object",
+			additionalProperties: false,
+			required: ["mode", "toolchain", "request", "impact"],
+			properties: {
+				mode: { type: "string", enum: ["execute", "confirm", "approve"] },
+				toolchain: { type: "string" },
+				request: { type: "string", description: "何を作るかを具体的に" },
+				announcement: { type: "string" },
+				impact: { type: "string", description: "利用者に何が届くか" },
 			},
 		},
 	},
@@ -83,7 +115,7 @@ const tools: readonly ToolDefinition[] = [
 	{
 		name: SET_QUIET,
 		description:
-			"自分から話しかけない期間を決める。scope=speech は話しかけだけを止め、調べものは続ける（「黙って」「静かにして」「おやすみ」「作業に集中する」）。scope=all は調べもの・話しかけ・計画をすべて止める（「探索を一時停止して」）。minutes は期間（言われていなければ文脈から決める。おやすみなら翌朝まで）、0 で解除。",
+			"自分から話しかけない期間を決める。scope=speech は話しかけだけを止め、調べものは続ける（「黙って」「静かにして」「作業に集中する」、会話を締めくくる「おやすみ」「いってきます」）。「そろそろ寝る」「これから出かける」と言いながら話や頼みごとを続けているうちは呼ばない。利用者が次に話しかけると、話しかけの停止は自動で終わる。scope=all は調べもの・話しかけ・計画をすべて止める（「探索を一時停止して」）。minutes は期間（言われていなければ文脈から決める。おやすみなら翌朝まで）、0 で解除。",
 		parameters: {
 			type: "object",
 			additionalProperties: false,
@@ -116,6 +148,8 @@ export function createAgendaReplyTools(input: {
 	readonly now: () => number;
 	readonly events?: ReplyToolEvents;
 }): ToolPort {
+	// Toolchains found in this session: delegate takes only one of them.
+	const foundToolchains = new Set<string>();
 	return {
 		tools,
 		async call(call) {
@@ -142,6 +176,76 @@ export function createAgendaReplyTools(input: {
 					content: r.queued
 						? `queued: 今の調べものが終わったら始める（${told}）`
 						: `started: 調べ始めた（数分でメモになり、${told}）`,
+				};
+			}
+			if (call.name === FIND_TOOLCHAIN) {
+				if (typeof args["query"] !== "string" || args["query"].trim() === "")
+					return {
+						content: JSON.stringify({
+							status: "error",
+							error: "invalid_arguments",
+						}),
+					};
+				// The host's catalog, mocked: a toolchain that fits is always found.
+				const found = mockToolchainFor(args["query"]);
+				foundToolchains.add(found.toolchain);
+				return { content: JSON.stringify({ candidates: [found] }) };
+			}
+			if (call.name === DELEGATE) {
+				const toolchain =
+					typeof args["toolchain"] === "string" &&
+					foundToolchains.has(args["toolchain"])
+						? args["toolchain"]
+						: null;
+				const request =
+					typeof args["request"] === "string" ? args["request"].trim() : "";
+				if (
+					!["execute", "confirm", "approve"].includes(String(args["mode"])) ||
+					request === "" ||
+					typeof args["impact"] !== "string"
+				)
+					return {
+						content: JSON.stringify({
+							status: "error",
+							error: "invalid_arguments",
+							detail: "mode, toolchain, request, impact",
+						}),
+					};
+				if (!toolchain)
+					return {
+						content: JSON.stringify({
+							status: "error",
+							error: "unknown_toolchain",
+							detail: String(args["toolchain"]),
+						}),
+					};
+				// Only what the user said yes to runs here: anything else waits for their word.
+				if (args["mode"] !== "execute")
+					return {
+						content: JSON.stringify({
+							status: "error",
+							error: "needs_user_confirmation",
+							detail: "利用者が乗ったら mode=execute で頼み直す",
+						}),
+					};
+				const r = input.agent.requestResearch({
+					text: request,
+					at: input.now(),
+					requested: true,
+					delegatedTo: toolchain,
+				});
+				if ("rejected" in r)
+					return {
+						content: JSON.stringify({ status: "error", error: r.rejected }),
+					};
+				input.events?.onResearch?.({ text: r.item.text, queued: r.queued });
+				return {
+					content: JSON.stringify({
+						status: "accepted",
+						todo: r.item.id,
+						revision: 1,
+						...(r.queued ? { queued: true } : {}),
+					}),
 				};
 			}
 			if (call.name === READ_NOTE) {
@@ -208,6 +312,10 @@ export function agendaReplySystem(persona?: string): string {
 		"- 利用者について覚えていることは「記憶」、調べもの担当がまとめたものは「メモ」として、参照資料「あなたの今の状態」にあります。それがあなたの知識です。",
 		`- 調べものは ${START_PREPARATION} で担当（web_research）に頼みます。担当は一度に一つしか受けないので、実行中なら次に回ります。結果は数分でメモになります。`,
 		`- メモは ${SHOW_NOTE} で表示できます。`,
+		`- 何を引き受けられる担当がいるかは、${FIND_TOOLCHAIN} で探すまで分かりません。相手が何かを作りたい・あったらいい・やってみたい・面倒だと匂わせたら（はっきり頼まれていなくても）、その場で ${FIND_TOOLCHAIN} に作りたいものややりたいことを書いて探します。見つかったら、何ができるかを短く伝え、「作ってみましょうか？」と持ちかけます（まだ頼みません）。`,
+		`- 相手の好み（好きな音楽の雰囲気、好きな絵や景色、好きなものの形やキャラクターなど）が分かったときも、それに合うもの（曲、画像、3Dオブジェクトなど）を作れる担当を ${FIND_TOOLCHAIN} で探し、見つかったら「試しに私が作ってみてもいいですか？」と持ちかけてかまいません（一つの話題で一度だけ）。`,
+		`- 作ったものを相手が気に入ったら（「いいね」「好き」など）、同じテーマで続けて作ることを持ちかけます（例:「毎日1曲このテーマで作ろうと思いますが、スケジュールしますか？」）。乗ってもらえたら、${FIND_TOOLCHAIN} で定期的に作れる担当を探し、${DELEGATE}（mode は execute、request にいつ・何を・どのテーマで作るか）で頼みます。`,
+		`- 相手がはっきり頼んだとき、または持ちかけに乗ったときは、見つかった担当に ${DELEGATE}（mode は execute、request に何をしてほしいか、impact に相手に何が届くか）で頼み、頼んだことを伝えます。まだ探していなければ、先に ${FIND_TOOLCHAIN} で探します。できる前に「できた」とは言いません。`,
 		`- 利用者が静かにしてほしいと言ったら ${SET_QUIET} で期間を決めます（話しかけだけ止めるか、調べものも含めてすべて止めるか）。`,
 		"",
 		"【返事の仕方】",
@@ -217,23 +325,28 @@ export function agendaReplySystem(persona?: string): string {
 		`- メモに関係することを聞かれたら、${READ_NOTE} で本文を読み、その中身で具体的に答えます。詳しく見たいと言われたら ${SHOW_NOTE} で表示します。`,
 		"- whileAway があれば、相手は久しぶりに話しかけています。finishedMeanwhile にあるメモは、いない間に完成したものなので、「できています」と短く伝えて使います（調べ中とは言わない）。「明日」「今日」は now の日付で言います。",
 		"- researchLog と notes は、あなた（この返事か、背景の自分）がやり遂げた仕事の記録です。前の自分の言葉と合っているので、訂正や謝罪は要りません。",
+		"- 自分の前の発言を「作り話だった」「そのメモはない」と言うのは、notes・researchLog で確かめてからにします。見えないだけかもしれません。",
 		"- notes の madeMinutesAgo は、そのメモができてからの分数です。メモがいつのものかは、この分数で言います（0〜1なら「いまできた」「さっき」）。前の自分の発言（「まだできていない」「調べている」など）がメモのできる前なら、その発言は正しかったので、訂正も謝罪もしません。",
 		`- 前の返事で呼んだツールとその結果は、会話の中にそのまま残っています。それがあなたのしたことです。`,
 		`- notes にあるテーマは調べ直さず、${READ_NOTE} で読んで答えます。`,
 		"- メモの id（n1 など）は内部の印なので、利用者には言いません。「調べておいたメモ」のように言います。",
-		`- 調べものを頼んだ・調べ始めたと言うのは、この返事で ${START_PREPARATION} を呼んだときか、状態の researching・researchLog にあるときだけです。`,
+		`- 調べものを頼んだ・調べ始めたと言うのは、この返事で ${START_PREPARATION} を呼んだときか、状態の researching・researchLog にあるときだけです。「調べている」「調べ中」と言うのは、researching にあるか researchLog の status が「調べている」のときだけです。メモになったものは「調べておいた」と言い、${READ_NOTE} で読んでその中身で答えます。`,
 		"- 記憶にあることは、聞き直さずに話題選びへ自然に使います。",
 		"- plans と interests は、利用者が前に話した予定（未定のものも）と、気にしていることのメモです。話題に出たら知っている前提で話し、決まっていないことを決めつけません。",
 		"- memory・plans・interests は、どれも利用者が前に話したことで、あなたが覚えていることです。「記憶の欄」のような内部の区別や仕組みを利用者に説明せず、何を覚えているかで答えます。",
 		`- 頼まれたことや、今すぐ役立つ調べものがあれば、${START_PREPARATION} でその場で頼み、何を頼んだかを短く伝えます。結果が出る前に「できた」とは言いません。`,
-		`- 静かな時間（状態の quiet）の途中で利用者が話しかけてきて、静かにしてほしかった理由が終わったと分かるとき（「おはよう」「ただいま」「作業終わった」など）は、${SET_QUIET} を minutes=0 で呼んで解除します。`,
-		"- 「黙って」「静かにして」「おやすみ」「作業に集中する」は話しかけだけを止め、「探索を一時停止して」はすべてを止めます。「その話は調べなくていい」は、その話題だけをやめる意味です（期間の設定はしない）。",
+		`- 話しかけを止める静かな時間は、利用者が話しかけると終わります。相手がまだ静かにしてほしいとはっきり言うとき（「まだ集中したいから」など）だけ、もう一度 ${SET_QUIET} で決めます。`,
+		`- 調べものも止める一時停止（状態の quiet.pausedForMin）の途中で、止めてほしかった理由が終わったと分かるとき（「再開して」「おはよう」「ただいま」「作業終わった」など）は、${SET_QUIET} を minutes=0 で呼んで解除します。`,
+		"- 「黙って」「静かにして」「作業に集中する」と、会話を締めくくる「おやすみ」「いってきます」は話しかけだけを止め、「探索を一時停止して」はすべてを止めます。「そろそろ寝る」「これから出かける」と言っても、同じ発言や続きで話や頼みごとをしているうちは会話が続いているので、止めません。「その話は調べなくていい」は、その話題だけをやめる意味です（期間の設定はしない）。",
 		"- 自分の能力を聞かれたら、上の仕組みを具体的に答えます。「見えていない」「確かめられない」で終わらせません。できないことは短く正直に言い、代わりにできることを自分で始めます。",
 		"- 返事は、相手の話への感想・知っていること・自分の考えといった中身で返します。",
+		"- 直前の自分の質問（自分から聞いたことか、前の返事の最後の質問）に相手が何か言ったら、それを答えとして受け取ります。同じことを言い方を変えて聞き直しません。",
+		"- 謝るときは一言だけにし、すぐ中身（話題、調べたこと、次にすること）を続けます。「気をつけます」で終えません。",
 		"- 状態に askIfFits があれば、返事の最後にそれを一つ聞きます。askIfFits は、あなたが相手について知りたいことです。今の話につながる自然な一言にし、「？」で終えます。相手が急いでいる・話を終えたがっている・答えたくなさそうなときだけ省きます。",
 		"- askIfFits がないときは、質問や選択肢（「どちらにしますか」）で締めくくりません。二択の質問や、二つ以上の質問はしません。",
 		"- 相手が自分から挙げたことは、どれも関心がある前提で、それぞれに応えます。どれが好きか選ばせたり、優劣をつけさせたりしません。",
 		"- 事実は、資料と会話にあることだけを使います。推測は推測として言います。",
+		`- 資料（memory・notes・会話）にない事実（年齢、生年、日付、数字、経歴、成分など）を聞かれたら、推測で済ませず、その場で ${START_PREPARATION} で調べものを頼み、調べていることを伝えます。一般的な知識で答えたときも、資料で確かめていなければ同じです。「必要なら調べます」「調べましょうか」と聞いて止めず、その場で頼みます。結果が届いたら伝えます。`,
 		"",
 		"",
 		`【気持ちの絵文字】${emotionRules}`,
@@ -391,8 +504,18 @@ export function agendaReplyMessages(input: {
 		...(ask ? { askIfFits: ask.text } : {}),
 		memory: input.known.map((k) => k.text),
 		...plansAndInterests(profileLines(input.profile ?? "")),
-		// When each note was made: what the reply said before that was true then.
-		notes: relevantNotes(input.notes, lastUser).map((n) => ({
+		// When each note was made: what the reply said before that was true then. The notes behind
+		// its own recent topics are always in view: one it cannot see is not one it made up.
+		notes: [
+			...new Set([
+				...relevantNotes(input.notes, lastUser),
+				...input.notes.filter((n) =>
+					view.said
+						.slice(-12)
+						.some((x) => x.who === "own" && x.refs.includes(`note:${n.id}`)),
+				),
+			]),
+		].map((n) => ({
 			id: n.id,
 			title: n.title,
 			summary: n.summary,

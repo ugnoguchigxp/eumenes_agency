@@ -45,6 +45,7 @@ export interface AgendaState {
 		readonly plan: string;
 		readonly check: string;
 		readonly compose: string;
+		readonly askCheck: string;
 	};
 	said: Said[];
 	items: AgendaItem[];
@@ -55,6 +56,18 @@ export interface AgendaState {
 	readonly issued: Map<string, AgendaTicket>;
 	researching: { ticket: AgendaTicket; at: number } | null;
 	planDue: boolean;
+	/** The plan that is due digs into one of the user's interests: nothing was left to say. */
+	dig: boolean;
+	/** The last dig: no other until something new comes (the user's words, a result, news). */
+	dugAt: number | null;
+	/** What the last dig proposed and code refused (a theme researched already...): shown to the next. */
+	refusedLastDig: {
+		readonly kind: string;
+		readonly text: string;
+		readonly why: string;
+	}[];
+	/** A dig whose every proposal was refused is tried once more; this says it was. */
+	digRetried: boolean;
 	/** Grows with every reason to plan; a plan that ran while it grew leaves the plan due. */
 	planGen: number;
 	lastPlanAt: number | null;
@@ -96,6 +109,10 @@ export function createState(
 		issued: new Map(),
 		researching: null,
 		planDue: true,
+		dig: false,
+		dugAt: null,
+		refusedLastDig: [],
+		digRetried: false,
 		planGen: 0,
 		lastPlanAt: null,
 		lastInfoAt: deps.startedAt,
@@ -154,7 +171,13 @@ export const makeItem = (
 		Partial<
 			Pick<
 				AgendaItem,
-				"requested" | "promised" | "noteId" | "status" | "endedAt"
+				| "requested"
+				| "promised"
+				| "noteId"
+				| "status"
+				| "endedAt"
+				| "delegatedTo"
+				| "checkedRequest"
 			>
 		>,
 ): AgendaItem => ({

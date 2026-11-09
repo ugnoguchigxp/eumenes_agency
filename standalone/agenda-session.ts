@@ -38,6 +38,8 @@ export type AgendaSessionEvent =
 			readonly text: string;
 			readonly requested: boolean;
 			readonly accepted: boolean;
+			/** The toolchain the work went to, not research. */
+			readonly delegatedTo?: string;
 	  }
 	| {
 			readonly type: "researched";
@@ -131,6 +133,7 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 				text: t.text,
 				requested: t.requested,
 				accepted,
+				...(t.delegatedTo ? { delegatedTo: t.delegatedTo } : {}),
 			});
 			if (accepted) void collect();
 			return;

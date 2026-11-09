@@ -5,9 +5,7 @@
  */
 import {
 	ANSWER_WINDOW_MS,
-	ENGAGED_MS,
-	QUESTION_WAIT_MS,
-	SPEECH_HOLD_MS,
+	FRESH_TALK_MS,
 	TOPIC_RECENT_MS,
 	type AgendaItem,
 } from "./contracts.ts";
@@ -43,20 +41,11 @@ export const speechOpenAt = (st: AgendaState, now: number): number | null => {
 		at = st.quiet.allUntil;
 	if (st.quiet.speechUntil !== null && st.quiet.speechUntil > at)
 		at = st.quiet.speechUntil;
-	const gap = st.intervalMs * 2 ** st.unanswered;
-	// No talking to an empty room: past the hold, only the user's next words open it again.
-	if (st.unanswered > 0 && gap > Math.max(SPEECH_HOLD_MS, st.intervalMs))
-		return null;
-	if (st.lastAgentAt !== null) {
-		at = Math.max(
-			at,
-			st.lastAgentAt + (st.unanswered > 0 ? gap : st.intervalMs),
-		);
-		const waiting =
-			st.lastAgentAsked &&
-			(st.lastUserAt === null || st.lastUserAt <= st.lastAgentAt);
-		if (waiting) at = Math.max(at, st.lastAgentAt + QUESTION_WAIT_MS);
-	}
+	// The same pace whether or not the user answers, and after a question too: only a second
+	// question waits for the answer (askBlocked). It talks about once in ten seconds (user,
+	// 2026-11-09: "やや喧しいくらい"); what it has to say is what bounds it.
+	if (st.lastAgentAt !== null)
+		at = Math.max(at, st.lastAgentAt + st.intervalMs);
 	return at;
 };
 
@@ -71,15 +60,11 @@ export const order = (a: AgendaItem, b: AgendaItem) =>
 	b.value - a.value ||
 	a.createdAt - b.createdAt;
 
-/** The user is in the middle of a conversation (spoke a moment ago). */
-const engaged = (st: AgendaState, now: number) =>
-	st.lastUserAt !== null && now - st.lastUserAt < ENGAGED_MS;
-
 /**
  * Does the item tie into what is being talked about: the user's or the agent's words of the
  * last few minutes, or a note made from them? What the user asked for always does.
  */
-const connected = (st: AgendaState, i: AgendaItem, now: number) => {
+export const connected = (st: AgendaState, i: AgendaItem, now: number) => {
 	if (i.requested || i.promised) return true;
 	const recent = new Set(
 		st.said.filter((s) => now - s.at <= TOPIC_RECENT_MS).map((s) => s.id),
@@ -92,17 +77,6 @@ const connected = (st: AgendaState, i: AgendaItem, now: number) => {
 		...i.refs.flatMap((r) => (r.startsWith("note:") ? [r.slice(5)] : [])),
 	];
 	return notes(st).some((n) => noteIds.includes(n.id) && fromRecent(n.refs));
-};
-
-/**
- * When an item may be said, as far as the flow of the conversation goes. In a conversation the
- * agent asks nothing on its own (what it wants to know goes into the reply, see replyAsk), and
- * brings up only what ties into it.
- */
-export const topicOpenAt = (st: AgendaState, i: AgendaItem, now: number) => {
-	if (!engaged(st, now)) return now;
-	if (i.kind === "ask") return st.lastUserAt! + ENGAGED_MS;
-	return connected(st, i, now) ? now : st.lastUserAt! + ENGAGED_MS;
 };
 
 /**
@@ -148,9 +122,18 @@ export const replyAsk = (st: AgendaState, now: number): AgendaItem | null => {
 	const tied = asks.find((i) => connected(st, i, now));
 	if (tied) return tied;
 	const j = lastUser(k);
-	const fresh = j < 0 || user.at - st.said[j]!.at >= ENGAGED_MS;
+	const fresh = j < 0 || user.at - st.said[j]!.at >= FRESH_TALK_MS;
 	return fresh ? (asks[0] ?? null) : null;
 };
+
+/**
+ * A talk is going on (the user spoke within TOPIC_RECENT_MS): what is said ties into it. Topics
+ * from elsewhere stay unsaid meanwhile, kept for later or never (user, 2026-11-09: "ユーザーの
+ * フォーカスから外れている事をいきなり降ると違和感しかない…死蔵しても構わない"). With nothing that
+ * ties in, it digs into the talk at once (canDig).
+ */
+export const holdsElsewhere = (st: AgendaState, now: number) =>
+	st.lastUserAt !== null && now - st.lastUserAt <= TOPIC_RECENT_MS;
 
 /** What may be said now, best first. */
 export const speakable = (st: AgendaState, now: number) =>
@@ -162,9 +145,26 @@ export const speakable = (st: AgendaState, now: number) =>
 				(i.deferUntil === null || i.deferUntil <= now) &&
 				!(i.kind === "ask" && askBlocked(st)) &&
 				!topicGone(st, i, now) &&
-				topicOpenAt(st, i, now) <= now,
+				(!holdsElsewhere(st, now) || connected(st, i, now)),
 		)
 		.sort(order);
+
+/**
+ * Nothing left to say and nothing on the way: no question or topic may be said, no plan is due.
+ * Then it digs into one of the user's interests (user, 2026-11-09: "興味を掘り進んでほしい"); a
+ * dig that found nothing is not tried again until something new comes (then it idles). While
+ * speech is quiet (the user asleep, out, busy) nothing may be said, but work goes on: it digs
+ * whenever no research runs or waits, to have something ready when the user is back (user,
+ * 2026-11-09: "発話はしなくても、やるべき作業があるならやって構わない"). A pause stops it.
+ */
+export const canDig = (st: AgendaState, now: number) =>
+	!st.stopped &&
+	!paused(st, now) &&
+	!st.planDue &&
+	(speechQuiet(st, now)
+		? st.researching === null && nextResearch(st, now) === null
+		: speakable(st, now).length === 0) &&
+	(st.dugAt === null || Math.max(st.lastInfoAt, st.lastUserAt ?? 0) > st.dugAt);
 
 /** The research to start next, if any. */
 export const nextResearch = (st: AgendaState, now: number) =>

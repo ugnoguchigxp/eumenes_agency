@@ -5,7 +5,6 @@
 import { callModel } from "../application/model-call.ts";
 import {
 	composeSchema,
-	DECLINE_DEFER_MS,
 	type AgendaItem,
 	type AgendaTicket,
 	type CallRecord,
@@ -24,7 +23,7 @@ import {
 	unlimited,
 	type AgendaState,
 } from "./state.ts";
-import { normalize, questionMarks, sentences } from "./text.ts";
+import { normalize, questionMarks, sentences, withoutSaid } from "./text.ts";
 
 export async function compose(
 	st: AgendaState,
@@ -44,8 +43,9 @@ export async function compose(
 		call: CallRecord,
 		ticket: AgendaTicket | null,
 	) => ({ outcome: { itemId: item.id, declined, rejected, call }, ticket });
-	if (item.kind === "talk" && note === null) {
-		// The note is gone (deleted or forgotten): nothing to talk about.
+	if (item.kind === "talk" && item.noteId !== null && note === null) {
+		// The note is gone (deleted or forgotten): nothing to talk about. A topic without a note
+		// (the agent's own thought) is said as it is.
 		item.status = "dropped";
 		item.endedAt = now;
 		return done(
@@ -81,7 +81,8 @@ export async function compose(
 		signal,
 	);
 	if (!call.ok) {
-		item.deferUntil = now + DECLINE_DEFER_MS;
+		// A failed call is tried again at the next turn to speak, not ten minutes later.
+		item.deferUntil = now + st.intervalMs;
 		return done(
 			null,
 			[],
@@ -108,7 +109,7 @@ export async function compose(
 			record("compose", now, call.usage, false, "stale"),
 			null,
 		);
-	const utterance = (call.value.utterance ?? "").trim();
+	let utterance = (call.value.utterance ?? "").trim();
 	const rejected: string[] = [];
 	if (utterance !== "") {
 		// Whole or in part: a sentence the agent already said is not said again.
@@ -117,6 +118,12 @@ export async function compose(
 				.filter((s) => s.who !== "user")
 				.flatMap((s) => [normalize(s.text), ...sentences(s.text)]),
 		);
+		// A topic is not held back for one sentence said before (by a reply, say): that sentence
+		// goes, the rest is said (user, 2026-11-09: "そこでしらべたのになんで見送りするの？").
+		if (item.kind === "talk") {
+			const rest = withoutSaid(utterance, earlier);
+			if (rest !== "") utterance = rest;
+		}
 		if (
 			earlier.has(normalize(utterance)) ||
 			sentences(utterance).some((x) => earlier.has(x))
@@ -141,15 +148,13 @@ export async function compose(
 	if (declined !== null) {
 		item.declines++;
 		item.lastDecline = { reason: declined, at: now };
-		if (item.declines >= 2) {
+		// The model declines only what was said or answered already, or went stale: it goes. An
+		// utterance code refused (a repeat, two questions, either-or) is written once more. Nothing
+		// else waits for it (user, 2026-11-09: "見送りばっかりしてる").
+		if (utterance === "" || item.declines >= 2) {
 			item.status = "dropped";
 			item.endedAt = now;
-		} else item.deferUntil = now + DECLINE_DEFER_MS;
-		// A question that does not fit now means questions do not: the others wait too.
-		if (item.kind === "ask")
-			for (const i of st.items)
-				if (i.kind === "ask" && i.status === "open" && i !== item)
-					i.deferUntil = Math.max(i.deferUntil ?? 0, now + DECLINE_DEFER_MS);
+		}
 		return done(
 			declined,
 			rejected,

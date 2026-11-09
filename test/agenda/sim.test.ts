@@ -222,15 +222,16 @@ test("a simulated user answers the agent's own speech a little later, unless awa
 	});
 	const { events } = await simulateAgenda({
 		deps: { llm },
-		minutes: 5,
+		minutes: 10,
 		turns: [{ atSec: 0, text: "辛いラーメンが好き" }],
 		memory,
 		steward: createMockSteward({ llm, memory }),
 		docs,
 		research,
 		reply: async () => "いいですね",
+		// Away from 400 s on. The general question waits until the talk is over (300 s).
 		user: async (ctx) =>
-			ctx.atSec >= 200
+			ctx.atSec >= 400
 				? null
 				: { text: "そうだね", delaySec: 10, feeling: "自然" },
 	});
@@ -240,6 +241,6 @@ test("a simulated user answers the agent's own speech a little later, unless awa
 	)!;
 	expect(answer.atSec).toBe(spoke.atSec + 10);
 	expect(
-		events.filter((e) => e.type === "felt").every((e) => e.atSec < 200),
+		events.filter((e) => e.type === "felt").every((e) => e.atSec < 400),
 	).toBe(true);
 });

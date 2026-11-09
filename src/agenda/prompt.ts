@@ -30,14 +30,15 @@ export function planSystem(persona: string = defaultPersona): string {
 		"【やることの種類】",
 		`- ask: 相手に聞くこと（一度に${PLAN_ADD_LIMITS.ask}件まで足せる）。1件で聞くのは一つのことだけです（「AとB」のように二つ聞かない）。text には聞きたいことを書きます（言い回しは話すときに整えます）。`,
 		`- research: 調べもの（一度に${PLAN_ADD_LIMITS.research}件まで）。担当（web_research）が調べて、結論を Markdown のメモにまとめます。text には、何を調べ、何を結論にしてほしいかを一文で書きます。おすすめの一覧や下調べのまとめも、そう頼めば作られます。refs に、きっかけになった相手の言葉（会話の who=user の id）か記憶（memory:<id>）か予定・関心（profile:<id>）か、それを元にしたメモ（note:<id>）を必ず入れます。相手が言っていない話題（相手の予定や好みの推測）は調べません。`,
-		`- talk: 調べたメモをもとに、相手に話題を振ること（一度に${PLAN_ADD_LIMITS.talk}件まで）。refs に note:<id> を一つ入れます。`,
+		`- talk: 相手に話題を振ること（一度に${PLAN_ADD_LIMITS.talk}件まで）。調べたメモをもとにするときは、refs に note:<id> を一つ入れます。メモがなくても、相手の今の話につながるあなたの考え・知っていること・感想を talk にできます（refs にその言葉の id、text に話す中身）。`,
 		`一覧に置いておける数には上限があります（ask ${OPEN_LIMITS.ask}・research ${OPEN_LIMITS.research}・talk ${OPEN_LIMITS.talk}）。足すときは、価値の低いものを drop で外して入れ替えます。`,
 		"value は、相手にとっての価値（1〜5）です。reason には、なぜそれをするのかを一言で書きます。",
 		"",
 		"【情報を集める】",
 		"- 多少うるさいくらいに、相手のことを知りに行きます。記憶（user.memory）が薄いこと（好きなもの、苦手なもの、仕事や生活、予定、いま気にしていること）を聞く ask を、いつも1〜2件持っておきます。",
-		"- 会話が一つの話題で続いている間は、その話題を深める ask にします。会話の最中は、ask は返事の最後に一つだけ添えて聞かれます（自分から割り込んで聞くことはしません）。好き嫌いや生活のような一般的な質問で話題を断ち切りません。一般的な質問は、会話が途切れたときに自分から聞かれます。refs には、つながる相手の言葉の id を入れます。",
+		"- 会話が一つの話題で続いている間は、その話題を深める ask にします。ask は、返事の最後に一つ添えて聞かれるか、あなたから話しかけて聞かれます。好き嫌いや生活のような一般的な質問で話題を断ち切りません。refs には、つながる相手の言葉の id を入れます。",
 		"- 相手が話したことには、それを深める ask を考えます。ただし、答えによって次に調べることや話すことが変わる質問にします。",
+		"- 相手が何かを知りたいと言ったら、なぜ知りたいのか・どんな点が気になるのか・きっかけは何かを聞きません。答えにつながる話や調べもので応えます。",
 		"- 記憶にあること、会話で答えてもらったこと、askedBefore と agenda にある質問は、言い方を変えても聞きません。",
 		"- 相手が自分から挙げたものに、どれが好きか選ばせたり、優劣をつけさせたりする質問はしません。挙げたものは、どれも関心がある前提で扱います。",
 		"- 「AとBのどちらが好きか」のような二択の質問にせず、相手が自由に答えられる聞き方にします。",
@@ -48,10 +49,21 @@ export function planSystem(persona: string = defaultPersona): string {
 		"- notes・researchedBefore・researching と同じテーマの調べものは、言い方を変えても足しません（同じ結果を何度も受け取ることになります。ホストも似たテーマを断ります）。次に調べるなら、まだ扱っていない別の話題や観点にします。",
 		"- 相手が話した話題で、まだメモにない観点があれば research を足します。調べものは一度に一つずつ順に進むので、続けて調べたいことは待ちの列に入れておいてかまいません。",
 		"- 調べた結果を全部伝えようとはしません。メモは記録に残り、後の会話で使えます。talk にするのは、雑談のネタになりそうなもの、相手が喜びそう・驚きそうなものだけです。",
+		"- 直前の返事（conversation の最後の agent の言葉）が話したことと同じ中身の talk は足しません。",
+		"- toolchainsFound は、返事が find_toolchain で見つけた、仕事を引き受けられる担当です（query は何を探したか）。相手が作りたい・あったらいい・やってみたいと言っていたこと、または好みが分かったもの（好きな音楽の雰囲気、好きな絵や景色、好きなものの形やキャラクターなど。曲・画像・3Dオブジェクトにできるもの）に合う担当があれば、「試しに私が〜を作ってみてもいいですか？」と持ちかける ask を足します（text に何を作るかを具体的に。一つの話題で一度だけ）。見つかっていない仕事は持ちかけません（何ができるかは、担当を探すまで分かりません）。",
+		"- 頼まれて作ったもの（「頼まれた〜ができた」の報告）を相手が気に入っていたら、同じテーマで続けて作ることを持ちかける ask を足します（例:「毎日1曲このテーマで作ろうと思いますが、スケジュールしますか？」）。定期的に作れる担当は、乗ってもらってから返事が探します。",
+		"",
+		"【掘り下げる】",
+		"- nothingToSay が true のときは、話すことが尽きています。",
+		"  - 会話の最中（conversation の終わりに数分以内の相手の言葉がある）なら、いま相手が話している話題を掘り下げます。会話に出てきた人・もの・できごと（名前の出た人物の来歴、話に出た会社や製品の歴史や今の動き、比べると面白い相手、など）で、まだ notes・researchedBefore・researching にないものを一つ選び、research を必ず一件足します（refs にその言葉の id）。あわせて、その話題につながる ask を一件と、その話題についてのあなたの考えや知っていることの talk（メモがなくてよい。refs にその言葉の id）を一件足します。別の話題は足しません。",
+		"  - refusedLastDig があれば、前の掘り下げの案と、断られた理由です（same_theme は同じテーマの調べものがもうある、など）。research が断られていたら、今回は research を足さず、talk（調べたメモのまだ話していない点や、あなたの考え・知っていること）か ask を必ず足します。",
+		"  - 会話がないときは、相手の関心（user.interests と、user.memory の好きなもの・気にしていること）から一つを選び、notes・researchedBefore・researching にない観点を掘り下げる research を一件足します（refs にその関心の memory:<id> か profile:<id>）。同じ関心を続けて掘ってかまいません。新しい観点なら、その分くわしくなります。その関心について相手に聞く ask も一件足せます。",
+		"  - quiet.speechForSec があるときは、相手に話しかけない時間です（寝ている、出かけている、集中しているなど）。話しかけは止まっていても仕事は続けます。会話の最中でも、相手の関心か、最後に話していた話題を掘り下げる research を一件足し、相手が戻ったときに話せるよう準備します（ask・talk は、戻ってから話す時に足します）。",
+		"- 会話がなく、掘り下げられる関心もない（関心がまだ分からない、主な観点を調べ尽くした）ときだけ、何も足しません。",
 		"",
 		"【外す】",
-		"- declinedRecently は、話す直前に「今は合わない」と見送ったものと理由です。その理由がまだ当てはまるなら、同じ種類の項目（言い方を変えた質問など）は足しません。相づちだけが続く、休みたがっているなどで質問が合わないときは、ask を足さずに待ちます。",
-		"- declinedByUser は、あなたの質問や話題（agentSaid）を相手が断った記録です（user が相手の言葉）。その話題の talk と、同じ種類の ask は足さず、一覧に残っていれば drop します。断られてから1時間は、新しい talk も相手の関心がはっきりしたものだけにします。",
+		"- declinedRecently は、話す直前に「今は合わない」と見送ったものと理由です。その理由がまだ当てはまるなら、同じ種類の項目（言い方を変えた質問など）は足しません。",
+		"- declinedByUser は、あなたの質問や話題（agentSaid）を相手が断った記録です（user が相手の言葉）。その話題の talk と、同じ種類の ask は足さず、一覧に残っていれば drop します。ほかの話題は止めません。",
 		"- 答えが出た質問、古くなった項目、もう意味のない項目は drop します。時刻が進んで合わなくなった項目（「明日の〜」の予定がもう当日になった、済んだ予定の下調べ）も drop し、必要なら今に合う言い方で足し直します。",
 		"- 相手が「（その話は）調べなくていい」「その話はもういい」と言った話題の項目は drop し、その話題は足しません。好みを取り消した話題も同じです。",
 		"",
@@ -74,6 +86,49 @@ export function checkSystem(): string {
 		dataRule,
 		"出力は指定された JSON だけです。",
 	].join("\n");
+}
+
+/** The check before a question is asked: asked or answered already, in meaning? */
+export function askCheckSystem(): string {
+	return [
+		"この呼び出しは「質問の聞き直しチェック」です。これから相手に聞こうとしている質問（candidates）が、意味として、もう聞いた質問と同じでないか、相手がもう話した・答えたことを聞いていないかを確かめます。言い回しが違っても、聞いている中身が同じなら同じ質問です。",
+		"- asked: 意味として同じことを、あなたがもう聞いた（conversation の who=agent の発言の中の質問、askedBefore）。",
+		"- answered: 相手がもう話した・答えた（conversation の who=user、user.memory、user.plans、user.interests）ので、聞く必要がない。相手が説明した目的や希望を、もう一度たずねるのも answered です。",
+		"- new: どちらでもない。前の答えを踏まえて、まだ聞いていない新しい点を聞くもの。",
+		"- 一般的な質問（最近楽しみにしていること、夢中になっていること、気になっていること、困っていること、予定、好きなもの、苦手なもの）は、どれか一つを聞いたら、ほかも同じ種類の質問として asked にします。",
+		"- candidates どうしで意味が同じものは、一つだけ new にし、残りは asked にします。",
+		"- candidates のすべての id について verdicts を返します。reason に判断の理由を一言で書きます。",
+		dataRule,
+		"出力は指定された JSON だけです。",
+	].join("\n");
+}
+
+export interface AskCheckInput {
+	readonly clock: string | null;
+	readonly said: readonly Said[];
+	readonly known: readonly KnownItem[];
+	readonly profile: readonly ProfileLine[];
+	readonly askedBefore: readonly string[];
+	readonly candidates: readonly {
+		readonly id: string;
+		readonly text: string;
+	}[];
+}
+
+export function askCheckData(input: AskCheckInput): string {
+	return asData({
+		now: input.clock,
+		conversation: input.said.slice(-30).map((s) => ({
+			who: s.who === "user" ? "user" : "agent",
+			text: s.text,
+		})),
+		user: {
+			memory: input.known.map((k) => k.text),
+			...plansAndInterests(input.profile, (l) => l.text),
+		},
+		askedBefore: input.askedBefore,
+		candidates: input.candidates,
+	});
 }
 
 export interface CheckInput {
@@ -102,13 +157,14 @@ export function composeSystem(persona: string = defaultPersona): string {
 		"この呼び出しは「話す文を書く」です。ホストが、今これを話すと決めました。item の内容を、自然な日本語の話しかけにします。",
 		"- 1〜2文にします。見出し・箇条書き・URLは使いません。",
 		"- ask: 相手が答えやすい、やわらかい一つの質問にし、「？」で終えます。聞くのは一つのことだけで、「〜と、〜も」のように二つ聞きません。直前の会話につながるなら、ひとこと受けてから聞きます。",
-		"- talk: メモ（note）をもとに、雑談として話題を振ります。例:「ご存じでしたか？ XXのYYYが新しくなったそうです。詳細をメモにまとめてあるので、表示しましょうか？」。頼まれた調べもの（requested）や、自分が調べておくと言ったもの（promised）なら、できたことと要点を短く伝え、メモを表示できることを添えます。promised は相手に頼まれたものではないので、「お願いされた」「頼まれていた」とは言わず、「調べておくと言っていた」のように言います。メモにないことは足しません。talk は「表示しましょうか？」で締め、said にある質問をもう一度付け足しません。",
+		"- talk: メモ（note）をもとに、雑談として話題を振ります。例:「ご存じでしたか？ XXのYYYが新しくなったそうです。詳細をメモにまとめてあるので、表示しましょうか？」。頼まれた調べもの（requested）や、自分が調べておくと言ったもの（promised）なら、できたことと要点を短く伝え、メモを表示できることを添えます。promised は相手に頼まれたものではないので、「お願いされた」「頼まれていた」とは言わず、「調べておくと言っていた」のように言います。メモにないことは足しません。調べた結果を伝えるときは、答えの中心（人の名前、数字、結論）を必ず入れます。talk は「表示しましょうか？」で締め、said にある質問をもう一度付け足しません。",
+		"- note が null の talk は、item.text（あなたの考えや知っていること）を、雑談として一、二文で話します。確かでないことは、そう添えます。メモの表示は申し出ません。",
 		"- quiet.endedSecAgo があれば、相手が頼んだ静かな時間は、その秒数前にもう終わっています。静かにしてと頼まれたことを理由に見送りません。",
 		"- item は hoursAgo 時間前に作ったものです。「明日」「今夜」などの言い方は、今の時刻（now）に合わせて直します。予定がもう済んだなど、今では意味のない内容なら見送ります。",
 		"- 二択の質問（「AとBのどちらが」）にせず、自由に答えられる聞き方にします。",
-		"- 会話が続いている話題から急に別の話題へ切り替える内容なら、見送ります（話題が一区切りしてからにする）。",
+		"- 会話が別の話題の途中でも、見送らずに話します。「ところで」「そういえば」と一言つないでから話します。",
 		"- said にある自分の言葉と同じことは、言い方を変えても言いません。",
-		"- 今は合わないと思ったら、utterance を null にし、decline に理由を書きます（会話の流れが変わった、相手が疲れている・急いでいる、もう話した、記憶にもう答えがある、など）。",
+		"- 見送るのは、同じことをもう話した・聞いた、答えがもう会話や記憶にある、予定が済んだなどで内容が古くなった、のどれかのときだけです。そのときは utterance を null にし、decline に理由を書きます。それ以外は話します。",
 		"- 下ネタや性生活の話題は振りません。",
 		"",
 		"【気持ち】emotion には、その一言を言う気持ちを、次の絵文字から一つだけ選びます。読み上げの声の調子と動きになります。utterance の本文では絵文字を使いません。見送るときは null にします。",
@@ -161,7 +217,47 @@ export interface PlanInput {
 		readonly agentId: string;
 		readonly userId: string;
 	}[];
+	/** Nothing was left to say and nothing is on the way: dig into an interest. */
+	readonly nothingToSay?: boolean;
+	/** What the last dig proposed and code refused, and why. */
+	readonly refusedLastDig?: readonly {
+		readonly kind: string;
+		readonly text: string;
+		readonly why: string;
+	}[];
 }
+
+/** The toolchains the reply's find_toolchain calls found (newest last, each once). */
+const toolchainsFound = (said: readonly Said[]) => {
+	const found = new Map<
+		string,
+		{ toolchain: string; description: string; query: string }
+	>();
+	for (const s of said)
+		for (const c of s.calls ?? []) {
+			if (c.name !== "find_toolchain") continue;
+			try {
+				const query = String(
+					(JSON.parse(c.arguments) as { query?: unknown }).query ?? "",
+				);
+				const out = JSON.parse(c.content) as {
+					candidates?: { toolchain?: unknown; description?: unknown }[];
+				};
+				for (const x of out.candidates ?? [])
+					if (typeof x.toolchain === "string") {
+						found.delete(x.toolchain);
+						found.set(x.toolchain, {
+							toolchain: x.toolchain,
+							description: String(x.description ?? ""),
+							query,
+						});
+					}
+			} catch {
+				// A call that did not return a catalog is not one.
+			}
+		}
+	return [...found.values()].slice(-8);
+};
 
 /** How many recent words and notes the plan sees. */
 const PLAN_SAID = 20;
@@ -171,6 +267,10 @@ export function planData(input: PlanInput): string {
 	const { now } = input;
 	return asData({
 		now: input.clock,
+		...(input.nothingToSay ? { nothingToSay: true } : {}),
+		...(input.refusedLastDig?.length
+			? { refusedLastDig: input.refusedLastDig }
+			: {}),
 		user: {
 			memory: input.known.map((k) => ({ id: `memory:${k.id}`, text: k.text })),
 			...plansAndInterests(input.profile ?? [], (l) => ({
@@ -226,6 +326,9 @@ export function planData(input: PlanInput): string {
 			.filter((i) => i.kind === "research" && i.status === "done")
 			.slice(-12)
 			.map((i) => i.checkedRequest ?? i.text),
+		// What the reply found through find_toolchain: the plan cannot look itself, and knows of
+		// a toolchain only once one was found.
+		toolchainsFound: toolchainsFound(input.said),
 		researching: input.researching
 			? {
 					text: input.researching.text,
