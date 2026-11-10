@@ -26,6 +26,9 @@ export type AgendaSessionEvent =
 			readonly latencyMs: number;
 			/** The feeling the reply is said with (its leading emoji, removed from the text). */
 			readonly emotion: EmotionEmoji | null;
+			/** The tools it called and what they answered (the CLI, 2026-11-10: a reply said it had
+			 * asked for research, and the log could not tell whether it had). */
+			readonly calls: readonly ReplyCall[];
 	  }
 	| { readonly type: "step"; readonly outcome: StepOutcome }
 	| {
@@ -320,6 +323,7 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 						text: reply,
 						latencyMs: now() - started,
 						emotion,
+						calls,
 					});
 				}
 			} catch (e) {

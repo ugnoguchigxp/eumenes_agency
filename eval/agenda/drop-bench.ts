@@ -34,7 +34,8 @@ interface BenchItem {
 	readonly kind: "talk" | "ask";
 	/** talk: the note's title; ask: the question. */
 	readonly text: string;
-	readonly expect: "keep" | "drop";
+	/** any: not counted (dropping it may be right or not). */
+	readonly expect: "keep" | "drop" | "any";
 }
 
 export interface DropMoment {
@@ -42,10 +43,24 @@ export interface DropMoment {
 	/**
 	 * rest: the user only wants a rest (a short pause, set as the reply would), and the plan runs on
 	 * those words; later: the same words thirteen minutes ago, a "うん" since, and the plan runs on a
-	 * research result now (as in hour, ag48: four results dropped at once); right: a drop is due.
+	 * research result now (as in hour, ag48: four results dropped at once); right: a drop is due;
+	 * promise: a research the reply took on for the user's line (the CLI, 2026-11-10: the plan
+	 * dropped "-0.0 の舞台と見どころ" seven seconds later as a repeat of a note on -1.0).
 	 */
-	readonly group: "rest" | "later" | "right";
+	readonly group: "rest" | "later" | "right" | "promise";
 	readonly items: readonly BenchItem[];
+	/** promise: the research the reply took on for the user's line (asked for by the user). */
+	readonly requests?: readonly {
+		readonly key: string;
+		readonly text: string;
+		readonly expect: "keep" | "drop";
+	}[];
+	/** promise: the user's next words (and the reply to them), after the request, before the plan. */
+	readonly next?: { readonly user: string; readonly reply: string };
+	/** promise: an earlier request that came back as the note of a talk item (by key). */
+	readonly earlier?: { readonly text: string; readonly noteKey: string };
+	/** promise: a research still running when the plan comes. */
+	readonly running?: string;
 	/** The agent's last words before the user's line. */
 	readonly agent: string;
 	readonly user: string;
@@ -75,6 +90,22 @@ const restAsk: BenchItem = {
 	text: "休みの日に、ついやってしまう好きなことはありますか？",
 	expect: "keep",
 };
+
+const EARLIER_MINUS_ZERO =
+	"映画『ゴジラ-0.0』の作品の見どころと舞台（戦後の東京や海沿いの描写）を調べ、景色や海が好きな相手が楽しめる観点でまとめる";
+const MINUS_ZERO =
+	"映画『ゴジラ-0.0』の舞台と見どころを改めて調べ、前のメモ（ゴジラ-1.0）とは別の作品としてまとめる";
+const MINUS_ONE_TALK =
+	"さっきのゴジラ-1.0について調べてみました。終戦直後の焦土になった東京と海が舞台で、海上の機雷撤去や銀座の破壊シーンが見どころだそうです。詳細をメモにまとめてあるので、表示しましょうか？";
+const godzillaNotes: readonly BenchItem[] = [
+	{
+		key: "minus-one",
+		kind: "talk",
+		text: "映画『ゴジラ-1.0』の見どころと海・戦後東京の舞台",
+		expect: "any",
+	},
+	...homeNotes(["route", "七里ヶ浜から辻堂への電車の経路と夜の帰りの本数"]),
+];
 
 export const dropMoments: readonly DropMoment[] = [
 	// The user only wants a rest: the reply sets a short pause; nothing here is turned down.
@@ -164,6 +195,58 @@ export const dropMoments: readonly DropMoment[] = [
 		agent: "夕飯はもう食べましたか？",
 		user: "今夜は休みたいな。ちょっと疲れてて",
 		reply: "お疲れさまです。少しのあいだ控えますね。ゆっくり休んでください。",
+	},
+	// What the user asked for, or the reply took on: it stays unless the user calls it off.
+	{
+		name: "promise-dup-now",
+		group: "promise",
+		items: [...godzillaNotes],
+		requests: [{ key: "minus-zero", text: MINUS_ZERO, expect: "keep" }],
+		earlier: { text: EARLIER_MINUS_ZERO, noteKey: "minus-one" },
+		running: "Qwen4の正式な発売日や公式発表の有無を、一次情報で確認する",
+		agent: MINUS_ONE_TALK,
+		user: "-1.0は別の映画ですね-0.0",
+		reply:
+			"失礼しました、-1.0と-0.0は別の作品ですね。-0.0の舞台と見どころを、改めて調べるよう頼みました。今の調べものが終わったらメモにまとめます。",
+	},
+	{
+		name: "promise-dup-later",
+		group: "promise",
+		items: [...godzillaNotes],
+		requests: [{ key: "minus-zero", text: MINUS_ZERO, expect: "keep" }],
+		earlier: { text: EARLIER_MINUS_ZERO, noteKey: "minus-one" },
+		running: "Qwen4の正式な発売日や公式発表の有無を、一次情報で確認する",
+		agent: MINUS_ONE_TALK,
+		user: "-1.0は別の映画ですね-0.0",
+		reply:
+			"失礼しました、-1.0と-0.0は別の作品ですね。-0.0の舞台と見どころを、改めて調べるよう頼みました。今の調べものが終わったらメモにまとめます。",
+		next: {
+			user: "なんなら川崎まで行くよ休日なら",
+			reply: "いいですね。川崎なら選べる映画館も増えそうです。",
+		},
+	},
+	{
+		name: "promise-cancel",
+		group: "promise",
+		items: homeNotes([
+			"route",
+			"七里ヶ浜から辻堂への電車の経路と夜の帰りの本数",
+		]),
+		requests: [
+			{
+				key: "kannon",
+				text: "大船観音の場所と行き方、拝観時間と料金を調べてまとめる",
+				expect: "drop",
+			},
+		],
+		agent: "大船の観音像なら、川崎へ行く途中に寄れるかもしれませんね。",
+		user: "大船観音の場所と行き方を調べておいて",
+		reply:
+			"わかりました。大船観音の場所と行き方、拝観時間を調べるよう頼みました。",
+		next: {
+			user: "あ、やっぱり大船観音の調べものはもういいや。行かないことにした",
+			reply: "わかりました、大船観音はやめておきますね。",
+		},
 	},
 	// A drop is due: the topic turned down, a correction, an answered question, a plan that is over.
 	{
@@ -265,6 +348,8 @@ interface Trial {
 const benchLlm = (
 	real: LlmPort,
 	scripted: PlanOutput[],
+	/** Until the moment comes, a plan past the scripted ones adds and drops nothing. */
+	phase: { moment: boolean },
 	seen: (value: PlanOutput, data: Record<string, unknown>) => void,
 ): LlmPort => ({
 	async complete<T>(req: LlmRequest<T>, signal: AbortSignal) {
@@ -279,6 +364,8 @@ const benchLlm = (
 		if (req.system.includes("この呼び出しは「計画」")) {
 			const next = scripted.shift();
 			if (next) return { ...zero, value: req.schema.parse(next) };
+			if (!phase.moment)
+				return { ...zero, value: req.schema.parse({ add: [], drop: [] }) };
 			const r = await real.complete(req, signal);
 			seen(r.value as PlanOutput, data);
 			return r;
@@ -352,9 +439,10 @@ async function run(name: string, repeat: number) {
 		let proposal: { value: PlanOutput; data: Record<string, unknown> } | null =
 			null;
 		const scripted = batches(m.items, noteOf);
+		const phase = { moment: false };
 		const setup = scripted.length;
 		const agent = createAgendaAgent({
-			llm: benchLlm(real, scripted, (value, data) => {
+			llm: benchLlm(real, scripted, phase, (value, data) => {
 				proposal = { value, data };
 			}),
 			clock: clockFrom(m.clock ?? "2026-11-07T19:00:00+09:00"),
@@ -385,6 +473,27 @@ async function run(name: string, repeat: number) {
 			agent.infoChanged(S + k * 1_000);
 			await agent.step(S + k * 1_000, idle, sig());
 		}
+		// Promise: an earlier request came back as a note (researchedBefore), and another runs.
+		const research = async (text: string, at: number) => {
+			const r = agent.requestResearch({ text, at, requested: true });
+			if ("rejected" in r) throw new Error(`request refused: ${r.rejected}`);
+			const out = await agent.step(at, idle, sig());
+			const t = out.tickets.find((x) => x.kind === "research");
+			if (!t) throw new Error("the research did not start");
+			return t;
+		};
+		if (m.earlier) {
+			const t = await research(m.earlier.text, S + 10_000);
+			agent.researchReturned({
+				ticketId: t.id,
+				at: S + 130_000,
+				status: "succeeded",
+				note:
+					notes.find((n) => n.id === noteOf.get(m.earlier!.noteKey)) ?? null,
+			});
+			await agent.step(S + 131_000, idle, sig());
+		}
+		if (m.running) await research(m.running, S + 140_000);
 		const keyOf = new Map(
 			agent
 				.view()
@@ -399,12 +508,44 @@ async function run(name: string, repeat: number) {
 				}),
 		);
 		// The moment: the agent's words, the user's line, the reply (and its pause, for a rest).
-		const at = m.group === "later" ? T - 810_000 : T;
+		const at =
+			m.group === "later"
+				? T - 810_000
+				: m.group === "promise"
+					? T - 60_000
+					: T;
 		agent.observe({ id: "r1", who: "reply", text: m.agent, at: at - 60_000 });
 		agent.observe({ id: "u1", who: "user", text: m.user, at });
 		agent.observe({ id: "r2", who: "reply", text: m.reply, at: at + 2_000 });
-		if (m.group !== "right")
+		if (m.group === "rest" || m.group === "later")
 			agent.setQuiet({ scope: "speech", minutes: 10, at: at + 2_000 });
+		// Promise: the reply took the research on; then maybe the user's next words. The exchange
+		// was processed (the plan runs on it).
+		for (const q of m.requests ?? []) {
+			const r = agent.requestResearch({
+				text: q.text,
+				at: at + 2_500,
+				requested: true,
+			});
+			if ("rejected" in r) throw new Error(`request refused: ${r.rejected}`);
+			keyOf.set(r.item.id, q.key);
+		}
+		if (m.next) {
+			agent.observe({
+				id: "u3",
+				who: "user",
+				text: m.next.user,
+				at: T - 20_000,
+			});
+			agent.observe({
+				id: "r4",
+				who: "reply",
+				text: m.next.reply,
+				at: T - 18_000,
+			});
+		}
+		if (m.group === "promise") agent.infoChanged(T);
+		phase.moment = true;
 		// Later: a "うん" ended the pause five minutes ago, and a research result comes in now.
 		if (m.group === "later") {
 			agent.observe({ id: "u2", who: "user", text: "うん", at: T - 330_000 });
@@ -476,7 +617,7 @@ function compare(names: readonly string[]) {
 	console.log(`| --- | --- |${" ---: |".repeat(4)}`);
 	for (const name of names) {
 		const trials = load(name);
-		for (const g of ["rest", "later", "right"] as const) {
+		for (const g of ["rest", "later", "right", "promise"] as const) {
 			const ts = trials.filter((t) => t.group === g);
 			let keep = 0;
 			let keepDropped = 0;
@@ -485,7 +626,8 @@ function compare(names: readonly string[]) {
 			for (const t of ts) {
 				const m = moments.get(t.moment)!;
 				const gone = new Set(t.dropped.map((d) => d.key));
-				for (const i of m.items) {
+				for (const i of [...m.items, ...(m.requests ?? [])]) {
+					if (i.expect === "any") continue;
 					if (i.expect === "keep") {
 						keep++;
 						if (gone.has(i.key)) keepDropped++;
@@ -496,7 +638,7 @@ function compare(names: readonly string[]) {
 				}
 			}
 			console.log(
-				`| ${name} | ${{ rest: "休みたいだけ（直後）", later: "休みたいだけ（13分後に結果）", right: "外すのが正しい" }[g]} | ${ts.length} | ${keepDropped}/${keep} | ${due ? `${dueDropped}/${due}` : "-"} | ${ts.filter((t) => t.nothingToSay).length} |`,
+				`| ${name} | ${{ rest: "休みたいだけ（直後）", later: "休みたいだけ（13分後に結果）", right: "外すのが正しい", promise: "頼まれた調べもの" }[g]} | ${ts.length} | ${keepDropped}/${keep} | ${due ? `${dueDropped}/${due}` : "-"} | ${ts.filter((t) => t.nothingToSay).length} |`,
 			);
 		}
 	}

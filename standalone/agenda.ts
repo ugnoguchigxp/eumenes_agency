@@ -240,6 +240,7 @@ async function main() {
 					text: e.text,
 					emotion: e.emotion,
 					latencyMs: e.latencyMs,
+					...(e.calls.length ? { calls: e.calls } : {}),
 				});
 				return out(`${e.emotion ? `${e.emotion} ` : ""}${e.text}`);
 			case "step": {

@@ -182,6 +182,45 @@ describe("agenda agent", () => {
 		});
 	});
 
+	test("CLI 2026-11-10: what the user asked for is not dropped by the plan before the user speaks again", async () => {
+		let asked = "";
+		const m = scripted({
+			plan: (d, n) =>
+				n === 1
+					? plan(
+							add("research", "A", [
+								(d["conversation"] as { id: string }[])[0]!.id,
+							]),
+						)
+					: {
+							add: [],
+							drop: [{ id: asked, reason: "同じ調べものがもうある" }],
+						},
+		});
+		const agent = make({ llm: m.llm });
+		agent.observe({ id: "u1", who: "user", text: "ゴジラ-0.0を見たい", at: 0 });
+		await agent.step(0, idle, sig());
+		const r = agent.requestResearch({ text: "-0.0の見どころ", at: 1_000 });
+		if (!("item" in r)) throw new Error("refused");
+		asked = r.item.id;
+		// The plan right after (the reply's exchange processed) may not drop it.
+		agent.infoChanged(2_000);
+		const out = await agent.step(2_000, idle, sig());
+		expect(out.plan?.rejected).toContain(`drop:${asked}:promised`);
+		expect(agent.view().items.find((i) => i.id === asked)?.status).toBe("open");
+		// The user calls it off: then it may go.
+		agent.observe({
+			id: "u2",
+			who: "user",
+			text: "やっぱり-0.0の調べものはいいや",
+			at: 30_000,
+		});
+		await agent.step(30_000, idle, sig());
+		expect(agent.view().items.find((i) => i.id === asked)?.status).toBe(
+			"dropped",
+		);
+	});
+
 	test("a refused start is tried again later", async () => {
 		const m = scripted({
 			plan: (d) =>

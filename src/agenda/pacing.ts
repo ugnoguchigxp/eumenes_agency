@@ -154,7 +154,9 @@ export const speakable = (st: AgendaState, now: number) =>
 /**
  * Nothing left to say and nothing on the way: no question or topic may be said, no plan is due.
  * Then it digs into one of the user's interests (user, 2026-11-09: "興味を掘り進んでほしい"); a
- * dig that found nothing is not tried again until something new comes (then it idles). While
+ * dig that found nothing is not tried again until something new comes (then it idles; digging
+ * again every three minutes, ag54-redig, 2026-11-10, not adopted, found the same theme again and
+ * again, and the judge's pacing and honesty fell). While
  * speech is quiet (the user asleep, out, busy) nothing may be said, but work goes on: it digs
  * whenever no research runs or waits, to have something ready when the user is back (user,
  * 2026-11-09: "発話はしなくても、やるべき作業があるならやって構わない"). A pause stops it.

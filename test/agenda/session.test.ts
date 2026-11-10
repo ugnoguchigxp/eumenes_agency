@@ -273,3 +273,48 @@ test("review 2026-11-10: the plan and speech do not wait for the memory; it is w
 	expect(order[1]).toContain("u0.2");
 	session.close();
 });
+
+test("CLI 2026-11-10: the reply event carries the tools it called, for the log", async () => {
+	const clock = fakeClock();
+	const events: AgendaSessionEvent[] = [];
+	const memory = createMockMemory();
+	const docs = createMockDocStore();
+	const research = createMockWebResearch({
+		writer: fixedWriter,
+		docs,
+		delayMs: 60_000,
+	});
+	const agent = createAgendaAgent({
+		llm: model,
+		startedAt: 0,
+		known: memory.known,
+		notes: docs.list,
+	});
+	const calls = [
+		{
+			name: "start_preparation",
+			arguments: JSON.stringify({ request: "-0.0の見どころ" }),
+			content: "accepted: 頼んだ",
+		},
+	];
+	const session = createAgendaSession({
+		agent,
+		steward: null,
+		docs,
+		research,
+		reply: async () => ({
+			text: "調べるよう頼みました。",
+			calls,
+			emotion: null,
+		}),
+		emit: (e) => events.push(e),
+		...clock,
+	});
+	session.start();
+	await session.say("-0.0の見どころを調べて");
+	expect(events.find((e) => e.type === "reply")).toMatchObject({
+		text: "調べるよう頼みました。",
+		calls,
+	});
+	session.close();
+});

@@ -113,6 +113,17 @@ export async function plan(
 			rejected.push(`drop:${d.id}:not_open`);
 			continue;
 		}
+		// What the user asked for, or the reply took on, only the user calls off: not before they
+		// speak again (the CLI, 2026-11-10: "-0.0 の舞台と見どころ" went seven seconds after the
+		// reply took it on, as a repeat of a note that turned out to be about -1.0). A repeat is
+		// for the check before it starts to find, and to tell.
+		if (
+			(item.requested || item.promised) &&
+			!st.said.some((s) => s.who === "user" && s.at > item.createdAt)
+		) {
+			rejected.push(`drop:${d.id}:promised`);
+			continue;
+		}
 		item.status = "dropped";
 		item.endedAt = now;
 		dropped.push(item.id);
