@@ -1,8 +1,15 @@
 /**
  * The agenda agent in a mock Eumenes, on a virtual clock: the user's turns, the normal reply with
  * its tools, the steward writing the memory after each exchange, web_research taking one request
- * at a time and saving notes, and the agent stepping whenever something is due. The model calls
- * take real time but the virtual clock stands still during them.
+ * at a time and saving notes, and the agent stepping whenever something is due.
+ *
+ * As in the CLI (review 2026-11-10): the agent's own work (the reply, the memory writers, each
+ * step) moves the virtual clock by the real time it takes, rounded to the second; research and the
+ * simulated user run beside it and do not. The user types each line before it arrives (about three
+ * characters a second) and the agent is busy meanwhile; an utterance written while the user
+ * started typing is thrown away, as the CLI does. When the agent speaks again before the user
+ * started typing an answer, the user answers the newest words instead, no later than they would
+ * have answered the earlier ones (or still sends the earlier answer if the new words get none).
  */
 import {
 	createAgendaAgent,
@@ -38,7 +45,13 @@ export interface UserTurn {
 	readonly text: string;
 	/** Said in answer to the agent (the simulated user), not from the script. */
 	readonly reactive?: boolean;
+	/** When the user starts typing it (default: `typingMs` before `atSec`). */
+	readonly typingFromSec?: number;
 }
+
+/** How long the user types a line: about three characters a second, 2 to 20 s (an estimate). */
+export const typingMs = (text: string) =>
+	Math.min(20_000, Math.max(2_000, [...text].length * 300));
 
 interface Usage {
 	readonly latencyMs: number;
@@ -144,6 +157,21 @@ export type AgendaSimEvent =
 			readonly emotion?: EmotionEmoji | null;
 	  }
 	| {
+			/** A question of the agent's list that the reply asked at its end. */
+			readonly type: "reply_ask";
+			readonly atSec: number;
+			readonly itemId: string;
+	  }
+	| {
+			/** A question not asked: in meaning, asked or answered already (the agent's check). */
+			readonly type: "repeat";
+			readonly atSec: number;
+			readonly itemId: string;
+			readonly text: string;
+			readonly verdict: "asked" | "answered";
+			readonly reason: string;
+	  }
+	| {
 			readonly type: "research";
 			readonly atSec: number;
 			readonly itemId: string;
@@ -180,6 +208,8 @@ export interface AgendaSimInput {
 	readonly onEvent?: (e: AgendaSimEvent) => void;
 	/** A user who answers the agent's own speech (absent: only the scripted turns). */
 	readonly user?: SimulatedUser;
+	/** Real milliseconds, for the time the agent's work takes (default `performance.now`). */
+	readonly realMs?: () => number;
 }
 
 export async function simulateAgenda(input: AgendaSimInput) {
@@ -203,6 +233,27 @@ export async function simulateAgenda(input: AgendaSimInput) {
 	let n = 0;
 	const seen = new Set<string>();
 	const signal = new AbortController().signal;
+	const realMs = input.realMs ?? (() => performance.now());
+	/** Real time since `t0`, as the virtual clock counts it (whole seconds). */
+	const spent = (t0: number) => Math.round((realMs() - t0) / 1000) * 1000;
+	/** The agent's work: the virtual clock goes on by the time it took. */
+	const work = async <T>(f: () => Promise<T>): Promise<T> => {
+		const t0 = realMs();
+		const r = await f();
+		now += spent(t0);
+		return r;
+	};
+	const turnAtMs = (u: UserTurn) => start + u.atSec * 1000;
+	const typingFromMs = (u: UserTurn) =>
+		u.typingFromSec === undefined
+			? turnAtMs(u) - typingMs(u.text)
+			: start + u.typingFromSec * 1000;
+	/**
+	 * The line the user is typing at `t`, or has sent and the agent has not taken yet (the CLI is
+	 * busy with it as soon as it is sent).
+	 */
+	const typedAt = (t: number) =>
+		turns.find((u) => typingFromMs(u) <= t) ?? null;
 
 	const handle = (t: AgendaTicket) => {
 		if (t.kind === "research") {
@@ -233,6 +284,9 @@ export async function simulateAgenda(input: AgendaSimInput) {
 	/** The simulated user hears what the agent said and maybe answers a little later. */
 	const react = async (utterance: string, on: "speak" | "reply") => {
 		if (!input.user) return;
+		// An answer to the agent's earlier words the user has not started typing yet.
+		const pending =
+			turns.find((u) => u.reactive && typingFromMs(u) > now) ?? null;
 		const history = events.flatMap((e) =>
 			e.type === "user" || e.type === "reply" || e.type === "speak"
 				? [{ who: e.type === "user" ? "user" : "agent", text: e.text }]
@@ -253,13 +307,34 @@ export async function simulateAgenda(input: AgendaSimInput) {
 			...(r.uneasy === undefined ? {} : { uneasy: r.uneasy }),
 			replied: r.text !== null,
 		});
+		// Nothing to say to the new words: the answer to the earlier ones still comes.
 		if (r.text === null) return;
-		turns.push({ atSec: sec(now) + r.delaySec, text: r.text, reactive: true });
+		// Something to say to the new words: one line answers what is in front of them now, sent no
+		// later than the earlier answer would have been (more words do not put an answer off).
+		if (pending) turns.splice(turns.indexOf(pending), 1);
+		const atSec = Math.min(
+			sec(now) + r.delaySec,
+			pending?.atSec ?? Number.POSITIVE_INFINITY,
+		);
+		// Typing is part of the delay: it starts no earlier than the words were heard.
+		turns.push({
+			atSec,
+			text: r.text,
+			reactive: true,
+			typingFromSec: Math.max(sec(now), atSec - typingMs(r.text) / 1000),
+		});
 		turns.sort((a, b) => a.atSec - b.atSec);
 	};
 
 	const step = async () => {
-		const out = await agent.step(now, () => ({ busy: false }), signal);
+		const t0 = realMs();
+		// Busy while the user types, as of the moment the agent asks (its calls take time).
+		const out = await agent.step(
+			now,
+			() => ({ busy: typedAt(now + spent(t0)) !== null }),
+			signal,
+		);
+		now += spent(t0);
 		if (out.plan) {
 			const { call } = out.plan;
 			emit({
@@ -300,6 +375,15 @@ export async function simulateAgenda(input: AgendaSimInput) {
 				},
 			});
 		}
+		for (const r of out.repeats)
+			emit({
+				type: "repeat",
+				atSec: sec(now),
+				itemId: r.itemId,
+				text: r.text,
+				verdict: r.verdict,
+				reason: r.reason,
+			});
 		if (out.compose) {
 			const { call } = out.compose;
 			emit({
@@ -327,13 +411,18 @@ export async function simulateAgenda(input: AgendaSimInput) {
 		const turn = turns[0];
 		const turnAt = turn ? start + turn.atSec * 1000 : Number.POSITIVE_INFINITY;
 		const jobAt = input.research.nextAt() ?? Number.POSITIVE_INFINITY;
-		const agentAt = agent.nextAt(now) ?? Number.POSITIVE_INFINITY;
+		let agentAt = agent.nextAt(now) ?? Number.POSITIVE_INFINITY;
+		// While the user types, nothing is planned or said: the agent's next step is when the line
+		// arrives (research that comes back meanwhile is still received).
+		const typing = typedAt(agentAt);
+		if (typing) agentAt = turnAtMs(typing);
 		const at = Math.min(turnAt, jobAt, agentAt);
 		if (at > end) break;
 		// A step that keeps asking for the same moment without doing anything moves time on.
 		sameTime = at === lastAt ? sameTime + 1 : 0;
 		lastAt = at;
-		now = sameTime > 4 ? at + 1000 : at;
+		// Time never goes back: a research left from an earlier session was due before this one.
+		now = Math.max(now, sameTime > 4 ? at + 1000 : at);
 		if (jobAt <= now) {
 			const r = await input.research.due(now);
 			if (r) {
@@ -389,13 +478,24 @@ export async function simulateAgenda(input: AgendaSimInput) {
 						onResearch: (r) => emit({ type: "asked", atSec: sec(now), ...r }),
 					},
 				});
-				const out = await input.reply(agent, now, tools);
+				const at = now;
+				const out = await work(() => input.reply!(agent, at, tools));
 				const { text, calls, emotion } =
 					typeof out === "string"
 						? { text: out, calls: [], emotion: null }
 						: { emotion: null, ...out };
 				const replyId = `r${stamp}.${n}`;
+				const openAsks = new Set(
+					agent
+						.view()
+						.items.filter((i) => i.kind === "ask" && i.status === "open")
+						.map((i) => i.id),
+				);
 				agent.observe({ id: replyId, who: "reply", text, at: now, calls });
+				// The question offered to this reply was asked in it: the agent's item is done.
+				for (const i of agent.view().items)
+					if (i.kind === "ask" && i.status === "done" && openAsks.has(i.id))
+						emit({ type: "reply_ask", atSec: sec(now), itemId: i.id });
 				for (const id of notesMentioned(text, input.docs.list()))
 					agent.noteUsed(id, now);
 				emit({ type: "reply", atSec: sec(now), id: replyId, text, emotion });
@@ -415,7 +515,8 @@ export async function simulateAgenda(input: AgendaSimInput) {
 				["profile", input.profile ?? null],
 			] as const) {
 				if (!writer) continue;
-				const m = await writer({ said, fresh, at: now });
+				const at = now;
+				const m = await work(() => writer({ said, fresh, at }));
 				emit({
 					type,
 					atSec: sec(now),

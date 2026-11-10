@@ -316,6 +316,94 @@ test("Eumenes' way of handing work over: find a toolchain that fits, delegate to
 	).toContain("（mock）mock.x");
 });
 
+test("review 2026-11-10: the tool says research was taken, not started; the reply sees one that failed", async () => {
+	const { createAgendaAgent } = await import("../../src/agenda/index.ts");
+	const { createAgendaReplyTools, agendaReplyMessages } =
+		await import("../../standalone/agenda-reply.ts");
+	const agent = createAgendaAgent({
+		llm: { complete: () => Promise.reject(new Error("unused")) },
+		startedAt: 0,
+	});
+	agent.observe({ id: "u1", who: "user", text: "京都の朝を調べて", at: 0 });
+	const tools = createAgendaReplyTools({
+		agent,
+		read: () => null,
+		now: () => 0,
+	});
+	const r = await tools.call(
+		{
+			id: "c",
+			name: "start_preparation",
+			arguments: JSON.stringify({ request: "京都の朝", askedByUser: true }),
+		},
+		new AbortController().signal,
+	);
+	expect(r.content).toStartWith("accepted: 頼んだ");
+	expect(agent.view().items[0]).toMatchObject({ status: "open" });
+	const out = await agent.step(
+		0,
+		() => ({ busy: true }),
+		new AbortController().signal,
+	);
+	agent.researchReturned({
+		ticketId: out.tickets[0]!.id,
+		at: 60_000,
+		status: "failed",
+		note: null,
+	});
+	const m = agendaReplyMessages({
+		agent,
+		known: [],
+		notes: [],
+		clock: null,
+		now: 60_000,
+	});
+	expect(m[1]!.content).toContain('"status":"調べられなかった"');
+});
+
+test("review 2026-11-10: the CLI's snapshot file is written when it changed and set aside when it does not parse", async () => {
+	const { openSnapshotFile } =
+		await import("../../examples/virtual-eumenes/agenda/state-file.ts");
+	const { createAgendaAgent } = await import("../../src/agenda/index.ts");
+	const {
+		existsSync,
+		mkdtempSync,
+		readFileSync,
+		rmSync,
+		statSync,
+		writeFileSync,
+	} = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const dir = mkdtempSync(join(tmpdir(), "agenda-state-"));
+	try {
+		const path = join(dir, "sub", "agenda-state.json");
+		const empty = openSnapshotFile(path);
+		expect(empty).toMatchObject({ loaded: null, problem: null });
+		const llm = { complete: () => Promise.reject(new Error("unused")) };
+		const a = createAgendaAgent({ llm, startedAt: 0 });
+		a.observe({ id: "u1", who: "user", text: "京都の朝を調べて", at: 0 });
+		a.requestResearch({ text: "京都の朝", at: 0 });
+		empty.save(a.snapshot(1));
+		const written = statSync(path).mtimeMs;
+		// The same promises at a later time: nothing to write.
+		empty.save(a.snapshot(2));
+		expect(statSync(path).mtimeMs).toBe(written);
+		const back = openSnapshotFile(path);
+		expect(back.loaded?.items.map((i) => i.text)).toEqual(["京都の朝"]);
+		const b = createAgendaAgent({ llm, startedAt: 3, restore: back.loaded! });
+		expect(b.view().items.map((i) => i.text)).toEqual(["京都の朝"]);
+		writeFileSync(path, "{ broken");
+		const bad = openSnapshotFile(path);
+		expect(bad.loaded).toBeNull();
+		expect(bad.problem).not.toBeNull();
+		expect(existsSync(path)).toBe(false);
+		expect(readFileSync(`${path}.bad`, "utf8")).toBe("{ broken");
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
 test("a reply that follows a note's summary closely has talked about it", async () => {
 	const { notesMentioned } = await import("../../standalone/agenda-reply.ts");
 	const notes = [

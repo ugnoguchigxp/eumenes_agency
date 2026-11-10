@@ -28,6 +28,31 @@ describe("pack", () => {
 		}
 	}, 60_000);
 
+	test("rejects a tarball whose package has no agenda entry point", async () => {
+		const out = mkdtempSync(join(tmpdir(), "agency-pack-noagenda-"));
+		try {
+			const built = await pack(out);
+			const stage = join(out, "stage");
+			mkdirSync(stage);
+			expect(
+				Bun.spawnSync(["tar", "-xzf", built.tgz, "-C", stage]).exitCode,
+			).toBe(0);
+			const pkgPath = join(stage, "package", "package.json");
+			const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+			delete pkg.exports["./agenda"];
+			writeFileSync(pkgPath, JSON.stringify(pkg));
+			const tgz = join(out, "noagenda.tgz");
+			expect(
+				Bun.spawnSync(["tar", "-czf", tgz, "-C", stage, "package"]).exitCode,
+			).toBe(0);
+			const errors = await checkTarball(tgz);
+			expect(errors.some((e) => e.startsWith('exports "./agenda"'))).toBe(true);
+			expect(errors.some((e) => e.startsWith("import failed"))).toBe(true);
+		} finally {
+			rmSync(out, { recursive: true, force: true });
+		}
+	}, 60_000);
+
 	test("rejects a tarball that carries standalone/, .env or sources", async () => {
 		const dir = mkdtempSync(join(tmpdir(), "agency-pack-bad-"));
 		try {

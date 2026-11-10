@@ -56,7 +56,13 @@ export interface AgendaItem {
 	readonly promised: boolean;
 	/** `talk`: the note it is about. */
 	readonly noteId: string | null;
-	status: "open" | "doing" | "done" | "dropped";
+	/**
+	 * open: waiting (a research the reply asked for is queued here until the next step issues it);
+	 * doing: a research handed to the researcher, an utterance handed to the host;
+	 * done: finished; dropped: given up on purpose (covered, repeated, declined, forgotten);
+	 * failed: `research` only, the researcher failed or never came back.
+	 */
+	status: "open" | "doing" | "done" | "dropped" | "failed";
 	readonly createdAt: number;
 	deferUntil: number | null;
 	declines: number;
@@ -70,6 +76,44 @@ export interface AgendaItem {
 	/** Why the utterance was last declined, and when (the plan learns from it). */
 	lastDecline?: { readonly reason: string; readonly at: number } | null;
 }
+
+/**
+ * What outlives the process (the host saves it and passes it back at start): what was promised to
+ * the user and not finished — research asked for or promised (queued or running), results and
+ * failures not told yet — and the user's wish for quiet. The rest is working memory and starts
+ * anew. Running research comes back queued: its researcher did not survive the restart.
+ */
+export const AGENDA_SNAPSHOT_VERSION = 1;
+export const agendaSnapshotSchema = z.strictObject({
+	version: z.literal(AGENDA_SNAPSHOT_VERSION),
+	at: z.number(),
+	/** The id counter: ids made after a restore never collide with restored ones. */
+	n: z.number().int().min(0),
+	quiet: z.strictObject({
+		speechUntil: z.number().nullable(),
+		allUntil: z.number().nullable(),
+	}),
+	items: z
+		.array(
+			z.strictObject({
+				id: z.string().min(1),
+				kind: z.enum(["research", "talk"]),
+				text: z.string(),
+				refs: z.array(z.string()),
+				value: z.number().int().min(1).max(5),
+				reason: z.string(),
+				requested: z.boolean(),
+				promised: z.boolean(),
+				noteId: z.string().nullable(),
+				createdAt: z.number(),
+				declines: z.number().int().min(0),
+				checkedRequest: z.string().nullable().optional(),
+				delegatedTo: z.string().optional(),
+			}),
+		)
+		.max(200),
+});
+export type AgendaSnapshot = z.infer<typeof agendaSnapshotSchema>;
 
 /** Words in the conversation: the user's, the agent's reply, the agent's own speech. */
 /** A tool the reply called, with what it got back (kept so the next reply sees what it did). */

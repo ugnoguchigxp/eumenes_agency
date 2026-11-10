@@ -36,7 +36,7 @@ export const agendaScenarios: readonly AgendaScenario[] = [
 		minutes: 10,
 		turns: [],
 		expect:
-			"記憶も会話もない。自分から相手を知りに行く。返事がなければ間隔を空け、同じことを繰り返さない。",
+			"記憶も会話もない。自分から相手を知りに行き、やや喧しいくらいに話しかけ続ける（返事がなくても止めない）。同じことを繰り返さず、話の中身を替える。",
 	},
 	{
 		name: "lull",
@@ -49,7 +49,8 @@ export const agendaScenarios: readonly AgendaScenario[] = [
 			{ atSec: 0, text: "ただいま。今日はちょっと疲れたな" },
 			{ atSec: 200, text: "うん、仕事が立て込んでてね" },
 		],
-		expect: "疲れている相手に、やわらかく知りに行く。騒がしくしない。",
+		expect:
+			"疲れている相手に、やわらかい中身で話しかけ続ける（ねぎらい、軽い話題、調べた豆知識）。話しかけを減らすのではなく、重い質問や質問攻めを避ける。",
 	},
 	{
 		name: "intro",
@@ -174,7 +175,8 @@ export const agendaScenarios: readonly AgendaScenario[] = [
 			{ atSec: 1500, text: "そうだね" },
 			{ atSec: 2400, text: "へえ" },
 		],
-		expect: "相づちしか返ってこない1時間で、同じ話題・同じ問いを繰り返さない。",
+		expect:
+			"相づちしか返ってこない1時間でも、話す材料（調べたメモ、相手の関心）を切らさず話しかけ続ける。同じ話題・同じ問いを繰り返さない。",
 	},
 	{
 		name: "inject",

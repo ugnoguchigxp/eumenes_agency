@@ -28,7 +28,12 @@ export async function check(
 	const notesNow = notes(st);
 	const researchedBefore = st.items
 		.filter(
-			(i) => i.kind === "research" && i.id !== item.id && i.status !== "open",
+			// A research that failed brought nothing back: asking it again is not a repeat.
+			(i) =>
+				i.kind === "research" &&
+				i.id !== item.id &&
+				i.status !== "open" &&
+				i.status !== "failed",
 		)
 		.map((i) => i.checkedRequest ?? i.text);
 	const out = (
@@ -111,11 +116,14 @@ export async function check(
 			record("check", now, call.usage, true, "applied"),
 		);
 	}
+	// Covered by an earlier request (no note to name, as the instructions allow) or by a note
+	// that is not there: it is dropped all the same. A promise never gets here without a note.
 	if (v.verdict === "covered") {
 		item.status = "dropped";
 		item.endedAt = now;
-		const noteId = coveredBy!.slice(5);
+		const noteId = coveredBy?.slice("note:".length) ?? null;
 		if (
+			coveredBy !== null &&
 			item.promised &&
 			!st.items.some(
 				(i) =>
@@ -126,7 +134,7 @@ export async function check(
 				makeItem(st, {
 					kind: "talk",
 					text: "調べておくと言った件は、前に調べたメモにもうまとまっている",
-					refs: [coveredBy!, ...item.refs],
+					refs: [coveredBy, ...item.refs],
 					value: 5,
 					reason: "返事で調べておくと言ったことは、既存のメモで答えられる",
 					promised: true,

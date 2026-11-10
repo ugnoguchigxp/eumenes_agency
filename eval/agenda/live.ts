@@ -31,6 +31,7 @@ import { createProfileNote } from "../../examples/virtual-eumenes/agenda/profile
 import {
 	createMockWebResearch,
 	llmWriter,
+	mockToolchainWork,
 } from "../../examples/virtual-eumenes/agenda/research.ts";
 import { agendaScenarios } from "./scenarios.ts";
 import { judgeAspects, judgeScenario } from "./judge.ts";
@@ -81,6 +82,10 @@ const show = (e: AgendaSimEvent) => {
 			return `${t} reply ${e.emotion ?? ""}: ${e.text}`;
 		case "felt":
 			return `${t} 👤${e.on === "reply" ? "（返事の質問へ）" : ""} ${e.replied ? "" : "（返事せず）"}${e.feeling}`;
+		case "repeat":
+			return `${t} ↩ 聞かない（${e.verdict === "asked" ? "もう聞いた" : "もう答えがある"}）: ${e.text}`;
+		case "reply_ask":
+			return null;
 		default:
 			return `${t} ${e.type}: ${e.text}`;
 	}
@@ -181,11 +186,17 @@ if (import.meta.main) {
 					})
 				: null;
 			let planted = false;
+			const researchWriter = searcher?.writer ?? llmWriter(llm);
 			const research = createMockWebResearch({
-				writer: searcher?.writer ?? llmWriter(llm),
+				// Work delegated to a toolchain goes to its mock, as in the CLI (Eumenes runs the real
+				// one); only research is written by the researcher's stand-in.
+				writer: (request, delegatedTo) =>
+					delegatedTo
+						? mockToolchainWork(request, delegatedTo)
+						: researchWriter(request),
 				docs,
-				// A research takes minutes, web or not: the virtual clock stands still while the real
-				// search runs, so without this a note would be ready the second it was asked for.
+				// A research takes minutes, web or not: it runs beside the agent and the virtual clock
+				// does not wait for the real search, so without this a note would be ready at once.
 				delayMs: 120_000,
 				...(s.inject
 					? {

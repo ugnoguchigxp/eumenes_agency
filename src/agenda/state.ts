@@ -1,7 +1,8 @@
 /**
  * The agenda agent's working state and what every part of it shares: the host's inputs, ids, the
  * record of a model call. Kept in one object so the rules (pacing.ts) and the calls (plan.ts,
- * check.ts, compose.ts) read and change the same state. Never saved: it is working memory.
+ * check.ts, compose.ts) read and change the same state. Working memory, never saved as a whole:
+ * only the promises still open and the quiet go into a snapshot (agent.ts, `snapshot`).
  */
 import type { LlmPort } from "../contracts/ports.ts";
 import { defaultBudget } from "../contracts/runtime.ts";
@@ -9,6 +10,7 @@ import type { Budget } from "../application/budget.ts";
 import {
 	SAID_KEPT,
 	type AgendaItem,
+	type AgendaSnapshot,
 	type AgendaTicket,
 	type CallRecord,
 	type KnownItem,
@@ -36,6 +38,11 @@ export interface AgendaDeps {
 	readonly clock?: (now: number) => string;
 	/** When the agent starts: planning is due at once, so it can go and learn about the user. */
 	readonly startedAt: number;
+	/**
+	 * What the agent saved before the last restart (`AgendaAgent.snapshot`), validated here: the
+	 * promises still open and the quiet the user asked for. Absent: a fresh start.
+	 */
+	readonly restore?: AgendaSnapshot;
 }
 
 export interface AgendaState {

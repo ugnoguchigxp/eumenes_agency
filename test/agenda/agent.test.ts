@@ -7,7 +7,9 @@ import type { LlmPort, LlmRequest } from "../../src/index.ts";
 import {
 	createAgendaAgent,
 	declinesOffer,
+	RESEARCH_TTL_MS,
 	type AgendaDeps,
+	type AgendaSnapshot,
 	type CheckOutput,
 	type ComposeOutput,
 	type NoteRef,
@@ -1659,5 +1661,169 @@ describe("agenda agent", () => {
 		expect(out.plan).toBeNull();
 		expect(out.tickets.map((t) => t.kind)).toEqual(["research"]);
 		expect(m.calls.length).toBe(0);
+	});
+
+	test("review 2026-11-10: covered with no note (an earlier request) or a note not there is dropped, not thrown", async () => {
+		for (const coveredBy of [null, "note:missing"]) {
+			const m = scripted({
+				plan: (_d, n) =>
+					n === 1
+						? plan(add("research", "辛いラーメンの新作", ["u1"]))
+						: plan(),
+				check: () => ({
+					verdict: "covered",
+					coveredBy,
+					request: null,
+					reason: "前に頼んだものと同じ",
+				}),
+			});
+			const agent = make({
+				llm: m.llm,
+				notes: () => [{ id: "n1", title: "t", summary: "s", at: 0, refs: [] }],
+			});
+			agent.observe({ id: "u1", who: "user", text: "辛いのが好き", at: 0 });
+			const out = await agent.step(0, idle, sig());
+			expect(out.check).toMatchObject({ verdict: "covered", coveredBy: null });
+			expect(out.tickets.filter((t) => t.kind === "research")).toEqual([]);
+			expect(agent.view().items.map((i) => [i.kind, i.status])).toEqual([
+				["research", "dropped"],
+			]);
+		}
+	});
+
+	test("review 2026-11-10: research asked for that fails is told, not left in silence", async () => {
+		const m = scripted({});
+		const agent = make({ llm: m.llm });
+		agent.observe({ id: "u1", who: "user", text: "京都の朝を調べて", at: 0 });
+		agent.requestResearch({ text: "京都の朝", at: 0 });
+		const out = await agent.step(0, () => ({ busy: true }), sig());
+		const t = out.tickets.find((x) => x.kind === "research")!;
+		agent.researchReturned({
+			ticketId: t.id,
+			at: 60_000,
+			status: "failed",
+			note: null,
+		});
+		const items = agent.view().items;
+		expect(items.find((i) => i.kind === "research")).toMatchObject({
+			status: "failed",
+			endedAt: 60_000,
+		});
+		const told = items.find((i) => i.kind === "talk")!;
+		expect(told).toMatchObject({
+			requested: true,
+			promised: true,
+			noteId: null,
+			status: "open",
+			refs: ["u1"],
+		});
+		expect(told.text).toContain("「京都の朝」は、うまく調べられなかった");
+		const next = await agent.step(60_000, idle, sig());
+		expect(next.tickets).toMatchObject([
+			{ kind: "speak", itemKind: "talk", itemId: told.id },
+		]);
+		// Asked again, it is not refused as a repeat of what failed.
+		expect(
+			agent.requestResearch({ text: "京都の朝", at: 70_000 }),
+		).toHaveProperty("item");
+	});
+
+	test("review 2026-11-10: a promised research never returned fails after its time and is told; the agent's own is not", async () => {
+		const m = scripted({
+			plan: (_d, n) =>
+				n === 1 ? plan(add("research", "辛い店の探し方", ["u1"])) : plan(),
+		});
+		const agent = make({ llm: m.llm });
+		agent.observe({ id: "u1", who: "user", text: "辛いのが好き", at: 0 });
+		// Its own research (from the plan) first; it fails: nothing to tell.
+		const own = await agent.step(0, idle, sig());
+		const t1 = own.tickets.find((x) => x.kind === "research")!;
+		agent.researchReturned({
+			ticketId: t1.id,
+			at: 1,
+			status: "failed",
+			note: null,
+		});
+		expect(agent.view().items.filter((i) => i.kind === "talk")).toEqual([]);
+		// What the reply said it would look into, never returned.
+		agent.requestResearch({ text: "京都の朝", at: 2, requested: false });
+		const out = await agent.step(2, () => ({ busy: true }), sig());
+		expect(out.tickets.map((x) => x.kind)).toEqual(["research"]);
+		await agent.step(2 + RESEARCH_TTL_MS, () => ({ busy: true }), sig());
+		const items = agent.view().items;
+		expect(
+			items.find((i) => i.kind === "research" && i.text === "京都の朝"),
+		).toMatchObject({ status: "failed" });
+		expect(items.find((i) => i.kind === "talk")).toMatchObject({
+			requested: false,
+			promised: true,
+			text: "調べておくと言った「京都の朝」は、うまく調べられなかった",
+		});
+	});
+
+	test("review 2026-11-10: the promises still open and the quiet outlive a restart; working memory does not", async () => {
+		const m = scripted({
+			plan: (_d, n) =>
+				n === 1 ? plan(add("ask", "最近ハマっていること")) : plan(),
+		});
+		const a = make({ llm: m.llm });
+		a.observe({ id: "u1", who: "user", text: "京都の朝と夜を調べて", at: 0 });
+		a.requestResearch({ text: "京都の朝", at: 0 });
+		a.requestResearch({ text: "京都の夜", at: 0 });
+		const out = await a.step(0, idle, sig());
+		const first = out.tickets.find((x) => x.kind === "research")!;
+		// The agent's own question is working memory: it is not kept.
+		expect(a.view().items.map((i) => [i.kind, i.status])).toEqual([
+			["research", "doing"],
+			["research", "open"],
+			["ask", "open"],
+		]);
+		a.setQuiet({ scope: "speech", minutes: 60, at: 0 });
+		// The host stores it as JSON and passes it back after the restart.
+		const saved = JSON.parse(JSON.stringify(a.snapshot(1))) as AgendaSnapshot;
+		expect(saved.items.map((i) => [i.kind, i.text])).toEqual([
+			["research", "京都の朝"],
+			["research", "京都の夜"],
+		]);
+		const b = make({ llm: m.llm, startedAt: 2, restore: saved });
+		expect(b.view().items.map((i) => [i.text, i.status])).toEqual([
+			["京都の朝", "open"],
+			["京都の夜", "open"],
+		]);
+		expect(b.view().said).toEqual([]);
+		expect(b.view().quiet.speechUntil).toBe(3_600_000);
+		// The running one comes back queued and starts again first; new ids go on after the old.
+		const again = await b.step(2, () => ({ busy: true }), sig());
+		expect(again.tickets).toMatchObject([
+			{ kind: "research", text: "京都の朝", requested: true },
+		]);
+		expect(again.tickets[0]!.id).not.toBe(first.id);
+		b.observe({ id: "u2", who: "user", text: "昼も", at: 3 });
+		const r = b.requestResearch({ text: "京都の昼", at: 3 });
+		expect("item" in r && saved.items.some((i) => i.id === r.item.id)).toBe(
+			false,
+		);
+		// What was promised and told is gone from the next snapshot.
+		b.researchReturned({
+			ticketId: again.tickets[0]!.id,
+			at: 4,
+			status: "failed",
+			note: null,
+		});
+		expect(b.snapshot(5).items.map((i) => [i.kind, i.text])).toEqual([
+			["research", "京都の夜"],
+			["research", "京都の昼"],
+			[
+				"talk",
+				"頼まれた調べもの「京都の朝」は、うまく調べられなかった（もう一度頼まれればやり直せる）",
+			],
+		]);
+		// A snapshot is checked before it is trusted.
+		expect(() =>
+			make({
+				llm: m.llm,
+				restore: { ...saved, version: 2 } as unknown as AgendaSnapshot,
+			}),
+		).toThrow();
 	});
 });

@@ -1,8 +1,9 @@
 /**
  * The agenda agent's conversation CLI (spec/always-on-agenda-design-2026-11-08.md) in a mock
  * Eumenes with the real memory: eumenes_memory (the vendored Memory host; its own planner writes
- * after each exchange) and the researcher's notes (Markdown files) stay in data/agenda/; the
- * agent's working memory does not.
+ * after each exchange), the researcher's notes (Markdown files) and the agent's snapshot (the
+ * promises still open and the quiet, agenda-state.json) stay in data/agenda/; the agent's
+ * working memory does not.
  * Cost is recorded in data/agenda/usage.jsonl and never capped.
  *
  *   zsh -l scripts/api-entry.zsh standalone/agenda.ts [--interval 10|60|300]
@@ -40,6 +41,7 @@ import {
 	llmWriter,
 	mockToolchainWork,
 } from "../examples/virtual-eumenes/agenda/research.ts";
+import { openSnapshotFile } from "../examples/virtual-eumenes/agenda/state-file.ts";
 
 const dataDir = resolve(import.meta.dir, "../data/agenda");
 /** The memory's store (its own SQLite, journal and socket); data/agenda/memory.json was the mock's. */
@@ -47,6 +49,8 @@ const memoryDir = resolve(dataDir, "memory-host");
 const notesDir = resolve(dataDir, "notes");
 /** The user's plans and interests (Markdown; the user may edit it while the CLI runs). */
 const profilePath = resolve(dataDir, "profile.md");
+/** What outlives a restart: research asked for or promised, results not told yet, the quiet. */
+const statePath = resolve(dataDir, "agenda-state.json");
 
 interface Args {
 	readonly interval: SpeechIntervalSec;
@@ -126,7 +130,9 @@ async function main() {
 		rmSync(memoryDir, { recursive: true, force: true });
 		rmSync(notesDir, { recursive: true, force: true });
 		rmSync(profilePath, { force: true });
+		rmSync(statePath, { force: true });
 	}
+	const stateFile = openSnapshotFile(statePath);
 	if (settings.llm.background.provider === "openai")
 		throw new Error(
 			"the memory's model runs on the Claude API: set llm.background to a Claude model",
@@ -169,7 +175,28 @@ async function main() {
 		known: memory.known,
 		notes: docs.list,
 		profile: note.get,
+		...(stateFile.loaded ? { restore: stateFile.loaded } : {}),
 	});
+	const restored = agent.view().items;
+	// Written after anything happened (a step, a reply, a result), once the host has handled it.
+	const saveState = () => {
+		try {
+			stateFile.save(agent.snapshot(Date.now()));
+		} catch (e) {
+			console.warn(
+				`[warn] agenda state write failed: ${e instanceof Error ? e.message : String(e)}`,
+			);
+		}
+	};
+	let saveQueued = false;
+	const saveSoon = () => {
+		if (saveQueued) return;
+		saveQueued = true;
+		setTimeout(() => {
+			saveQueued = false;
+			saveState();
+		}, 0);
+	};
 	const log = createChatLog(args.log, Date.now, (m) =>
 		console.warn(`[warn] log write failed: ${m}`),
 	);
@@ -369,7 +396,10 @@ async function main() {
 			return h;
 		},
 		clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
-		emit: show,
+		emit: (e) => {
+			show(e);
+			saveSoon();
+		},
 		reply: async (a, tools) => {
 			const r = await runRespond({
 				messages: agendaReplyMessages({
@@ -462,6 +492,18 @@ async function main() {
 			`agenda / 調べもの: ${searcher ? "Web検索" : "mock"} / 記憶 ${memory.known().length}件・メモ ${docs.list().length}件 / 話しかけの最短間隔 ${args.interval}秒 / background ${settings.llm.background.model} (${settings.llm.background.effort}) / log ${args.log ?? "off"}\ncommands: /agenda /notes /show <id> /memory /profile /plan /stop /resume /quit`,
 		),
 	);
+	if (restored.length)
+		console.log(
+			dim(
+				`前回から引き継ぎ: 調べもの ${restored.filter((i) => i.kind === "research").length}件・まだ伝えていないこと ${restored.filter((i) => i.kind === "talk").length}件`,
+			),
+		);
+	if (stateFile.problem)
+		console.log(
+			dim(
+				`[warn] ${statePath} が読めないので ${statePath}.bad に退避し、引き継がずに始めます: ${stateFile.problem}`,
+			),
+		);
 	emitKeypressEvents(process.stdin, rl);
 	process.stdin.on(
 		"keypress",
@@ -487,6 +529,7 @@ async function main() {
 	rl.on("close", () => {
 		closed = true;
 		session.close();
+		saveState();
 		log.write({ type: "end", spentUsd: meter.spentUsd() - sessionStart });
 		console.log(
 			dim(
@@ -499,7 +542,11 @@ async function main() {
 			queue,
 			new Promise((done) => setTimeout(done, 15_000).unref?.()),
 		])
-			.then(() => memory.close())
+			.then(() => {
+				// The exchange that finished meanwhile may have asked for research.
+				saveState();
+				return memory.close();
+			})
 			.finally(() => process.exit(0));
 	});
 	rl.prompt();

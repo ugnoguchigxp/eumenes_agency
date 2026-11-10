@@ -6,6 +6,8 @@
  * state.ts. Host-neutral: time comes in as arguments, nothing is stored outside the instance.
  */
 import {
+	AGENDA_SNAPSHOT_VERSION,
+	agendaSnapshotSchema,
 	ANSWER_WINDOW_MS,
 	DEFAULT_QUIET_MIN,
 	defaultSpeechIntervalSec,
@@ -15,6 +17,7 @@ import {
 	TOPIC_RECENT_MS,
 	speechIntervals,
 	type AgendaItem,
+	type AgendaSnapshot,
 	type AgendaTicket,
 	type CheckOutcome,
 	type ComposeOutcome,
@@ -59,6 +62,7 @@ import {
 	remember,
 	wantPlan,
 	type AgendaDeps,
+	type AgendaState,
 } from "./state.ts";
 import { declinesOffer, endsWithQuestion, normalize } from "./text.ts";
 
@@ -137,6 +141,11 @@ export interface AgendaAgent {
 	/** Drops the words and memory/note refs given, and everything that rests on them. */
 	forget(refs: readonly string[]): void;
 	view(): AgendaView;
+	/**
+	 * What the host saves to outlive a restart and passes back as `restore`: the promises still
+	 * open and the quiet. Save it after each step, reply and research result (and at exit).
+	 */
+	snapshot(now: number): AgendaSnapshot;
 }
 
 export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
@@ -149,10 +158,42 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 		compose: composeSystem(deps.persona),
 		askCheck: askCheckSystem(),
 	});
+	if (deps.restore) restore(st, deps.restore);
 	const researchingItem = () =>
 		st.researching
 			? (st.items.find((i) => i.id === st.researching!.ticket.itemId) ?? null)
 			: null;
+	/**
+	 * The researcher failed, or never came back. What the user asked for, or what the reply said
+	 * it would look into, was promised: the user hears it did not work out, not silence.
+	 */
+	const researchFailed = (
+		t: Extract<AgendaTicket, { kind: "research" }>,
+		at: number,
+	) => {
+		const item = st.items.find((i) => i.id === t.itemId);
+		if (!item) return;
+		item.status = "failed";
+		item.endedAt = at;
+		if (!(t.requested || t.promised) || t.refs.some((x) => st.forgotten.has(x)))
+			return;
+		st.items.push(
+			makeItem(st, {
+				kind: "talk",
+				text: t.delegatedTo
+					? `頼まれた「${item.text}」は、担当（${t.delegatedTo}）がやり遂げられなかった`
+					: t.requested
+						? `頼まれた調べもの「${item.text}」は、うまく調べられなかった（もう一度頼まれればやり直せる）`
+						: `調べておくと言った「${item.text}」は、うまく調べられなかった`,
+				refs: [...t.refs],
+				value: 5,
+				reason: "約束した調べものが失敗した（黙って終わらせない）",
+				requested: t.requested,
+				promised: true,
+				createdAt: at,
+			}),
+		);
+	};
 
 	return {
 		observe(s) {
@@ -246,13 +287,10 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			if (st.stopped) return { ...base, skipped: "stopped" };
 			endQuiet(st, now);
 			if (st.researching && st.researching.at + RESEARCH_TTL_MS <= now) {
-				const item = researchingItem();
-				if (item) {
-					item.status = "dropped";
-					item.endedAt = now;
-				}
-				st.issued.delete(st.researching.ticket.id);
+				const t = st.researching.ticket;
+				st.issued.delete(t.id);
 				st.researching = null;
+				if (t.kind === "research") researchFailed(t, now);
 			}
 			// With nothing new for an hour, the time of day itself is the news.
 			if (
@@ -425,14 +463,18 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			if (!t || t.kind !== "research") return;
 			st.issued.delete(r.ticketId);
 			if (st.researching?.ticket.id === r.ticketId) st.researching = null;
+			wantPlan(st);
+			st.lastInfoAt = Math.max(st.lastInfoAt, r.at);
+			if (r.status === "failed") {
+				researchFailed(t, r.at);
+				return;
+			}
 			const item = st.items.find((i) => i.id === t.itemId);
 			if (item) {
-				item.status = r.status === "succeeded" ? "done" : "dropped";
+				item.status = "done";
 				item.endedAt = r.at;
 				item.resultNoteId = r.note?.id ?? null;
 			}
-			wantPlan(st);
-			st.lastInfoAt = Math.max(st.lastInfoAt, r.at);
 			const usable =
 				r.status === "succeeded" &&
 				r.note &&
@@ -650,5 +692,78 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			planDue: st.planDue,
 			unanswered: st.unanswered,
 		}),
+
+		snapshot: (now) => ({
+			version: AGENDA_SNAPSHOT_VERSION,
+			at: now,
+			n: st.n,
+			quiet: { ...st.quiet },
+			items: st.items
+				.filter(
+					(i) =>
+						(i.kind === "research" || i.kind === "talk") &&
+						(i.status === "open" || i.status === "doing") &&
+						(i.requested || i.promised),
+				)
+				.map((i) => ({
+					id: i.id,
+					kind: i.kind === "research" ? "research" : "talk",
+					text: i.text,
+					refs: [...i.refs],
+					value: i.value,
+					reason: i.reason,
+					requested: i.requested,
+					promised: i.promised,
+					noteId: i.noteId,
+					createdAt: i.createdAt,
+					declines: i.declines,
+					...(i.checkedRequest !== undefined
+						? { checkedRequest: i.checkedRequest }
+						: {}),
+					...(i.delegatedTo !== undefined
+						? { delegatedTo: i.delegatedTo }
+						: {}),
+				})),
+		}),
 	};
+}
+
+/**
+ * Puts back what a snapshot kept. Running work comes back queued (its researcher or its speech did
+ * not survive the restart); ids go on after the highest restored one.
+ */
+function restore(st: AgendaState, given: AgendaSnapshot): void {
+	const s = agendaSnapshotSchema.parse(given);
+	st.quiet.speechUntil = s.quiet.speechUntil;
+	st.quiet.allUntil = s.quiet.allUntil;
+	const seen = new Set<string>();
+	for (const x of s.items) {
+		if (seen.has(x.id)) continue;
+		seen.add(x.id);
+		st.items.push({
+			id: x.id,
+			kind: x.kind,
+			text: x.text,
+			refs: x.refs,
+			value: x.value,
+			reason: x.reason,
+			requested: x.requested,
+			promised: x.promised,
+			noteId: x.noteId,
+			status: "open",
+			createdAt: x.createdAt,
+			deferUntil: null,
+			declines: x.declines,
+			endedAt: null,
+			...(x.checkedRequest !== undefined
+				? { checkedRequest: x.checkedRequest }
+				: {}),
+			...(x.delegatedTo !== undefined ? { delegatedTo: x.delegatedTo } : {}),
+		});
+	}
+	const highest = Math.max(
+		0,
+		...s.items.map((i) => Number(/\d+$/u.exec(i.id)?.[0] ?? 0)),
+	);
+	st.n = Math.max(st.n, s.n, highest);
 }

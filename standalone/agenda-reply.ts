@@ -172,10 +172,12 @@ export function createAgendaReplyTools(input: {
 				const told = r.item.requested
 					? "できたら自分から知らせる"
 					: "メモに残る";
+				// Taken, not yet running: it starts at a later step (not while everything is paused, nor
+				// before its check). A failure is told too (in the state: status 調べられなかった).
 				return {
 					content: r.queued
-						? `queued: 今の調べものが終わったら始める（${told}）`
-						: `started: 調べ始めた（数分でメモになり、${told}）`,
+						? `queued: 今の調べものが終わったら始める（${told}。うまくいかなければ、それも知らせる）`
+						: `accepted: 頼んだ（始まれば数分でメモになり、${told}。うまくいかなければ、それも知らせる）`,
 				};
 			}
 			if (call.name === FIND_TOOLCHAIN) {
@@ -219,7 +221,10 @@ export function createAgendaReplyTools(input: {
 							detail: String(args["toolchain"]),
 						}),
 					};
-				// Only what the user said yes to runs here: anything else waits for their word.
+				// Only what the user said yes to runs here: anything else waits for their word. The
+				// toolchains here are mocks with no side effects, so the model's mode=execute is taken
+				// as that yes. A host with real toolchains must not: it asks the user itself and keeps
+				// the record of what ran (spec 2026-11-08 §12, review 2026-11-10).
 				if (args["mode"] !== "execute")
 					return {
 						content: JSON.stringify({
@@ -330,7 +335,7 @@ export function agendaReplySystem(persona?: string): string {
 		`- 前の返事で呼んだツールとその結果は、会話の中にそのまま残っています。それがあなたのしたことです。`,
 		`- notes にあるテーマは調べ直さず、${READ_NOTE} で読んで答えます。`,
 		"- メモの id（n1 など）は内部の印なので、利用者には言いません。「調べておいたメモ」のように言います。",
-		`- 調べものを頼んだ・調べ始めたと言うのは、この返事で ${START_PREPARATION} を呼んだときか、状態の researching・researchLog にあるときだけです。「調べている」「調べ中」と言うのは、researching にあるか researchLog の status が「調べている」のときだけです。メモになったものは「調べておいた」と言い、${READ_NOTE} で読んでその中身で答えます。`,
+		`- 調べものを頼んだ・調べ始めたと言うのは、この返事で ${START_PREPARATION} を呼んだときか、状態の researching・researchLog にあるときだけです。「調べている」「調べ中」と言うのは、researching にあるか researchLog の status が「調べている」のときだけです。メモになったものは「調べておいた」と言い、${READ_NOTE} で読んでその中身で答えます。status が「調べられなかった」ものは、調べられなかったと正直に言い、頼まれればもう一度 ${START_PREPARATION} で頼みます。`,
 		"- 記憶にあることは、聞き直さずに話題選びへ自然に使います。",
 		"- plans と interests は、利用者が前に話した予定（未定のものも）と、気にしていることのメモです。話題に出たら知っている前提で話し、決まっていないことを決めつけません。",
 		"- memory・plans・interests は、どれも利用者が前に話したことで、あなたが覚えていることです。「記憶の欄」のような内部の区別や仕組みを利用者に説明せず、何を覚えているかで答えます。",
@@ -546,7 +551,9 @@ export function agendaReplyMessages(input: {
 							: "メモになった"
 						: i.status === "doing"
 							? "調べている"
-							: "やめた",
+							: i.status === "failed"
+								? "調べられなかった"
+								: "やめた",
 				minutesAgo: Math.round((input.now - i.createdAt) / 60_000),
 				...(i.requested ? { askedByUser: true } : {}),
 			})),

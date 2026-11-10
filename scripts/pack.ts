@@ -63,6 +63,32 @@ export const requiredExports = [
 	"ALWAYS_ON_VERSION",
 ] as const;
 
+/** Names a host needs from `eumenes-agency/agenda` (the agenda agent, spec 2026-11-08). */
+export const requiredAgendaExports = [
+	"createAgendaAgent",
+	"agendaSnapshotSchema",
+	"AGENDA_SNAPSHOT_VERSION",
+	"AGENDA_VERSION",
+	"speechIntervals",
+	"defaultSpeechIntervalSec",
+	"defaultPersona",
+	"emptyProfile",
+	"updateProfile",
+	"profileLines",
+	"PROFILE_TITLE",
+	"declinesOffer",
+	"endsWithQuestion",
+] as const;
+
+/** The package's entry points: the core and the agenda agent. */
+const entryPoints = {
+	".": { types: "./dist/index.d.ts", default: "./dist/index.js" },
+	"./agenda": {
+		types: "./dist/agenda/index.d.ts",
+		default: "./dist/agenda/index.js",
+	},
+} as const;
+
 /** Only these may appear in the tarball. */
 const allowedPath = /^package\/(package\.json|LICENSE|dist\/.+\.(js|d\.ts))$/;
 const forbiddenPath =
@@ -132,7 +158,7 @@ export function tarballPackageJson(pkg: RootPackage) {
 		type: "module",
 		sideEffects: false,
 		exports: {
-			".": { types: "./dist/index.d.ts", default: "./dist/index.js" },
+			...entryPoints,
 			"./package.json": "./package.json",
 		},
 		files: ["dist", "LICENSE"],
@@ -154,6 +180,8 @@ export async function checkTarball(tgz: string): Promise<string[]> {
 		"package/package.json",
 		"package/dist/index.js",
 		"package/dist/index.d.ts",
+		"package/dist/agenda/index.js",
+		"package/dist/agenda/index.d.ts",
 	])
 		if (!listed.includes(need)) errors.push(`missing: ${need}`);
 	if (errors.length > 0) return errors;
@@ -176,15 +204,11 @@ export async function checkTarball(tgz: string): Promise<string[]> {
 			dependencies?: Record<string, string>;
 		};
 		if (pkg.name !== "eumenes-agency") errors.push("package name");
-		const dot = JSON.stringify(pkg.exports?.["."]);
-		if (
-			dot !==
-			JSON.stringify({
-				types: "./dist/index.d.ts",
-				default: "./dist/index.js",
-			})
-		)
-			errors.push(`exports "." is ${dot}`);
+		for (const [entry, want] of Object.entries(entryPoints)) {
+			const got = JSON.stringify(pkg.exports?.[entry]);
+			if (got !== JSON.stringify(want))
+				errors.push(`exports "${entry}" is ${got}`);
+		}
 		if (Object.keys(pkg.dependencies ?? {}).join() !== "zod")
 			errors.push("dependencies must be exactly zod");
 		const dts = readFileSync(join(pkgDir, "dist", "index.d.ts"), "utf8");
@@ -201,17 +225,34 @@ export async function checkTarball(tgz: string): Promise<string[]> {
 			join(root, "node_modules", "zod"),
 			join(pkgDir, "node_modules", "zod"),
 		);
-		const probe = await run([
-			process.execPath,
-			"--eval",
-			"const m = await import(process.argv[1]); console.log(JSON.stringify(Object.keys(m)));",
-			join(pkgDir, "dist", "index.js"),
-		]);
+		// A host installs the package under its name and imports it by name (the exports map, not
+		// paths into dist): the core and the agenda subpath.
+		const host = join(dir, "host");
+		mkdirSync(join(host, "node_modules"), { recursive: true });
+		symlinkSync(pkgDir, join(host, "node_modules", "eumenes-agency"), "dir");
+		writeFileSync(
+			join(host, "probe.mjs"),
+			`const core = await import("eumenes-agency");
+const agenda = await import("eumenes-agency/agenda");
+console.log(JSON.stringify({ core: Object.keys(core), agenda: Object.keys(agenda) }));
+`,
+		);
+		const probe = await run([process.execPath, join(host, "probe.mjs")], {
+			cwd: host,
+		});
 		if (probe.code !== 0) errors.push(`import failed: ${probe.err.trim()}`);
 		else {
-			const names = new Set(JSON.parse(probe.out) as string[]);
+			const got = JSON.parse(probe.out) as {
+				core: string[];
+				agenda: string[];
+			};
+			const core = new Set(got.core);
 			for (const name of requiredExports)
-				if (!names.has(name)) errors.push(`missing export: ${name}`);
+				if (!core.has(name)) errors.push(`missing export: ${name}`);
+			const agenda = new Set(got.agenda);
+			for (const name of requiredAgendaExports)
+				if (!agenda.has(name))
+					errors.push(`missing export: eumenes-agency/agenda ${name}`);
 		}
 		// Compile a host against only the emitted declarations, including the breaking changes.
 		const consumer = join(pkgDir, "consumer.ts");
@@ -256,6 +297,45 @@ respondSystem({ opening: ["recorded utterance"] });
 		);
 		if (types.code !== 0)
 			errors.push(`consumer types failed: ${types.out || types.err}`);
+		// The agenda agent, typed through the package name: create, save, restore.
+		const agendaConsumer = join(host, "agenda-consumer.ts");
+		writeFileSync(
+			agendaConsumer,
+			`
+import type { LlmPort } from "eumenes-agency";
+import {
+  createAgendaAgent, agendaSnapshotSchema,
+  type AgendaAgent, type AgendaDeps, type AgendaSnapshot,
+} from "eumenes-agency/agenda";
+declare const llm: LlmPort;
+const agent: AgendaAgent = createAgendaAgent({ llm, startedAt: 0 });
+const saved: AgendaSnapshot = agendaSnapshotSchema.parse(JSON.parse(JSON.stringify(agent.snapshot(0))));
+const deps: AgendaDeps = { llm, startedAt: 1, restore: saved };
+createAgendaAgent(deps).requestResearch({ text: "q", at: 1 });
+// @ts-expect-error a snapshot is the agent's, not any object
+createAgendaAgent({ llm, startedAt: 1, restore: { items: [] } });
+`,
+		);
+		const agendaTypes = await run(
+			[
+				join(root, "node_modules", ".bin", "tsc"),
+				"--noEmit",
+				"--strict",
+				"--skipLibCheck",
+				"--target",
+				"ES2022",
+				"--module",
+				"ESNext",
+				"--moduleResolution",
+				"Bundler",
+				agendaConsumer,
+			],
+			{ cwd: host },
+		);
+		if (agendaTypes.code !== 0)
+			errors.push(
+				`agenda consumer types failed: ${agendaTypes.out || agendaTypes.err}`,
+			);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

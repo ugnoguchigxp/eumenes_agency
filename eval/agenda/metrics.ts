@@ -51,6 +51,138 @@ const load = (dir: string, file: string): E[] =>
 const quietSpoke = (events: readonly E[], from: number, to: number) =>
 	of(events, "speak").some((e) => e.atSec > from && e.atSec < to);
 
+const median = (xs: readonly number[]) => {
+	if (xs.length === 0) return null;
+	const s = [...xs].sort((a, b) => a - b);
+	const m = Math.floor(s.length / 2);
+	return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+};
+
+/**
+ * The quiet periods set in a session, merged (seconds from its start, within it): a quiet for
+ * speech ends when the user talks again (the agent's rule), any quiet when it is set again or
+ * ended with 0 minutes, and at most at the session's end.
+ */
+export function quietSpans(events: readonly E[], endSec: number) {
+	const spans: [number, number][] = [];
+	const open: Partial<Record<"speech" | "all", [number, number]>> = {};
+	const close = (scope: "speech" | "all", at: number) => {
+		const q = open[scope];
+		if (!q) return;
+		if (Math.min(q[1], at) > q[0]) spans.push([q[0], Math.min(q[1], at)]);
+		delete open[scope];
+	};
+	for (const e of [...events].sort((a, b) => a.atSec - b.atSec)) {
+		if (e.type === "user") close("speech", e.atSec);
+		if (e.type !== "quiet") continue;
+		if (e.minutes === 0) {
+			close("speech", e.atSec);
+			close("all", e.atSec);
+			continue;
+		}
+		close(e.scope, e.atSec);
+		open[e.scope] = [e.atSec, e.atSec + e.minutes * 60];
+	}
+	close("speech", endSec);
+	close("all", endSec);
+	// Merged and kept within the session.
+	const out: [number, number][] = [];
+	for (const [a, b] of spans
+		.map(([a, b]): [number, number] => [Math.max(0, a), Math.min(endSec, b)])
+		.filter(([a, b]) => b > a)
+		.sort((x, y) => x[0] - y[0])) {
+		const last = out.at(-1);
+		if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+		else out.push([a, b]);
+	}
+	return out;
+}
+
+/**
+ * How much and how soon the agent speaks on its own (review 2026-11-10: the goal is speech about
+ * every ten seconds outside the quiet the user asked for, so the ruler has to count it). The
+ * quiet the reply set is taken out of the rate and the silences and counted on its own, so a
+ * quiet set too long shows as quiet, not as a slower agent.
+ */
+export function speechMetrics(all: readonly E[], minutes: number) {
+	const endSec = minutes * 60;
+	// What the agent did after the session's end (a last reply that ran over) does not count.
+	const events = all.filter((e) => e.atSec <= endSec);
+	const quiet = quietSpans(events, endSec);
+	const inQuiet = (t: number) => quiet.some(([a, b]) => t >= a && t < b);
+	const quietIn = (from: number, to: number) =>
+		quiet.reduce(
+			(n, [a, b]) => n + Math.max(0, Math.min(b, to) - Math.max(a, from)),
+			0,
+		);
+	const quietSec = quietIn(0, endSec);
+	const speak = of(events, "speak").sort((a, b) => a.atSec - b.atSec);
+	const gaps = speak.slice(1).map((e, i) => e.atSec - speak[i]!.atSec);
+	// Silence: no word of the agent's (own or reply) from the start to the end of the session,
+	// the quiet aside.
+	const words = [...speak, ...of(events, "reply")]
+		.map((e) => e.atSec)
+		.sort((a, b) => a - b);
+	const marks = [0, ...words, endSec];
+	const longestSilenceSec = Math.max(
+		0,
+		...marks.slice(1).map((t, i) => t - marks[i]! - quietIn(marks[i]!, t)),
+	);
+	const openMin = (endSec - quietSec) / 60;
+	const spokeInQuiet = speak.filter((e) => inQuiet(e.atSec)).length;
+	// From each line of the user's to the agent's first own words after it, before their next.
+	const users = of(events, "user").sort((a, b) => a.atSec - b.atSec);
+	const firstOwnSec = users.flatMap((u, i) => {
+		const next = users[i + 1]?.atSec ?? Number.POSITIVE_INFINITY;
+		const s = speak.find((e) => e.atSec >= u.atSec && e.atSec < next);
+		return s ? [s.atSec - u.atSec] : [];
+	});
+	// Notes made in this session that the user heard of: brought up, shown, or read for a reply.
+	const made = of(events, "researched")
+		.filter((r) => r.status === "succeeded" && r.noteId !== null)
+		.map((r) => r.noteId!);
+	const used = new Set([
+		...speak.flatMap((e) => (e.noteId ? [e.noteId] : [])),
+		...events.flatMap((e) =>
+			e.type === "show" || e.type === "read" ? [e.noteId] : [],
+		),
+	]);
+	// What the plan added to say (questions and topics), and how much of it was said.
+	const planned = new Set(
+		of(events, "plan").flatMap((p) =>
+			p.added.filter((a) => a.kind !== "research").map((a) => a.id),
+		),
+	);
+	// Said on its own, or asked at the end of a reply (the question offered to it).
+	const said = new Set([
+		...speak.map((e) => e.itemId),
+		...of(events, "reply_ask").map((e) => e.itemId),
+	]);
+	const composes = of(events, "compose");
+	return {
+		own: speak.length,
+		/** Outside the quiet set in the session. */
+		openMin,
+		perMin: openMin > 0 ? (speak.length - spokeInQuiet) / openMin : 0,
+		quietMin: quietSec / 60,
+		spokeInQuiet,
+		gaps,
+		gapP50: median(gaps),
+		longestSilenceSec,
+		userLines: users.length,
+		firstOwnSec,
+		firstOwnP50: median(firstOwnSec),
+		notesMade: made.length,
+		notesUsed: made.filter((id) => used.has(id)).length,
+		planned: planned.size,
+		plannedSaid: [...planned].filter((id) => said.has(id)).length,
+		composes: composes.length,
+		/** Written while the user started typing or new words came: thrown away. */
+		stale: composes.filter((c) => c.code === "stale").length,
+		repeatsDropped: of(events, "repeat").length,
+	};
+}
+
 /** A word of feeling that says being spoken to was off (the count before the user's own yes or no). */
 const uneasyWords = (feeling: string) =>
 	/うるさ|しつこ|唐突|的外れ|繰り返|押しつけ|面倒|多すぎ/u.test(feeling);
@@ -235,6 +367,7 @@ export function scenarioMetrics(dir: string, run: string) {
 				run,
 				scenario,
 				minutes: s.minutes,
+				speech: speechMetrics(ev, s.minutes),
 				asks: asks.length,
 				answered: answered.length,
 				talks: talks.length,
@@ -322,4 +455,15 @@ if (import.meta.main) {
 	console.log(
 		`\n合計: 質問 ${sum("asks")}（答え ${sum("answered")}）、話題 ${sum("talks")}（反応 ${sum("reacted")}）、調べもの ${sum("research")}（重複で除外 ${sum("covered")}、絞り込み ${sum("narrowed")}）、メモ ${sum("notes")}、記憶 ${sum("memory")}、計画 ${sum("plans")}（変化 ${sum("plansChanged")}）、話す文 ${sum("composes")}（見送り ${sum("declines")}）、LLM ${llm.toFixed(0)}秒のうち無駄 ${llm ? ((waste / llm) * 100).toFixed(0) : 0}%、重ね ${sum("piled")}、二択 ${sum("eitherOr")}、繰り返し ${sum("repeats")}、守る条件 ${checked.filter((r) => r.condition!.ok).length}/${checked.length}、費用 $${sum("usd").toFixed(3)}`,
 	);
+	console.log(
+		"\n| run | シナリオ | 自発 | 回/分（静かな時間の外） | 静かな時間（分） | 静かな時間に話した | 間隔p50 | 最長の沈黙 | 発言→自発p50 | 自発が出た | メモ使用 | 計画→発話 | 破棄 | 聞き直し除外 |",
+	);
+	console.log(`| --- | --- |${" ---: |".repeat(12)}`);
+	const sec = (x: number | null) => (x === null ? "-" : `${Math.round(x)}秒`);
+	for (const r of rows) {
+		const p = r.speech;
+		console.log(
+			`| ${r.run} | ${r.scenario} | ${p.own} | ${p.perMin.toFixed(2)} | ${p.quietMin.toFixed(0)} | ${p.spokeInQuiet} | ${sec(p.gapP50)} | ${sec(p.longestSilenceSec)} | ${sec(p.firstOwnP50)} | ${p.firstOwnSec.length}/${p.userLines} | ${p.notesUsed}/${p.notesMade} | ${p.plannedSaid}/${p.planned} | ${p.stale}/${p.composes} | ${p.repeatsDropped} |`,
+		);
+	}
 }

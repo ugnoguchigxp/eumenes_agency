@@ -17,6 +17,9 @@ import { simulateAgenda } from "../../eval/agenda/sim.ts";
 
 type Data = Record<string, unknown>;
 
+/** The agent's work takes no time: atSec stays exact whatever the machine's load. */
+const frozen = () => 0;
+
 /** Steward: remembers each new user line; plan: one research and one ask per new user line. */
 const model = (): LlmPort => ({
 	complete<T>(req: LlmRequest<T>) {
@@ -99,6 +102,7 @@ test("quiet for speech: the reply sets it, research goes on into a note, speech 
 		delayMs: 120_000,
 	});
 	const { events } = await simulateAgenda({
+		realMs: frozen,
 		deps: { llm },
 		minutes: 40,
 		turns: [{ atSec: 0, text: "30分は話しかけないで" }],
@@ -140,6 +144,7 @@ test("a later session: a fresh agent, the memory and notes are still there", asy
 	});
 	const base = {
 		deps: { llm },
+		realMs: frozen,
 		memory,
 		steward: createMockSteward({ llm, memory }),
 		docs,
@@ -185,6 +190,7 @@ test("pause: the reply pauses everything; nothing runs until it ends", async () 
 		delayMs: 60_000,
 	});
 	const { events } = await simulateAgenda({
+		realMs: frozen,
 		deps: { llm },
 		minutes: 20,
 		turns: [{ atSec: 0, text: "探索を一時停止して。10分ね" }],
@@ -221,6 +227,7 @@ test("a simulated user answers the agent's own speech a little later, unless awa
 		delayMs: 60_000,
 	});
 	const { events } = await simulateAgenda({
+		realMs: frozen,
 		deps: { llm },
 		minutes: 10,
 		turns: [{ atSec: 0, text: "辛いラーメンが好き" }],
@@ -243,4 +250,227 @@ test("a simulated user answers the agent's own speech a little later, unless awa
 	expect(
 		events.filter((e) => e.type === "felt").every((e) => e.atSec < 400),
 	).toBe(true);
+});
+
+// ------------------------------------------------------------------ the ruler (review 2026-11-10)
+
+test("ruler: the agent's work moves the virtual clock by the real time it takes", async () => {
+	const llm = model();
+	const memory = createMockMemory();
+	const docs = createMockDocStore();
+	let real = 0;
+	const { events } = await simulateAgenda({
+		deps: { llm },
+		minutes: 1,
+		turns: [{ atSec: 0, text: "辛いラーメンが好き" }],
+		memory,
+		steward: null,
+		docs,
+		research: createMockWebResearch({
+			writer: fixedWriter,
+			docs,
+			delayMs: 60_000,
+		}),
+		realMs: () => real,
+		reply: async () => {
+			real += 3_000;
+			return "いいですね";
+		},
+	});
+	expect(events.find((e) => e.type === "user")?.atSec).toBe(0);
+	expect(events.find((e) => e.type === "reply")?.atSec).toBe(3);
+	expect(events.find((e) => e.type === "plan")?.atSec).toBe(3);
+});
+
+test("ruler: what is written while the user starts typing is thrown away; nothing is said meanwhile", async () => {
+	const base = model();
+	let real = 0;
+	// Writing an utterance takes five seconds.
+	const llm: LlmPort = {
+		complete(req, s) {
+			if (req.system.includes("この呼び出しは「話す文を書く」")) real += 5_000;
+			return base.complete(req, s);
+		},
+	};
+	const memory = createMockMemory();
+	const docs = createMockDocStore();
+	const { events } = await simulateAgenda({
+		deps: { llm },
+		minutes: 3,
+		// The note comes at 60 s and its topic is written until 65 s; the user starts typing at 62 s.
+		turns: [
+			{ atSec: 0, text: "辛いラーメンが好き" },
+			{ atSec: 64, text: "そういえば" },
+		],
+		memory,
+		steward: createMockSteward({ llm, memory }),
+		docs,
+		research: createMockWebResearch({
+			writer: fixedWriter,
+			docs,
+			delayMs: 60_000,
+		}),
+		realMs: () => real,
+		reply: async () => "いいですね",
+	});
+	expect(
+		events.find((e) => e.type === "compose" && e.code === "stale"),
+	).toMatchObject({ atSec: 65 });
+	expect(
+		events
+			.filter((e) => e.type === "speak")
+			.every((e) => e.atSec < 62 || e.atSec > 65),
+	).toBe(true);
+	// The line sent meanwhile is taken once the agent is done.
+	expect(
+		events.find((e) => e.type === "user" && e.text === "そういえば"),
+	).toMatchObject({ atSec: 65 });
+});
+
+test("ruler: spoken to again before typing, the user answers the newest words, no later than the first answer", async () => {
+	const llm: LlmPort = {
+		complete<T>(req: LlmRequest<T>) {
+			const d = JSON.parse(req.prompt) as Data;
+			const plans = req.system.includes("この呼び出しは「計画」");
+			let value: unknown;
+			if (plans) {
+				const user = (d["conversation"] as { id: string; who: string }[]).find(
+					(s) => s.who === "user",
+				);
+				const first = (d["agenda"] as unknown[]).length === 0 && user;
+				value = {
+					add: first
+						? ["一つ目の話", "二つ目の話"].map((text) => ({
+								kind: "talk",
+								text,
+								refs: [user.id],
+								value: 3,
+								reason: "test",
+							}))
+						: [],
+					drop: [],
+				};
+			} else
+				value = {
+					utterance: `「${(d["item"] as { text: string }).text}」です`,
+					emotion: "😊",
+					decline: null,
+				};
+			return Promise.resolve({
+				value: req.schema.parse(value),
+				model: "scripted",
+				inputTokens: 1,
+				outputTokens: 1,
+				cacheReadTokens: 0,
+				latencyMs: 1,
+			});
+		},
+	};
+	const run = async (answersSecond: boolean) => {
+		const docs = createMockDocStore();
+		const { events } = await simulateAgenda({
+			deps: { llm },
+			realMs: frozen,
+			minutes: 2,
+			turns: [{ atSec: 0, text: "ラーメンの話をしよう" }],
+			memory: createMockMemory(),
+			steward: null,
+			docs,
+			research: createMockWebResearch({
+				writer: fixedWriter,
+				docs,
+				delayMs: 60_000,
+			}),
+			reply: async () => "いいですね",
+			user: async (ctx) =>
+				!answersSecond && ctx.utterance.includes("二つ目")
+					? { text: null, delaySec: 30, feeling: "自然" }
+					: {
+							text: `そうだね:${ctx.utterance}`,
+							delaySec: 30,
+							feeling: "自然",
+						},
+		});
+		const spoke = events.filter((e) => e.type === "speak");
+		expect(spoke.map((e) => e.text)).toEqual([
+			"「一つ目の話」です",
+			"「二つ目の話」です",
+		]);
+		const answers = events.filter(
+			(e) => e.type === "user" && e.text.startsWith("そうだね"),
+		);
+		return { spoke, answers };
+	};
+	// Ten seconds apart, before the user started typing: one line, to the newest words, sent when
+	// the first answer would have been (more speech does not put the answer off).
+	const both = await run(true);
+	expect(
+		both.answers.map((e) => [e.atSec, e.type === "user" && e.text]),
+	).toEqual([[both.spoke[0]!.atSec + 30, "そうだね:「二つ目の話」です"]]);
+	// Nothing to say to the newer words: the answer to the earlier ones still comes.
+	const first = await run(false);
+	expect(
+		first.answers.map((e) => [e.atSec, e.type === "user" && e.text]),
+	).toEqual([[first.spoke[0]!.atSec + 30, "そうだね:「一つ目の話」です"]]);
+});
+
+test("ruler: time never goes back for research left from an earlier session; repeats are recorded", async () => {
+	const base = model();
+	const llm: LlmPort = {
+		complete<T>(req: LlmRequest<T>, s: AbortSignal) {
+			if (!req.system.includes("質問の聞き直しチェック"))
+				return base.complete(req, s);
+			const d = JSON.parse(req.prompt) as Data;
+			return Promise.resolve({
+				value: req.schema.parse({
+					verdicts: (d["candidates"] as { id: string }[]).map((c) => ({
+						id: c.id,
+						verdict: "asked",
+						reason: "もう聞いた",
+					})),
+				}),
+				model: "scripted",
+				inputTokens: 1,
+				outputTokens: 1,
+				cacheReadTokens: 0,
+				latencyMs: 1,
+			});
+		},
+	};
+	const memory = createMockMemory();
+	const docs = createMockDocStore();
+	const research = createMockWebResearch({
+		writer: fixedWriter,
+		docs,
+		delayMs: 3_600_000,
+	});
+	const base2 = {
+		deps: { llm },
+		realMs: frozen,
+		memory,
+		steward: createMockSteward({ llm, memory }),
+		docs,
+		research,
+		reply: async () => "いいですね",
+	};
+	const first = await simulateAgenda({
+		...base2,
+		minutes: 1,
+		turns: [{ atSec: 0, text: "辛いラーメンが好き" }],
+	});
+	expect(first.events.find((e) => e.type === "repeat")).toMatchObject({
+		verdict: "asked",
+		text: "好きな食べ物",
+	});
+	// The research is due in the first session's hour, before the second session starts.
+	const second = await simulateAgenda({
+		...base2,
+		startMs: 2 * 3_600_000,
+		minutes: 1,
+		turns: [],
+	});
+	expect(second.events.find((e) => e.type === "researched")).toMatchObject({
+		atSec: 0,
+	});
+	expect(second.events.every((e) => e.atSec >= 0)).toBe(true);
 });
