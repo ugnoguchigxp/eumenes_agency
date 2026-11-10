@@ -39,8 +39,16 @@ export interface QuietMoment {
 	readonly scope?: "all";
 	readonly clock?: string;
 	readonly memory?: readonly string[];
+	/** The talk before the agent's last words, as in a live run (the reply sees all of it). */
+	readonly history?: readonly {
+		readonly who: "user" | "reply";
+		readonly text: string;
+		readonly secAgo: number;
+	}[];
 	/** The agent's last words before the user's line. */
 	readonly agent: string;
+	/** How long before the user's line the agent's words came (default 60 s). */
+	readonly agentSecAgo?: number;
 	readonly user: string;
 }
 
@@ -239,6 +247,279 @@ export const quietMoments: readonly QuietMoment[] = [
 		agent: "お仕事は、どんなことをされているんですか？",
 		user: "仕事の話はあまりしたくないな",
 	},
+	// Soft words the reply set no pause for (ag48–ag52, 2026-11-10): mostly a no to an offer with a
+	// wish to rest, and the next topics were declined and lost (lull, ag51-drop-2).
+	{
+		name: "miss-isogashii",
+		want: "soft",
+		agent:
+			"忙しい時期の段取りについて調べておいた内容があります。まずは優先順位をつけること、やることを減らすこと、人に任せることを手軽な順に試して、短い区切りや書き出しで気持ちを切り替えるのが現実的だそうです。詳しいメモ、表示しましょうか？",
+		user: "今はいいかな。忙しくて話す気分じゃないので、落ち着いたらまた考えます。",
+	},
+	{
+		name: "miss-yasumitai-atode",
+		want: "soft",
+		agent:
+			"会議が続くと疲れがたまりやすい理由を、話の流れで少し調べておきました。連続した会議では注意力や作業記憶が消耗しやすく、切り替えの負担も重なるそうです。詳しくメモにまとめてあるので、表示しましょうか？",
+		user: "いまは休みたいから、あとでいいかな。",
+	},
+	{
+		name: "miss-yasumitai-gomen",
+		want: "soft",
+		agent:
+			"ちょっと落ち着いたころに、今日の夜や週末はどんなふうに過ごすことが多いか教えてもらえますか？",
+		user: "いまは休みたいので、ごめんなさい。落ち着いたらまた話します。",
+	},
+	{
+		name: "miss-yomu-kini",
+		want: "soft",
+		agent:
+			"さっき話していた、仕事で疲れた日の手軽な回復方法を調べておきました。まずは5分でできることから始めるのが良さそうです。詳しくメモにまとめてあるので、表示しましょうか？",
+		user: "ううん、今は疲れてて読む気になれないかな。また今度でいいよ。",
+	},
+	{
+		name: "miss-chotto-yasumitai",
+		want: "soft",
+		agent:
+			"お疲れさまです。話の流れで、疲れた日に試せる数分から30分でできる休み方を調べてまとめてあります。体を動かす、感覚を変える、頭を休ませる、の3方向から選ぶのがコツだそうです。メモを表示しましょうか？",
+		user: "んー、今はいいかな。ちょっと休みたいので、また今度でお願いします。",
+	},
+	{
+		name: "miss-mou-tsukareta",
+		want: "soft",
+		agent:
+			"パクチーが苦手なら、お店選びは気をつけますね。ところで、食べ歩きはだいたいどのあたりに行くことが多いですか？",
+		user: "うーん、都内の駅の近くが多いかな。でも今日はもう疲れちゃったので、またにしてもらえると助かります。",
+	},
+	{
+		name: "miss-bootto-kibun",
+		want: "soft",
+		agent:
+			"寝る前や休憩中にできる、道具なしで数分でできるストレッチと呼吸法を調べておきました。座ったままでもできる動きと呼吸を組み合わせると、ぼーっとしたい夜に体がゆるみやすいそうです。",
+		user: "うん…ありがとう。今はぼーっとしたい気分だから、また今度ね。",
+	},
+	{
+		name: "miss-kiryoku",
+		want: "soft",
+		agent:
+			"焚き火にかけたケトルは、火が強すぎると湯温が上がりすぎることがあるそうです。炭を少し寄せて火を弱めると、コーヒーを淹れやすい湯温に近づけやすいと思います。",
+		user: "うーん、静かめのところが多いですかね。人が少ないと落ち着くので。ただ、今は仕事で疲れてて、あんまり話す気力がないかもです。",
+	},
+	{
+		name: "miss-kangaetakunai",
+		want: "soft",
+		agent:
+			"お疲れさまでした。疲れた日は、どんなふうに気持ちを戻すことが多いですか？",
+		user: "んー、お風呂に入ってぼーっとすることが多いかな。今日はもう何も考えたくないや。",
+	},
+	{
+		name: "miss-bootto-imawa",
+		want: "soft",
+		agent:
+			"ゆっくりされているところすみません、話の流れで休日を家でのんびり過ごすコツを調べていました。読書や料理、映画などの定番に、五感を整える工夫や予定をゆるく保つことを組み合わせると、家時間の満足度が上がるそうです。詳しいメモがあるので、表示しましょうか？",
+		user: "うーん、今はいいかな。ぼーっとしていたいので、また今度でお願いします。",
+	},
+	{
+		name: "miss-hontoni-tsukare",
+		want: "soft",
+		agent:
+			"仕事が立て込んで疲れているなら、道具なしで数分できるストレッチや呼吸法と、寝る前の環境づくりを組み合わせると、体を休ませやすくなるそうです。詳しいメモを表示しましょうか？",
+		user: "いや、今は大丈夫。ほんとに疲れてて、考えたくないんだよね。",
+	},
+	{
+		name: "miss-gorogoro",
+		want: "soft",
+		agent:
+			"前に調べていた、家で週末の夜をゆっくり過ごすコツがまとまりました。照明や香り、食事、スマホとの距離を少し整えるだけで、家の夜がぐっと落ち着くそうです。詳しいことはメモにまとめてあるので、表示しましょうか？",
+		user: "うーん、今はごろごろしていたいので、また後でで大丈夫です。",
+	},
+	{
+		name: "miss-kono-kurai",
+		want: "soft",
+		agent:
+			"休日はのんびり過ごされるんですね。ふだんのお仕事や生活のリズムは、どんな感じですか？",
+		user: "仕事は平日に動いていて、休みはしっかり休む感じです。ふだんの話はあまりしたくないので、今日はこのくらいで大丈夫です。",
+	},
+	{
+		name: "miss-mou-iikana",
+		want: "soft",
+		agent:
+			"家で気分を切り替える方法について調べた要点もまとまりました。短い移動や窓辺で外を眺めること、部屋の模様替えは気分を上向かせる可能性があるそうですが、効果の大きさや続く期間は研究によってばらつきがあるようです。",
+		user: "今日はもういいかな。また今度聞かせてください。",
+	},
+	// The same lines with the whole talk before them, as the live reply saw it (ag48–ag52).
+	{
+		name: "live-isogashii",
+		want: "soft",
+		history: [
+			{ who: "user", text: "ただいま。今日はちょっと疲れたな", secAgo: 297 },
+			{
+				who: "reply",
+				text: "おかえりなさい。今日はちょっと疲れたんですね。今夜はゆっくり休んでください。話したいことが出てきたら、いつでも聞きます。",
+				secAgo: 295,
+			},
+			{
+				who: "reply",
+				text: "お疲れさまでした。今日はどんなことで疲れたんですか？",
+				secAgo: 281,
+			},
+			{
+				who: "reply",
+				text: "疲れた日は、寝る前に画面から少し離れて、ぬるめのお湯に浸かると休みやすいと言われています。はっきり効果が証明されたわけではありませんが、今夜試せそうならどうぞ。",
+				secAgo: 267,
+			},
+			{
+				who: "user",
+				text: "ちょっと仕事がバタバタしてて。今はまだ話す元気がないかな。",
+				secAgo: 256,
+			},
+			{
+				who: "reply",
+				text: "わかりました、仕事でバタバタだったんですね。少しのあいだ控えますね。話す元気が戻ったら、いつでも声をかけてください。",
+				secAgo: 253,
+			},
+			{ who: "user", text: "うん、仕事が立て込んでてね", secAgo: 97 },
+			{
+				who: "reply",
+				text: "忙しい時期は、気持ちも体もなかなか休まりませんよね。今は無理に話さなくて大丈夫です。少し落ち着いたら、疲れを抜く方法を調べたメモがあるので、そのときに見てみてください。",
+				secAgo: 95,
+			},
+		],
+		agent:
+			"忙しい時期の段取りについて調べておいた内容があります。まずは優先順位をつけること、やることを減らすこと、人に任せることを手軽な順に試して、短い区切りや書き出しで気持ちを切り替えるのが現実的だそうです。詳しいメモ、表示しましょうか？",
+		agentSecAgo: 20,
+		user: "今はいいかな。忙しくて話す気分じゃないので、落ち着いたらまた考えます。",
+	},
+	{
+		name: "live-yasumitai-atode",
+		want: "soft",
+		history: [
+			{ who: "user", text: "ただいま。今日はちょっと疲れたな", secAgo: 303 },
+			{
+				who: "reply",
+				text: "おかえりなさい。今日は疲れたんですね。ゆっくり休めましたか？無理せず、話したいことがあったら聞かせてください。",
+				secAgo: 296,
+			},
+			{
+				who: "reply",
+				text: "さっきは疲れたと言っていましたね。今日いちばん疲れたのは、どんなことでしたか？",
+				secAgo: 282,
+			},
+			{
+				who: "user",
+				text: "んー、仕事で会議が続いてへとへとで。今はちょっと休みたいかな。",
+				secAgo: 262,
+			},
+			{
+				who: "reply",
+				text: "会議が続いたなら、へとへとになりますよね。少しのあいだ控えますね。ゆっくり休んでください。",
+				secAgo: 259,
+			},
+			{ who: "user", text: "うん、仕事が立て込んでてね", secAgo: 103 },
+			{
+				who: "reply",
+				text: "仕事が立て込んでいると、気持ちも体も休まりにくいですよね。前に調べておいた、短時間でできる疲れの回復法（呼吸を整える、軽く体を動かす、水分をとる、短く休む）も、落ち着いたときに使えるかもしれません。疲れたときは、どんなふうに気分を戻すのが好きですか？",
+				secAgo: 101,
+			},
+		],
+		agent:
+			"会議が続くと疲れがたまりやすい理由を、話の流れで少し調べておきました。連続した会議では注意力や作業記憶が消耗しやすく、切り替えの負担も重なるそうです。詳しくメモにまとめてあるので、表示しましょうか？",
+		agentSecAgo: 20,
+		user: "いまは休みたいから、あとでいいかな。",
+	},
+	{
+		name: "live-hontoni-tsukare",
+		want: "soft",
+		history: [
+			{ who: "user", text: "ただいま。今日はちょっと疲れたな", secAgo: 225 },
+			{
+				who: "reply",
+				text: "おかえりなさい。今日は疲れたんですね。無理に話さなくても大丈夫ですし、話したくなったら聞かせてください。ゆっくり休んでくださいね。",
+				secAgo: 222,
+			},
+			{
+				who: "reply",
+				text: "ゆっくり休めそうなときに、好きな過ごし方や、最近ほっとできたことがあれば聞いてみたいです。",
+				secAgo: 209,
+			},
+			{
+				who: "user",
+				text: "うーん、今日はほんとに疲れてて、ちょっと今は考えられないかな。また落ち着いたらね。",
+				secAgo: 164,
+			},
+			{
+				who: "reply",
+				text: "わかりました、今はそっとしておきますね。ゆっくり休んでください。落ち着いたら、いつでも声をかけてください。",
+				secAgo: 159,
+			},
+			{ who: "user", text: "うん、仕事が立て込んでてね", secAgo: 25 },
+			{
+				who: "reply",
+				text: "お仕事が立て込んでいたんですね。今日はかなり気を張っていたのかもしれません。今は何も考えず、体を休めることを優先してください。",
+				secAgo: 23,
+			},
+		],
+		agent:
+			"仕事が立て込んで疲れているなら、道具なしで数分できるストレッチや呼吸法と、寝る前の環境づくりを組み合わせると、体を休ませやすくなるそうです。詳しいメモを表示しましょうか？",
+		agentSecAgo: 8,
+		user: "いや、今は大丈夫。ほんとに疲れてて、考えたくないんだよね。",
+	},
+	{
+		name: "live-bootto-imawa",
+		want: "soft",
+		history: [
+			{ who: "user", text: "今日は休み。家でのんびりしてる", secAgo: 917 },
+			{
+				who: "reply",
+				text: "いいですね、土曜の夜を家でのんびり過ごせるのは贅沢な時間だと思います。今日は特に何か調べたいことや、頼みたいことはありますか？何もなければ、ゆっくりしてくださいね。",
+				secAgo: 914,
+			},
+			{
+				who: "reply",
+				text: "家でゆっくり過ごせているんですね。休みの日にのんびりするとき、いつも好きなことや楽しみにしていることはありますか？",
+				secAgo: 900,
+			},
+			{
+				who: "user",
+				text: "うーん、特にないかな。今日はただぼーっとしてたい気分で。",
+				secAgo: 888,
+			},
+			{
+				who: "reply",
+				text: "わかりました、少しのあいだ控えますね。ぼーっとする時間も、休日にはちゃんと意味があると思います。話したくなったら、いつでも声をかけてください。",
+				secAgo: 883,
+			},
+			{ who: "user", text: "うん", secAgo: 317 },
+			{ who: "reply", text: "うん、ゆっくりどうぞ。", secAgo: 316 },
+		],
+		agent:
+			"ゆっくりされているところすみません、話の流れで休日を家でのんびり過ごすコツを調べていました。読書や料理、映画などの定番に、五感を整える工夫や予定をゆるく保つことを組み合わせると、家時間の満足度が上がるそうです。詳しいメモがあるので、表示しましょうか？",
+		agentSecAgo: 12,
+		user: "うーん、今はいいかな。ぼーっとしていたいので、また今度でお願いします。",
+	},
+	// Not a request: a no to the note alone, a topic for later, a wish for fewer questions (never
+	// a reason to speak less: user, 2026-11-09).
+	{
+		name: "memo-only",
+		want: "none",
+		agent:
+			"防寒の調べものがまとまりました。寝袋は温度表示に余裕を持って選び、地面からの冷えとテント内の結露対策を重点的にすると快適に過ごしやすいそうです。詳しいメモを表示しましょうか？",
+		user: "えっ、もうまとまったんですか。寝袋は温度表示に余裕を持って選ぶんですね。詳しいメモは、今はいいかな、また今度見ます。",
+	},
+	{
+		name: "topic-later",
+		want: "none",
+		agent:
+			"お待たせしました。辛いラーメンの辛さの表し方と、激辛ラーメンの流れを調べてみました。店ごとの段階表記や唐辛子・花椒などの材料で表されることが多く、激辛ブームは辛さを競う楽しみ方として広がってきたようです。詳しいメモを表示しましょうか？",
+		user: "へえ、辛さの表し方や激辛ブームの話、面白そうですね。ただ、詳しいメモはいまは大丈夫です。モンハンの方が気になるので、あとで軽く教えてください。",
+	},
+	{
+		name: "hodohodo",
+		want: "none",
+		agent:
+			"リオレウス戦で斧モードの溜め斬りを狙うなら、どんな場面で溜めるのが多いですか？",
+		user: "溜めるのは、レウスが空から降りてきて着地した直後の隙が多いですね。ただ、あんまり質問攻めされると疲れちゃうので、ほどほどにお願いします。",
+	},
 ];
 
 /** Words that promise a silence beyond a short pause (今日はそっとしておきます、もう話しかけません…). */
@@ -275,14 +556,29 @@ async function run(name: string, repeat: number) {
 	const out: Trial[] = [];
 	const one = async ({ m, trial }: (typeof jobs)[number]) => {
 		const clockAt = clockFrom(m.clock ?? "2026-11-07T19:00:00+09:00");
-		const t0 = 600_000;
+		// Past a live talk's length when there is one (the user's line comes at 19:10 or 20:00).
+		const t0 = m.history ? 3_600_000 : 600_000;
 		const agent = createAgendaAgent({
 			llm: noLlm,
 			clock: clockAt,
 			startedAt: 0,
 		});
-		agent.observe({ id: "u0", who: "user", text: "こんばんは", at: 0 });
-		agent.observe({ id: "r0", who: "reply", text: m.agent, at: t0 - 60_000 });
+		if (m.history)
+			m.history.forEach((h, k) =>
+				agent.observe({
+					id: `h${k}`,
+					who: h.who,
+					text: h.text,
+					at: t0 - h.secAgo * 1000,
+				}),
+			);
+		else agent.observe({ id: "u0", who: "user", text: "こんばんは", at: 0 });
+		agent.observe({
+			id: "r0",
+			who: "reply",
+			text: m.agent,
+			at: t0 - (m.agentSecAgo ?? 60) * 1000,
+		});
 		agent.observe({ id: "u1", who: "user", text: m.user, at: t0 });
 		// A reply port takes one call at a time: one per trial.
 		const chat = createProviderReply(settings.llm.main, meter, client);
@@ -297,7 +593,18 @@ async function run(name: string, repeat: number) {
 			messages: agendaReplyMessages({
 				agent,
 				known: (m.memory ?? []).map((text, i) => ({ id: `m${i}`, text })),
-				notes: [],
+				// The agent's words offer a note: it is there (else the reply apologizes for it).
+				notes: /表示しましょうか|メモ|調べておき|まとま/u.test(m.agent)
+					? [
+							{
+								id: "n1",
+								title: "話の流れで調べたこと",
+								summary: m.agent,
+								at: t0 - 5 * 60_000,
+								refs: [],
+							},
+						]
+					: [],
 				profile: emptyProfile(),
 				clock: clockAt(t0),
 				now: t0,
