@@ -5,8 +5,11 @@
  * never capped.
  *
  *   zsh -l scripts/api-entry.zsh eval/agenda/live.ts <run-name> [--web | --mock-research]
- *       [--jobs N] [--samples N] [scenario...]
+ *       [--jobs N] [--samples N] [--quick] [scenario...]
  *   bun eval/agenda/compare.ts <runs of A> <runs of B>   (comma-separated runs per group)
+ *
+ * `--quick` runs the quick suite (scenarios.ts `quickSuite`) for the adoption check of one
+ * change; its baseline is a full run cut to the same windows (window.ts).
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -33,7 +36,7 @@ import {
 	llmWriter,
 	mockToolchainWork,
 } from "../../examples/virtual-eumenes/agenda/research.ts";
-import { agendaScenarios } from "./scenarios.ts";
+import { agendaScenarios, inWindow, quickScenarios } from "./scenarios.ts";
 import { judgeAspects, judgeScenario } from "./judge.ts";
 import { llmUser } from "./user.ts";
 import { simulateAgenda, type AgendaSimEvent, type UserTurn } from "./sim.ts";
@@ -124,7 +127,9 @@ if (import.meta.main) {
 		resolve("data/agenda/runs", samples > 1 ? `${name}-${k + 1}` : name),
 	);
 	for (const d of runDirs) mkdirSync(d, { recursive: true });
-	const selected = agendaScenarios.filter(
+	// --quick: the quick suite (scenarios.ts), each scenario cut to its window.
+	const quick = argv.includes("--quick");
+	const selected = (quick ? quickScenarios() : agendaScenarios).filter(
 		(x) => wanted.length === 0 || wanted.includes(x.name),
 	);
 	const queue = runDirs.flatMap((d, k) =>
@@ -277,7 +282,9 @@ if (import.meta.main) {
 			const judge = await judgeScenario(llm, {
 				expect: s.expect,
 				previous: previousEvents,
-				events,
+				// In the quick suite the judge reads the window only, as for a full run cut there
+				// (window.ts): what an action begun before the end did after it is left out.
+				events: quick ? inWindow(events, s.minutes) : events,
 				clock: {
 					previous: (sec) => clockAt(sec * 1000),
 					current: (sec) => clockAt(startMs + sec * 1000),
@@ -289,6 +296,7 @@ if (import.meta.main) {
 				scenario: s.name,
 				expect: s.expect,
 				minutes: s.minutes,
+				suite: quick ? "quick" : "full",
 				memory: memory.all().map((m) => m.text),
 				profile: note.get(),
 				notes: docs.list().map((n) => ({
@@ -327,7 +335,7 @@ if (import.meta.main) {
 			);
 			const judged =
 				"flow" in judge
-					? `  judge ${judgeAspects.map((a) => `${a} ${judge[a].score}`).join(" ")} — ${judge.worst}`
+					? `  judge ${judgeAspects.map((a) => `${a} ${Number(judge[a].score.toFixed(1))}`).join(" ")} — ${judge.worst}`
 					: "";
 			say(
 				`  $${summary.usd.toFixed(4)}  memory ${summary.memory.length}  notes ${summary.notes.length}${judged}`,

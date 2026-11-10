@@ -474,3 +474,36 @@ test("ruler: time never goes back for research left from an earlier session; rep
 	});
 	expect(second.events.every((e) => e.atSec >= 0)).toBe(true);
 });
+
+test("review 2026-11-10: a writer that fails behind the step fails its scenario, not the process", async () => {
+	const llm = model();
+	const memory = createMockMemory();
+	const docs = createMockDocStore();
+	const research = createMockWebResearch({
+		writer: fixedWriter,
+		docs,
+		delayMs: 120_000,
+	});
+	const unhandled: unknown[] = [];
+	const onUnhandled = (e: unknown) => unhandled.push(e);
+	process.on("unhandledRejection", onUnhandled);
+	try {
+		await expect(
+			simulateAgenda({
+				realMs: frozen,
+				deps: { llm },
+				minutes: 5,
+				turns: [{ atSec: 0, text: "こんばんは" }],
+				memory,
+				steward: () => Promise.reject(new Error("the store is gone")),
+				docs,
+				research,
+				reply: () => Promise.resolve("こんばんは。"),
+			}),
+		).rejects.toThrow("the store is gone");
+		await new Promise((r) => setTimeout(r, 0));
+		expect(unhandled).toEqual([]);
+	} finally {
+		process.off("unhandledRejection", onUnhandled);
+	}
+});

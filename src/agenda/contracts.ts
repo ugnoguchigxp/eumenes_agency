@@ -26,8 +26,31 @@ export const ANSWER_WINDOW_MS = 600_000;
 export const RESEARCH_RETRY_MS = 60_000;
 /** A research the host never returns stops counting as running after this. */
 export const RESEARCH_TTL_MS = 6 * 3_600_000;
-/** When the user wants quiet but names no length. */
+/** When the user asks for quiet in so many words («黙って») but names no length. */
 export const DEFAULT_QUIET_MIN = 60;
+/**
+ * Soft words («ちょっと待って», «今はそっとしておいて», «話しかけが続いてる») ask for a short
+ * pause, not a long silence (the user's decision 2026-11-10: a 一時停滞).
+ */
+export const SOFT_QUIET_MIN = 10;
+
+/**
+ * How the user asked for quiet, as the reply reads their words: softly with no length, in so many
+ * words with no length, with a length or an end time, or closing the conversation to leave.
+ */
+export const quietKinds = ["soft", "asked", "said", "leaving"] as const;
+export type QuietKind = (typeof quietKinds)[number];
+
+/**
+ * The quiet's length from how it was asked: the code decides it when no length was said, so the
+ * model never turns soft words into hours. 0 ends the quiet, whatever the kind.
+ */
+export function quietMinutes(kind: QuietKind, minutes: number | null): number {
+	if (minutes === 0) return 0;
+	if (kind === "soft") return SOFT_QUIET_MIN;
+	if (kind === "asked" || minutes === null) return DEFAULT_QUIET_MIN;
+	return Math.min(minutes, 1440);
+}
 /** Recent words kept in the working memory (never saved). */
 export const SAID_KEPT = 60;
 

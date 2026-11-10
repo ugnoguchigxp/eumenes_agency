@@ -530,21 +530,22 @@ async function main() {
 		closed = true;
 		session.close();
 		saveState();
-		log.write({ type: "end", spentUsd: meter.spentUsd() - sessionStart });
-		console.log(
-			dim(
-				`\nspend this session $${(meter.spentUsd() - sessionStart).toFixed(4)}`,
-			),
-		);
 		// The exchange in progress (reply, memory, note) finishes first, though not for ever; then
-		// the store's owner closes its socket and database before the process ends.
+		// the store's owner closes its socket and database before the process ends. The spend is
+		// told after it, so the writing behind the last exchange is in it.
 		void Promise.race([
-			queue,
+			queue.then(() => session.flush()),
 			new Promise((done) => setTimeout(done, 15_000).unref?.()),
 		])
 			.then(() => {
 				// The exchange that finished meanwhile may have asked for research.
 				saveState();
+				log.write({ type: "end", spentUsd: meter.spentUsd() - sessionStart });
+				console.log(
+					dim(
+						`\nspend this session $${(meter.spentUsd() - sessionStart).toFixed(4)}`,
+					),
+				);
 				return memory.close();
 			})
 			.finally(() => process.exit(0));

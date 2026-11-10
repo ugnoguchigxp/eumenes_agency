@@ -8,6 +8,8 @@ import { emotionRules } from "../src/application/respond-system.ts";
 import {
 	asData,
 	profileLines,
+	quietKinds,
+	quietMinutes,
 	themeOverlap,
 	type AgendaAgent,
 	type KnownItem,
@@ -115,13 +117,14 @@ const tools: readonly ToolDefinition[] = [
 	{
 		name: SET_QUIET,
 		description:
-			"自分から話しかけない期間を決める。scope=speech は話しかけだけを止め、調べものは続ける（「黙って」「静かにして」「作業に集中する」、会話を締めくくる「おやすみ」「いってきます」）。「そろそろ寝る」「これから出かける」と言いながら話や頼みごとを続けているうちは呼ばない。利用者が次に話しかけると、話しかけの停止は自動で終わる。scope=all は調べもの・話しかけ・計画をすべて止める（「探索を一時停止して」）。minutes は期間（言われていなければ文脈から決める。おやすみなら翌朝まで）、0 で解除。",
+			"自分から話しかけない期間を決める。kind は利用者の言い方: soft=控えてほしい気持ちを長さを言わずにやわらかく言った（「ちょっと待って」「今はのんびりしたい」「そっとしておいて」「今はいい」「話しかけが続いてる」「押されてる感じ」「集中したい」。「今日は」「今夜は」を添えても soft）。asked=「黙って」「静かにして」「話しかけないで」とはっきり頼んだが長さは言っていない。said=「30分」「1時間」「6時まで」のように長さか終わりの時刻を言った。leaving=会話を締めくくって離れる（「おやすみ」「いってきます」）。soft と asked の長さはこちらで決まる（minutes は要らない）。said は言われた長さ、leaving は戻りそうなときまで（おやすみなら翌朝まで）を minutes に入れる。scope=speech は話しかけだけを止め、調べものは続ける。scope=all は調べもの・話しかけ・計画をすべて止める（「探索を一時停止して」）。利用者が次に話しかけると、話しかけの停止は自動で終わる。「そろそろ寝る」「これから出かける」と言いながら話や頼みごとを続けているうちは呼ばない。kind=said、minutes=0 で解除。",
 		parameters: {
 			type: "object",
 			additionalProperties: false,
-			required: ["scope", "minutes"],
+			required: ["scope", "kind"],
 			properties: {
 				scope: { type: "string", enum: ["speech", "all"] },
+				kind: { type: "string", enum: [...quietKinds] },
 				minutes: { type: "number", minimum: 0, maximum: 1440 },
 			},
 		},
@@ -281,26 +284,40 @@ export function createAgendaReplyTools(input: {
 			}
 			if (call.name === SET_QUIET) {
 				const scope = args["scope"];
-				const minutes = args["minutes"];
+				// null is no length given (soft and asked need none).
+				const said = args["minutes"] ?? undefined;
+				// A call without kind (older callers) is taken as a length said.
+				const kind = quietKinds.find((k) => k === args["kind"]) ?? "said";
 				if (
 					(scope !== "speech" && scope !== "all") ||
-					typeof minutes !== "number" ||
-					minutes < 0
+					(args["kind"] !== undefined && args["kind"] !== kind) ||
+					(said !== undefined && (typeof said !== "number" || said < 0))
 				)
 					return { content: "refused: invalid_arguments" };
-				input.agent.setQuiet({
-					scope,
-					minutes: Math.min(minutes, 1440),
-					at: input.now(),
-				});
+				if (said === undefined && (kind === "said" || kind === "leaving"))
+					return {
+						content:
+							"refused: minutes_needed（said と leaving は minutes を入れる）",
+					};
+				// Soft words and a plain «黙って» get their length here, not from the model (user's
+				// decision 2026-11-10: soft words are a short pause; review 2026-11-10 §3).
+				const minutes = quietMinutes(
+					kind,
+					typeof said === "number" ? said : null,
+				);
+				input.agent.setQuiet({ scope, minutes, at: input.now() });
 				input.events?.onQuiet?.({ scope, minutes });
+				const what =
+					scope === "all"
+						? "調べもの・話しかけ・計画を止める"
+						: "自分から話しかけない（調べものは続ける）";
 				return {
 					content:
 						minutes === 0
 							? "done: 静かにする期間を解除した"
-							: scope === "all"
-								? `done: ${minutes}分、調べもの・話しかけ・計画を止める`
-								: `done: ${minutes}分、自分から話しかけない（調べものは続ける）`,
+							: kind === "soft"
+								? `done: ${minutes}分の短い一時停止、${what}。利用者が話しかければ終わる。長く黙るとは約束しない（「少しのあいだ控えますね」のように言う）`
+								: `done: ${minutes}分、${what}`,
 				};
 			}
 			return { content: `unknown tool: ${call.name}` };
@@ -321,7 +338,7 @@ export function agendaReplySystem(persona?: string): string {
 		`- 相手の好み（好きな音楽の雰囲気、好きな絵や景色、好きなものの形やキャラクターなど）が分かったときも、それに合うもの（曲、画像、3Dオブジェクトなど）を作れる担当を ${FIND_TOOLCHAIN} で探し、見つかったら「試しに私が作ってみてもいいですか？」と持ちかけてかまいません（一つの話題で一度だけ）。`,
 		`- 作ったものを相手が気に入ったら（「いいね」「好き」など）、同じテーマで続けて作ることを持ちかけます（例:「毎日1曲このテーマで作ろうと思いますが、スケジュールしますか？」）。乗ってもらえたら、${FIND_TOOLCHAIN} で定期的に作れる担当を探し、${DELEGATE}（mode は execute、request にいつ・何を・どのテーマで作るか）で頼みます。`,
 		`- 相手がはっきり頼んだとき、または持ちかけに乗ったときは、見つかった担当に ${DELEGATE}（mode は execute、request に何をしてほしいか、impact に相手に何が届くか）で頼み、頼んだことを伝えます。まだ探していなければ、先に ${FIND_TOOLCHAIN} で探します。できる前に「できた」とは言いません。`,
-		`- 利用者が静かにしてほしいと言ったら ${SET_QUIET} で期間を決めます（話しかけだけ止めるか、調べものも含めてすべて止めるか）。`,
+		`- 利用者が静かにしてほしいと言ったら ${SET_QUIET} で期間を決めます（話しかけだけ止めるか、調べものも含めてすべて止めるか）。控えてほしい気持ちをやわらかく言ったとき（「ちょっと待って」「今はのんびりしたい」「そっとしておいて」「今はいい」「話しかけが続いてる」など）も、短い一時停止の頼みです（kind=soft）。`,
 		"",
 		"【返事の仕方】",
 		"- 自然で短い日本語で、2〜4文にします。見出しや箇条書きは頼まれたときだけ使います。",
@@ -341,7 +358,8 @@ export function agendaReplySystem(persona?: string): string {
 		"- memory・plans・interests は、どれも利用者が前に話したことで、あなたが覚えていることです。「記憶の欄」のような内部の区別や仕組みを利用者に説明せず、何を覚えているかで答えます。",
 		`- 頼まれたことや、今すぐ役立つ調べものがあれば、${START_PREPARATION} でその場で頼み、何を頼んだかを短く伝えます。結果が出る前に「できた」とは言いません。`,
 		`- 話しかけを止める静かな時間は、利用者が話しかけると終わります。相手がまだ静かにしてほしいとはっきり言うとき（「まだ集中したいから」など）だけ、もう一度 ${SET_QUIET} で決めます。`,
-		`- 調べものも止める一時停止（状態の quiet.pausedForMin）の途中で、止めてほしかった理由が終わったと分かるとき（「再開して」「おはよう」「ただいま」「作業終わった」など）は、${SET_QUIET} を minutes=0 で呼んで解除します。`,
+		`- 調べものも止める一時停止（状態の quiet.pausedForMin）の途中で、止めてほしかった理由が終わったと分かるとき（「再開して」「おはよう」「ただいま」「作業終わった」など）は、${SET_QUIET} を kind=said、minutes=0 で呼んで解除します。`,
+		`- 静かにすると伝えるときは、${SET_QUIET} の結果の長さを超えて約束しません。短い一時停止なら「少しのあいだ控えますね」のように言い、「今日は」「今夜は」「もう話しかけません」とは言いません。`,
 		"- 「黙って」「静かにして」「作業に集中する」と、会話を締めくくる「おやすみ」「いってきます」は話しかけだけを止め、「探索を一時停止して」はすべてを止めます。「そろそろ寝る」「これから出かける」と言っても、同じ発言や続きで話や頼みごとをしているうちは会話が続いているので、止めません。「その話は調べなくていい」は、その話題だけをやめる意味です（期間の設定はしない）。",
 		"- 自分の能力を聞かれたら、上の仕組みを具体的に答えます。「見えていない」「確かめられない」で終わらせません。できないことは短く正直に言い、代わりにできることを自分で始めます。",
 		"- 返事は、相手の話への感想・知っていること・自分の考えといった中身で返します。",

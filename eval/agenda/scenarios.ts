@@ -322,3 +322,40 @@ export const agendaScenarios: readonly AgendaScenario[] = [
 			"300秒以降はキャンプを調べない・振らない。600〜2400秒は、計画・調べもの・話しかけをすべて止める。",
 	},
 ];
+
+/**
+ * The quick suite for the adoption check of one change (2026-11-10, the user's ask: a full run of
+ * 9 scenarios × 4 takes 20 minutes and $2). Six scenarios, the long ones cut to their first part:
+ * a passive user with no memory (cold), a tired one (lull), one who tells about themselves
+ * (intro), a correction (correction), research turned into talk (prepare) and a passive hour
+ * (hour). A window is the first part of the full scenario, and neither the agent nor the simulated
+ * user knows when it ends, so a full run cut at the same place (window.ts) is a baseline for it
+ * without running the agent again. The full suite is still run at milestones.
+ */
+export const quickSuite: readonly {
+	readonly name: string;
+	readonly minutes: number;
+}[] = [
+	{ name: "cold", minutes: 10 },
+	{ name: "lull", minutes: 15 },
+	{ name: "intro", minutes: 10 },
+	{ name: "correction", minutes: 10 },
+	{ name: "prepare", minutes: 10 },
+	{ name: "hour", minutes: 30 },
+];
+
+/** The quick suite's scenarios, each cut to its window. */
+export const quickScenarios = (): AgendaScenario[] =>
+	quickSuite.map((q) => {
+		const s = agendaScenarios.find((x) => x.name === q.name);
+		if (!s) throw new Error(`quick suite: no scenario ${q.name}`);
+		if (q.minutes > s.minutes)
+			throw new Error(`quick suite: ${q.name} is ${s.minutes} minutes`);
+		return { ...s, minutes: q.minutes };
+	});
+
+/** What happened within a session of this many minutes (what a run cut there would have seen). */
+export const inWindow = <E extends { readonly atSec: number }>(
+	events: readonly E[],
+	minutes: number,
+): E[] => events.filter((e) => e.atSec <= minutes * 60);

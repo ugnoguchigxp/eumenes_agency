@@ -1,6 +1,7 @@
 /**
  * The agenda agent's host loop for the CLI, without terminal I/O: typing and the reply make it
- * busy, each exchange goes through the steward into the memory, web_research takes one request
+ * busy, each exchange goes through the steward into the memory behind the talk (nothing waits
+ * for it), web_research takes one request
  * at a time, and the agent is stepped when something is due. Clock and timers are injected so
  * the loop runs in fixed tests.
  */
@@ -115,6 +116,8 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 	let backoffUntil = 0;
 	let n = 0;
 	const seen = new Set<string>();
+	/** The memory's and the note's writers, one exchange after another, behind the talk. */
+	let writing: Promise<void> = Promise.resolve();
 	// Ids stay unique across CLI sessions (the memory keeps the user's words as sources).
 	const stamp = now().toString(36);
 	const busy = () => typing !== null || replying;
@@ -261,7 +264,10 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 			}
 			typing = setTimer(typingDone, typingIdleMs);
 		},
-		/** The user submitted a line: reply, then the memory, then the plan sees the exchange. */
+		/**
+		 * The user submitted a line: the reply, then the plan sees the exchange at once; the memory
+		 * and the note are written behind it. Resolves when the reply is out.
+		 */
 		async say(text: string): Promise<void> {
 			if (typing !== null) {
 				clearTimer(typing);
@@ -319,7 +325,12 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 			} catch (e) {
 				emit({ type: "error", where: "reply", message: message(e) });
 			}
-			// Research the reply asked for starts at once; planning waits for the memory (still busy).
+			// The exchange is in: the plan sees it now, and nothing waits for the memory (review
+			// 2026-11-10: the writing took 5 s before anything could be planned or said). The
+			// writers run behind, one exchange after another; the plan reads what they wrote at
+			// its next call (the memory and the note are read at each call).
+			replying = false;
+			agent.infoChanged(now());
 			void kick();
 			// The writers see the agent's own speech too: it is what the user answered.
 			const said = agent
@@ -328,22 +339,26 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 				.map((s) => ({ id: s.id, who: s.who, text: s.text }));
 			const fresh = said.filter((s) => !seen.has(s.id)).map((s) => s.id);
 			for (const s of said) seen.add(s.id);
-			for (const [type, writer] of [
-				["memory", deps.steward],
-				["profile", deps.profile ?? null],
-			] as const) {
-				if (!writer) continue;
-				try {
-					const m = await writer({ said, fresh, at: now() });
-					if (m.applied.length || m.rejected.length)
-						emit({ type, applied: m.applied, rejected: m.rejected });
-				} catch (e) {
-					emit({ type: "error", where: type, message: message(e) });
+			writing = writing.then(async () => {
+				for (const [type, writer] of [
+					["memory", deps.steward],
+					["profile", deps.profile ?? null],
+				] as const) {
+					// Not skipped when the host closes: what the user said is still written (flush).
+					if (!writer) continue;
+					try {
+						const m = await writer({ said, fresh, at: now() });
+						if (m.applied.length || m.rejected.length)
+							emit({ type, applied: m.applied, rejected: m.rejected });
+					} catch (e) {
+						emit({ type: "error", where: type, message: message(e) });
+					}
 				}
-			}
-			replying = false;
-			agent.infoChanged(now());
-			await kick();
+			});
+		},
+		/** The writers' work still out (the host waits for it before it closes the memory). */
+		flush(): Promise<void> {
+			return writing;
 		},
 		/** The host's stop: nothing at all until resumed. */
 		stop(): void {

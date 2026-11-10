@@ -361,6 +361,61 @@ test("review 2026-11-10: the tool says research was taken, not started; the repl
 	expect(m[1]!.content).toContain('"status":"調べられなかった"');
 });
 
+test("review 2026-11-10 §3: soft words get a short pause whatever length the model names; a length said is kept", async () => {
+	const { createAgendaAgent, SOFT_QUIET_MIN, DEFAULT_QUIET_MIN } =
+		await import("../../src/agenda/index.ts");
+	const { createAgendaReplyTools } =
+		await import("../../standalone/agenda-reply.ts");
+	const agent = createAgendaAgent({
+		llm: { complete: () => Promise.reject(new Error("unused")) },
+		startedAt: 0,
+	});
+	const set: { scope: string; minutes: number }[] = [];
+	const tools = createAgendaReplyTools({
+		agent,
+		read: () => null,
+		now: () => 0,
+		events: { onQuiet: (q) => set.push(q) },
+	});
+	const quiet = (args: Record<string, unknown>) =>
+		tools.call(
+			{ id: "c", name: "set_quiet", arguments: JSON.stringify(args) },
+			new AbortController().signal,
+		);
+	// The model's 720 minutes for «今日はそっとしておいて» become the short pause.
+	const soft = await quiet({ scope: "speech", kind: "soft", minutes: 720 });
+	expect(soft.content).toContain(`${SOFT_QUIET_MIN}分の短い一時停止`);
+	expect(agent.view().quiet.speechUntil).toBe(SOFT_QUIET_MIN * 60_000);
+	await quiet({ scope: "speech", kind: "asked" });
+	expect(agent.view().quiet.speechUntil).toBe(DEFAULT_QUIET_MIN * 60_000);
+	await quiet({ scope: "all", kind: "said", minutes: 30 });
+	expect(agent.view().quiet.allUntil).toBe(30 * 60_000);
+	// Leaving needs its length (おやすみ: till morning); without it nothing is set.
+	const leaving = await quiet({ scope: "speech", kind: "leaving" });
+	expect(leaving.content).toStartWith("refused: minutes_needed");
+	// Older callers without kind name a length.
+	await quiet({ scope: "speech", minutes: 45 });
+	expect(agent.view().quiet.speechUntil).toBe(45 * 60_000);
+	await quiet({ scope: "speech", kind: "said", minutes: 0 });
+	expect(agent.view().quiet).toMatchObject({
+		speechUntil: null,
+		allUntil: null,
+	});
+	expect(set.map((q) => q.minutes)).toEqual([
+		SOFT_QUIET_MIN,
+		DEFAULT_QUIET_MIN,
+		30,
+		45,
+		0,
+	]);
+	// A model that writes minutes: null for soft words still gets its pause.
+	await quiet({ scope: "speech", kind: "soft", minutes: null });
+	expect(agent.view().quiet.speechUntil).toBe(SOFT_QUIET_MIN * 60_000);
+	expect((await quiet({ scope: "speech", kind: "later" })).content).toBe(
+		"refused: invalid_arguments",
+	);
+});
+
 test("review 2026-11-10: the CLI's snapshot file is written when it changed and set aside when it does not parse", async () => {
 	const { openSnapshotFile } =
 		await import("../../examples/virtual-eumenes/agenda/state-file.ts");

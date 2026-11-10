@@ -3,9 +3,9 @@
  * its tools, the steward writing the memory after each exchange, web_research taking one request
  * at a time and saving notes, and the agent stepping whenever something is due.
  *
- * As in the CLI (review 2026-11-10): the agent's own work (the reply, the memory writers, each
- * step) moves the virtual clock by the real time it takes, rounded to the second; research and the
- * simulated user run beside it and do not. The user types each line before it arrives (about three
+ * As in the CLI (review 2026-11-10): the agent's own work (the reply and each step) moves the
+ * virtual clock by the real time it takes, rounded to the second; the memory writers, research and
+ * the simulated user run beside it and do not. The user types each line before it arrives (about three
  * characters a second) and the agent is busy meanwhile; an utterance written while the user
  * started typing is thrown away, as the CLI does. When the agent speaks again before the user
  * started typing an answer, the user answers the newest words instead, no later than they would
@@ -510,24 +510,39 @@ export async function simulateAgenda(input: AgendaSimInput) {
 				.map((s) => ({ id: s.id, who: s.who, text: s.text }));
 			const fresh = said.filter((s) => !seen.has(s.id)).map((s) => s.id);
 			for (const s of said) seen.add(s.id);
-			for (const [type, writer] of [
-				["memory", input.steward],
-				["profile", input.profile ?? null],
-			] as const) {
-				if (!writer) continue;
-				const at = now;
-				const m = await work(() => writer({ said, fresh, at }));
-				emit({
-					type,
-					atSec: sec(now),
-					applied: m.applied,
-					rejected: m.rejected,
-					usage: m.usage,
-				});
-			}
-			// The exchange is processed (reply and memory): the plan sees it once.
+			// The exchange is in: the plan sees it now, as in the CLI (review 2026-11-10). The
+			// writers run beside the agent's step, so they do not move the clock; the step reads
+			// whatever they have written by the time it asks.
 			agent.infoChanged(now);
-			await step();
+			const at = now;
+			// A writer's failure is held, not left unhandled while the step runs, and fails the
+			// scenario after it (as before the writers ran behind).
+			const writing = (async () => {
+				for (const [type, writer] of [
+					["memory", input.steward],
+					["profile", input.profile ?? null],
+				] as const) {
+					if (!writer) continue;
+					const m = await writer({ said, fresh, at });
+					emit({
+						type,
+						atSec: sec(at),
+						applied: m.applied,
+						rejected: m.rejected,
+						usage: m.usage,
+					});
+				}
+			})().then(
+				() => null,
+				(e: unknown) => ({ failed: e }),
+			);
+			const stepped = await step().then(
+				() => null,
+				(e: unknown) => ({ failed: e }),
+			);
+			const wrote = await writing;
+			if (stepped) throw stepped.failed;
+			if (wrote) throw wrote.failed;
 			continue;
 		}
 		await step();

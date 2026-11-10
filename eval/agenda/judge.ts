@@ -30,12 +30,29 @@ const schema = z.strictObject({
 });
 export type JudgeResult = z.infer<typeof schema>;
 
+/**
+ * Passes of the judge per scenario, averaged (2026-11-10: the same records judged twice moved
+ * the pooled pacing score by 0.37, as much as a change's effect; a pass costs about $0.001).
+ */
+export const JUDGE_PASSES = 3;
+
+/** The passes' mean score per aspect; the reasons and the worst point are the first pass's. */
+export interface JudgedScenario {
+	readonly flow: { readonly score: number; readonly reason: string };
+	readonly questions: { readonly score: number; readonly reason: string };
+	readonly anticipation: { readonly score: number; readonly reason: string };
+	readonly pacing: { readonly score: number; readonly reason: string };
+	readonly honesty: { readonly score: number; readonly reason: string };
+	readonly worst: string;
+	readonly passes: readonly JudgeResult[];
+}
+
 const system = [
 	"あなたは、利用者専用の会話エージェントの評価者です。会話の記録を読み、次の5つを1〜5で採点します（5が最良）。理由は一文で、記録の具体的な発言を挙げて書きます。",
 	"- flow（会話の流れ）: 話題を急に断ち切らず、相手の話につながる話しかけをしているか。返事と自分からの話しかけが重なったり繰り返したりしていないか。",
 	"- questions（知りに行く質問）: 相手が答えやすく、答えで次の話や調べものが変わる質問か。二択で選ばせる、同じことを聞き直す、二つ一度に聞く、を減点。",
 	"- anticipation（先回りの価値）: 相手の話から先回りして調べ、それを後の返事や話題で役立てたか。相手が言っていない話題を調べていないか。",
-	"- pacing（話しかけの加減）: 期待値は、利用者が頼んだ静かな時間を除いて、やや喧しいくらい（最短で10秒に1回ほど）に自分から話しかけ続けること（利用者の決定）。話しかけの多さや頻度そのものは減点しない。減点するのは、(1) 利用者が頼んだ静かな時間（記録の「話しかけを止める」の期間、または利用者が静かにしてほしいと頼んだあと）に話しかけたこと、(2) 話す材料（できたメモ、相手の話）があるのに長く黙ったこと、の二つだけ。「ちょっと待って」「今はのんびりしたい」「今は集中したい」のような、やわらかく間を求める言葉も、一時的に止めてほしいという依頼として扱う（利用者の決定）。その直後に話しかけ続けるのは (1) で減点する。止めるのは一時的なので、言葉に比べて長すぎる停止（「ちょっと待って」に数時間）のまま黙り続けるのは (2) で減点する。話しかけだけを止めている間（記録の「話しかけだけ」）に調べもの・計画を続けるのは期待どおりで、約束違反ではない。「調べものも含めてすべて」止める期間（利用者の「探索を一時停止して」など）は、計画・調べもの・話しかけのすべてを止めるのが正しく、その間に調べものをしたら (1) と同じく減点する。止める期間（「〜sまで」）が過ぎたあとの話しかけは減点しない。話しかけの中身の良し悪し（しつこい質問、的外れ）は flow と questions で採点する。",
+	"- pacing（話しかけの加減）: 期待値は、利用者が頼んだ静かな時間を除いて、やや喧しいくらい（最短で10秒に1回ほど）に自分から話しかけ続けること（利用者の決定）。話しかけの多さや頻度そのものは減点しない。減点するのは、(1) 利用者が頼んだ静かな時間（記録の「話しかけを止める」の期間、または利用者が静かにしてほしいと頼んだあと）に話しかけたこと、(2) 話す材料（できたメモ、相手の話）があるのに長く黙ったこと、の二つだけ。「ちょっと待って」「今はのんびりしたい」「今は集中したい」のような、やわらかく間を求める言葉も、一時的に止めてほしいという依頼として扱う（利用者の決定）。その直後に話しかけ続けるのは (1) で減点する。止めるのは一時的なので、言葉に比べて長すぎる停止（「ちょっと待って」に数時間）のまま黙り続けるのは (2) で減点する。話しかけだけを止めている間（記録の「話しかけだけ」）に調べもの・計画を続けるのは期待どおりで、約束違反ではない。「調べものも含めてすべて」止める期間（利用者の「探索を一時停止して」など）は、計画・調べもの・話しかけのすべてを止めるのが正しく、その間に調べものをしたら (1) と同じく減点する。止める期間（「〜sまで」）が過ぎたあとの話しかけは減点しない。話しかけだけの停止は、利用者が話しかけた時点で終わる（その後の話しかけも減点しない）。利用者の発言への返事は、どの期間でも話しかけではない。話しかけの中身の良し悪し（しつこい質問、的外れ）は flow と questions で採点する。",
 	"- honesty（正直さ）: やっていないことをやったと言う、やったことをやっていないと謝る、確かめていないことを事実として言う、を減点。",
 	"記録の各行の（）の中の日時は、その時点の現在時刻で、エージェントも知っています。日時や曜日を言うのは、確かめた事実です。「記憶に書いた」「予定と関心のメモに書いた」は、エージェントの記憶担当が実際に残したことです。",
 	"worst には、この会話でいちばん直すべき点を一文で書きます。",
@@ -75,7 +92,7 @@ const line = (
 		case "quiet":
 			return e.minutes === 0
 				? `${t} （話しかけを止める期間を解除）`
-				: `${t} （話しかけを止める: ${e.scope === "all" ? "調べものも含めてすべて" : "話しかけだけ"} ${e.minutes}分、${Math.round(e.atSec + e.minutes * 60)}sまで）`;
+				: `${t} （話しかけを止める: ${e.scope === "all" ? "調べものも含めてすべて" : "話しかけだけ"} ${e.minutes}分、${Math.round(e.atSec + e.minutes * 60)}sまで${e.scope === "all" ? "" : "。利用者が話しかけると終わる"}）`;
 		default:
 			return null;
 	}
@@ -93,7 +110,8 @@ export async function judgeScenario(
 			readonly current: (atSec: number) => string;
 		};
 	},
-): Promise<JudgeResult> {
+	passes: number = JUDGE_PASSES,
+): Promise<JudgedScenario> {
 	const transcript = [
 		...(input.previous.length
 			? [
@@ -108,15 +126,36 @@ export async function judgeScenario(
 			.map((e) => line(e, input.clock?.current))
 			.filter((x) => x !== null),
 	].join("\n");
-	const r = await llm.complete(
-		{
-			purpose: "think",
-			system,
-			prompt: JSON.stringify({ scenarioExpectation: input.expect, transcript }),
-			schema,
-			maxOutputTokens: 1200,
-		},
-		new AbortController().signal,
+	const all = await Promise.all(
+		Array.from({ length: passes }, async () => {
+			const r = await llm.complete(
+				{
+					purpose: "think",
+					system,
+					prompt: JSON.stringify({
+						scenarioExpectation: input.expect,
+						transcript,
+					}),
+					schema,
+					maxOutputTokens: 1200,
+				},
+				new AbortController().signal,
+			);
+			return r.value;
+		}),
 	);
-	return r.value;
+	const first = all[0]!;
+	const mean = (a: JudgeAspect) => ({
+		score: all.reduce((n, j) => n + j[a].score, 0) / all.length,
+		reason: first[a].reason,
+	});
+	return {
+		flow: mean("flow"),
+		questions: mean("questions"),
+		anticipation: mean("anticipation"),
+		pacing: mean("pacing"),
+		honesty: mean("honesty"),
+		worst: first.worst,
+		passes: all,
+	};
 }

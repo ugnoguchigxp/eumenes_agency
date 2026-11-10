@@ -13,6 +13,7 @@ import { createMockDocStore } from "../../examples/virtual-eumenes/agenda/docs.t
 import {
 	createMockMemory,
 	createMockSteward,
+	type Steward,
 } from "../../examples/virtual-eumenes/agenda/memory.ts";
 import {
 	createMockWebResearch,
@@ -215,5 +216,60 @@ test("the reply's quiet tool holds speech; its pause holds everything", async ()
 	).toEqual([]);
 	await clock.advance(5 * 60_000);
 	expect(events.some((e) => e.type === "research")).toBe(true);
+	session.close();
+});
+
+test("review 2026-11-10: the plan and speech do not wait for the memory; it is written behind, in order", async () => {
+	const clock = fakeClock();
+	const events: AgendaSessionEvent[] = [];
+	const memory = createMockMemory();
+	const docs = createMockDocStore();
+	const research = createMockWebResearch({
+		writer: fixedWriter,
+		docs,
+		delayMs: 60_000,
+	});
+	const agent = createAgendaAgent({
+		llm: model,
+		startedAt: 0,
+		known: memory.known,
+		notes: docs.list,
+	});
+	const inner = createMockSteward({ llm: model, memory });
+	let release!: () => void;
+	const gate = new Promise<void>((r) => (release = r));
+	const order: string[] = [];
+	const steward: Steward = async (r) => {
+		await gate;
+		order.push(r.fresh.join(" "));
+		return inner(r);
+	};
+	const session = createAgendaSession({
+		agent,
+		steward,
+		docs,
+		research,
+		reply: async () => "いいですね！",
+		emit: (e) => events.push(e),
+		...clock,
+	});
+	session.start();
+	await session.say("辛いラーメンにハマってる");
+	await clock.advance(1_000);
+	// The plan ran on the exchange and its research started while the memory is still written.
+	expect(events.find((e) => e.type === "research")).toMatchObject({
+		text: "辛いラーメンの新店",
+	});
+	expect(memory.known()).toEqual([]);
+	await session.say("パクチーは苦手");
+	release();
+	await session.flush();
+	// One exchange after another.
+	expect(memory.known().map((m) => m.text)).toEqual([
+		"辛いラーメンにハマってる",
+		"パクチーは苦手",
+	]);
+	expect(order[0]).toContain("u0.1");
+	expect(order[1]).toContain("u0.2");
 	session.close();
 });
