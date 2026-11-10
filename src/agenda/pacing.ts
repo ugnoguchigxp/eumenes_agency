@@ -64,18 +64,25 @@ export const order = (a: AgendaItem, b: AgendaItem) =>
  * Does the item tie into what is being talked about: the user's or the agent's words of the
  * last few minutes, or a note made from them? What the user asked for always does.
  */
-export const connected = (st: AgendaState, i: AgendaItem, now: number) => {
-	if (i.requested || i.promised) return true;
+export const connected = (st: AgendaState, i: AgendaItem, now: number) =>
+	i.requested ||
+	i.promised ||
+	tiesIn(st, [...i.refs, ...(i.noteId ? [`note:${i.noteId}`] : [])], now);
+
+/** Refs that tie into the talk: words of the last few minutes, or a note made from them. */
+export const tiesIn = (
+	st: AgendaState,
+	refs: readonly string[],
+	now: number,
+) => {
 	const recent = new Set(
 		st.said.filter((s) => now - s.at <= TOPIC_RECENT_MS).map((s) => s.id),
 	);
-	const fromRecent = (refs: readonly string[]) =>
-		refs.some((r) => recent.has(r));
-	if (fromRecent(i.refs)) return true;
-	const noteIds = [
-		...(i.noteId ? [i.noteId] : []),
-		...i.refs.flatMap((r) => (r.startsWith("note:") ? [r.slice(5)] : [])),
-	];
+	const fromRecent = (rs: readonly string[]) => rs.some((r) => recent.has(r));
+	if (fromRecent(refs)) return true;
+	const noteIds = refs.flatMap((r) =>
+		r.startsWith("note:") ? [r.slice(5)] : [],
+	);
 	return notes(st).some((n) => noteIds.includes(n.id) && fromRecent(n.refs));
 };
 
@@ -123,8 +130,15 @@ export const replyAsk = (st: AgendaState, now: number): AgendaItem | null => {
 	if (tied) return tied;
 	const j = lastUser(k);
 	const fresh = j < 0 || user.at - st.said[j]!.at >= FRESH_TALK_MS;
-	return fresh ? (asks[0] ?? null) : null;
+	// The first words in a while may get a general question; one drawn from the memory, the
+	// interests or a note only when it ties in (the CLI, 2026-11-10: "猫を飼ってるんですよ" got
+	// "最近ジョギング以外で休日に楽しみにしていることは？", and "なんでジョギングの話を振りましたか？").
+	return fresh ? (asks.find((i) => !drawsOnMemory(i.refs)) ?? null) : null;
 };
+
+/** Refs that draw on the memory, the user's plans and interests, or a note. */
+export const drawsOnMemory = (refs: readonly string[]) =>
+	refs.some((r) => /^(?:memory|profile|note):/u.test(r));
 
 /**
  * A talk is going on (the user spoke within TOPIC_RECENT_MS): what is said ties into it. Topics
@@ -177,6 +191,10 @@ export const nextResearch = (st: AgendaState, now: number) =>
 			(i) =>
 				i.status === "open" &&
 				i.kind === "research" &&
-				(i.deferUntil === null || i.deferUntil <= now),
+				(i.deferUntil === null || i.deferUntil <= now) &&
+				// In a talk, only research that ties into it runs; the rest waits for the talk to end
+				// (the CLI, 2026-11-10: five of ten looked into Qwen, Bezos, Neuro-sama... while the
+				// user talked about the weather and Fable 5.2).
+				(!holdsElsewhere(st, now) || connected(st, i, now)),
 		)
 		.sort(order)[0] ?? null;

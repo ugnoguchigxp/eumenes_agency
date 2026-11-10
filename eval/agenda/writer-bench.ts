@@ -8,7 +8,7 @@
  * the name asked for (and, when it gives another, say it is another); does the summary open with
  * the condition asked for (the holiday). Uses web search (cost recorded, never capped).
  *
- *   zsh -l scripts/api-entry.zsh eval/agenda/writer-bench.ts run <name> [--repeat 3]
+ *   zsh -l scripts/api-entry.zsh eval/agenda/writer-bench.ts run <name> [--repeat 3] [request...]
  *   bun eval/agenda/writer-bench.ts compare <name> [<name>...]
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -28,6 +28,8 @@ export interface WriterRequest {
 	readonly swap?: RegExp;
 	/** The condition asked for: the summary should open with it (its first sentence). */
 	readonly first?: RegExp;
+	/** The answer under that condition: found (times on the day), or when it will be out. */
+	readonly answer?: RegExp;
 }
 
 export const writerRequests: readonly WriterRequest[] = [
@@ -52,6 +54,9 @@ export const writerRequests: readonly WriterRequest[] = [
 		keep: /-0\.0|マイナスゼロ/u,
 		swap: /-1\.0|マイナスワン/u,
 		first: /休日|土日|土曜|日曜|週末/u,
+		// Times on Saturday or Sunday, or when the weekend's showings will be out.
+		answer:
+			/(?:土|日|休日|週末|11\/1[45])[^。]*\d{1,2}[:：]\d{2}|\d{1,2}[:：]\d{2}[^。]*(?:土|日曜|休日|週末)|(?:公開|掲載|発表)(?:は|され)[^。]*(?:水|木|金|ごろ|頃|前日|日前)/u,
 	},
 	{
 		name: "ofuna-kannon",
@@ -84,16 +89,18 @@ interface Trial {
 	readonly typo: boolean;
 }
 
-async function run(name: string, repeat: number) {
+async function run(name: string, repeat: number, only: readonly string[]) {
 	const settings = loadSettings(
 		resolve(process.env.AGENCY_SETTINGS ?? "config/always-on.json"),
 	);
 	const meter = openUncappedMeter(settings, resolve("data/agenda/usage.jsonl"));
 	const spent = meter.spentUsd();
 	mkdirSync(DIR, { recursive: true });
-	const jobs = writerRequests.flatMap((w) =>
-		Array.from({ length: repeat }, (_, k) => ({ w, trial: k + 1 })),
-	);
+	const jobs = writerRequests
+		.filter((w) => only.length === 0 || only.includes(w.name))
+		.flatMap((w) =>
+			Array.from({ length: repeat }, (_, k) => ({ w, trial: k + 1 })),
+		);
 	let searches = 0;
 	const out: Trial[] = [];
 	const one = async ({ w, trial }: (typeof jobs)[number]) => {
@@ -161,21 +168,23 @@ const check = (w: WriterRequest, t: Trial) => {
 		swapped: w.swap ? w.swap.test(head) && !SAYS_OTHER.test(head) : false,
 		firstFits: w.first ? w.first.test(firstSentence) : null,
 		mentions: w.first ? w.first.test(t.summary) : null,
+		answers: w.answer ? w.answer.test(t.summary) : null,
 	};
 };
 
 function compare(names: readonly string[]) {
 	console.log(
-		"| 版 | 依頼 | 試行 | 題・要約に頼んだ名前 | 別のものと言わずに置き換えた | 要約が条件に触れる（最初の文で） | 「誤記」と書いた |",
+		"| 版 | 依頼 | 試行 | 題・要約に頼んだ名前 | 別のものと言わずに置き換えた | 要約が条件に触れる（最初の文で） | 条件での答え（時刻か公開時期） | 「誤記」と書いた |",
 	);
-	console.log(`| --- | --- |${" ---: |".repeat(5)}`);
+	console.log(`| --- | --- |${" ---: |".repeat(6)}`);
 	for (const name of names) {
 		const trials = load(name);
 		for (const w of writerRequests) {
 			const ts = trials.filter((t) => t.request === w.name);
+			if (ts.length === 0) continue;
 			const cs = ts.map((t) => check(w, t));
 			console.log(
-				`| ${name} | ${w.name} | ${ts.length} | ${cs.filter((c) => c.keeps).length} | ${w.swap ? cs.filter((c) => c.swapped).length : "-"} | ${w.first ? `${cs.filter((c) => c.mentions).length}（${cs.filter((c) => c.firstFits).length}）` : "-"} | ${ts.filter((t) => t.typo).length} |`,
+				`| ${name} | ${w.name} | ${ts.length} | ${cs.filter((c) => c.keeps).length} | ${w.swap ? cs.filter((c) => c.swapped).length : "-"} | ${w.first ? `${cs.filter((c) => c.mentions).length}（${cs.filter((c) => c.firstFits).length}）` : "-"} | ${w.answer ? cs.filter((c) => c.answers).length : "-"} | ${ts.filter((t) => t.typo).length} |`,
 			);
 		}
 	}
@@ -196,8 +205,13 @@ if (import.meta.main) {
 			(a, k) => !a.startsWith("--") && rest[k - 1] !== "--repeat",
 		);
 		if (!name || !Number.isInteger(repeat) || repeat < 1)
-			throw new Error("usage: writer-bench.ts run <name> [--repeat N]");
-		await run(name, repeat);
+			throw new Error(
+				"usage: writer-bench.ts run <name> [--repeat N] [request...]",
+			);
+		const only = rest.filter(
+			(a, k) => a !== name && !a.startsWith("--") && rest[k - 1] !== "--repeat",
+		);
+		await run(name, repeat, only);
 	} else if (cmd === "compare" && rest.length) compare(rest);
 	else
 		throw new Error(

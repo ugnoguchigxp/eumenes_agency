@@ -535,7 +535,9 @@ async function main() {
 		// the store's owner closes its socket and database before the process ends. The spend is
 		// told after it, so the writing behind the last exchange is in it.
 		void Promise.race([
-			queue.then(() => session.flush()),
+			// A failed write is reported where it happens; the state is saved and the end logged
+			// either way (review 2026-11-10).
+			queue.then(() => session.flush()).catch(() => undefined),
 			new Promise((done) => setTimeout(done, 15_000).unref?.()),
 		])
 			.then(() => {

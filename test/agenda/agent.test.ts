@@ -221,6 +221,99 @@ describe("agenda agent", () => {
 		);
 	});
 
+	test("CLI 2026-11-10: in a talk, nothing is drawn from the memory unless it ties into the talk", async () => {
+		const m = scripted({
+			plan: (d) => {
+				const said = (d["conversation"] as { id: string }[]).at(-1)!.id;
+				return plan(
+					add("research", "Qwen4の発売日", ["memory:m1"], 5),
+					add("research", "明日の天気", [said], 4),
+					add("ask", "走るなら富士山を見に行く？", [said, "memory:m2"], 3),
+					add("ask", "Qwen4は何に使う？", ["memory:m1"], 3),
+				);
+			},
+		});
+		const agent = make({
+			llm: m.llm,
+			known: () => [
+				{ id: "m1", text: "Qwenの新作が気になっている" },
+				{ id: "m2", text: "ジョギングで富士山を見るのが好き" },
+			],
+		});
+		agent.observe({ id: "u1", who: "user", text: "明日は走ろうかな", at: 0 });
+		const out = await agent.step(0, idle, sig());
+		// What is drawn from the memory alone is not added; with something in common with the
+		// talk (its words among the refs), it is.
+		expect(out.plan?.rejected).toEqual(["research:off_topic", "ask:off_topic"]);
+		expect(out.plan?.added.map((i) => i.text)).toEqual([
+			"明日の天気",
+			"走るなら富士山を見に行く？",
+		]);
+		expect(
+			out.tickets.filter((t) => t.kind === "research").map((t) => t.text),
+		).toEqual(["明日の天気"]);
+	});
+
+	test("review 2026-11-10: research held back in a talk wakes the agent at the talk's end, not at once", async () => {
+		const m = scripted({
+			plan: (_d, n) =>
+				n === 1
+					? plan(
+							add("research", "A", ["memory:m1"], 5),
+							add("research", "B", ["memory:m1"], 4),
+						)
+					: plan(),
+		});
+		const agent = make({
+			llm: m.llm,
+			known: () => [{ id: "m1", text: "Qwenの新作が気になっている" }],
+		});
+		const first = await agent.step(0, idle, sig());
+		const a = first.tickets.find((t) => t.kind === "research")!;
+		agent.observe({ id: "u1", who: "user", text: "雨だね", at: 10_000 });
+		agent.researchReturned({
+			ticketId: a.id,
+			at: 20_000,
+			status: "succeeded",
+			note: null,
+		});
+		// Whatever is due now runs (the plan, a dig); then B waits for the talk to end.
+		let t = 20_000;
+		for (let k = 0; k < 5 && agent.nextAt(t)! <= t; k++)
+			await agent.step(t, idle, sig());
+		expect(agent.nextAt(t)).toBe(10_000 + 300_001);
+		const later = await agent.step(10_000 + 300_001, idle, sig());
+		expect(later.tickets.find((x) => x.kind === "research")).toMatchObject({
+			text: "B",
+		});
+	});
+
+	test("CLI 2026-11-10: the first words get no question drawn from the memory that does not tie in", async () => {
+		const m = scripted({
+			plan: (_d, n) =>
+				n === 1
+					? plan(
+							add("ask", "ジョギング以外の休日の楽しみ", ["memory:m1"], 5),
+							add("ask", "最近ハマっていること", [], 3),
+						)
+					: plan(),
+		});
+		const agent = make({
+			llm: m.llm,
+			known: () => [{ id: "m1", text: "毎朝ジョギングしている" }],
+		});
+		await agent.step(0, idle, sig());
+		agent.observe({
+			id: "u1",
+			who: "user",
+			text: "猫を飼ってるんですよ",
+			at: 20_000,
+		});
+		// The memory's question is worth more, but has nothing in common with the cat: the general
+		// one goes to the reply.
+		expect(agent.askForReply(20_000)?.text).toBe("最近ハマっていること");
+	});
+
 	test("a refused start is tried again later", async () => {
 		const m = scripted({
 			plan: (d) =>

@@ -423,7 +423,16 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			if (st.researching === null) {
 				for (const i of st.items)
 					if (i.status === "open" && i.kind === "research")
-						times.push(Math.max(now, i.deferUntil ?? now));
+						times.push(
+							Math.max(
+								now,
+								i.deferUntil ?? now,
+								// Research that does not tie into a talk waits for its end (nextResearch).
+								holdsElsewhere(st, now) && !connected(st, i, now)
+									? st.lastUserAt! + TOPIC_RECENT_MS + 1
+									: now,
+							),
+						);
 			} else times.push(st.researching.at + RESEARCH_TTL_MS);
 			const open = speechOpenAt(st, now);
 			if (open !== null)

@@ -12,6 +12,7 @@ import {
 	type AgendaKind,
 	type PlanOutcome,
 } from "./contracts.ts";
+import { connected, drawsOnMemory, holdsElsewhere, tiesIn } from "./pacing.ts";
 import { profileOf } from "./profile.ts";
 import { planData } from "./prompt.ts";
 import {
@@ -134,8 +135,17 @@ export async function plan(
 	for (const a of call.value.add) {
 		const text = a.text.trim();
 		const refs = [...new Set(a.refs)];
+		// Research held back in a talk (it does not tie in) leaves room for what does.
 		const open = st.items.filter(
-			(i) => i.kind === a.kind && (i.status === "open" || i.status === "doing"),
+			(i) =>
+				i.kind === a.kind &&
+				(i.status === "open" || i.status === "doing") &&
+				!(
+					i.kind === "research" &&
+					i.status === "open" &&
+					holdsElsewhere(st, now) &&
+					!connected(st, i, now)
+				),
 		).length;
 		const why = (code: string) => {
 			rejected.push(`${a.kind}:${code}`);
@@ -170,6 +180,17 @@ export async function plan(
 			)
 		) {
 			why("needs_user_reason");
+			continue;
+		}
+		// In a talk, what is drawn from the memory, the interests or a note ties into it too: the
+		// talk's words among its refs, or a note made from them (user, 2026-11-10: "Qwenとかダリオ
+		// アモデイとか、今の会話に関係無いメモリを拾ってくるべきでは無い…共通点があるなら優秀").
+		if (
+			holdsElsewhere(st, now) &&
+			drawsOnMemory(refs) &&
+			!tiesIn(st, refs, now)
+		) {
+			why("off_topic");
 			continue;
 		}
 		const noteIds = refs.map(noteRef).filter((x): x is string => x !== null);
