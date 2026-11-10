@@ -30,9 +30,17 @@ const DIR = resolve("data/agenda/decline-bench");
 /** keep: the item should not be lost (spoken, or held for later); drop: a decline is right; speak. */
 type Want = "keep" | "drop" | "speak";
 
+/**
+ * tuned: moments the writer and the plan may be tuned on (the default); held: the same intents in
+ * other words and other topics, to see whether a fix holds beyond them. Not to be read or tuned on.
+ */
+export type MomentSet = "tuned" | "held";
+
 export interface DeclineMoment {
 	readonly name: string;
 	readonly want: Want;
+	/** Absent: tuned. */
+	readonly set?: "held";
 	/** A topic from a note (title, summary), or a question. */
 	readonly item:
 		| {
@@ -413,6 +421,356 @@ export const declineMoments: readonly DeclineMoment[] = [
 			{ who: "reply", text: "それは大変でしたね。", minAgo: 0.45 },
 		],
 	},
+	// ---- Held set (not to be tuned on): the same intents in other words, in everyday topics. ----
+	// keep, as "rest-isogashii": no energy for talk in a busy stretch (travel plans), no quiet set.
+	{
+		name: "held-rest-ryokou",
+		set: "held",
+		want: "keep",
+		item: {
+			kind: "talk",
+			title: "冬の京都の紅葉スポットと混雑の避け方",
+			summary: "朝の早い時間か夕方に回ると混みにくい。",
+		},
+		history: [
+			{
+				who: "user",
+				text: "来月、京都に行こうと思ってる",
+				minAgo: 3,
+				ref: true,
+			},
+			{ who: "reply", text: "いいですね。楽しみですね。", minAgo: 3 },
+			{
+				who: "user",
+				text: "でも今は仕事の山場で、旅行のことまで頭が回らないんだ。落ち着いたら考えるよ",
+				minAgo: 0.5,
+			},
+			{
+				who: "reply",
+				text: "了解です、無理しないでくださいね。",
+				minAgo: 0.45,
+			},
+		],
+	},
+	// keep, as "rest-bootto-later": a long night shift, a question to ask later (music).
+	{
+		name: "held-rest-yakin",
+		set: "held",
+		want: "keep",
+		item: { kind: "ask", text: "最近よく聴く曲はありますか？" },
+		history: [
+			{ who: "user", text: "今日はレコードを聴いてる", minAgo: 12, ref: true },
+			{
+				who: "reply",
+				text: "いいですね。ゆったりできそうですね。",
+				minAgo: 12,
+			},
+			{
+				who: "user",
+				text: "夜勤明けで頭がぼんやりしてて、会話する余裕ないわ",
+				minAgo: 10,
+			},
+			{
+				who: "reply",
+				text: "お疲れさまでした。ゆっくりしてくださいね。",
+				minAgo: 9.9,
+			},
+			{ who: "user", text: "うん、ありがとう", minAgo: 4 },
+			{ who: "reply", text: "どういたしまして。", minAgo: 3.95 },
+		],
+	},
+	// keep, as "rest-tsukareta-ask": low after a quarrel (family).
+	{
+		name: "held-rest-kazoku",
+		set: "held",
+		want: "keep",
+		item: {
+			kind: "talk",
+			title: "家族の誕生日に作りやすい手作りケーキ",
+			summary: "ホットケーキミックスで作るスポンジなら失敗しにくい。",
+		},
+		history: [
+			{
+				who: "user",
+				text: "今日は家族とちょっとケンカして凹んでる",
+				minAgo: 2.5,
+				ref: true,
+			},
+			{ who: "reply", text: "それはつらいですね。", minAgo: 2.4 },
+			{
+				who: "user",
+				text: "いまは誰とも話したくないかも",
+				minAgo: 0.5,
+			},
+			{
+				who: "reply",
+				text: "わかりました。気持ちが落ち着くといいですね。",
+				minAgo: 0.45,
+			},
+		],
+	},
+	// keep, as "rest-sotto-ask": no strength left after training (sports).
+	{
+		name: "held-rest-sport",
+		set: "held",
+		want: "keep",
+		item: { kind: "ask", text: "ランニングは、週に何回くらい走っていますか？" },
+		history: [
+			{ who: "user", text: "今日は練習で追い込んだ", minAgo: 8, ref: true },
+			{ who: "reply", text: "おつかれさまです。", minAgo: 8 },
+			{
+				who: "user",
+				text: "もう体力ゼロ。口を動かす元気もないや",
+				minAgo: 7,
+			},
+			{
+				who: "reply",
+				text: "ゆっくり休んでくださいね。",
+				minAgo: 6.95,
+			},
+			{ who: "user", text: "うん", minAgo: 3 },
+			{ who: "reply", text: "お大事に。", minAgo: 2.95 },
+		],
+	},
+	// keep, as "rest-lull-busy-1": a note offered, turned down for lack of energy (cooking).
+	{
+		name: "held-rest-lull-cook",
+		set: "held",
+		want: "keep",
+		item: {
+			kind: "talk",
+			title: "疲れた日の10分で作れる一人ごはん",
+			summary: "卵とご飯で作る雑炊や、レンジで作るうどんなど。",
+		},
+		history: [
+			{ who: "user", text: "帰ったよ。今日は残業でぐったり", minAgo: 7 },
+			{
+				who: "reply",
+				text: "おかえりなさい、お疲れさまです。",
+				minAgo: 6.95,
+			},
+			{
+				who: "user",
+				text: "ごはんを作る気力もないんだよね",
+				minAgo: 6,
+				ref: true,
+			},
+			{
+				who: "reply",
+				text: "今日は無理せず、できる範囲で大丈夫ですよ。",
+				minAgo: 5.95,
+			},
+			{
+				who: "reply",
+				text: "疲れた日向けの簡単ごはんについて調べたメモがあります。表示しましょうか？",
+				minAgo: 2.5,
+			},
+			{
+				who: "user",
+				text: "いや、今日は見なくて大丈夫。気力が戻ったらお願いする",
+				minAgo: 2,
+				ref: true,
+			},
+			{
+				who: "reply",
+				text: "わかりました。いつでも声をかけてください。",
+				minAgo: 1.95,
+			},
+		],
+	},
+	// keep, as "rest-lull-busy-2": the same, with another note (family trip).
+	{
+		name: "held-rest-lull-onsen",
+		set: "held",
+		want: "keep",
+		item: {
+			kind: "talk",
+			title: "子連れで行きやすい近場の日帰り温泉",
+			summary: "貸切の家族風呂があるところが使いやすい。",
+		},
+		history: [
+			{ who: "user", text: "帰ったよ。今週は子どもの世話で疲れた", minAgo: 9 },
+			{
+				who: "reply",
+				text: "おかえりなさい。お疲れさまです。",
+				minAgo: 8.95,
+			},
+			{
+				who: "user",
+				text: "週末も予定を立てる元気がなくて",
+				minAgo: 7.5,
+				ref: true,
+			},
+			{
+				who: "reply",
+				text: "無理に立てなくても大丈夫ですよ。",
+				minAgo: 7.45,
+			},
+			{
+				who: "reply",
+				text: "週末の過ごし方について調べておいた内容があります。詳しいメモを表示しましょうか？",
+				minAgo: 4.5,
+			},
+			{
+				who: "user",
+				text: "いまは考えられないから、また元気になったらにするよ",
+				minAgo: 4,
+				ref: true,
+			},
+			{
+				who: "reply",
+				text: "わかりました。メモはいつでも表示できます。",
+				minAgo: 3.95,
+			},
+		],
+	},
+	// drop, as "right-said": the topic was told already (cooking).
+	{
+		name: "held-right-said",
+		set: "held",
+		want: "drop",
+		item: {
+			kind: "talk",
+			title: "圧力鍋で作る豚の角煮の時間と火加減",
+			summary: "加圧は20分ほど。沸騰したら弱火にする。",
+		},
+		history: [
+			{
+				who: "user",
+				text: "角煮を作りたいんだけど、時間かかるよね",
+				minAgo: 3,
+				ref: true,
+			},
+			{
+				who: "reply",
+				text: "圧力鍋なら、加圧20分ほどで柔らかくなるそうです。沸騰したら弱火にするのがコツです。",
+				minAgo: 2.9,
+			},
+			{ who: "user", text: "20分でいいんだ、助かる", minAgo: 2.5 },
+			{
+				who: "reply",
+				text: "ぜひ試してみてください。美味しくできるといいですね。",
+				minAgo: 2.45,
+			},
+		],
+	},
+	// drop, as "right-answered": the question answered by the user (travel).
+	{
+		name: "held-right-answered",
+		set: "held",
+		want: "drop",
+		item: { kind: "ask", text: "今度の連休は、どこかへ出かける予定ですか？" },
+		history: [
+			{ who: "user", text: "来週から連休だ〜", minAgo: 3, ref: true },
+			{ who: "reply", text: "いいですね。", minAgo: 3 },
+			{
+				who: "user",
+				text: "連休は実家に帰ることにしたよ",
+				minAgo: 0.5,
+			},
+			{
+				who: "reply",
+				text: "ご家族とゆっくりできるといいですね。",
+				minAgo: 0.45,
+			},
+		],
+	},
+	// drop, as "right-over": the match the topic was for is over (sports).
+	{
+		name: "held-right-over",
+		set: "held",
+		want: "drop",
+		item: {
+			kind: "talk",
+			title: "明日の試合に向けた前日のコンディション調整",
+			summary: "睡眠を優先し、前日は軽い運動にとどめる。",
+		},
+		history: [
+			{
+				who: "user",
+				text: "明日、サッカーの試合なんだ",
+				minAgo: 240,
+				ref: true,
+			},
+			{ who: "reply", text: "がんばってください。", minAgo: 240 },
+			{
+				who: "user",
+				text: "試合、終わったよ。2対1で勝てた",
+				minAgo: 6,
+			},
+			{ who: "reply", text: "おめでとうございます！", minAgo: 5.95 },
+		],
+	},
+	// speak, as "speak-engaged": the user is on the topic (cooking).
+	{
+		name: "held-speak-presscooker",
+		set: "held",
+		want: "speak",
+		item: {
+			kind: "talk",
+			title: "圧力鍋の安全な使い方の基本",
+			summary: "ふたのロックを確認し、水や調味料は規定の量を守る。",
+		},
+		history: [
+			{
+				who: "user",
+				text: "圧力鍋を買ったんだ。まだ使ったことないけど",
+				minAgo: 2,
+				ref: true,
+			},
+			{ who: "reply", text: "楽しみですね。", minAgo: 1.9 },
+			{ who: "user", text: "どんな料理から試すのがいいかな", minAgo: 0.5 },
+			{ who: "reply", text: "煮込み料理が定番ですね。", minAgo: 0.45 },
+		],
+	},
+	// speak, as "speak-engaged": the user is on the topic (music).
+	{
+		name: "held-speak-guitar",
+		set: "held",
+		want: "speak",
+		item: {
+			kind: "talk",
+			title: "初心者向けのギターのチューニングアプリ",
+			summary: "スマホのアプリで、弦を弾くだけで音の高さが分かる。",
+		},
+		history: [
+			{
+				who: "user",
+				text: "ギターを始めたんだけど、音合わせが難しくて",
+				minAgo: 2,
+				ref: true,
+			},
+			{ who: "reply", text: "最初は難しいですよね。", minAgo: 1.9 },
+			{
+				who: "user",
+				text: "耳だけだと、合ってるのか全然分からない",
+				minAgo: 0.5,
+			},
+			{ who: "reply", text: "そうですよね。", minAgo: 0.45 },
+		],
+	},
+	// speak, as "speak-engaged": a question that fits what the user just said (reading).
+	{
+		name: "held-speak-books",
+		set: "held",
+		want: "speak",
+		item: { kind: "ask", text: "最近読んだ本で、面白かったものはありますか？" },
+		history: [
+			{
+				who: "user",
+				text: "電車の中で本を読むのが日課になってる",
+				minAgo: 2,
+				ref: true,
+			},
+			{ who: "reply", text: "いいですね。", minAgo: 1.9 },
+			{
+				who: "user",
+				text: "通勤が長いから、年に50冊くらい読めるんだ",
+				minAgo: 0.5,
+			},
+			{ who: "reply", text: "すごいですね。", minAgo: 0.45 },
+		],
+	},
 ];
 
 interface Trial {
@@ -477,7 +835,11 @@ const benchLlm = (
 	};
 };
 
-async function run(name: string, repeat: number) {
+/** Which moments a run takes (default: all). */
+const takes = (m: DeclineMoment, sets: "all" | MomentSet) =>
+	sets === "all" || (m.set ?? "tuned") === sets;
+
+async function run(name: string, repeat: number, sets: "all" | MomentSet) {
 	const settings = loadSettings(
 		resolve(process.env.AGENCY_SETTINGS ?? "config/always-on.json"),
 	);
@@ -485,9 +847,11 @@ async function run(name: string, repeat: number) {
 	const spent = meter.spentUsd();
 	const real = createProviderLlm(settings.llm.background, meter);
 	mkdirSync(DIR, { recursive: true });
-	const jobs = declineMoments.flatMap((m) =>
-		Array.from({ length: repeat }, (_, k) => ({ m, trial: k + 1 })),
-	);
+	const jobs = declineMoments
+		.filter((m) => takes(m, sets))
+		.flatMap((m) =>
+			Array.from({ length: repeat }, (_, k) => ({ m, trial: k + 1 })),
+		);
 	const out: Trial[] = [];
 	const one = async ({ m, trial }: (typeof jobs)[number]) => {
 		const T = 20_000_000;
@@ -514,6 +878,7 @@ async function run(name: string, repeat: number) {
 							refs: ["note:n1"],
 							value: 4,
 							reason: "話の流れで調べたことの結果",
+							topic: "",
 						}
 					: {
 							kind: "ask",
@@ -521,9 +886,11 @@ async function run(name: string, repeat: number) {
 							refs,
 							value: 3,
 							reason: "相手を知るため",
+							topic: "",
 						},
 			],
 			drop: [],
+			focus: "",
 		};
 		let value: Record<string, unknown> | null = null;
 		const agent = createAgendaAgent({
@@ -612,39 +979,73 @@ const load = (name: string): Trial[] => {
 
 const CODE = /^(?:repeat|too_many_questions|either_or)(?:,|$)/u;
 
+/** Met what the moment asks: kept or spoken (keep), dropped or not said (drop), spoken (speak). */
+const passes = (t: Trial) => {
+	const code = t.declined !== null && CODE.test(t.declined);
+	if (t.want === "speak") return t.utterance !== null;
+	if (t.want === "keep") return t.status !== "dropped" || code;
+	return t.utterance === null && t.status === "dropped" && !code;
+};
+
+const SETS: readonly MomentSet[] = ["tuned", "held"];
+const SET_LABEL: Record<MomentSet, string> = {
+	tuned: "手を入れてよい組",
+	held: "見ない組",
+};
+
 function compare(names: readonly string[]) {
+	const moments = new Map(declineMoments.map((m) => [m.name, m]));
+	const setOf = (t: Trial): MomentSet => moments.get(t.moment)?.set ?? "tuned";
 	const label: Record<Want, string> = {
 		keep: "休みたいだけ（失いたくない）",
 		drop: "見送りが正しい",
 		speak: "話すべき",
 	};
 	console.log(
-		"| 版 | 場面 | 試行 | 話した | 見送って残した | 見送って外した | コードが断った（書き直し） |",
+		"| 版 | 組 | 場面 | 試行 | 話した | 見送って残した | 見送って外した | コードが断った（書き直し） |",
 	);
-	console.log(`| --- | --- |${" ---: |".repeat(5)}`);
+	console.log(`| --- | --- | --- |${" ---: |".repeat(5)}`);
 	for (const name of names) {
 		const trials = load(name);
-		for (const w of ["keep", "drop", "speak"] as const) {
-			const ts = trials.filter((t) => t.want === w);
+		for (const g of SETS)
+			for (const w of ["keep", "drop", "speak"] as const) {
+				const ts = trials.filter((t) => t.want === w && setOf(t) === g);
+				if (ts.length === 0) continue;
+				const spoke = ts.filter((t) => t.utterance !== null).length;
+				const code = ts.filter((t) => t.declined && CODE.test(t.declined));
+				const kept = ts.filter(
+					(t) =>
+						t.utterance === null && t.status === "open" && !code.includes(t),
+				).length;
+				const gone = ts.filter(
+					(t) => t.status === "dropped" && !code.includes(t),
+				).length;
+				console.log(
+					`| ${name} | ${SET_LABEL[g]} | ${label[w]} | ${ts.length} | ${spoke} | ${kept} | ${gone} | ${code.length} |`,
+				);
+			}
+	}
+	console.log(
+		"\n合格率（休みたいだけ: 外さない。見送りが正しい: 話さず外す。話すべき: 話す）:\n",
+	);
+	console.log("| 版 | 組 | 合格 | 試行 | 率 |");
+	console.log("| --- | --- | ---: | ---: | ---: |");
+	for (const name of names) {
+		const trials = load(name);
+		for (const g of SETS) {
+			const ts = trials.filter((t) => setOf(t) === g);
 			if (ts.length === 0) continue;
-			const spoke = ts.filter((t) => t.utterance !== null).length;
-			const code = ts.filter((t) => t.declined && CODE.test(t.declined));
-			const kept = ts.filter(
-				(t) => t.utterance === null && t.status === "open" && !code.includes(t),
-			).length;
-			const gone = ts.filter(
-				(t) => t.status === "dropped" && !code.includes(t),
-			).length;
+			const ok = ts.filter(passes).length;
 			console.log(
-				`| ${name} | ${label[w]} | ${ts.length} | ${spoke} | ${kept} | ${gone} | ${code.length} |`,
+				`| ${name} | ${SET_LABEL[g]} | ${ok} | ${ts.length} | ${((100 * ok) / ts.length).toFixed(0)}% |`,
 			);
 		}
 	}
 	console.log(
 		"\n場面ごと（S 話した、K 見送って残した、D 見送って外した、R コードが断った。括弧は見送りの種類）:\n",
 	);
-	console.log(`| 場面 | ${names.join(" | ")} |`);
-	console.log(`| --- |${" --- |".repeat(names.length)}`);
+	console.log(`| 場面 | 組 | ${names.join(" | ")} |`);
+	console.log(`| --- | --- |${" --- |".repeat(names.length)}`);
 	const runs = names.map(load);
 	for (const m of declineMoments) {
 		const cells = runs.map((ts) =>
@@ -662,24 +1063,38 @@ function compare(names: readonly string[]) {
 				)
 				.join(" "),
 		);
-		console.log(`| ${m.name} | ${cells.join(" | ")} |`);
+		// A moment the run did not take (a run of one set) has no trials.
+		if (cells.every((c) => c === "")) continue;
+		console.log(`| ${m.name} | ${m.set ?? "tuned"} | ${cells.join(" | ")} |`);
 	}
 }
 
 if (import.meta.main) {
 	const [cmd, ...rest] = process.argv.slice(2);
 	if (cmd === "run") {
-		const i = rest.indexOf("--repeat");
-		const repeat = i >= 0 ? Number(rest[i + 1]) : 8;
+		const flagged = new Set(["--repeat", "--set"]);
+		const flag = (n: string) => {
+			const i = rest.indexOf(n);
+			return i >= 0 ? rest[i + 1] : undefined;
+		};
+		const repeat = Number(flag("--repeat") ?? 8);
+		const sets = flag("--set") ?? "all";
 		const name = rest.find(
-			(a, k) => !a.startsWith("--") && rest[k - 1] !== "--repeat",
+			(a, k) => !a.startsWith("--") && !flagged.has(rest[k - 1] ?? ""),
 		);
-		if (!name || !Number.isInteger(repeat) || repeat < 1)
-			throw new Error("usage: decline-bench.ts run <name> [--repeat N]");
-		await run(name, repeat);
+		if (
+			!name ||
+			!Number.isInteger(repeat) ||
+			repeat < 1 ||
+			!["all", "tuned", "held"].includes(sets)
+		)
+			throw new Error(
+				"usage: decline-bench.ts run <name> [--repeat N] [--set all|tuned|held]",
+			);
+		await run(name, repeat, sets as "all" | MomentSet);
 	} else if (cmd === "compare" && rest.length) compare(rest);
 	else
 		throw new Error(
-			"usage: decline-bench.ts run <name> [--repeat N] | compare <name> [<name>...]",
+			"usage: decline-bench.ts run <name> [--repeat N] [--set all|tuned|held] | compare <name> [<name>...]",
 		);
 }

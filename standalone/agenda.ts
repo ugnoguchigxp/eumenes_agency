@@ -158,7 +158,8 @@ async function main() {
 				? mockToolchainWork(request, delegatedTo)
 				: researchWriter(request),
 		docs,
-		delayMs: searcher ? 0 : 60_000,
+		// The stand-in's note comes when it is written: no made-up wait on top.
+		delayMs: 0,
 	});
 	const steward = memory.steward;
 	const note = createProfileNote({

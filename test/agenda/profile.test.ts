@@ -213,6 +213,7 @@ test("the plan sees the note and may research a plan from it; the utterance sees
 									refs: ["profile:p1"],
 									value: 4,
 									reason: "予定の下調べ",
+									topic: "",
 								},
 								{
 									kind: "ask",
@@ -220,10 +221,12 @@ test("the plan sees the note and may research a plan from it; the utterance sees
 									refs: ["profile:p1"],
 									value: 3,
 									reason: "同行者が未定",
+									topic: "",
 								},
 							]
 						: [],
 				drop: [],
+				focus: "",
 			};
 			const value = isPlan
 				? plan
@@ -232,6 +235,8 @@ test("the plan sees the note and may research a plan from it; the utterance sees
 					: {
 							utterance: "箱根には誰と行く予定ですか？",
 							decline: null,
+							questions: 1,
+							choice: false,
 							emotion: "🙂",
 						};
 			return Promise.resolve({

@@ -85,12 +85,15 @@ export interface AgendaState {
 	ownAskPending: boolean;
 	/** The question offered to the reply to the user's words `userId`; asked if the reply ends in one. */
 	offeredAsk: { readonly itemId: string; readonly userId: string } | null;
-	/** The user said no to the agent's question or offer: the words of both, by id. */
-	userDeclines: {
-		readonly at: number;
-		readonly agentId: string;
-		readonly userId: string;
-	}[];
+	/** A plan that failed is tried again at this time (null: no failure pending). */
+	planRetryAt: number | null;
+	/** A line written ahead of its time, said when speech opens unless the user spoke (epoch). */
+	ready: {
+		readonly ticket: Extract<AgendaTicket, { kind: "speak" }>;
+		readonly epoch: number;
+	} | null;
+	/** The topic of the user's words `userId`, as the plan named it. */
+	focus: { readonly topic: string; readonly userId: string } | null;
 	lastUserAt: number | null;
 	unanswered: number;
 	stopped: boolean;
@@ -127,7 +130,9 @@ export function createState(
 		lastAgentAsked: false,
 		ownAskPending: false,
 		offeredAsk: null,
-		userDeclines: [],
+		focus: null,
+		ready: null,
+		planRetryAt: null,
 		lastUserAt: null,
 		unanswered: 0,
 		stopped: false,
@@ -185,6 +190,7 @@ export const makeItem = (
 				| "endedAt"
 				| "delegatedTo"
 				| "checkedRequest"
+				| "topic"
 			>
 		>,
 ): AgendaItem => ({

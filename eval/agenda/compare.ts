@@ -93,16 +93,18 @@ const speechStats = (rows: Rows) => {
 		planned: sum((p) => p.planned),
 		stale: sum((p) => p.stale),
 		composes: sum((p) => p.composes),
+		background: sum((p) => p.background),
+		own: sum((p) => p.own),
 		repeatsDropped: sum((p) => p.repeatsDropped),
 	};
 };
 const speechHead =
-	"| 実行 | 自発 回/分（静かな時間の外） | 静かな時間（分/回） | 静かな時間に話した | 間隔p50 | 最長の沈黙（シナリオの中央値） | 発言→自発p50 | 次の発言までに自発 | メモ使用 | 計画→発話 | 破棄した話す文 | 聞き直しで外した質問 |";
-const speechCols = 11;
+	"| 実行 | 自発 回/分（静かな時間の外） | 静かな時間（分/回） | 静かな時間に話した | 間隔p50 | 最長の沈黙（シナリオの中央値） | 発言→自発p50 | 次の発言までに自発 | メモ使用 | 計画→発話 | 破棄した話す文 | 背景の呼び出し/自発 | 聞き直しで外した質問 |";
+const speechCols = 12;
 const secs = (x: number | null) => (x === null ? "-" : `${Math.round(x)}秒`);
 const speechLine = (name: string, p: ReturnType<typeof speechStats>) =>
 	console.log(
-		`| ${name} | ${p.perMin.toFixed(2)} | ${p.quietMinPerRun.toFixed(0)} | ${p.spokeInQuiet} | ${secs(p.gapP50)} | ${secs(p.silenceP50)} | ${secs(p.firstOwnP50)} | ${p.firstOwn}/${p.userLines}（${pct(p.firstOwn, p.userLines)}） | ${p.notesUsed}/${p.notesMade}（${pct(p.notesUsed, p.notesMade)}） | ${p.plannedSaid}/${p.planned}（${pct(p.plannedSaid, p.planned)}） | ${p.stale}/${p.composes}（${pct(p.stale, p.composes)}） | ${p.repeatsDropped} |`,
+		`| ${name} | ${p.perMin.toFixed(2)} | ${p.quietMinPerRun.toFixed(0)} | ${p.spokeInQuiet} | ${secs(p.gapP50)} | ${secs(p.silenceP50)} | ${secs(p.firstOwnP50)} | ${p.firstOwn}/${p.userLines}（${pct(p.firstOwn, p.userLines)}） | ${p.notesUsed}/${p.notesMade}（${pct(p.notesUsed, p.notesMade)}） | ${p.plannedSaid}/${p.planned}（${pct(p.plannedSaid, p.planned)}） | ${p.stale}/${p.composes}（${pct(p.stale, p.composes)}） | ${p.own ? (p.background / p.own).toFixed(1) : "-"} | ${p.repeatsDropped} |`,
 	);
 
 if (import.meta.main) {

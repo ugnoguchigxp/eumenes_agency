@@ -20,10 +20,16 @@ export const FRESH_TALK_MS = 180_000;
 export const TOPIC_RECENT_MS = 300_000;
 /** With nothing new for this long, the passing of time itself is new information. */
 export const IDLE_PLAN_MS = 3_600_000;
+/** The next line is written this long before the agent may speak, and said when it may. */
+export const WRITE_AHEAD_MS = 15_000;
 /** The user's words this soon after the agent's question or offer are taken as the answer to it. */
 export const ANSWER_WINDOW_MS = 600_000;
-/** A research the host refused to start is tried again after this. */
-export const RESEARCH_RETRY_MS = 60_000;
+/**
+ * After a failure (a model call failed, the host refused a research or did not deliver a line)
+ * the same is tried again after this: enough not to hammer a failing service, no more (it was a
+ * minute; user, 2026-11-11: no wait without a reason).
+ */
+export const RESEARCH_RETRY_MS = 10_000;
 /** A research the host never returns stops counting as running after this. */
 export const RESEARCH_TTL_MS = 6 * 3_600_000;
 /** When the user asks for quiet in so many words («黙って») but names no length. */
@@ -98,6 +104,8 @@ export interface AgendaItem {
 	resultNoteId?: string | null;
 	/** Why the utterance was last declined, and when (the plan learns from it). */
 	lastDecline?: { readonly reason: string; readonly at: number } | null;
+	/** What it is about, as the plan names it: in a talk, said while the user is on that topic. */
+	readonly topic?: string;
 }
 
 /**
@@ -277,10 +285,14 @@ export const planSchema = z.strictObject({
 				refs: z.array(z.string()).max(6),
 				value: z.number().int().min(1).max(5),
 				reason: z.string(),
+				/** What it is about, a short name; the same name for the same topic. */
+				topic: z.string(),
 			}),
 		)
 		.max(7),
 	drop: z.array(z.strictObject({ id: z.string(), reason: z.string() })).max(8),
+	/** The topic of the user's latest words, by the same kind of name ("" with no talk). */
+	focus: z.string(),
 });
 export type PlanOutput = z.infer<typeof planSchema>;
 
@@ -309,11 +321,25 @@ export type AskCheckOutput = z.infer<typeof askCheckSchema>;
  * tryptophan, 0.39) goes on to the check, which reads meaning (user, 2026-11-09).
  */
 export const SAME_THEME_OVERLAP = 0.6;
+/**
+ * Notes this new are compared with a new research in code; an older one may be out of date
+ * (tomorrow's weather, this week's news, another day's showings), and whether it still answers is
+ * for the check to read (review 2026-11-10 evening 3.4).
+ */
+export const NOTE_FRESH_MS = 24 * 3_600_000;
 
 export const composeSchema = z.strictObject({
 	utterance: z.string().nullable(),
 	/** The feeling the utterance is said with (null when declining). */
 	emotion: z.enum(emotionEmojis).nullable(),
 	decline: z.string().nullable(),
+	/**
+	 * What the writer says of its own utterance (review 2026-11-10 evening: code read "どちら" and
+	 * "あと、" as an either-or or a second question, and refused "ご出身はどちらですか？", "そのあと、
+	 * どうなりましたか？"): how many things it asks the user (0: none), and whether it has them pick
+	 * one of the options it gives (A or B).
+	 */
+	questions: z.number().int().min(0).max(9),
+	choice: z.boolean(),
 });
 export type ComposeOutput = z.infer<typeof composeSchema>;

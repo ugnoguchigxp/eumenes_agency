@@ -9,12 +9,22 @@
 			"model": "claude-haiku-5-5",
 			"effort": "medium",
 			"thinkingHeadroom": 4000
+		},
+		"judge": {
+			"provider": "openai",
+			"model": "gpt-6-luna",
+			"effort": "medium",
+			"thinkingHeadroom": 4000
 		}
 	},
 	"spend": {
 		"limitUsd": 50,
 		"pricing": {
 			"claude-haiku-5-5": {
+				"input": 0.1,
+				"output": 0.5
+			},
+			"gpt-6-luna": {
 				"input": 0.1,
 				"output": 0.5
 			}

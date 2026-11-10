@@ -101,8 +101,8 @@ export interface AgendaSessionDeps {
 	readonly typingIdleMs?: number;
 }
 
-/** After a step threw, the next try waits this long. */
-const STEP_RETRY_MS = 60_000;
+/** After a step threw, the next try waits this long (not a tight loop; it was a minute). */
+const STEP_RETRY_MS = 10_000;
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -115,6 +115,8 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 	let stepping = false;
 	let again = false;
 	let timer: unknown = null;
+	/** The step out now: the user's words call it off (its plan and line are stale). */
+	let inFlight: AbortController | null = null;
 	let collecting = false;
 	let backoffUntil = 0;
 	let n = 0;
@@ -210,11 +212,13 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 		try {
 			do {
 				again = false;
+				inFlight = new AbortController();
 				const out = await agent.step(
 					now(),
 					() => ({ busy: busy() }),
-					new AbortController().signal,
+					inFlight.signal,
 				);
+				inFlight = null;
 				if (closed) return;
 				emit({ type: "step", outcome: out });
 				for (const t of out.tickets) handle(t);
@@ -280,6 +284,9 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 			n++;
 			const userId = `u${stamp}.${n}`;
 			agent.observe({ id: userId, who: "user", text, at: now() });
+			// The plan and the line out now are for words before these: called off, so the next
+			// step (right after the reply) does not wait for them (review 2026-11-10 evening 4.2 B).
+			inFlight?.abort();
 			emit({ type: "user", text });
 			replying = true;
 			const started = now();

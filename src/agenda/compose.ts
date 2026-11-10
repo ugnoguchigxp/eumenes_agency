@@ -1,6 +1,7 @@
 /**
  * The utterance for the one item code picked: the model writes it or declines; code refuses
- * repeats, extra questions and either-or questions, and says nothing that went stale meanwhile.
+ * repeats, extra questions and either-or questions (as the writer accounts for its words), and
+ * says nothing that went stale meanwhile.
  */
 import { callModel } from "../application/model-call.ts";
 import {
@@ -25,13 +26,15 @@ import {
 } from "./state.ts";
 import { normalize, questionMarks, sentences, withoutSaid } from "./text.ts";
 
+export type SpeakTicket = Extract<AgendaTicket, { kind: "speak" }>;
+
 export async function compose(
 	st: AgendaState,
 	item: AgendaItem,
 	now: number,
 	host: () => StepHost,
 	signal: AbortSignal,
-): Promise<{ outcome: ComposeOutcome; ticket: AgendaTicket | null }> {
+): Promise<{ outcome: ComposeOutcome; ticket: SpeakTicket | null }> {
 	const startEpoch = st.epoch;
 	const note =
 		item.noteId === null
@@ -41,7 +44,7 @@ export async function compose(
 		declined: string | null,
 		rejected: string[],
 		call: CallRecord,
-		ticket: AgendaTicket | null,
+		ticket: SpeakTicket | null,
 	) => ({ outcome: { itemId: item.id, declined, rejected, call }, ticket });
 	if (item.kind === "talk" && item.noteId !== null && note === null) {
 		// The note is gone (deleted or forgotten): nothing to talk about. A topic without a note
@@ -81,8 +84,9 @@ export async function compose(
 		signal,
 	);
 	if (!call.ok) {
-		// A failed call is tried again at the next turn to speak, not ten minutes later.
-		item.deferUntil = now + st.intervalMs;
+		// A failed call is tried again at the next turn to speak, not ten minutes later; one
+		// called off (the user spoke) at once.
+		if (call.outcome.code !== "aborted") item.deferUntil = now + st.intervalMs;
 		return done(
 			null,
 			[],
@@ -96,9 +100,11 @@ export async function compose(
 			null,
 		);
 	}
-	// New words or the user started typing while it was written: say nothing stale.
+	// New words or the user started typing while it was written, or the plan dropped it
+	// meanwhile (they run side by side): say nothing stale.
 	if (
 		st.epoch !== startEpoch ||
+		item.status !== "open" ||
 		host().busy ||
 		st.stopped ||
 		speechQuiet(st, now)
@@ -130,14 +136,15 @@ export async function compose(
 		)
 			rejected.push("repeat");
 		// One question per ask; a topic may open with "ご存じでしたか？" and still offer the note.
+		// What it asks and whether it makes the user pick are the writer's own account of its
+		// words, not read from them here (a list of words caught "そのあと、" and "どちら").
 		if (
 			questionMarks(utterance) > (item.kind === "ask" ? 1 : 2) ||
-			(item.kind === "ask" && /それと|あと、|ついでに/u.test(utterance))
+			(item.kind === "ask" && call.value.questions > 1)
 		)
 			rejected.push("too_many_questions");
 		// The user does not want to be made to pick one of two.
-		if (item.kind === "ask" && /どちら(?!も)|どっち/u.test(utterance))
-			rejected.push("either_or");
+		if (item.kind === "ask" && call.value.choice) rejected.push("either_or");
 	}
 	const declined =
 		utterance === ""
@@ -164,7 +171,9 @@ export async function compose(
 			null,
 		);
 	}
-	const ticket: AgendaTicket = {
+	// Not handed out here: the step says it (or holds it for the end of the gap) once it is sure
+	// the user has not spoken and the plan has not dropped the item meanwhile.
+	const ticket: SpeakTicket = {
 		id: nextId(st, "t"),
 		kind: "speak",
 		itemId: item.id,
@@ -175,8 +184,6 @@ export async function compose(
 		refs: [...item.refs],
 		at: now,
 	};
-	item.status = "doing";
-	st.issued.set(ticket.id, ticket);
 	return done(
 		null,
 		[],

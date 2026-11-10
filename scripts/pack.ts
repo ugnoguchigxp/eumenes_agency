@@ -78,6 +78,7 @@ export const requiredAgendaExports = [
 	"PROFILE_TITLE",
 	"declinesOffer",
 	"endsWithQuestion",
+	"asksQuestion",
 ] as const;
 
 /** The package's entry points: the core and the agenda agent. */

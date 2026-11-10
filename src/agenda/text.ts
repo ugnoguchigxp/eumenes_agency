@@ -71,11 +71,29 @@ export const withoutSaid = (text: string, said: ReadonlySet<string>) =>
 		.join("")
 		.trim();
 
-/** Ends in a question: "？", or a polite question closed with "。" (ありますか。表示しましょうか。). */
-export const endsWithQuestion = (text: string) =>
-	/(?:[？?]|(?:です|ます|ません|でしょう|ましょう|ました|でした)か[。．]?)\s*[」』）)]*\s*$/u.test(
-		text,
+/** Text inside quotes: the user's own words read back ("「有毒ガスが出るの？」という点は…") ask nothing. */
+const unquoted = (text: string) =>
+	text.replace(/「[^」]*」|『[^』]*』|https?:\/\/\S+/gu, "");
+
+/**
+ * Asks the user something, wherever in the text: a "？", a request to tell (聞かせてください,
+ * 教えてもらえますか), or a polite question closed with "。" at the end (ありますか。). Read at the
+ * end only, a question with a sentence after it went uncounted (the CLI, 2026-11-10: "…大丈夫ですか？
+ * 風が直接当たると、温度が安定しにくいこともあるそうです。"); "そうですか。" opening a reply is no
+ * question, so the polite form counts only at the end.
+ */
+export const asksQuestion = (text: string) => {
+	const t = unquoted(text);
+	return (
+		/[？?]/u.test(t) ||
+		/(?:聞かせて|教えて)(?:ください|くださいね|ほしい|もらえ|ね[。．]?\s*$)/u.test(
+			t,
+		) ||
+		/(?:です|ます|ません|でしょう|ましょう|ました|でした)か[。．]?\s*[」』）)]*\s*$/u.test(
+			t,
+		)
 	);
+};
 
 export const questionMarks = (text: string) =>
 	(text.match(/[？?]/gu) ?? []).length;
@@ -106,8 +124,10 @@ const NO_THANKS = new RegExp(
 );
 
 /**
- * "Not now" to a question or an offer (今はいいかな, また今度, 結構です...). Only read right after
- * the agent asked or offered something. A clause must say no as a whole, so an ordinary answer
+ * "Not now" to a question or an offer (今はいいかな, また今度, 結構です...). Kept for hosts (the
+ * package exports it); the agent no longer reads it: a list of ways to say no missed "不要です",
+ * "見なくていいです", and the plan reads the no in the conversation (review 2026-11-10 evening 3.1).
+ * Only read right after the agent asked or offered something. A clause must say no as a whole, so an ordinary answer
  * that shares a word ("それはいいですね", "それは結構好き", "もう大丈夫そう") is not a no.
  */
 export const declinesOffer = (text: string) =>
@@ -115,3 +135,6 @@ export const declinesOffer = (text: string) =>
 		.split(/[、。，．,.！!？?…\n]+/u)
 		.map((c) => c.trim().replace(FILLER, "").trim())
 		.some((c) => c !== "" && NO_THANKS.test(c));
+
+/** The earlier name of {@link asksQuestion}, kept for hosts (now read anywhere in the text). */
+export const endsWithQuestion = (text: string) => asksQuestion(text);

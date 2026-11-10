@@ -13,7 +13,7 @@
  */
 import {
 	createAgendaAgent,
-	endsWithQuestion,
+	asksQuestion,
 	type AgendaAgent,
 	type AgendaDeps,
 	type AgendaTicket,
@@ -232,7 +232,6 @@ export async function simulateAgenda(input: AgendaSimInput) {
 	let now = start;
 	let n = 0;
 	const seen = new Set<string>();
-	const signal = new AbortController().signal;
 	const realMs = input.realMs ?? (() => performance.now());
 	/** Real time since `t0`, as the virtual clock counts it (whole seconds). */
 	const spent = (t0: number) => Math.round((realMs() - t0) / 1000) * 1000;
@@ -328,12 +327,24 @@ export async function simulateAgenda(input: AgendaSimInput) {
 
 	const step = async () => {
 		const t0 = realMs();
+		// The user's next line calls the step off when it comes while the step is out, as in the
+		// CLI (its plan and line are stale then).
+		const off = new AbortController();
+		const nextLine = turns[0] ? start + turns[0].atSec * 1000 - now : null;
+		const callOff =
+			nextLine === null
+				? null
+				: setTimeout(() => off.abort(), Math.max(1, nextLine));
 		// Busy while the user types, as of the moment the agent asks (its calls take time).
-		const out = await agent.step(
-			now,
-			() => ({ busy: typedAt(now + spent(t0)) !== null }),
-			signal,
-		);
+		const out = await agent
+			.step(
+				now,
+				() => ({ busy: typedAt(now + spent(t0)) !== null }),
+				off.signal,
+			)
+			.finally(() => {
+				if (callOff !== null) clearTimeout(callOff);
+			});
 		now += spent(t0);
 		if (out.plan) {
 			const { call } = out.plan;
@@ -500,7 +511,7 @@ export async function simulateAgenda(input: AgendaSimInput) {
 					agent.noteUsed(id, now);
 				emit({ type: "reply", atSec: sec(now), id: replyId, text, emotion });
 				// A reply that asks something is answered (or not) like the agent's own words.
-				if (endsWithQuestion(text)) await react(text, "reply");
+				if (asksQuestion(text)) await react(text, "reply");
 			}
 			// The writers see the agent's own speech too: it is what the user answered. The note
 			// of plans and interests goes after the memory, so it leaves out what that holds.

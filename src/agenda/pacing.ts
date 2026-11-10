@@ -10,7 +10,7 @@ import {
 	type AgendaItem,
 } from "./contracts.ts";
 import { notes, wantPlan, type AgendaState } from "./state.ts";
-import { endsWithQuestion } from "./text.ts";
+import { asksQuestion, normalize } from "./text.ts";
 
 export const paused = (st: AgendaState, now: number) =>
 	st.quiet.allUntil !== null && now < st.quiet.allUntil;
@@ -61,23 +61,44 @@ export const order = (a: AgendaItem, b: AgendaItem) =>
 	a.createdAt - b.createdAt;
 
 /**
- * Does the item tie into what is being talked about: the user's or the agent's words of the
- * last few minutes, or a note made from them? What the user asked for always does.
+ * Does the item tie into what the user talks about now: the topic of their latest words, as the
+ * plan named both (focus), or refs on their latest two lines, the agent's words since, or a note
+ * made from them? What the user asked for always does. Any words of the last five minutes let a
+ * question on the heater through twenty seconds after the user turned to a cat that had died
+ * (the CLI, 2026-11-10 874 s; review 2026-11-10 evening 3.5).
  */
-export const connected = (st: AgendaState, i: AgendaItem, now: number) =>
+export const connected = (st: AgendaState, i: AgendaItem) =>
 	i.requested ||
 	i.promised ||
-	tiesIn(st, [...i.refs, ...(i.noteId ? [`note:${i.noteId}`] : [])], now);
+	onFocus(st, i) ||
+	tiesToLatest(st, [...i.refs, ...(i.noteId ? [`note:${i.noteId}`] : [])]);
 
-/** Refs that tie into the talk: words of the last few minutes, or a note made from them. */
-export const tiesIn = (
+/**
+ * Two names the plan gave are one topic: the same, or one inside the other ("猫" and "猫の話"),
+ * as the plan names a topic anew at each call.
+ */
+export const sameTopic = (a: string | undefined, b: string | undefined) => {
+	const x = normalize(a ?? "");
+	const y = normalize(b ?? "");
+	return x !== "" && y !== "" && (x.includes(y) || y.includes(x));
+};
+
+/**
+ * The item's topic is the one the plan named for the user's latest words, or for the words before
+ * them while the plan has not read the latest yet (the reply comes before that plan).
+ */
+export const onFocus = (st: AgendaState, i: AgendaItem) => {
+	if (st.focus === null || !sameTopic(i.topic, st.focus.topic)) return false;
+	const users = st.said.filter((s) => s.who === "user").slice(-2);
+	return users.some((u) => u.id === st.focus!.userId);
+};
+
+/** Refs that tie into words in `recent`, or into a note made from them. */
+const tiesTo = (
 	st: AgendaState,
 	refs: readonly string[],
-	now: number,
+	recent: ReadonlySet<string>,
 ) => {
-	const recent = new Set(
-		st.said.filter((s) => now - s.at <= TOPIC_RECENT_MS).map((s) => s.id),
-	);
 	const fromRecent = (rs: readonly string[]) => rs.some((r) => recent.has(r));
 	if (fromRecent(refs)) return true;
 	const noteIds = refs.flatMap((r) =>
@@ -86,6 +107,25 @@ export const tiesIn = (
 	return notes(st).some((n) => noteIds.includes(n.id) && fromRecent(n.refs));
 };
 
+/** Refs on the user's latest two lines or the agent's words since, or a note made from them. */
+export const tiesToLatest = (st: AgendaState, refs: readonly string[]) => {
+	const users = st.said.filter((s) => s.who === "user");
+	const from = users.at(-2) ?? users.at(-1);
+	if (!from) return false;
+	const since = st.said.slice(st.said.indexOf(from)).map((s) => s.id);
+	return tiesTo(st, refs, new Set(since));
+};
+
+/** Refs on words of the last few minutes (anyone's), or a note made from them: the talk goes on. */
+export const tiesIn = (st: AgendaState, refs: readonly string[], now: number) =>
+	tiesTo(
+		st,
+		refs,
+		new Set(
+			st.said.filter((s) => now - s.at <= TOPIC_RECENT_MS).map((s) => s.id),
+		),
+	);
+
 /**
  * A question about something said in the conversation, once that talk is over (its words are
  * older than TOPIC_RECENT_MS): asked now it would come out of nowhere ("モンハンの話に戻りますね").
@@ -93,7 +133,9 @@ export const tiesIn = (
 export const topicGone = (st: AgendaState, i: AgendaItem, now: number) =>
 	i.kind === "ask" &&
 	i.refs.some((r) => !/^(?:memory|profile|note):/u.test(r)) &&
-	!connected(st, i, now);
+	!i.requested &&
+	!i.promised &&
+	!tiesIn(st, [...i.refs, ...(i.noteId ? [`note:${i.noteId}`] : [])], now);
 
 /**
  * The question the reply to the user's latest words may end with: the best open one that ties
@@ -114,7 +156,7 @@ export const replyAsk = (st: AgendaState, now: number): AgendaItem | null => {
 		before &&
 		before.who !== "user" &&
 		user.at - before.at <= ANSWER_WINDOW_MS &&
-		endsWithQuestion(before.text)
+		asksQuestion(before.text)
 	)
 		return null;
 	const asks = st.items
@@ -126,7 +168,7 @@ export const replyAsk = (st: AgendaState, now: number): AgendaItem | null => {
 				!topicGone(st, i, now),
 		)
 		.sort(order);
-	const tied = asks.find((i) => connected(st, i, now));
+	const tied = asks.find((i) => connected(st, i));
 	if (tied) return tied;
 	const j = lastUser(k);
 	const fresh = j < 0 || user.at - st.said[j]!.at >= FRESH_TALK_MS;
@@ -161,7 +203,7 @@ export const speakable = (st: AgendaState, now: number) =>
 				(i.deferUntil === null || i.deferUntil <= now) &&
 				!(i.kind === "ask" && askBlocked(st)) &&
 				!topicGone(st, i, now) &&
-				(!holdsElsewhere(st, now) || connected(st, i, now)),
+				(!holdsElsewhere(st, now) || connected(st, i)),
 		)
 		.sort(order);
 
@@ -181,7 +223,7 @@ export const canDig = (st: AgendaState, now: number) =>
 	!st.planDue &&
 	(speechQuiet(st, now)
 		? st.researching === null && nextResearch(st, now) === null
-		: speakable(st, now).length === 0) &&
+		: speakable(st, now).length === 0 && st.ready === null) &&
 	(st.dugAt === null || Math.max(st.lastInfoAt, st.lastUserAt ?? 0) > st.dugAt);
 
 /** The research to start next, if any. */
@@ -195,6 +237,6 @@ export const nextResearch = (st: AgendaState, now: number) =>
 				// In a talk, only research that ties into it runs; the rest waits for the talk to end
 				// (the CLI, 2026-11-10: five of ten looked into Qwen, Bezos, Neuro-sama... while the
 				// user talked about the weather and Fable 5.2).
-				(!holdsElsewhere(st, now) || connected(st, i, now)),
+				(!holdsElsewhere(st, now) || connected(st, i)),
 		)
 		.sort(order)[0] ?? null;

@@ -26,7 +26,7 @@ import {
 	agendaReplyMessages,
 	dropRepeatedSentences,
 } from "../../standalone/agenda-reply.ts";
-import { claudeMemoryModel } from "../../standalone/agenda-memory.ts";
+import { memoryModel } from "../../standalone/agenda-memory.ts";
 import { webNoteWriter } from "../../standalone/agenda-research.ts";
 import { createMockDocStore } from "../../examples/virtual-eumenes/agenda/docs.ts";
 import { openHostMemory } from "../../examples/virtual-eumenes/agenda/host-memory.ts";
@@ -39,6 +39,7 @@ import {
 import { agendaScenarios, inWindow, quickScenarios } from "./scenarios.ts";
 import { judgeAspects, judgeScenario } from "./judge.ts";
 import { llmUser } from "./user.ts";
+import { clientFor, verifierLlm } from "./verifier.ts";
 import { simulateAgenda, type AgendaSimEvent, type UserTurn } from "./sim.ts";
 
 export const clockFrom = (start: string) => (now: number) =>
@@ -155,9 +156,15 @@ if (import.meta.main) {
 		);
 		// Many scenarios at once meet the API's rate limit: a check waits and tries again
 		// (the SDK honours retry-after) instead of failing the scenario.
-		const client = createClaudeClient({ maxRetries: 8, timeout: 120_000 });
+		const client = clientFor(settings.llm.background);
 		const llm = createProviderLlm(settings.llm.background, meter, client);
-		const chat = createProviderReply(settings.llm.main, meter, client);
+		const chat = createProviderReply(
+			settings.llm.main,
+			meter,
+			clientFor(settings.llm.main),
+		);
+		// The judge and the simulated user: another vendor's model than the agent's (verifier.ts).
+		const verifier = verifierLlm(settings, meter);
 		const say = (line: string) =>
 			console.log(jobs > 1 ? line.replace(/^/gmu, `[${job.label}] `) : line);
 		const spentBefore = meter.spentUsd();
@@ -166,10 +173,10 @@ if (import.meta.main) {
 		const memoryDir = mkdtempSync(join(tmpdir(), "agm-"));
 		const memory = await openHostMemory({
 			dir: memoryDir,
-			complete: claudeMemoryModel({
+			complete: memoryModel({
 				role: settings.llm.background,
 				meter,
-				client,
+				claudeClient: createClaudeClient({ maxRetries: 8, timeout: 120_000 }),
 			}),
 			clock: clockAt,
 		});
@@ -187,7 +194,8 @@ if (import.meta.main) {
 						role: settings.llm.background,
 						meter,
 						today: () => clockAt(0),
-						client,
+						// Web search runs on the Claude API only.
+						client: createClaudeClient({ maxRetries: 8, timeout: 120_000 }),
 					})
 				: null;
 			let planted = false;
@@ -202,7 +210,8 @@ if (import.meta.main) {
 				docs,
 				// A research takes minutes, web or not: it runs beside the agent and the virtual clock
 				// does not wait for the real search, so without this a note would be ready at once.
-				delayMs: 120_000,
+				// Research in the CLI came back in 13.5 s (median of 44, 2026-11-10; it was 120 s here).
+				delayMs: 15_000,
 				...(s.inject
 					? {
 							tamper: (n) => {
@@ -262,7 +271,7 @@ if (import.meta.main) {
 						const line = show(e);
 						if (line) say(line);
 					},
-					user: llmUser(llm, s.persona),
+					user: llmUser(verifier.llm, s.persona),
 				});
 			say(`=== ${s.name}`);
 			let startMs = 0;
@@ -279,7 +288,7 @@ if (import.meta.main) {
 			}
 			const result = await session(s.minutes, s.turns, startMs, llm);
 			// The judge reads the whole conversation; its scores are measurement, never the agent's.
-			const judge = await judgeScenario(llm, {
+			const judge = await judgeScenario(verifier.llm, {
 				expect: s.expect,
 				previous: previousEvents,
 				// In the quick suite the judge reads the window only, as for a full run cut there
@@ -315,6 +324,7 @@ if (import.meta.main) {
 				research: searcher ? `web (${searcher.searches()} searches)` : "mock",
 				model: settings.llm.background.model,
 				effort: settings.llm.background.effort,
+				verifier: verifier.model,
 				previous: s.previous ? { events: previousEvents.length } : null,
 				wallSec: Math.round((performance.now() - startedWall) / 1000),
 				judge,

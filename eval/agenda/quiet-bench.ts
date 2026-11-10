@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { runRespond, type LlmPort } from "../../src/index.ts";
 import { createAgendaAgent, emptyProfile } from "../../src/agenda/index.ts";
-import { createClaudeClient } from "../../standalone/claude.ts";
+import { clientFor } from "./verifier.ts";
 import { openUncappedMeter } from "../../standalone/always-on-host.ts";
 import { createProviderReply } from "../../standalone/providers.ts";
 import { loadSettings } from "../../standalone/settings.ts";
@@ -30,9 +30,18 @@ const DIR = resolve("data/agenda/quiet-bench");
 /** What the user's words ask for (the user's decision 2026-11-10: soft words are a short pause). */
 type Want = "soft" | "asked" | "said" | "leaving" | "none";
 
+/**
+ * tuned: moments the reply may be tuned on (the default); held: made to see whether a fix holds
+ * beyond them (the same wish in other words and other topics; no line of the reply's
+ * instructions is among them). Do not read these, or tune on them, while changing the reply.
+ */
+export type MomentSet = "tuned" | "held";
+
 export interface QuietMoment {
 	readonly name: string;
 	readonly want: Want;
+	/** Absent: tuned. */
+	readonly set?: "held";
 	/** For `said`: the length the words give, in minutes. */
 	readonly minutes?: number;
 	/** For a pause of everything (「探索を一時停止して」). */
@@ -520,6 +529,125 @@ export const quietMoments: readonly QuietMoment[] = [
 			"リオレウス戦で斧モードの溜め斬りを狙うなら、どんな場面で溜めるのが多いですか？",
 		user: "溜めるのは、レウスが空から降りてきて着地した直後の隙が多いですね。ただ、あんまり質問攻めされると疲れちゃうので、ほどほどにお願いします。",
 	},
+	// ---- Held set (not to be tuned on): the same wishes in other words, in everyday topics. ----
+	// Soft: "give me a moment, my hands are full" (cooking).
+	{
+		name: "held-soft-ryori",
+		set: "held",
+		want: "soft",
+		agent: "今夜の晩ごはんは、もう献立を決めていますか？",
+		user: "うーん、まだ。いま包丁持ってるから、ちょっと間をあけてもらえると助かる。",
+	},
+	// Soft: "I am listening, leave me for a while" (music).
+	{
+		name: "held-soft-ongaku",
+		set: "held",
+		want: "soft",
+		agent: "最近よく聴いているアルバムはありますか？",
+		user: "昔のジャズばっかりかな。あ、ごめん、いまちょうど聴き入ってるところだから、少し間をおいてくれると嬉しい。",
+	},
+	// Soft: a sick child (family), asked to ease off until things calm down.
+	{
+		name: "held-soft-kazoku",
+		set: "held",
+		want: "soft",
+		agent: "週末は、ご家族でお出かけの予定ですか？",
+		user: "子どもが熱出しててそれどころじゃないんだよね。落ち着くまでは控えめにしてもらえると助かる。",
+	},
+	// Soft: worn out after a race (sports), will talk again when recovered.
+	{
+		name: "held-soft-sport",
+		set: "held",
+		want: "soft",
+		agent: "昨日のマラソン大会は、完走できましたか？",
+		user: "完走はしたけど、足がパンパンで今は何も頭に入らないや。元気になったらまた話すね。",
+	},
+	// Soft: declining an offered note with a wish to rest (appliances).
+	{
+		name: "held-soft-memo",
+		set: "held",
+		want: "soft",
+		agent:
+			"洗濯機の乾燥機能の電気代について調べたメモがあります。使い方によって月に数百円ほど違うそうです。表示しましょうか？",
+		user: "ううん、今は見る余裕がないや。落ち着いてからにするよ。",
+	},
+	// Asked: close your mouth until I call (work).
+	{
+		name: "held-asked-report",
+		set: "held",
+		want: "asked",
+		agent: "今日の仕事は、もう一段落しましたか？",
+		user: "いまからレポート書くから、こっちが呼ぶまで口を閉じてて。",
+	},
+	// Asked: leave me alone, no reply needed (cooking).
+	{
+		name: "held-asked-hitori",
+		set: "held",
+		want: "asked",
+		agent: "圧力鍋のレシピも、いくつか探しておきましょうか？",
+		user: "今はひとりにして。返事もいらない。",
+	},
+	// Said: forty-five minutes (sports).
+	{
+		name: "held-said-45",
+		set: "held",
+		want: "said",
+		minutes: 45,
+		agent: "今日のランニングは、何キロ走る予定ですか？",
+		user: "45分は声かけないでもらえる？ ストレッチするから。",
+	},
+	// Said: until three o'clock (travel / the afternoon).
+	{
+		name: "held-said-3ji",
+		set: "held",
+		want: "said",
+		minutes: 60,
+		clock: "2026-11-07T14:00:00+09:00",
+		agent: "午後は、どこかへ出かけますか？",
+		user: "3時までは静かにしといて。",
+	},
+	// Leaving: off to work in the morning.
+	{
+		name: "held-leaving-shigoto",
+		set: "held",
+		want: "leaving",
+		clock: "2026-11-08T07:30:00+09:00",
+		agent: "今日のお弁当は、もう用意しましたか？",
+		user: "うん、作った。じゃ、仕事行ってくる。",
+	},
+	// Leaving: going to bed.
+	{
+		name: "held-leaving-nemui",
+		set: "held",
+		want: "leaving",
+		clock: "2026-11-07T23:45:00+09:00",
+		agent: "明日の朝ごはんは、いつもどんな感じですか？",
+		user: "眠くなってきたから、今日は寝るわ。また明日。",
+	},
+	// None: takes up a fact (cooking).
+	{
+		name: "held-none-kakuni",
+		set: "held",
+		want: "none",
+		agent: "圧力鍋は、煮込み料理の時間をぐっと短くできて便利だそうですよ。",
+		user: "ふーん、便利なんだね。今度使ってみようかな。",
+	},
+	// None: turns a research offer down for a reason (travel), no wish for quiet.
+	{
+		name: "held-none-yado",
+		set: "held",
+		want: "none",
+		agent: "来月の京都旅行の宿も、調べておきましょうか？",
+		user: "宿は友人が押さえてくれてるから、そこは頼まなくて平気だよ。",
+	},
+	// None: mentions being busy but asks for more (music).
+	{
+		name: "held-none-gen",
+		set: "held",
+		want: "none",
+		agent: "ギターの弦は、どのくらいの頻度で替えていますか？",
+		user: "半年に一回くらいかな。最近は仕事が忙しくて弾けてないけど。弦の選び方も調べてくれる？",
+	},
 ];
 
 /** Words that promise a silence beyond a short pause (今日はそっとしておきます、もう話しかけません…). */
@@ -542,17 +670,22 @@ const noLlm: LlmPort = {
 	},
 };
 
-async function run(name: string, repeat: number) {
+/** Which moments a run takes (default: all). */
+const takes = (m: QuietMoment, sets: "all" | MomentSet) =>
+	sets === "all" || (m.set ?? "tuned") === sets;
+
+async function run(name: string, repeat: number, sets: "all" | MomentSet) {
 	const settings = loadSettings(
 		resolve(process.env.AGENCY_SETTINGS ?? "config/always-on.json"),
 	);
 	const meter = openUncappedMeter(settings, resolve("data/agenda/usage.jsonl"));
 	const spent = meter.spentUsd();
-	const client = createClaudeClient({ maxRetries: 8, timeout: 120_000 });
 	mkdirSync(DIR, { recursive: true });
-	const jobs = quietMoments.flatMap((m) =>
-		Array.from({ length: repeat }, (_, k) => ({ m, trial: k + 1 })),
-	);
+	const jobs = quietMoments
+		.filter((m) => takes(m, sets))
+		.flatMap((m) =>
+			Array.from({ length: repeat }, (_, k) => ({ m, trial: k + 1 })),
+		);
 	const out: Trial[] = [];
 	const one = async ({ m, trial }: (typeof jobs)[number]) => {
 		const clockAt = clockFrom(m.clock ?? "2026-11-07T19:00:00+09:00");
@@ -581,7 +714,11 @@ async function run(name: string, repeat: number) {
 		});
 		agent.observe({ id: "u1", who: "user", text: m.user, at: t0 });
 		// A reply port takes one call at a time: one per trial.
-		const chat = createProviderReply(settings.llm.main, meter, client);
+		const chat = createProviderReply(
+			settings.llm.main,
+			meter,
+			clientFor(settings.llm.main),
+		);
 		const quiet: { scope: string; minutes: number }[] = [];
 		const tools = createAgendaReplyTools({
 			agent,
@@ -670,6 +807,22 @@ const median = (xs: readonly number[]) => {
 /** The quiet a trial ended with: the last call's (a later call replaces an earlier one). */
 const last = (t: Trial) => t.quiet.at(-1) ?? null;
 
+/** The wish was met: a quiet period for what asked for one (of the length said), none for the rest. */
+const passes = (t: Trial, m: QuietMoment | undefined) => {
+	const q = last(t);
+	const set = q !== null && q.minutes > 0;
+	if (t.want === "none") return !set;
+	if (!set) return false;
+	if (t.want === "said") return Math.abs(q.minutes - (m?.minutes ?? -1)) <= 10;
+	return t.want === "leaving" || !t.longPromise;
+};
+
+const SETS: readonly MomentSet[] = ["tuned", "held"];
+const SET_LABEL: Record<MomentSet, string> = {
+	tuned: "手を入れてよい組",
+	held: "見ない組",
+};
+
 function compare(names: readonly string[]) {
 	const wants: Want[] = ["soft", "asked", "said", "leaving", "none"];
 	const label: Record<Want, string> = {
@@ -679,31 +832,49 @@ function compare(names: readonly string[]) {
 		leaving: "離れる",
 		none: "依頼なし",
 	};
+	const moments = new Map(quietMoments.map((m) => [m.name, m]));
+	const setOf = (t: Trial): MomentSet => moments.get(t.moment)?.set ?? "tuned";
 	console.log(
-		"| 版 | 言い方 | 件数 | 静かにした | 長さの中央値（分） | 長さの範囲（分） | 長く黙る約束の言葉 | 言った長さと合う（said） | 全部止める（scope=all） |",
+		"| 版 | 組 | 言い方 | 件数 | 静かにした | 長さの中央値（分） | 長さの範囲（分） | 長く黙る約束の言葉 | 言った長さと合う（said） | 全部止める（scope=all） |",
 	);
-	console.log(`| --- | --- |${" ---: |".repeat(7)}`);
+	console.log(`| --- | --- | --- |${" ---: |".repeat(7)}`);
 	for (const name of names) {
 		const trials = load(name);
-		for (const w of wants) {
-			const ts = trials.filter((t) => t.want === w);
+		for (const g of SETS)
+			for (const w of wants) {
+				const ts = trials.filter((t) => t.want === w && setOf(t) === g);
+				if (ts.length === 0) continue;
+				const set = ts.filter((t) => last(t) && last(t)!.minutes > 0);
+				const mins = set.map((t) => last(t)!.minutes);
+				const fits =
+					w === "said"
+						? `${set.filter((t) => Math.abs(last(t)!.minutes - (moments.get(t.moment)?.minutes ?? -1)) <= 10).length}/${ts.length}`
+						: "-";
+				const all = set.filter((t) => last(t)!.scope === "all").length;
+				console.log(
+					`| ${name} | ${SET_LABEL[g]} | ${label[w]} | ${ts.length} | ${set.length} | ${median(mins) ?? "-"} | ${mins.length ? `${Math.min(...mins)}〜${Math.max(...mins)}` : "-"} | ${ts.filter((t) => t.longPromise).length} | ${fits} | ${all} |`,
+				);
+			}
+	}
+	console.log(
+		"\n合格率（静かにすべき言い方は静かにし、長さが合い、長く黙る約束をしない。依頼なしは静かにしない）:\n",
+	);
+	console.log("| 版 | 組 | 合格 | 試行 | 率 |");
+	console.log("| --- | --- | ---: | ---: | ---: |");
+	for (const name of names) {
+		const trials = load(name);
+		for (const g of SETS) {
+			const ts = trials.filter((t) => setOf(t) === g);
 			if (ts.length === 0) continue;
-			const set = ts.filter((t) => last(t) && last(t)!.minutes > 0);
-			const mins = set.map((t) => last(t)!.minutes);
-			const moments = new Map(quietMoments.map((m) => [m.name, m]));
-			const fits =
-				w === "said"
-					? `${set.filter((t) => Math.abs(last(t)!.minutes - (moments.get(t.moment)?.minutes ?? -1)) <= 10).length}/${ts.length}`
-					: "-";
-			const all = set.filter((t) => last(t)!.scope === "all").length;
+			const ok = ts.filter((t) => passes(t, moments.get(t.moment))).length;
 			console.log(
-				`| ${name} | ${label[w]} | ${ts.length} | ${set.length} | ${median(mins) ?? "-"} | ${mins.length ? `${Math.min(...mins)}〜${Math.max(...mins)}` : "-"} | ${ts.filter((t) => t.longPromise).length} | ${fits} | ${all} |`,
+				`| ${name} | ${SET_LABEL[g]} | ${ok} | ${ts.length} | ${((100 * ok) / ts.length).toFixed(0)}% |`,
 			);
 		}
 	}
 	console.log("\n場面ごと（静かにした長さ、分。- は呼ばなかった）:\n");
-	console.log(`| 場面 | 言い方 | ${names.join(" | ")} |`);
-	console.log(`| --- | --- |${" --- |".repeat(names.length)}`);
+	console.log(`| 場面 | 組 | 言い方 | ${names.join(" | ")} |`);
+	console.log(`| --- | --- | --- |${" --- |".repeat(names.length)}`);
 	const runs = names.map(load);
 	for (const m of quietMoments) {
 		const cells = runs.map((ts) =>
@@ -715,7 +886,11 @@ function compare(names: readonly string[]) {
 				)
 				.join(" "),
 		);
-		console.log(`| ${m.name} | ${m.want} | ${cells.join(" | ")} |`);
+		// A moment the run did not take (a run of one set) has no trials: shown as blanks.
+		if (cells.every((c) => c === "")) continue;
+		console.log(
+			`| ${m.name} | ${m.set ?? "tuned"} | ${m.want} | ${cells.join(" | ")} |`,
+		);
 	}
 	console.log(
 		"\n（a は scope=all、! は返事が長く黙る約束の言葉（今日は・今夜は・話しかけません など）を含む）",
@@ -725,17 +900,29 @@ function compare(names: readonly string[]) {
 if (import.meta.main) {
 	const [cmd, ...rest] = process.argv.slice(2);
 	if (cmd === "run") {
-		const i = rest.indexOf("--repeat");
-		const repeat = i >= 0 ? Number(rest[i + 1]) : 4;
+		const flagged = new Set(["--repeat", "--set"]);
+		const flag = (n: string) => {
+			const i = rest.indexOf(n);
+			return i >= 0 ? rest[i + 1] : undefined;
+		};
+		const repeat = Number(flag("--repeat") ?? 4);
+		const sets = flag("--set") ?? "all";
 		const name = rest.find(
-			(a, k) => !a.startsWith("--") && rest[k - 1] !== "--repeat",
+			(a, k) => !a.startsWith("--") && !flagged.has(rest[k - 1] ?? ""),
 		);
-		if (!name || !Number.isInteger(repeat) || repeat < 1)
-			throw new Error("usage: quiet-bench.ts run <name> [--repeat N]");
-		await run(name, repeat);
+		if (
+			!name ||
+			!Number.isInteger(repeat) ||
+			repeat < 1 ||
+			!["all", "tuned", "held"].includes(sets)
+		)
+			throw new Error(
+				"usage: quiet-bench.ts run <name> [--repeat N] [--set all|tuned|held]",
+			);
+		await run(name, repeat, sets as "all" | MomentSet);
 	} else if (cmd === "compare" && rest.length) compare(rest);
 	else
 		throw new Error(
-			"usage: quiet-bench.ts run <name> [--repeat N] | compare <name> [<name>...]",
+			"usage: quiet-bench.ts run <name> [--repeat N] [--set all|tuned|held] | compare <name> [<name>...]",
 		);
 }

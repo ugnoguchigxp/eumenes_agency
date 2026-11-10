@@ -12,9 +12,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { createClaudeClient } from "../../standalone/claude.ts";
 import { openUncappedMeter } from "../../standalone/always-on-host.ts";
-import { createProviderLlm } from "../../standalone/providers.ts";
 import { loadSettings } from "../../standalone/settings.ts";
 import { judgeStored, load } from "./rejudge.ts";
 import { agendaScenarios, inWindow, quickSuite } from "./scenarios.ts";
@@ -35,6 +33,8 @@ const tokens = (events: readonly AgendaSimEvent[]) =>
 		return n + (u ? (u.inputTokens ?? 0) + (u.outputTokens ?? 0) : 0);
 	}, 0);
 
+import { verifierLlm } from "./verifier.ts";
+
 if (import.meta.main) {
 	const runs = process.argv.slice(2);
 	if (runs.length === 0) throw new Error("usage: window.ts <run> [<run>...]");
@@ -43,8 +43,8 @@ if (import.meta.main) {
 	);
 	const meter = openUncappedMeter(settings, resolve("data/agenda/usage.jsonl"));
 	const spentBefore = meter.spentUsd();
-	const client = createClaudeClient({ maxRetries: 8, timeout: 120_000 });
-	const llm = createProviderLlm(settings.llm.background, meter, client);
+	// The judge is another vendor's model than the agent's (verifier.ts).
+	const llm = verifierLlm(settings, meter).llm;
 	const jobs = runs.flatMap((run) => {
 		const dir = resolve("data/agenda/runs", run);
 		if (!existsSync(dir)) throw new Error(`no run: ${dir}`);

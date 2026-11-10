@@ -89,6 +89,7 @@ const model: LlmPort = {
 									refs: [user.id],
 									value: 4,
 									reason: "先回り",
+									topic: "",
 								},
 							]
 						: []),
@@ -101,9 +102,11 @@ const model: LlmPort = {
 							refs: [n.id],
 							value: 3,
 							reason: "雑談",
+							topic: "",
 						})),
 				],
 				drop: [],
+				focus: "",
 			};
 		} else
 			value = {
@@ -111,6 +114,8 @@ const model: LlmPort = {
 					"ご存じでしたか？ 新しい店ができたそうです。メモを表示しましょうか？",
 				emotion: "😮",
 				decline: null,
+				questions: 1,
+				choice: false,
 			};
 		return Promise.resolve({
 			value: req.schema.parse(value),

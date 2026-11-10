@@ -12,6 +12,7 @@ import {
 } from "./contracts.ts";
 import { checkData } from "./prompt.ts";
 import {
+	clock,
 	makeItem,
 	notes,
 	record,
@@ -73,6 +74,7 @@ export async function check(
 			system: st.instructions.check,
 			prompt: checkData({
 				now,
+				clock: clock(st, now),
 				request: item.text,
 				notes: notesNow,
 				researchedBefore,
@@ -83,8 +85,10 @@ export async function check(
 		signal,
 	);
 	if (!call.ok) {
-		// An unchecked research is not started blind; it is tried again later.
-		item.deferUntil = now + RESEARCH_RETRY_MS;
+		// An unchecked research is not started blind; it is tried again later (at once when the
+		// call was called off because the user spoke).
+		if (call.outcome.code !== "aborted")
+			item.deferUntil = now + RESEARCH_RETRY_MS;
 		return out(
 			"failed",
 			null,

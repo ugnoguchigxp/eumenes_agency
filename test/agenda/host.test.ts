@@ -205,14 +205,18 @@ test("the reply always sees the note behind a topic the agent brought up itself"
 											refs: ["note:n1"],
 											value: 3,
 											reason: "r",
+											topic: "",
 										},
 									],
 									drop: [],
+									focus: "",
 								}
 							: {
 									utterance: "口パクのメモがあります。",
 									emotion: "🙂",
 									decline: null,
+									questions: 1,
+									choice: false,
 								},
 					),
 					model: "scripted",

@@ -178,7 +178,11 @@ export function speechMetrics(all: readonly E[], minutes: number) {
 		plannedSaid: [...planned].filter((id) => said.has(id)).length,
 		composes: composes.length,
 		/** Written while the user started typing or new words came: thrown away. */
-		stale: composes.filter((c) => c.code === "stale").length,
+		stale: composes.filter((c) => c.code === "stale" || c.code === "aborted")
+			.length,
+		/** The model calls behind the agent's own words: plans, utterances written, checks. */
+		background:
+			of(events, "plan").length + composes.length + of(events, "check").length,
 		repeatsDropped: of(events, "repeat").length,
 	};
 }

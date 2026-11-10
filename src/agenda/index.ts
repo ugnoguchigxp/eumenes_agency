@@ -1,5 +1,5 @@
 export * from "./contracts.ts";
-export { declinesOffer, endsWithQuestion } from "./text.ts";
+export { asksQuestion, declinesOffer, endsWithQuestion } from "./text.ts";
 export {
 	createAgendaAgent,
 	normalize,

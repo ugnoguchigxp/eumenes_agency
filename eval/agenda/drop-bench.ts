@@ -38,8 +38,16 @@ interface BenchItem {
 	readonly expect: "keep" | "drop" | "any";
 }
 
+/**
+ * tuned: moments the plan may be tuned on (the default); held: the same intents in other words and
+ * other topics, to see whether a fix holds beyond them. Not to be read or tuned on.
+ */
+export type MomentSet = "tuned" | "held";
+
 export interface DropMoment {
 	readonly name: string;
+	/** Absent: tuned. */
+	readonly set?: "held";
 	/**
 	 * rest: the user only wants a rest (a short pause, set as the reply would), and the plan runs on
 	 * those words; later: the same words thirteen minutes ago, a "うん" since, and the plan runs on a
@@ -105,6 +113,38 @@ const godzillaNotes: readonly BenchItem[] = [
 		expect: "any",
 	},
 	...homeNotes(["route", "七里ヶ浜から辻堂への電車の経路と夜の帰りの本数"]),
+];
+
+// The held set's topics: everyday ones (cooking, work, travel, home), none of the tuned set's.
+const heldTopics = homeNotes(
+	["okazu", "平日の夜に作り置きできる簡単おかず"],
+	["commute", "朝の通勤が楽になる持ち物の整え方"],
+	["music", "休みの日に聴きたいおだやかな音楽"],
+);
+const heldLaterTopics = [
+	...heldTopics,
+	...homeNotes(["knit", "家で少しずつ進められる編みものの始め方"]),
+];
+const heldAsk: BenchItem = {
+	key: "ask-cooking",
+	kind: "ask",
+	text: "最近はまっている料理はありますか？",
+	expect: "keep",
+};
+const EARLIER_TOMATO =
+	"ベランダでのトマト栽培の基本（苗の選び方、水やり、支柱）を調べ、初心者向けにまとめる";
+const MINI_TOMATO =
+	"ミニトマトのベランダ栽培を改めて調べ、前のメモ（普通のトマト）とは別の品種としてまとめる";
+const TOMATO_TALK =
+	"ベランダでのトマト栽培について調べました。苗は葉の色が濃いものを選び、水やりは土の表面が乾いてからたっぷりが基本だそうです。詳細をメモにまとめてあるので、表示しましょうか？";
+const tomatoNotes: readonly BenchItem[] = [
+	{
+		key: "tomato",
+		kind: "talk",
+		text: "ベランダでのトマト栽培の基本と水やりの頻度",
+		expect: "any",
+	},
+	...homeNotes(["washer", "洗濯機の乾燥機能の電気代と時短のコツ"]),
 ];
 
 export const dropMoments: readonly DropMoment[] = [
@@ -332,6 +372,213 @@ export const dropMoments: readonly DropMoment[] = [
 		reply: "おつかれさまでした！無事に終わってよかったです。",
 		memory: ["今日の午後に大事な会議がある"],
 	},
+	// ---- Held set (not to be tuned on): the same intents in other words, in everyday topics. ----
+	// rest, as "rest-bootto": no head for anything (work).
+	{
+		name: "held-rest-atama",
+		set: "held",
+		group: "rest",
+		items: [...heldTopics, heldAsk],
+		agent: "今日の夕飯は、もう決めていますか？",
+		user: "いまは頭が回らないから、ひと息つかせて",
+		reply: "わかりました。少しのあいだ控えますね。",
+	},
+	// rest, as "rest-tsukareta": too tired to talk (work).
+	{
+		name: "held-rest-shindoi",
+		set: "held",
+		group: "rest",
+		items: [...heldTopics, heldAsk],
+		agent: "最近、お仕事は落ち着いていますか？",
+		user: "ちょっと今日はしんどくて、会話する気力がないや",
+		reply: "お疲れさまです。少しのあいだ控えますね。",
+	},
+	// rest, as "rest-matte": busy for a moment (family).
+	{
+		name: "held-rest-nekashi",
+		set: "held",
+		group: "rest",
+		items: [...heldTopics, heldAsk],
+		agent: "休みの日は、どんなふうに過ごすことが多いですか？",
+		user: "いま子どもを寝かしつけてるところだから、またのちほどね",
+		reply: "了解です。少しのあいだ控えますね。",
+	},
+	// rest, as "rest-nonbiri": wants a quiet evening (music).
+	{
+		name: "held-rest-shizuka",
+		set: "held",
+		group: "rest",
+		items: [...heldTopics, heldAsk],
+		agent: "音楽を聴きながら作業するのは、お好きですか？",
+		user: "今日はもう静かに過ごしたい気分なんだ",
+		reply: "いいですね。少しのあいだ控えますね。",
+	},
+	// later, as "later-bootto": nothing on the mind (commute), thirteen minutes on a result comes in.
+	{
+		name: "held-later-nanimo",
+		set: "held",
+		group: "later",
+		items: [...heldLaterTopics, heldAsk],
+		agent: "仕事帰りに寄り道することはありますか？",
+		user: "今日はなんにも考えたくない気分",
+		reply: "わかりました。少しのあいだ、こちらからは控えておきますね。",
+	},
+	// later, as "later-yasumitai": a headache, taking it easy (health).
+	{
+		name: "held-later-zutsu",
+		set: "held",
+		group: "later",
+		items: [...heldLaterTopics, heldAsk],
+		agent: "最近、体調はいかがですか？",
+		user: "ちょっと頭痛がするので、今日はおとなしくしてる",
+		reply: "お大事にしてください。少しのあいだ控えますね。",
+	},
+	// promise, as "promise-dup-now": a request that looks like an earlier note's (tomato, then
+	// cherry tomato); another research is running.
+	{
+		name: "held-promise-dup-now",
+		set: "held",
+		group: "promise",
+		items: [...tomatoNotes],
+		requests: [{ key: "mini-tomato", text: MINI_TOMATO, expect: "keep" }],
+		earlier: { text: EARLIER_TOMATO, noteKey: "tomato" },
+		running: "新しい洗濯機の乾燥機能の電気代を、機種ごとに比べる",
+		agent: TOMATO_TALK,
+		user: "トマトじゃなくて、ミニトマトの方を育てたいんだよね",
+		reply:
+			"ミニトマトのほうでしたね。ミニトマトの育て方を、改めて調べるよう頼みました。今の調べものが終わったらメモにまとめます。",
+	},
+	// promise, as "promise-dup-later": the same, and the user goes on to another thing.
+	{
+		name: "held-promise-dup-later",
+		set: "held",
+		group: "promise",
+		items: [...tomatoNotes],
+		requests: [{ key: "mini-tomato", text: MINI_TOMATO, expect: "keep" }],
+		earlier: { text: EARLIER_TOMATO, noteKey: "tomato" },
+		running: "新しい洗濯機の乾燥機能の電気代を、機種ごとに比べる",
+		agent: TOMATO_TALK,
+		user: "トマトじゃなくて、ミニトマトの方を育てたいんだよね",
+		reply:
+			"ミニトマトのほうでしたね。ミニトマトの育て方を、改めて調べるよう頼みました。今の調べものが終わったらメモにまとめます。",
+		next: {
+			user: "ベランダは南向きで、日当たりは良い方だよ",
+			reply: "それなら育てやすそうですね。",
+		},
+	},
+	// promise, as "promise-cancel": asked for, then called off (travel).
+	{
+		name: "held-promise-cancel",
+		set: "held",
+		group: "promise",
+		items: homeNotes(["okazu", "平日の夜に作り置きできる簡単おかず"]),
+		requests: [
+			{
+				key: "kyoto",
+				text: "京都の紅葉の見頃と混雑する時間帯を調べてまとめる",
+				expect: "drop",
+			},
+		],
+		agent: "来月の旅行先は、もう決めていますか？",
+		user: "京都の紅葉の見頃を調べておいて",
+		reply:
+			"わかりました。京都の紅葉の見頃と混雑する時間帯を調べるよう頼みました。",
+		next: {
+			user: "ごめん、やっぱり京都はやめて温泉にした。紅葉の調べものは取り下げるね",
+			reply: "わかりました、京都の紅葉の件は取り下げますね。",
+		},
+	},
+	// right, as "right-declined": a topic turned down for good (cooking).
+	{
+		name: "held-right-declined",
+		set: "held",
+		group: "right",
+		items: [
+			{
+				key: "curry",
+				kind: "talk",
+				text: "スパイスカレーの新しいお店",
+				expect: "drop",
+			},
+			...homeNotes(
+				["okazu", "平日の夜に作り置きできる簡単おかず"],
+				["music", "休みの日に聴きたいおだやかな音楽"],
+			),
+		],
+		agent:
+			"スパイスカレーの話の続きですが、新しいお店の情報がまとまりました。表示しましょうか？",
+		user: "カレーの話題はもう結構です。当分いらないな",
+		reply: "わかりました、カレーの話はここまでにしますね。",
+	},
+	// right, as "right-correction": a taste that changed (ramen to a salt-free diet).
+	{
+		name: "held-right-correction",
+		set: "held",
+		group: "right",
+		items: [
+			{
+				key: "ramen-new",
+				kind: "talk",
+				text: "味の濃いラーメンの新しい店",
+				expect: "drop",
+			},
+			{
+				key: "izakaya",
+				kind: "talk",
+				text: "塩気の強い居酒屋つまみの人気メニュー",
+				expect: "drop",
+			},
+			...homeNotes(["dashi", "減塩でも満足できる出汁の取り方"]),
+		],
+		agent:
+			"味の濃いものがお好きなんですよね。最近食べた中で一番濃かったのは何ですか？",
+		user: "実は健診で引っかかって、最近は減塩中で濃い味は避けてるんだ",
+		reply: "そうだったんですね。体をいたわってくださいね。",
+		memory: ["味の濃い料理が好き"],
+	},
+	// right, as "right-answered": the question answered (dinner).
+	{
+		name: "held-right-answered",
+		set: "held",
+		group: "right",
+		items: [
+			{
+				key: "ask-dinner",
+				kind: "ask",
+				text: "今夜の晩ごはんは、もう決まっていますか？",
+				expect: "drop",
+			},
+			...homeNotes(
+				["okazu", "平日の夜に作り置きできる簡単おかず"],
+				["music", "休みの日に聴きたいおだやかな音楽"],
+			),
+		],
+		agent: "お腹がすく時間ですね。",
+		user: "今夜は餃子にするって決めたよ",
+		reply: "いいですね！餃子、美味しくできるといいですね。",
+	},
+	// right, as "right-over": the day it was for is over (an interview).
+	{
+		name: "held-right-over",
+		set: "held",
+		group: "right",
+		items: [
+			{
+				key: "interview",
+				kind: "talk",
+				text: "今日の面接の前に確認したい自己紹介の整え方",
+				expect: "drop",
+			},
+			...homeNotes(
+				["commute", "朝の通勤が楽になる持ち物の整え方"],
+				["music", "休みの日に聴きたいおだやかな音楽"],
+			),
+		],
+		agent: "おかえりなさい。今日の面接はどうでしたか？",
+		user: "面接、終わったよ。ひと安心",
+		reply: "おつかれさまでした！ひと安心ですね。",
+		memory: ["今日の午後に面接がある"],
+	},
 ];
 
 /** A raw plan proposal: what the model asked to drop, by bench key. */
@@ -380,7 +627,13 @@ const benchLlm = (
 							reason: "bench",
 						})),
 					}
-				: { utterance: null, decline: "bench", emotion: null };
+				: {
+						utterance: null,
+						decline: "bench",
+						emotion: null,
+						questions: 0,
+						choice: false,
+					};
 		return { ...zero, value: req.schema.parse(value) };
 	},
 });
@@ -399,6 +652,7 @@ const batches = (items: readonly BenchItem[], noteOf: Map<string, string>) => {
 					refs: [`note:${noteOf.get(i.key)!}`],
 					value: 4,
 					reason: "話の流れで調べたことの結果",
+					topic: "",
 				})),
 				...asks.slice(k, k + 2).map((i) => ({
 					kind: "ask" as const,
@@ -406,14 +660,20 @@ const batches = (items: readonly BenchItem[], noteOf: Map<string, string>) => {
 					refs: [],
 					value: 3,
 					reason: "相手を知るため",
+					topic: "",
 				})),
 			],
 			drop: [],
+			focus: "",
 		});
 	return out;
 };
 
-async function run(name: string, repeat: number) {
+/** Which moments a run takes (default: all). */
+const takes = (m: DropMoment, sets: "all" | MomentSet) =>
+	sets === "all" || (m.set ?? "tuned") === sets;
+
+async function run(name: string, repeat: number, sets: "all" | MomentSet) {
 	const settings = loadSettings(
 		resolve(process.env.AGENCY_SETTINGS ?? "config/always-on.json"),
 	);
@@ -421,9 +681,11 @@ async function run(name: string, repeat: number) {
 	const spent = meter.spentUsd();
 	const real = createProviderLlm(settings.llm.background, meter);
 	mkdirSync(DIR, { recursive: true });
-	const jobs = dropMoments.flatMap((m) =>
-		Array.from({ length: repeat }, (_, k) => ({ m, trial: k + 1 })),
-	);
+	const jobs = dropMoments
+		.filter((m) => takes(m, sets))
+		.flatMap((m) =>
+			Array.from({ length: repeat }, (_, k) => ({ m, trial: k + 1 })),
+		);
 	const out: Trial[] = [];
 	const one = async ({ m, trial }: (typeof jobs)[number]) => {
 		const T = 1_800_000;
@@ -609,42 +871,85 @@ const load = (name: string): Trial[] => {
 		.map((l) => JSON.parse(l) as Trial);
 };
 
+const SETS: readonly MomentSet[] = ["tuned", "held"];
+const SET_LABEL: Record<MomentSet, string> = {
+	tuned: "手を入れてよい組",
+	held: "見ない組",
+};
+
 function compare(names: readonly string[]) {
 	const moments = new Map(dropMoments.map((m) => [m.name, m]));
+	const setOf = (t: Trial): MomentSet => moments.get(t.moment)?.set ?? "tuned";
+	/** Items the plan was right or wrong about in a trial: kept ones not dropped, due ones dropped. */
+	const tally = (t: Trial) => {
+		const m = moments.get(t.moment)!;
+		const gone = new Set(t.dropped.map((d) => d.key));
+		let keep = 0;
+		let keepDropped = 0;
+		let due = 0;
+		let dueDropped = 0;
+		for (const i of [...m.items, ...(m.requests ?? [])]) {
+			if (i.expect === "any") continue;
+			if (i.expect === "keep") {
+				keep++;
+				if (gone.has(i.key)) keepDropped++;
+			} else {
+				due++;
+				if (gone.has(i.key)) dueDropped++;
+			}
+		}
+		return { keep, keepDropped, due, dueDropped };
+	};
 	console.log(
-		"| 版 | 場面 | 試行 | 残すべき項目を外した | 外すべき項目を外した | 掘り下げ中（nothingToSay） |",
+		"| 版 | 組 | 場面 | 試行 | 残すべき項目を外した | 外すべき項目を外した | 掘り下げ中（nothingToSay） |",
 	);
-	console.log(`| --- | --- |${" ---: |".repeat(4)}`);
+	console.log(`| --- | --- | --- |${" ---: |".repeat(4)}`);
 	for (const name of names) {
 		const trials = load(name);
-		for (const g of ["rest", "later", "right", "promise"] as const) {
-			const ts = trials.filter((t) => t.group === g);
-			let keep = 0;
-			let keepDropped = 0;
-			let due = 0;
-			let dueDropped = 0;
-			for (const t of ts) {
-				const m = moments.get(t.moment)!;
-				const gone = new Set(t.dropped.map((d) => d.key));
-				for (const i of [...m.items, ...(m.requests ?? [])]) {
-					if (i.expect === "any") continue;
-					if (i.expect === "keep") {
-						keep++;
-						if (gone.has(i.key)) keepDropped++;
-					} else {
-						due++;
-						if (gone.has(i.key)) dueDropped++;
-					}
+		for (const s of SETS)
+			for (const g of ["rest", "later", "right", "promise"] as const) {
+				const ts = trials.filter((t) => t.group === g && setOf(t) === s);
+				if (ts.length === 0) continue;
+				let keep = 0;
+				let keepDropped = 0;
+				let due = 0;
+				let dueDropped = 0;
+				for (const t of ts) {
+					const x = tally(t);
+					keep += x.keep;
+					keepDropped += x.keepDropped;
+					due += x.due;
+					dueDropped += x.dueDropped;
 				}
+				console.log(
+					`| ${name} | ${SET_LABEL[s]} | ${{ rest: "休みたいだけ（直後）", later: "休みたいだけ（13分後に結果）", right: "外すのが正しい", promise: "頼まれた調べもの" }[g]} | ${ts.length} | ${keepDropped}/${keep} | ${due ? `${dueDropped}/${due}` : "-"} | ${ts.filter((t) => t.nothingToSay).length} |`,
+				);
 			}
+	}
+	console.log(
+		"\n合格率（項目ごと。残すべき項目を外さない、外すべき項目を外す）:\n",
+	);
+	console.log("| 版 | 組 | 合格 | 項目 | 率 |");
+	console.log("| --- | --- | ---: | ---: | ---: |");
+	for (const name of names) {
+		const trials = load(name);
+		for (const s of SETS) {
+			let ok = 0;
+			let all = 0;
+			for (const t of trials.filter((x) => setOf(x) === s)) {
+				const x = tally(t);
+				ok += x.keep - x.keepDropped + x.dueDropped;
+				all += x.keep + x.due;
+			}
+			if (all === 0) continue;
 			console.log(
-				`| ${name} | ${{ rest: "休みたいだけ（直後）", later: "休みたいだけ（13分後に結果）", right: "外すのが正しい", promise: "頼まれた調べもの" }[g]} | ${ts.length} | ${keepDropped}/${keep} | ${due ? `${dueDropped}/${due}` : "-"} | ${ts.filter((t) => t.nothingToSay).length} |`,
+				`| ${name} | ${SET_LABEL[s]} | ${ok} | ${all} | ${((100 * ok) / all).toFixed(0)}% |`,
 			);
 		}
 	}
 	console.log("\n場面ごと（外した項目。- は何も外さなかった）:\n");
-	console.log(`| 場面 | ${names.join(" | ")} |`);
-	console.log(`| --- |${" --- |".repeat(names.length)}`);
+	console.log(`| 場面 | 組 | ${names.join(" | ")} |`);
+	console.log(`| --- | --- |${" --- |".repeat(names.length)}`);
 	const runs = names.map(load);
 	for (const m of dropMoments) {
 		const cells = runs.map((ts) =>
@@ -655,24 +960,38 @@ function compare(names: readonly string[]) {
 				)
 				.join(" / "),
 		);
-		console.log(`| ${m.name} | ${cells.join(" | ")} |`);
+		// A moment the run did not take (a run of one set) has no trials.
+		if (cells.every((c) => c === "")) continue;
+		console.log(`| ${m.name} | ${m.set ?? "tuned"} | ${cells.join(" | ")} |`);
 	}
 }
 
 if (import.meta.main) {
 	const [cmd, ...rest] = process.argv.slice(2);
 	if (cmd === "run") {
-		const i = rest.indexOf("--repeat");
-		const repeat = i >= 0 ? Number(rest[i + 1]) : 4;
+		const flagged = new Set(["--repeat", "--set"]);
+		const flag = (n: string) => {
+			const i = rest.indexOf(n);
+			return i >= 0 ? rest[i + 1] : undefined;
+		};
+		const repeat = Number(flag("--repeat") ?? 4);
+		const sets = flag("--set") ?? "all";
 		const name = rest.find(
-			(a, k) => !a.startsWith("--") && rest[k - 1] !== "--repeat",
+			(a, k) => !a.startsWith("--") && !flagged.has(rest[k - 1] ?? ""),
 		);
-		if (!name || !Number.isInteger(repeat) || repeat < 1)
-			throw new Error("usage: drop-bench.ts run <name> [--repeat N]");
-		await run(name, repeat);
+		if (
+			!name ||
+			!Number.isInteger(repeat) ||
+			repeat < 1 ||
+			!["all", "tuned", "held"].includes(sets)
+		)
+			throw new Error(
+				"usage: drop-bench.ts run <name> [--repeat N] [--set all|tuned|held]",
+			);
+		await run(name, repeat, sets as "all" | MomentSet);
 	} else if (cmd === "compare" && rest.length) compare(rest);
 	else
 		throw new Error(
-			"usage: drop-bench.ts run <name> [--repeat N] | compare <name> [<name>...]",
+			"usage: drop-bench.ts run <name> [--repeat N] [--set all|tuned|held] | compare <name> [<name>...]",
 		);
 }

@@ -5,8 +5,8 @@
 import { describe, expect, test } from "bun:test";
 import type { LlmPort, LlmRequest } from "../../src/index.ts";
 import {
+	asksQuestion,
 	createAgendaAgent,
-	declinesOffer,
 	RESEARCH_TTL_MS,
 	type AgendaDeps,
 	type AgendaSnapshot,
@@ -20,11 +20,14 @@ type Data = Record<string, unknown>;
 
 type Kind = "plan" | "check" | "ask_check" | "compose";
 
-const withEmotion = (
-	c: Omit<ComposeOutput, "emotion"> & Partial<Pick<ComposeOutput, "emotion">>,
-): ComposeOutput => ({
+type ComposeScript = Omit<ComposeOutput, "emotion" | "questions" | "choice"> &
+	Partial<Pick<ComposeOutput, "emotion" | "questions" | "choice">>;
+
+const withEmotion = (c: ComposeScript): ComposeOutput => ({
 	...c,
 	emotion: c.emotion ?? (c.utterance === null ? null : "🙂"),
+	questions: c.questions ?? (c.utterance?.match(/[？?]/gu) ?? []).length,
+	choice: c.choice ?? false,
 });
 
 /** Plans, checks and utterances by script; tells the calls apart by their instructions. */
@@ -34,10 +37,7 @@ const scripted = (s: {
 	/** Questions asked or answered already, by id (none unless the script says so). */
 	repeats?: (d: Data, n: number) => Record<string, "asked" | "answered">;
 	/** The feeling may be left out of a script (🙂 when speaking, none when declining). */
-	compose?: (
-		d: Data,
-		n: number,
-	) => Omit<ComposeOutput, "emotion"> & Partial<Pick<ComposeOutput, "emotion">>;
+	compose?: (d: Data, n: number) => ComposeScript;
 }) => {
 	const calls: { kind: Kind; data: Data }[] = [];
 	const llm: LlmPort = {
@@ -54,7 +54,7 @@ const scripted = (s: {
 			const n = calls.filter((c) => c.kind === kind).length;
 			const value =
 				kind === "plan"
-					? (s.plan?.(data, n) ?? { add: [], drop: [] })
+					? (s.plan?.(data, n) ?? { add: [], drop: [], focus: "" })
 					: kind === "ask_check"
 						? {
 								verdicts: (data["candidates"] as { id: string }[]).map((c) => ({
@@ -104,10 +104,12 @@ const add = (
 	refs,
 	value,
 	reason: "test",
+	topic: "",
 });
 const plan = (...items: ReturnType<typeof add>[]): PlanOutput => ({
 	add: items,
 	drop: [],
+	focus: "",
 });
 const idle = () => ({ busy: false });
 const sig = () => new AbortController().signal;
@@ -195,6 +197,7 @@ describe("agenda agent", () => {
 					: {
 							add: [],
 							drop: [{ id: asked, reason: "同じ調べものがもうある" }],
+							focus: "",
 						},
 		});
 		const agent = make({ llm: m.llm });
@@ -314,6 +317,69 @@ describe("agenda agent", () => {
 		expect(agent.askForReply(20_000)?.text).toBe("最近ハマっていること");
 	});
 
+	test("review 2026-11-11: a line written beside a plan that drops its item is not said", async () => {
+		const note: NoteRef = {
+			id: "n1",
+			title: "店",
+			summary: "A店",
+			at: 0,
+			refs: [],
+		};
+		let b = "";
+		const m = scripted({
+			plan: (_d, n) =>
+				n === 1
+					? plan(add("talk", "店の話", ["note:n1"], 5))
+					: {
+							...plan(),
+							drop: [{ id: b, reason: "相手がその話題を断った" }],
+						},
+		});
+		const agent = make({ llm: m.llm, notes: () => [note] });
+		agent.setQuiet({ scope: "speech", minutes: 1, at: 0 });
+		await agent.step(0, idle, sig());
+		b = agent.view().items[0]!.id;
+		// The quiet ends: the plan reads it while the line is written beside it, and drops it.
+		const out = await agent.step(60_000, idle, sig());
+		expect(out.plan?.dropped).toEqual([b]);
+		expect(out.tickets).toEqual([]);
+		expect(agent.view().items.find((i) => i.id === b)?.status).toBe("dropped");
+	});
+
+	test("review 2026-11-11: the line held for the end of the gap is not said once the user speaks", async () => {
+		let agent: ReturnType<typeof make> | null = null;
+		// The host calls the step off when the user's line comes (agenda-session.ts).
+		const off = new AbortController();
+		const m = scripted({
+			plan: (_d, n) => {
+				if (n === 2) {
+					agent!.observe({
+						id: "u2",
+						who: "user",
+						text: "ところで",
+						at: 10_000,
+					});
+					off.abort();
+				}
+				return n === 1 ? plan(add("ask", "Q1", ["u1"])) : plan();
+			},
+		});
+		agent = make({ llm: m.llm });
+		agent.observe({ id: "u1", who: "user", text: "こんにちは", at: 0 });
+		agent.observe({ id: "r1", who: "reply", text: "どうも。", at: 0 });
+		// Written at once, held until ten seconds after the reply.
+		expect((await agent.step(0, idle, sig())).tickets).toEqual([]);
+		expect(m.count("compose")).toBe(1);
+		expect(agent.nextAt(1)).toBe(10_000);
+		// When the gap ends, the user speaks while the step is out: the line is not said.
+		agent.infoChanged(10_000);
+		const out = await agent.step(10_000, idle, off.signal);
+		expect(out.tickets.filter((t) => t.kind === "speak")).toEqual([]);
+		expect(agent.view().items.find((i) => i.text === "Q1")?.status).toBe(
+			"open",
+		);
+	});
+
 	test("a refused start is tried again later", async () => {
 		const m = scripted({
 			plan: (d) =>
@@ -335,7 +401,7 @@ describe("agenda agent", () => {
 		await agent.step(1, idle, sig());
 		expect(agent.nextAt(2)).toBe(2);
 		await agent.step(2, idle, sig());
-		expect(agent.nextAt(3)).toBe(60_000);
+		expect(agent.nextAt(3)).toBe(10_000);
 	});
 
 	test("quiet for speech: nothing is said, research goes on, the end plans again", async () => {
@@ -478,6 +544,9 @@ describe("agenda agent", () => {
 			status: "succeeded",
 		});
 		// Ten seconds later the talk comes, though Q1 is not answered; never Q2 before the answer.
+		// It is written at once, ahead of its time, and said when the ten seconds are over.
+		expect(agent.nextAt(1_000)).toBe(1_000);
+		expect((await agent.step(1_000, idle, sig())).tickets).toEqual([]);
 		expect(agent.nextAt(1_000)).toBe(10_000);
 		const b = await agent.step(10_000, idle, sig());
 		expect(b.tickets).toMatchObject([{ itemKind: "talk" }]);
@@ -1252,6 +1321,8 @@ describe("agenda agent", () => {
 		agent = make({ llm: m.llm });
 		await agent.step(0, idle, sig());
 		expect(agent.view().planDue).toBe(true);
+		// No wait: the news is planned on right after the plan that was out.
+		expect(agent.nextAt(10)).toBe(10);
 		await agent.step(10, idle, sig());
 		expect(m.count("plan")).toBe(2);
 		// That plan was for the news; with nothing left to say, the next one digs.
@@ -1435,18 +1506,37 @@ describe("agenda agent", () => {
 		expect(out.tickets).toMatchObject([{ kind: "speak", emotion: "🤔" }]);
 	});
 
-	test("a question that makes the user pick one of two is never said", async () => {
+	test("a question that makes the user pick one of two is never said: as its writer accounts for it", async () => {
 		const m = scripted({
 			plan: (_d, n) => (n === 1 ? plan(add("ask", "過ごし方")) : plan()),
 			compose: () => ({
 				utterance: "温泉と観光、どちらに時間を使いたいですか？",
 				decline: null,
+				choice: true,
 			}),
 		});
 		const agent = make({ llm: m.llm });
 		const out = await agent.step(0, idle, sig());
 		expect(out.compose?.rejected).toEqual(["either_or"]);
 		expect(out.tickets).toEqual([]);
+	});
+
+	test("words alone make no either-or or second question (review 2026-11-10 evening 3.1)", async () => {
+		const asks = [
+			"ご出身はどちらですか？",
+			"週末はどちらへ出かけることが多いですか？",
+			"そのあと、どうなりましたか？",
+			"お仕事のあと、よく寄るお店はありますか？",
+		];
+		for (const a of asks) {
+			const m = scripted({
+				plan: (_d, n) => (n === 1 ? plan(add("ask", a)) : plan()),
+				compose: () => ({ utterance: a, decline: null }),
+			});
+			const out = await make({ llm: m.llm }).step(0, idle, sig());
+			expect([a, out.compose?.rejected]).toEqual([a, []]);
+			expect(out.tickets).toMatchObject([{ kind: "speak", utterance: a }]);
+		}
 	});
 
 	test("a question asked or answered already, in meaning, is not asked: checked when planned and right before", async () => {
@@ -1599,7 +1689,7 @@ describe("agenda agent", () => {
 		expect(agent.askForReply(0)).toBeNull();
 	});
 
-	test("the user's no to an offer: the plan hears it, and nothing else is held back", async () => {
+	test("the user's no to an offer: nothing is held back, and the plan reads it in the conversation", async () => {
 		const notesNow: NoteRef[] = [
 			{ id: "n1", title: "辛い店", summary: "A店", at: 0, refs: [] },
 			{ id: "n2", title: "家ラーメン", summary: "B", at: 0, refs: [] },
@@ -1625,27 +1715,22 @@ describe("agenda agent", () => {
 			at: 0,
 			status: "succeeded",
 		});
-		agent.observe({ id: "u1", who: "user", text: "今はいいかな", at: 20_000 });
+		agent.observe({
+			id: "u1",
+			who: "user",
+			text: "見なくていいです",
+			at: 20_000,
+		});
 		// Nothing is held back for the no: something comes at once (a dig into the talk).
 		expect(agent.nextAt(20_000)).toBe(20_000);
 		agent.infoChanged(20_000);
 		await agent.step(20_000, idle, sig());
+		// No list of ways to say no: the plan reads the offer and the answer in the conversation.
+		const data = m.calls.filter((c) => c.kind === "plan").at(-1)!.data;
+		expect(data["declinedByUser"]).toBeUndefined();
 		expect(
-			m.calls.filter((c) => c.kind === "plan").at(-1)!.data["declinedByUser"],
-		).toEqual([
-			{
-				agentSaid: "話1があります。表示しましょうか？",
-				user: "今はいいかな",
-				minutesAgo: 0,
-			},
-		]);
-		// Forgotten words take the record with them.
-		agent.forget(["u1"]);
-		agent.infoChanged(30_000);
-		await agent.step(30_000, idle, sig());
-		expect(
-			m.calls.filter((c) => c.kind === "plan").at(-1)!.data["declinedByUser"],
-		).toEqual([]);
+			(data["conversation"] as { text: string }[]).map((x) => x.text).slice(-2),
+		).toEqual(["話1があります。表示しましょうか？", "見なくていいです"]);
 	});
 
 	test("a question about a talk that is over is not asked on its own", async () => {
@@ -1677,7 +1762,16 @@ describe("agenda agent", () => {
 	});
 
 	test("questions closed with 。 are questions too", async () => {
-		const m = scripted({ plan: () => plan(add("ask", "道具", ["u1"])) });
+		const m = scripted({
+			plan: (_d, n) => ({
+				...plan(
+					...(n === 1
+						? [{ ...add("ask", "道具", ["u1"]), topic: "キャンプ" }]
+						: []),
+				),
+				focus: "キャンプ",
+			}),
+		});
 		const agent = make({ llm: m.llm });
 		agent.observe({ id: "u1", who: "user", text: "キャンプに行った", at: 0 });
 		agent.observe({
@@ -1697,47 +1791,97 @@ describe("agenda agent", () => {
 			text: "楽しみですね。",
 			at: 10_000,
 		});
+		// The plan reads the exchange: the talk is still on camping.
+		agent.infoChanged(10_000);
+		await agent.step(10_000, idle, sig());
 		agent.observe({ id: "u3", who: "user", text: "うん", at: 20_000 });
 		expect(agent.askForReply(20_000)?.text).toBe("道具");
 	});
 
-	test("what counts as a no: only clear ones", () => {
+	test("in a talk, what is said is on the topic of the user's latest words (review 2026-11-10 evening 3.5)", async () => {
+		// The CLI, 2026-11-10 874 s: a question on the heater for the printer, tied to words of
+		// three minutes before, came twenty seconds after the user turned to a cat that had died.
+		const m = scripted({
+			plan: (d, n) => {
+				const conv = d["conversation"] as { id: string; text: string }[];
+				return n === 1
+					? {
+							...plan({
+								...add("ask", "印刷する部屋の暖房", [conv.at(-1)!.id]),
+								topic: "3Dプリンター",
+							}),
+							focus: "3Dプリンター",
+						}
+					: { ...plan(), focus: "猫" };
+			},
+		});
+		const agent = make({ llm: m.llm });
+		agent.observe({
+			id: "u1",
+			who: "user",
+			text: "これから冬だから温度管理が難しいかもね",
+			at: 0,
+		});
+		agent.observe({ id: "r1", who: "reply", text: "そうですね。", at: 0 });
+		agent.setQuiet({ scope: "speech", minutes: 1, at: 0 });
+		await agent.step(0, idle, sig());
+		agent.observe({
+			id: "u2",
+			who: "user",
+			text: "前にもう一匹三毛猫がいたのですが、一昨年あたりに死んじゃいました",
+			at: 90_000,
+		});
+		agent.observe({
+			id: "r2",
+			who: "reply",
+			text: "そうでしたか。",
+			at: 90_000,
+		});
+		agent.infoChanged(90_000);
+		await agent.step(90_000, idle, sig());
+		agent.observe({
+			id: "u3",
+			who: "user",
+			text: "エリと、あみちゃんは同時に飼ってたときもあって",
+			at: 140_000,
+		});
+		agent.observe({
+			id: "r3",
+			who: "reply",
+			text: "仲良しだったんですね。",
+			at: 140_000,
+		});
+		// Within five minutes of the heater words, but the user is on the cat now: it waits.
+		const out = await agent.step(160_000, idle, sig());
+		expect(out.compose).toBeNull();
+		expect(agent.askForReply(160_000)).toBeNull();
+		const heater = agent
+			.view()
+			.items.find((i) => i.text === "印刷する部屋の暖房");
+		expect(heater?.status).toBe("open");
+		// When the talk is over, it may come (as a topic from elsewhere does).
+		// (The talk is over one ms past the five minutes: no step at the very moment.)
+		expect(agent.nextAt(160_000)).toBe(140_000 + 300_000 + 1);
+	});
+
+	test("what asks the user something: a question anywhere in the text, not only at its end", () => {
 		for (const t of [
-			"今はいいかな",
-			"今はいいや",
-			"また今度で",
-			"いや、今はいらない",
-			"結構です",
-			"興味ないかな",
-			"あとで見る",
-			"今日はいいよ",
-			"うーん、今はいいかなー",
-			"ごめん、また今度",
-			"いいや",
-			"うーん、道具の話はまたそのうちで。今日はのんびりしたい",
-			"その話は今度で",
+			"好きな食べ物は？",
+			"次に出かける予定はありますか。",
+			// The CLI, 2026-11-10 689 s: a sentence after the question (review 2026-11-10 evening 3.1).
+			"印刷する部屋の暖房は大丈夫ですか？ 風が直接当たると、温度が安定しにくいこともあるそうです。",
+			"どんな子だったのか、よければ聞かせてください。",
+			"よかったら、どこで買ったか教えてもらえますか",
+			"ご出身はどちらですか？",
 		])
-			expect([t, declinesOffer(t)]).toEqual([t, true]);
+			expect([t, asksQuestion(t)]).toEqual([t, true]);
 		for (const t of [
-			"それはいいね",
-			"今はいい感じ",
-			"うん、見せて",
-			"テントのポールかな",
-			"いいですね",
-			"それはいいですね",
-			"それはいい！",
-			"別にいいよ",
-			"それは結構好きです",
-			"もう結構遅いね",
-			"うん、もういいよ、続けて",
-			"もう遠慮なく聞いて",
-			"それはやめたほうがいい",
-			"今日は大丈夫です、ありがとう",
-			"もう大丈夫そう",
-			"キャンプはいいね",
-			"仕事のことは特に話すこともないかな",
+			"いいですね。",
+			"そうですか。それは大変でしたね。",
+			"「有毒ガスが出るの？」という点は、換気をすれば心配は小さいそうです。",
+			"教えてくれてありがとうございます。",
 		])
-			expect([t, declinesOffer(t)]).toEqual([t, false]);
+			expect([t, asksQuestion(t)]).toEqual([t, false]);
 	});
 
 	test("the plan's refs are checked: unknown refs, research without a reason, talk without a note", async () => {

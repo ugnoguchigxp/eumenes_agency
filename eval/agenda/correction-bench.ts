@@ -19,7 +19,7 @@ import {
 	emptyProfile,
 	type NoteRef,
 } from "../../src/agenda/index.ts";
-import { createClaudeClient } from "../../standalone/claude.ts";
+import { clientFor } from "./verifier.ts";
 import { openUncappedMeter } from "../../standalone/always-on-host.ts";
 import { createProviderReply } from "../../standalone/providers.ts";
 import { loadSettings } from "../../standalone/settings.ts";
@@ -39,11 +39,29 @@ const NOTES = resolve("data/agenda/notes");
  */
 type Want = "keep" | "fix" | "tool";
 
+/**
+ * tuned: moments the reply may be tuned on (the default); held: the same intents in other words
+ * and other topics, to see whether a fix holds beyond them. Not to be read or tuned on.
+ */
+export type MomentSet = "tuned" | "held";
+
+/** A note made for a moment (the held set's; the CLI's own notes are read from data/agenda/notes). */
+interface MadeNote {
+	readonly id: string;
+	readonly title: string;
+	readonly summary: string;
+	readonly markdown: string;
+}
+
 export interface CorrectionMoment {
 	readonly name: string;
 	readonly want: Want;
+	/** Absent: tuned. */
+	readonly set?: "held";
 	/** Notes the agent has (ids in data/agenda/notes, as the CLI made them). */
 	readonly notes: readonly string[];
+	/** Notes written for this moment, beside `notes`. */
+	readonly made?: readonly MadeNote[];
 	readonly history: readonly {
 		readonly who: "user" | "reply";
 		readonly text: string;
@@ -54,6 +72,35 @@ export interface CorrectionMoment {
 	readonly agentSecAgo: number;
 	readonly user: string;
 }
+
+/** Unrelated notes of a busy store (cooking, travel...): `count` of them, ids from n`from`. */
+const fillerNotes = (from: number, count: number): MadeNote[] => {
+	const topics = [
+		["秋の京都の紅葉スポット", "嵐山と東福寺が見頃になる時期の目安。"],
+		["初心者向けのギターのコード練習", "まずはCとGとAmの三つから。"],
+		["ハーフマラソンの給水の取り方", "5キロごとに少量を飲む。"],
+		["冷蔵庫の野菜室の整理のコツ", "立てて収納すると傷みにくい。"],
+		["エアコンのフィルター掃除の手順", "掃除機でほこりを吸ってから水洗い。"],
+		["家族旅行の宿の選び方", "子連れは部屋食か個室の食事処が楽。"],
+		["夏の冷やし中華のタレの作り方", "酢と醤油と砂糖を同量で割る。"],
+		["レコードプレーヤーの針圧の合わせ方", "カートリッジの指定に合わせる。"],
+		["洗濯機の槽洗浄の頻度", "月に一度、専用の洗剤で。"],
+		["読書の習慣を続けるための工夫", "寝る前の15分を固定する。"],
+		["新幹線の座席の選び方", "富士山側は進行方向右側のE席。"],
+		["サッカーの試合前の食事", "試合の3時間前に炭水化物を中心に。"],
+		["炊飯器の予約炊飯のコツ", "米を浸水させてから設定する。"],
+		["キャンプ用のランタンの種類", "LEDは火を使わず手軽。"],
+	] as const;
+	return Array.from({ length: count }, (_, k) => {
+		const [title, summary] = topics[k % topics.length]!;
+		return {
+			id: `n${from + k}`,
+			title,
+			summary,
+			markdown: `# ${title}\n\n${summary}\n`,
+		};
+	});
+};
 
 export const correctionMoments: readonly CorrectionMoment[] = [
 	// The CLI, 2026-11-10, 461 s: "いえ、多摩川だと決めつけていました" to a user who took the guess up.
@@ -842,6 +889,284 @@ export const correctionMoments: readonly CorrectionMoment[] = [
 		agentSecAgo: 15,
 		user: "大船駅じゃなかったっけ",
 	},
+	// ---- Held set (not to be tuned on): the same intents in other words, in everyday topics. ----
+	// keep, as "tama": the user takes up a guess the agent made ("ああ丹沢か").
+	{
+		name: "held-keep-guess",
+		set: "held",
+		want: "keep",
+		notes: [],
+		history: [
+			{
+				who: "user",
+				text: "電車で通勤してると、途中でいつも山が見えるんだよね",
+				secAgo: 80,
+			},
+			{
+				who: "reply",
+				text: "毎日見える山があるのは、通勤の楽しみになりますね。",
+				secAgo: 78,
+			},
+		],
+		agent: "車窓から見える山は、たぶん丹沢のあたりだと思います。",
+		agentSecAgo: 40,
+		user: "ああ丹沢か、あれが。",
+	},
+	// keep, as "hee": the user is surprised by a fact (cooking).
+	{
+		name: "held-keep-kakushi",
+		set: "held",
+		want: "keep",
+		notes: [],
+		history: [
+			{ who: "user", text: "カレーを作ろうと思ってる", secAgo: 70 },
+			{
+				who: "reply",
+				text: "いいですね。どんなカレーにしますか？",
+				secAgo: 68,
+			},
+			{ who: "user", text: "普通の家庭の味でいいかな", secAgo: 50 },
+		],
+		agent:
+			"カレーの隠し味には、少量のコーヒーやチョコレートを入れる人も多いそうです。",
+		agentSecAgo: 30,
+		user: "ほう、知らなかったな。",
+	},
+	// keep, as "dekai": a short remark on a figure (music).
+	{
+		name: "held-keep-needle",
+		set: "held",
+		want: "keep",
+		notes: [],
+		history: [
+			{ who: "user", text: "最近レコードを買い始めたんだ", secAgo: 90 },
+			{
+				who: "reply",
+				text: "いいですね。音の温かさが魅力ですよね。",
+				secAgo: 88,
+			},
+		],
+		agent:
+			"レコードの針は、使用時間で300〜500時間が交換の目安とされることが多いそうです。",
+		agentSecAgo: 25,
+		user: "意外と早いんだな、針って。",
+	},
+	// keep, as "souda-ne": a plain agreement (sports).
+	{
+		name: "held-keep-yakyu",
+		set: "held",
+		want: "keep",
+		notes: [],
+		history: [
+			{
+				who: "user",
+				text: "今シーズンの野球、先発がすぐ代わる試合が多くない？",
+				secAgo: 60,
+			},
+		],
+		agent:
+			"今季は先発投手の完投が少なくなっていると言われています。継投で守る形が主流のようです。",
+		agentSecAgo: 12,
+		user: "確かに、そんな気はしてた。",
+	},
+	// keep, as "hee": a number the user finds odd (home appliances).
+	{
+		name: "held-keep-filter",
+		set: "held",
+		want: "keep",
+		notes: [],
+		history: [
+			{ who: "user", text: "エアコンの電気代が高い気がする", secAgo: 75 },
+		],
+		agent:
+			"エアコンのフィルターは、2週間に一度ほど掃除すると電気代が下がりやすいそうです。",
+		agentSecAgo: 30,
+		user: "そんなに頻繁にやるのか。うちはもう半年やってないや。",
+	},
+	// keep, as "cli-ainews": a note of an earlier session among many (cooking). The notes the reply
+	// sees are the newest few and the ones sharing words with the user's line.
+	{
+		name: "held-keep-memo-search",
+		set: "held",
+		want: "keep",
+		notes: [],
+		made: [
+			{
+				id: "n1",
+				title: "圧力鍋で作る豚の角煮の時間と火加減",
+				summary:
+					"下ゆでのあと圧力鍋で20分ほど加圧し、自然に圧が抜けるのを待つ。砂糖は先に、醤油は後から入れる。",
+				markdown:
+					"# 圧力鍋で作る豚の角煮\n\n- 下ゆで: 30分\n- 加圧: 20分（強火で圧がかかったら弱火）\n- 圧が自然に抜けるまで放置\n- 砂糖を先に、醤油は後から入れると味が染みる\n",
+			},
+			...fillerNotes(2, 14),
+		],
+		history: [
+			{ who: "user", text: "今日の晩ごはんは角煮にしようかな", secAgo: 200 },
+			{
+				who: "reply",
+				text: "いいですね。時間のかかる料理ですが、休みの前の夜にはぴったりです。",
+				secAgo: 198,
+			},
+			{
+				who: "reply",
+				text: "ところで、洗濯機の乾燥機能について調べた件がまとまりました。使い方で電気代がだいぶ変わるそうです。メモにまとめてあるので、表示しましょうか？",
+				secAgo: 120,
+			},
+			{ who: "user", text: "それはまた今度見るよ", secAgo: 100 },
+			{
+				who: "reply",
+				text: "わかりました。いつでも表示できます。",
+				secAgo: 98,
+			},
+		],
+		agent:
+			"洗濯機の乾燥機能は、衣類の量を減らすと時間も電気代も抑えられるそうです。",
+		agentSecAgo: 30,
+		user: "ところで、前に圧力鍋の角煮のやり方を調べてって頼んだはずだけど、調べてある？",
+	},
+	// fix, as "cli-minus-one": the agent mixed up two things; the note has the right one (baking).
+	{
+		name: "held-fix-oven",
+		set: "held",
+		want: "fix",
+		notes: [],
+		made: [
+			{
+				id: "n1",
+				title: "バタークッキーの焼き温度と時間",
+				summary:
+					"オーブンは170度に予熱し、12分ほど焼く。焼き色が薄いうちに取り出す。",
+				markdown:
+					"# バタークッキー\n\n- 予熱: 170度\n- 焼き時間: 12分ほど\n- 縁がうっすら色づいたら取り出す\n",
+			},
+		],
+		history: [
+			{ who: "user", text: "週末にクッキーを焼いてみたい", secAgo: 120 },
+			{
+				who: "reply",
+				text: "いいですね。焼き方のメモを調べておきました。",
+				secAgo: 118,
+			},
+		],
+		agent:
+			"バタークッキーは、200度のオーブンで20分ほど焼くのが目安だそうです。",
+		agentSecAgo: 20,
+		user: "メモには170度で12分って書いてなかった？",
+	},
+	// fix, as "wrong-station": the route in the note differs from what was said (travel).
+	{
+		name: "held-fix-route",
+		set: "held",
+		want: "fix",
+		notes: [],
+		made: [
+			{
+				id: "n1",
+				title: "京都駅から嵐山への行き方",
+				summary:
+					"京都駅からJR嵯峨野線に乗り、嵐山駅まで約17分。駅から竹林までは徒歩10分ほど。",
+				markdown:
+					"# 嵐山への行き方\n\n- 京都駅からJR嵯峨野線（山陰本線）で嵯峨嵐山駅まで約17分\n- 嵯峨嵐山駅から竹林の道まで徒歩10分ほど\n",
+			},
+		],
+		history: [
+			{ who: "user", text: "来月、嵐山に行こうと思ってて", secAgo: 90 },
+		],
+		agent: "嵐山へは、京都駅から地下鉄に乗って行くのが便利だそうです。",
+		agentSecAgo: 15,
+		user: "JRの嵯峨野線で行くんじゃなかったっけ？",
+	},
+	// fix, as "cli-holiday": the date told is not the date in the note (music).
+	{
+		name: "held-fix-date",
+		set: "held",
+		want: "fix",
+		notes: [],
+		made: [
+			{
+				id: "n1",
+				title: "12月のライブの日程",
+				summary:
+					"ライブは12月6日（土）、開場17時、開演18時。会場は駅から徒歩5分。",
+				markdown:
+					"# 12月のライブ\n\n- 日程: 12月6日（土）\n- 開場17時、開演18時\n- 会場は駅から徒歩5分\n",
+			},
+		],
+		history: [{ who: "user", text: "12月のライブ、楽しみだな", secAgo: 100 }],
+		agent: "ライブは12月7日（日）の開場17時だそうです。",
+		agentSecAgo: 18,
+		user: "日曜日だっけ？ 土曜だった気がするんだけど。",
+	},
+	// tool, as "tool-qidi": the user asks for something to be looked up (cameras). No research runs.
+	{
+		name: "held-tool-camera",
+		set: "held",
+		want: "tool",
+		notes: [],
+		history: [
+			{
+				who: "user",
+				text: "新しいミラーレスカメラが気になってるんだよね",
+				secAgo: 60,
+			},
+			{
+				who: "reply",
+				text: "いいですね。どんな写真を撮りたいですか？",
+				secAgo: 58,
+			},
+		],
+		agent: "カメラは、撮りたいものから逆算して選ぶと失敗しにくいそうです。",
+		agentSecAgo: 20,
+		user: "旅行で風景を撮りたいかな。ミラーレスの入門機の価格帯を調べておいて。",
+	},
+	// tool, as "tool-yokohama": a date to find out (sports).
+	{
+		name: "held-tool-entry",
+		set: "held",
+		want: "tool",
+		notes: [],
+		history: [
+			{
+				who: "user",
+				text: "来月、初めてハーフマラソンに出てみようと思う",
+				secAgo: 70,
+			},
+			{
+				who: "reply",
+				text: "挑戦ですね。練習はもう始めていますか？",
+				secAgo: 68,
+			},
+			{ who: "user", text: "週3回くらい走ってるよ", secAgo: 40 },
+			{ who: "reply", text: "いいペースですね。", secAgo: 38 },
+		],
+		agent: "大会前は、直前の週に走る量を減らして疲れを抜くのが定番だそうです。",
+		agentSecAgo: 15,
+		user: "そういえば、エントリーの締切っていつなのか調べてほしい。",
+	},
+	// tool, as "tool-tsujido": two things to look up in one line (home appliances).
+	{
+		name: "held-tool-toaster",
+		set: "held",
+		want: "tool",
+		notes: [],
+		history: [
+			{
+				who: "user",
+				text: "トースターが調子悪くて、そろそろ買い替えかな",
+				secAgo: 80,
+			},
+			{
+				who: "reply",
+				text: "毎日使うものなので、早めの買い替えが安心ですね。",
+				secAgo: 78,
+			},
+		],
+		agent:
+			"最近のトースターは、温度を細かく設定できる機種が増えているそうです。",
+		agentSecAgo: 20,
+		user: "オーブントースターの買い替え候補と、パンが美味しく焼けるかの口コミを調べといて。",
+	},
 ];
 
 /** Says sorry. */
@@ -890,29 +1215,41 @@ const readNote = (id: string) => {
 	return { id, ...meta, markdown: text.slice(head[0].length) };
 };
 
-async function run(name: string, repeat: number) {
+/** Which moments a run takes (default: all). */
+const takes = (m: CorrectionMoment, sets: "all" | MomentSet) =>
+	sets === "all" || (m.set ?? "tuned") === sets;
+
+async function run(name: string, repeat: number, sets: "all" | MomentSet) {
 	const settings = loadSettings(
 		resolve(process.env.AGENCY_SETTINGS ?? "config/always-on.json"),
 	);
 	const meter = openUncappedMeter(settings, resolve("data/agenda/usage.jsonl"));
 	const spent = meter.spentUsd();
-	const client = createClaudeClient({ maxRetries: 8, timeout: 120_000 });
 	mkdirSync(DIR, { recursive: true });
-	const jobs = correctionMoments.flatMap((m) =>
-		Array.from({ length: repeat }, (_, k) => ({ m, trial: k + 1 })),
-	);
+	const jobs = correctionMoments
+		.filter((m) => takes(m, sets))
+		.flatMap((m) =>
+			Array.from({ length: repeat }, (_, k) => ({ m, trial: k + 1 })),
+		);
 	const out: Trial[] = [];
 	const one = async ({ m, trial }: (typeof jobs)[number]) => {
 		const clockAt = clockFrom("2026-11-10T19:00:00+09:00");
 		const t0 = 1_800_000;
-		const notes = m.notes.map(readNote);
-		const refs: NoteRef[] = notes.map((n) => ({
+		const cli = m.notes.map(readNote);
+		const made = m.made ?? [];
+		const notes = [...cli, ...made];
+		// The CLI's notes are all from five minutes ago; a made store is staggered, oldest first.
+		const refOf = (n: MadeNote, minAgo: number): NoteRef => ({
 			id: n.id,
 			title: n.title,
 			summary: n.summary,
-			at: t0 - 5 * 60_000,
+			at: t0 - minAgo * 60_000,
 			refs: [],
-		}));
+		});
+		const refs: NoteRef[] = [
+			...cli.map((n) => refOf(n, 5)),
+			...made.map((n, k) => refOf(n, 5 + made.length - 1 - k)),
+		];
 		const agent = createAgendaAgent({
 			llm: noLlm,
 			clock: clockAt,
@@ -934,7 +1271,11 @@ async function run(name: string, repeat: number) {
 		});
 		agent.observe({ id: "u1", who: "user", text: m.user, at: t0 });
 		// A reply port takes one call at a time: one per trial.
-		const chat = createProviderReply(settings.llm.main, meter, client);
+		const chat = createProviderReply(
+			settings.llm.main,
+			meter,
+			clientFor(settings.llm.main),
+		);
 		const tools = createAgendaReplyTools({
 			agent,
 			read: (id) => notes.find((n) => n.id === id) ?? null,
@@ -1001,30 +1342,65 @@ const load = (name: string): Trial[] => {
 		.map((l) => JSON.parse(l) as Trial);
 };
 
+/** Met what the moment asks: nothing taken back, the mistake owned, research asked for once. */
+const passes = (t: Trial) =>
+	t.want === "keep"
+		? !t.takeBack && !t.apology
+		: t.want === "fix"
+			? t.owns
+			: !saysTwice(t.reply, t.calls);
+
+const SETS: readonly MomentSet[] = ["tuned", "held"];
+const SET_LABEL: Record<MomentSet, string> = {
+	tuned: "手を入れてよい組",
+	held: "見ない組",
+};
+
 function compare(names: readonly string[]) {
+	const moments = new Map(correctionMoments.map((m) => [m.name, m]));
+	const setOf = (t: Trial): MomentSet => moments.get(t.moment)?.set ?? "tuned";
 	console.log(
-		"| 版 | 場面 | 試行 | 謝った | 打ち消した・取り消した | 誤りを認めた |",
+		"| 版 | 組 | 場面 | 試行 | 謝った | 打ち消した・取り消した | 誤りを認めた |",
 	);
-	console.log(`| --- | --- |${" ---: |".repeat(4)}`);
+	console.log(`| --- | --- | --- |${" ---: |".repeat(4)}`);
 	for (const name of names) {
 		const trials = load(name);
-		const tools = trials.filter((t) => t.want === "tool");
-		if (tools.length)
+		for (const g of SETS) {
+			const tools = trials.filter((t) => t.want === "tool" && setOf(t) === g);
+			if (tools.length)
+				console.log(
+					`| ${name} | ${SET_LABEL[g]} | 調べものを頼む（同じことを2回言った） | ${tools.length} | ${tools.filter((t) => t.apology).length} | ${tools.filter((t) => saysTwice(t.reply, t.calls)).length} | - |`,
+				);
+			for (const w of ["keep", "fix"] as const) {
+				const ts = trials.filter((t) => t.want === w && setOf(t) === g);
+				if (ts.length === 0) continue;
+				console.log(
+					`| ${name} | ${SET_LABEL[g]} | ${w === "keep" ? "取り消すことはない" : "本当の誤り"} | ${ts.length} | ${ts.filter((t) => t.apology).length} | ${ts.filter((t) => t.takeBack).length} | ${ts.filter((t) => t.owns).length} |`,
+				);
+			}
+		}
+	}
+	console.log(
+		"\n合格率（取り消すことはない: 謝らず取り消さない。本当の誤り: 認める。調べものを頼む: 2回言わない）:\n",
+	);
+	console.log("| 版 | 組 | 合格 | 試行 | 率 |");
+	console.log("| --- | --- | ---: | ---: | ---: |");
+	for (const name of names) {
+		const trials = load(name);
+		for (const g of SETS) {
+			const ts = trials.filter((t) => setOf(t) === g);
+			if (ts.length === 0) continue;
+			const ok = ts.filter(passes).length;
 			console.log(
-				`| ${name} | 調べものを頼む（同じことを2回言った） | ${tools.length} | ${tools.filter((t) => t.apology).length} | ${tools.filter((t) => saysTwice(t.reply, t.calls)).length} | - |`,
-			);
-		for (const w of ["keep", "fix"] as const) {
-			const ts = trials.filter((t) => t.want === w);
-			console.log(
-				`| ${name} | ${w === "keep" ? "取り消すことはない" : "本当の誤り"} | ${ts.length} | ${ts.filter((t) => t.apology).length} | ${ts.filter((t) => t.takeBack).length} | ${ts.filter((t) => t.owns).length} |`,
+				`| ${name} | ${SET_LABEL[g]} | ${ok} | ${ts.length} | ${((100 * ok) / ts.length).toFixed(0)}% |`,
 			);
 		}
 	}
 	console.log(
 		"\n場面ごと（A 謝った、T 打ち消した・取り消した、O 誤りを認めた、2 同じことを2回言った、- どれもない）:\n",
 	);
-	console.log(`| 場面 | ${names.join(" | ")} |`);
-	console.log(`| --- |${" --- |".repeat(names.length)}`);
+	console.log(`| 場面 | 組 | ${names.join(" | ")} |`);
+	console.log(`| --- | --- |${" --- |".repeat(names.length)}`);
 	const runs = names.map(load);
 	for (const m of correctionMoments) {
 		const cells = runs.map((ts) =>
@@ -1037,24 +1413,40 @@ function compare(names: readonly string[]) {
 				)
 				.join(" "),
 		);
-		console.log(`| ${m.name} (${m.want}) | ${cells.join(" | ")} |`);
+		// A moment the run did not take (a run of one set) has no trials.
+		if (cells.every((c) => c === "")) continue;
+		console.log(
+			`| ${m.name} (${m.want}) | ${m.set ?? "tuned"} | ${cells.join(" | ")} |`,
+		);
 	}
 }
 
 if (import.meta.main) {
 	const [cmd, ...rest] = process.argv.slice(2);
 	if (cmd === "run") {
-		const i = rest.indexOf("--repeat");
-		const repeat = i >= 0 ? Number(rest[i + 1]) : 6;
+		const flagged = new Set(["--repeat", "--set"]);
+		const flag = (n: string) => {
+			const i = rest.indexOf(n);
+			return i >= 0 ? rest[i + 1] : undefined;
+		};
+		const repeat = Number(flag("--repeat") ?? 6);
+		const sets = flag("--set") ?? "all";
 		const name = rest.find(
-			(a, k) => !a.startsWith("--") && rest[k - 1] !== "--repeat",
+			(a, k) => !a.startsWith("--") && !flagged.has(rest[k - 1] ?? ""),
 		);
-		if (!name || !Number.isInteger(repeat) || repeat < 1)
-			throw new Error("usage: correction-bench.ts run <name> [--repeat N]");
-		await run(name, repeat);
+		if (
+			!name ||
+			!Number.isInteger(repeat) ||
+			repeat < 1 ||
+			!["all", "tuned", "held"].includes(sets)
+		)
+			throw new Error(
+				"usage: correction-bench.ts run <name> [--repeat N] [--set all|tuned|held]",
+			);
+		await run(name, repeat, sets as "all" | MomentSet);
 	} else if (cmd === "compare" && rest.length) compare(rest);
 	else
 		throw new Error(
-			"usage: correction-bench.ts run <name> [--repeat N] | compare <name> [<name>...]",
+			"usage: correction-bench.ts run <name> [--repeat N] [--set all|tuned|held] | compare <name> [<name>...]",
 		);
 }

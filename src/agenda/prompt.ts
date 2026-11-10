@@ -34,9 +34,14 @@ export function planSystem(persona: string = defaultPersona): string {
 		`一覧に置いておける数には上限があります（ask ${OPEN_LIMITS.ask}・research ${OPEN_LIMITS.research}・talk ${OPEN_LIMITS.talk}）。足すときは、価値の低いものを drop で外して入れ替えます。`,
 		"value は、相手にとっての価値（1〜5）です。reason には、なぜそれをするのかを一言で書きます。",
 		"",
+		"【話題の名前】",
+		"- focus には、相手の最新の言葉（conversation の最後の who=user）が何の話題かを、名詞一つか二つの短い名前（「3Dプリンター」「猫」「週末の予定」くらい）で書きます。会話がなければ空文字にします。lastFocus（前に付けた名前）と同じ話題が続いているなら、lastFocus をそのまま使います。相手が話題を替えたら、新しい名前にします。",
+		"- 足す項目の topic には、その項目が何の話題かを、同じ粒度の名前で書きます。focus や agenda の項目と同じ話題なら、同じ名前をそのまま使います。",
+		"- 会話の最中に話されるのは、相手の最新の言葉の話題（focus）の項目と、頼まれたものだけです。ほかの話題の項目は、会話が終わるまで待ちます。",
+		"",
 		"【情報を集める】",
 		"- 多少うるさいくらいに、相手のことを知りに行きます。記憶（user.memory）が薄いこと（好きなもの、苦手なもの、仕事や生活、予定、いま気にしていること）を聞く ask を、いつも1〜2件持っておきます。",
-		"- 会話の最中（conversation の終わりに数分以内の相手の言葉がある）は、その会話につながる項目だけを足します（refs に会話の言葉の id か、それを元にしたメモ）。会話と関係のない関心や記憶（前に調べた話題、別の趣味など）からは、ask・talk・research のどれも足しません。会話と共通点がある記憶や関心なら、refs に会話の言葉の id とその記憶の id の両方を入れて足します。",
+		"- 会話の最中（conversation の終わりに数分以内の相手の言葉がある）は、その会話につながる項目だけを足します（refs に会話の言葉の id か、それを元にしたメモ）。会話と関係のない関心や記憶（前に調べた話題、別の趣味など）からは、ask・talk・research のどれも足しません。会話と共通点がある記憶や関心なら、refs に相手の最新の言葉（最後か、その前の who=user）の id とその記憶の id の両方を入れて足します。",
 		"- 会話が一つの話題で続いている間は、その話題を深める ask にします。ask は、返事の最後に一つ添えて聞かれるか、あなたから話しかけて聞かれます。好き嫌いや生活のような一般的な質問で話題を断ち切りません。refs には、つながる相手の言葉の id を入れます。",
 		"- 相手が話したことには、それを深める ask を考えます。ただし、答えによって次に調べることや話すことが変わる質問にします。",
 		"- 相手が何かを知りたいと言ったら、なぜ知りたいのか・どんな点が気になるのか・きっかけは何かを聞きません。答えにつながる話や調べもので応えます。",
@@ -47,7 +52,7 @@ export function planSystem(persona: string = defaultPersona): string {
 		"【先回りする】",
 		"- user.plans と user.interests は、相手が話した予定（未定のものも）と、いま気にしていることのメモです。記憶（user.memory）は確かな事実と好みだけで、予定は持ちません。",
 		"- 相手がこれから考えそうなこと、聞きそうなことを先回りして research にします（user.plans の予定の下調べ、user.interests の話題の新しい動き、困っていることの解決の手がかり）。予定で決まっていないこと（宿、同行者など）は、ask で聞くか、決めるのに役立つ下調べにします。",
-		"- notes・researchedBefore・researching と同じテーマの調べものは、言い方を変えても足しません（同じ結果を何度も受け取ることになります。ホストも似たテーマを断ります）。次に調べるなら、まだ扱っていない別の話題や観点にします。",
+		"- notes・researchedBefore・researching と同じテーマの調べものは、言い方を変えても足しません（同じ結果を何度も受け取ることになります。ホストも似たテーマを断ります）。次に調べるなら、まだ扱っていない別の話題や観点にします。ただし天気・ニュース・上映や営業の時間・価格のように時期で変わる情報で、メモが古い（hoursAgo が大きく、今の時期のものでない）ときは、今の情報を調べ直す research を足してかまいません。",
 		"- 相手が話した話題で、まだメモにない観点があれば research を足します。調べものは一度に一つずつ順に進むので、続けて調べたいことは待ちの列に入れておいてかまいません。",
 		"- 調べた結果を全部伝えようとはしません。メモは記録に残り、後の会話で使えます。talk にするのは、雑談のネタになりそうなもの、相手が喜びそう・驚きそうなものだけです。",
 		"- 直前の返事（conversation の最後の agent の言葉）が話したことと同じ中身の talk は足しません。",
@@ -64,7 +69,7 @@ export function planSystem(persona: string = defaultPersona): string {
 		"",
 		"【外す】",
 		"- declinedRecently は、話す直前に「今は合わない」と見送ったものと理由です。その理由がまだ当てはまるなら、同じ種類の項目（言い方を変えた質問など）は足しません。",
-		"- declinedByUser は、あなたの質問や話題（agentSaid）を相手が断った記録です（user が相手の言葉）。「その話はもういい」「興味ない」のように話題そのものを断ったときは、その話題の talk と、同じ種類の ask は足さず、一覧に残っていれば drop します。「今はいい」「あとで」「今日は気分じゃない」のように今だけを断ったときは、同じものをすぐには足しませんが、一覧の項目は残します（時間をおいて話せます）。ほかの話題は止めません。",
+		"- conversation で、あなたの質問や話題（agent_reply・agent_own）に相手が断る返事をしていたら（言い方は問いません）、それを読みます。話題そのものを断ったときは、その話題の talk と、同じ種類の ask は足さず、一覧に残っていれば drop します。「今はいい」「あとで」「今日は気分じゃない」のように今だけを断ったときは、同じものをすぐには足しませんが、一覧の項目は残します（時間をおいて話せます）。ほかの話題は止めません。",
 		"- drop するのは、答えが出た質問、時期が過ぎた項目、相手がその話題そのものを断った項目、同じ内容が一覧やメモやこれまでの会話にもうある項目と、上限で入れ替えるときだけです。時刻が進んで合わなくなった項目（「明日の〜」の予定がもう当日になった、済んだ予定の下調べ）は drop し、必要なら今に合う言い方で足し直します。",
 		"- 相手が休みたい・静かにしたい・ぼーっとしたい・そっとしておいてほしいと言ったことは、drop の理由になりません。話しかけを控える時間は返事が決め、コードが守ります（相手が話しかけると終わります）。項目は、そのあと話せるよう一覧に残します。",
 		"- 相手が「（その話は）調べなくていい」「その話はもういい」と言った話題の項目は drop し、その話題は足しません。好みを取り消した話題も同じです。",
@@ -83,6 +88,7 @@ export function checkSystem(): string {
 		"- verdict=new: どのメモとも別のテーマ、または同じテーマでも明らかに別の観点を調べる。request は null。",
 		"- verdict=partial: 一部はメモでもう分かっている。まだ分かっていない点だけに絞った依頼文を request に一文で書く（すでに分かっていることは調べ直さない）。",
 		"- verdict=covered: メモでもう分かっている、または前に頼んだものとほぼ同じ。coveredBy にそのメモの id（note:<id>）を入れる（前の依頼と同じならそのまま null でよい）。",
+		"- notes の hoursAgo は、そのメモができてからの時間です（now が今の時刻）。天気・ニュース・上映や営業の時間・価格・在庫・空き状況のように時期で変わる情報は、メモがその時期のものでなければ（依頼の「明日」「最近」「今週」「土日」などや今の時刻と合わなければ）、同じテーマでも new にします。時期で変わらない情報（歴史・仕組み・作り方・場所など）は、古いメモでも covered です。",
 		"- 迷ったら、言い換えただけの依頼は covered、観点が一つでも新しければ partial にします。",
 		"- reason に判断の理由を一言で書きます。",
 		dataRule,
@@ -135,6 +141,7 @@ export function askCheckData(input: AskCheckInput): string {
 
 export interface CheckInput {
 	readonly now: number;
+	readonly clock?: string | null;
 	readonly request: string;
 	readonly notes: readonly NoteRef[];
 	readonly researchedBefore: readonly string[];
@@ -142,11 +149,17 @@ export interface CheckInput {
 
 export function checkData(input: CheckInput): string {
 	return asData({
+		now: input.clock ?? null,
 		request: input.request,
 		notes: [...input.notes]
 			.sort((a, b) => b.at - a.at)
 			.slice(0, 30)
-			.map((n) => ({ id: `note:${n.id}`, title: n.title, summary: n.summary })),
+			.map((n) => ({
+				id: `note:${n.id}`,
+				title: n.title,
+				summary: n.summary,
+				hoursAgo: Math.round((input.now - n.at) / 360_000) / 10,
+			})),
 		researchedBefore: input.researchedBefore.slice(-20),
 	});
 }
@@ -173,6 +186,7 @@ export function composeSystem(persona: string = defaultPersona): string {
 		emotionChoiceRules,
 		"",
 		dataRule,
+		"questions には、utterance で相手に聞いていることの数を書きます（聞いていなければ 0。「〜と、〜も」なら 2）。choice は、相手に選択肢から選ばせる聞き方（「AとBのどちらが」「AかBか」）なら true、自由に答えられる聞き方なら false です（「どちらへ」「どちらのご出身」のように場所を聞くのは選ばせる聞き方ではありません）。見送るときは 0 と false にします。",
 		"出力は指定された JSON だけです。話すなら decline は null にします。",
 	].join("\n");
 }
@@ -213,12 +227,8 @@ export interface PlanInput {
 	readonly notes: readonly NoteRef[];
 	readonly researching: AgendaItem | null;
 	readonly quiet: Quiet;
-	/** The user said no to the agent's question or offer (the words by id). */
-	readonly userDeclines?: readonly {
-		readonly at: number;
-		readonly agentId: string;
-		readonly userId: string;
-	}[];
+	/** The name the last plan gave the topic of the user's words (null: none yet). */
+	readonly lastFocus?: string | null;
 	/** Nothing was left to say and nothing is on the way: dig into an interest. */
 	readonly nothingToSay?: boolean;
 	/** What the last dig proposed and code refused, and why. */
@@ -293,9 +303,11 @@ export function planData(input: PlanInput): string {
 				kind: i.kind,
 				text: i.text,
 				value: i.value,
+				...(i.topic ? { topic: i.topic } : {}),
 				...(i.requested ? { requested: true } : {}),
 				...(i.status === "doing" ? { doing: true } : {}),
 			})),
+		...(input.lastFocus ? { lastFocus: input.lastFocus } : {}),
 		askedBefore: input.items
 			.filter((i) => i.kind === "ask" && i.status === "done")
 			.slice(-10)
@@ -310,20 +322,6 @@ export function planData(input: PlanInput): string {
 				reason: i.lastDecline!.reason,
 				minutesAgo: Math.round((now - i.lastDecline!.at) / 60_000),
 			})),
-		// What the user said no to: the plan neither brings it up again nor asks the same kind.
-		declinedByUser: (input.userDeclines ?? []).flatMap((d) => {
-			const agent = input.said.find((s) => s.id === d.agentId);
-			const user = input.said.find((s) => s.id === d.userId);
-			return agent && user && now - d.at < 3_600_000
-				? [
-						{
-							agentSaid: agent.text,
-							user: user.text,
-							minutesAgo: Math.round((now - d.at) / 60_000),
-						},
-					]
-				: [];
-		}),
 		researchedBefore: input.items
 			.filter((i) => i.kind === "research" && i.status === "done")
 			.slice(-12)

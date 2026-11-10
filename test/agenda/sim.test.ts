@@ -63,6 +63,7 @@ const model = (): LlmPort => ({
 									refs: [user.id],
 									value: 4,
 									reason: "先回り",
+									topic: "",
 								},
 								{
 									kind: "ask",
@@ -70,16 +71,20 @@ const model = (): LlmPort => ({
 									refs: memory.slice(0, 1).map((m) => m.id),
 									value: 3,
 									reason: "知りたい",
+									topic: "",
 								},
 							]
 						: [],
 				drop: [],
+				focus: "",
 			};
 		} else
 			value = {
 				utterance: `「${(d["item"] as { text: string }).text}」について話す`,
 				emotion: "😊",
 				decline: null,
+				questions: 1,
+				choice: false,
 			};
 		return Promise.resolve({
 			value: req.schema.parse(value),
@@ -346,15 +351,19 @@ test("ruler: spoken to again before typing, the user answers the newest words, n
 								refs: [user.id],
 								value: 3,
 								reason: "test",
+								topic: "",
 							}))
 						: [],
 					drop: [],
+					focus: "",
 				};
 			} else
 				value = {
 					utterance: `「${(d["item"] as { text: string }).text}」です`,
 					emotion: "😊",
 					decline: null,
+					questions: 1,
+					choice: false,
 				};
 			return Promise.resolve({
 				value: req.schema.parse(value),

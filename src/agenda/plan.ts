@@ -5,14 +5,22 @@
 import { callModel } from "../application/model-call.ts";
 import {
 	OPEN_LIMITS,
+	NOTE_FRESH_MS,
 	PLAN_ADD_LIMITS,
 	planSchema,
+	RESEARCH_RETRY_MS,
 	SAME_THEME_OVERLAP,
 	type AgendaItem,
 	type AgendaKind,
 	type PlanOutcome,
 } from "./contracts.ts";
-import { connected, drawsOnMemory, holdsElsewhere, tiesIn } from "./pacing.ts";
+import {
+	connected,
+	drawsOnMemory,
+	holdsElsewhere,
+	sameTopic,
+	tiesToLatest,
+} from "./pacing.ts";
 import { profileOf } from "./profile.ts";
 import { planData } from "./prompt.ts";
 import {
@@ -51,6 +59,8 @@ export async function plan(
 	const notesNow = notes(st);
 	const profileNow = profileOf(st);
 	const researching = st.researching;
+	// The focus the plan names is that of the user's latest words as it reads them now.
+	const latestUser = st.said.filter((s) => s.who === "user").at(-1) ?? null;
 	const prompt = planData({
 		now,
 		clock: clock(st, now),
@@ -63,7 +73,7 @@ export async function plan(
 			? (st.items.find((i) => i.id === researching.ticket.itemId) ?? null)
 			: null,
 		quiet: st.quiet,
-		userDeclines: st.userDeclines,
+		lastFocus: st.focus?.topic ?? null,
 		nothingToSay: digging,
 		refusedLastDig: digging ? st.refusedLastDig : [],
 	});
@@ -82,10 +92,13 @@ export async function plan(
 	);
 	if (!call.ok) {
 		const code = call.outcome.code === "aborted" ? "aborted" : "failed";
-		// A failed plan is not retried in a loop: the next new information plans again.
+		// Called off (the user spoke): the dig it was is still owed.
+		if (code === "aborted") st.dig ||= digging;
+		// A failed plan is tried again shortly, not left until the next news (which could be an
+		// hour away), and not in a tight loop either.
 		if (code === "failed") {
-			if (st.planGen === startGen) st.planDue = false;
 			st.lastPlanAt = now;
+			st.planRetryAt = now + RESEARCH_RETRY_MS;
 		}
 		return nothing(record("plan", now, null, false, code));
 	}
@@ -95,6 +108,10 @@ export async function plan(
 	// What came while it was out (a returned note, a memory change) is planned on next.
 	if (st.planGen === startGen) st.planDue = false;
 	st.lastPlanAt = now;
+	st.planRetryAt = null;
+	const focus = call.value.focus.trim();
+	if (latestUser && focus !== "")
+		st.focus = { topic: focus, userId: latestUser.id };
 	const refsKnown = new Set([
 		...st.said.map((s) => s.id),
 		...knownNow.map((k) => `memory:${k.id}`),
@@ -144,7 +161,7 @@ export async function plan(
 					i.kind === "research" &&
 					i.status === "open" &&
 					holdsElsewhere(st, now) &&
-					!connected(st, i, now)
+					!connected(st, i)
 				),
 		).length;
 		const why = (code: string) => {
@@ -183,12 +200,13 @@ export async function plan(
 			continue;
 		}
 		// In a talk, what is drawn from the memory, the interests or a note ties into it too: the
-		// talk's words among its refs, or a note made from them (user, 2026-11-10: "Qwenとかダリオ
-		// アモデイとか、今の会話に関係無いメモリを拾ってくるべきでは無い…共通点があるなら優秀").
+		// user's latest words among its refs, or a note made from them (user, 2026-11-10: "Qwenとか
+		// ダリオアモデイとか、今の会話に関係無いメモリを拾ってくるべきでは無い…共通点があるなら優秀").
 		if (
 			holdsElsewhere(st, now) &&
 			drawsOnMemory(refs) &&
-			!tiesIn(st, refs, now)
+			!tiesToLatest(st, refs) &&
+			!sameTopic(a.topic, focus)
 		) {
 			why("off_topic");
 			continue;
@@ -227,15 +245,22 @@ export async function plan(
 			why("duplicate");
 			continue;
 		}
-		// The same theme again brings the same result back: compare with every earlier
-		// research and every note (this session's or an earlier one's).
+		// The same theme again brings the same result back: compare with research running or
+		// waiting and with the notes of the last day. An older note may be out of date (tomorrow's
+		// weather, this week's news): the check reads whether it still answers.
 		if (
 			a.kind === "research" &&
 			[
 				...st.items
-					.filter((i) => i.kind === "research")
+					.filter(
+						(i) =>
+							i.kind === "research" &&
+							(i.status === "open" || i.status === "doing"),
+					)
 					.map((i) => i.checkedRequest ?? i.text),
-				...notesNow.map((x) => `${x.title}${x.summary}`),
+				...notesNow
+					.filter((x) => now - x.at < NOTE_FRESH_MS)
+					.map((x) => `${x.title}${x.summary}`),
 			].some((t) => themeOverlap(text, t) >= SAME_THEME_OVERLAP)
 		) {
 			why("same_theme");
@@ -249,6 +274,7 @@ export async function plan(
 			reason: a.reason,
 			noteId,
 			createdAt: now,
+			...(a.topic.trim() ? { topic: a.topic.trim() } : {}),
 		});
 		st.items.push(item);
 		added.push(item);
