@@ -484,3 +484,80 @@ test("a reply that follows a note's summary closely has talked about it", async 
 		),
 	).toEqual(["n1"]);
 });
+
+test("CLI 2026-11-10: a note from an earlier session is in view when the user asks for it among notes that share more letters", async () => {
+	const { relevantNotes } = await import("../../standalone/agenda-reply.ts");
+	const note = (id: string, title: string, summary: string, at: number) => ({
+		id,
+		title,
+		summary,
+		at,
+		refs: [],
+	});
+	const newest = [73, 74, 75, 76, 77, 78].map((k) =>
+		note(`n${k}`, `辻堂の上映時間 ${k}`, "", 1_000 + k),
+	);
+	// The notes that shared letters with the line, as they were (titles and summaries).
+	const older = [
+		note(
+			"n68",
+			"Claude Fable 5.2の公開リリース確認（2026年11月9日）",
+			"Claude Fable 5.2は2026年11月9日（月）に公開され、有料プランとClaude Platform・Claude Codeで使えるようになったと、Anthropicの公式ページと公式Xアカウントで確認できた。「Fable5.2」は、Anthropicの「Claude Fable 5.2」を指すと判断した。",
+			0,
+		),
+		note(
+			"n48",
+			"GPT-6.2 Astra のリリース状況（2026/11/10時点）",
+			"GPT-6.2 Astra について、OpenAIによる公式発表は確認できなかった。Codexの利用画面やGoogle Cloudのクォータページに現れたという非公式の痕跡と、報道ベースの「金曜リリース」観測があるが、いずれも未確認。",
+			1,
+		),
+		note(
+			"n38",
+			"七里ヶ浜の地名の由来と、ジョギングで見たい海岸の特徴",
+			"地名の由来は「7里あるから」という説が一般的ですが、距離が合わないため別の説も出ています。海岸は約2.9kmの直線状で、眺望と波の景色が見どころです。",
+			2,
+		),
+		note(
+			"n33",
+			"Qwen4のリリース時期の確認状況（2026年11月9日時点）",
+			"Qwen4は2026年11月7日時点で未公開で、Alibabaは発売日を公表していません。公式に確認できたのは「学習中」とプレビュー版の存在までで、「来週発売」や具体的なモデル構成は伝聞または噂の段階です。",
+			3,
+		),
+		note(
+			"n1",
+			"Qwen4のリリース状況（確定情報と未確認の噂）",
+			"2026/11/8時点で、Qwen4はまだ公開されておらず、公式な発表日もありません。確定しているのは「開発中であること」と「Qwen3.8-Flash-Nextが先行プレビューであること」だけです。「来週リリース」などの話は参加者の報告で、Alibabaは確認していません。",
+			4,
+		),
+		note(
+			"n67",
+			"2026年11月前半のAIエージェント・Qwen関連ニュース（自律行動・安全性の話題中心）",
+			"自律的に動くAIエージェントは、製品投入と同時にセキュリティ事故や制御の難しさも目立ってきた。Qwenについては、Cohereが報告したエージェントの予期しない外部通信が注目されているが、2026年11月に出たQwen本体の新発表は今回の検索では確認できなかった。",
+			5,
+		),
+		note(
+			"n10",
+			"Qwen4の時期に関する言及の確認（2026年11月8日以降）",
+			"2026年11月8日以降にAlibabaまたはQwenチームがQwen4の時期に言及したことは、検索では確認できなかった。公式の目安時期は示されていないため、確定的な時期は言えない。",
+			6,
+		),
+		note(
+			"n7",
+			"GPT-6.2 Astra の噂と公開状況（2026年11月9日時点）",
+			"GPT-6.2 Astra は、2026年11月9日時点で公式発表もリリースも確認できていません。Codex の利用画面に出た識別子が噂の出どころで、信頼性は低いと判断します。",
+			7,
+		),
+		note(
+			"n63",
+			"Qwen4のリリース時期は未発表（2026/11/10時点）",
+			"2026/11/10時点で、Qwen4の公開日はAlibabaから発表されておらず、モデルも公開されていないことを確認できませんでした。公式が確認しているのは「開発中」で「近いうちに」という表現までで、「来週」などの報道は未確認です。",
+			8,
+		),
+	];
+	const seen = relevantNotes(
+		[...older, ...newest],
+		"ところでさっき、Fable5.2のまえにAIニュース調べてといったはずですが、調べてある？",
+	).map((n) => n.id);
+	expect(seen).toContain("n67");
+	expect(seen.slice(0, 6)).toEqual(["n78", "n77", "n76", "n75", "n74", "n73"]);
+});

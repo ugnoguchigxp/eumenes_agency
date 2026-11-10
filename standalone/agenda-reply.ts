@@ -391,7 +391,10 @@ export function relevantNotes(
 	notes: readonly NoteRef[],
 	text: string,
 	newest = 6,
-	related = 4,
+	// Eight, not four: "AIニュース調べてといったはずですが" put the AI-news note fifth, behind notes on
+	// Fable 5.2 and GPT Astra that shared more letters, and the reply said it had none (the CLI,
+	// 2026-11-10 21:26).
+	related = 8,
 ): NoteRef[] {
 	const q = bigrams(text);
 	const score = (n: NoteRef) => {
