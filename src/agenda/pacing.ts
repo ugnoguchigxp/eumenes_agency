@@ -130,7 +130,9 @@ export const replyAsk = (st: AgendaState, now: number): AgendaItem | null => {
  * A talk is going on (the user spoke within TOPIC_RECENT_MS): what is said ties into it. Topics
  * from elsewhere stay unsaid meanwhile, kept for later or never (user, 2026-11-09: "ユーザーの
  * フォーカスから外れている事をいきなり降ると違和感しかない…死蔵しても構わない"). With nothing that
- * ties in, it digs into the talk at once (canDig).
+ * ties in, it digs into the talk at once (canDig). Letting topics from elsewhere come after a dig
+ * that found nothing (ag50-elsewhere, 2026-11-10, not adopted) broke into a game the user was
+ * talking about, and the user asked for quiet.
  */
 export const holdsElsewhere = (st: AgendaState, now: number) =>
 	st.lastUserAt !== null && now - st.lastUserAt <= TOPIC_RECENT_MS;

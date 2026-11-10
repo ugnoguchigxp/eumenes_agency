@@ -566,6 +566,8 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			st.lastAgentAt = Math.max(st.lastAgentAt ?? 0, r.at);
 			st.lastAgentAsked = t.itemKind === "ask" || endsWithQuestion(t.utterance);
 			// Anything it asked on its own (a topic that ends "表示しましょうか？" too) waits for an answer.
+			// The offer stays in: letting a question follow it (ag49-offer, 2026-11-10, not adopted)
+			// put the question over an offer not yet answered, felt as 唐突/しつこい (3 of 4).
 			if (st.lastAgentAsked) st.ownAskPending = true;
 			st.unanswered++;
 		},
