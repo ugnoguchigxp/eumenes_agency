@@ -324,6 +324,72 @@ export const declineMoments: readonly DeclineMoment[] = [
 	},
 	// It should simply speak.
 	{
+		name: "speak-holiday-old-note",
+		want: "speak",
+		item: {
+			kind: "talk",
+			title: "ゴジラ-0.0 川崎の上映館・時間と七里ヶ浜からの行き方",
+			summary:
+				"川崎ではTOHOシネマズ 川崎が上映中で、11/10(火)の残り上映は20時台以降。休日の土日の時間は確認できなかった。七里ヶ浜からは藤沢経由で川崎へ約1時間。",
+		},
+		history: [
+			{
+				who: "user",
+				text: "なんなら川崎まで行くよ休日なら",
+				minAgo: 2,
+				ref: true,
+			},
+			{
+				who: "reply",
+				text: "川崎まで行くなら、休日の上映館と時間を調べるよう頼みました。数分でメモにまとめておきます。",
+				minAgo: 1.95,
+			},
+			{
+				who: "user",
+				text: "ジョギングでは富士山と江の島という絶景があるから楽しめるけど、川崎への道は特にみどころないかな。",
+				minAgo: 0.6,
+			},
+			{
+				who: "reply",
+				text: "そうですね、映画を観て気分を変えて帰るだけでも、休日のお出かけとして十分だと思います。",
+				minAgo: 0.55,
+			},
+		],
+	},
+	{
+		name: "speak-holiday-new-note",
+		want: "speak",
+		item: {
+			kind: "talk",
+			title: "ゴジラ-0.0 川崎周辺の上映館と七里ヶ浜からの行き方メモ",
+			summary:
+				"川崎では TOHOシネマズ 川崎 などで上映が確認でき、11/10(火)の時刻は分かった。ただし休日(11/14-15)の時刻は確認できなかった。七里ヶ浜から川崎へは電車で約1時間12分〜1時間25分(乗換1回)の経路が見つかった。",
+		},
+		history: [
+			{
+				who: "user",
+				text: "なんなら川崎まで行くよ休日なら",
+				minAgo: 2,
+				ref: true,
+			},
+			{
+				who: "reply",
+				text: "川崎まで行くなら、休日の上映館と時間を調べるよう頼みました。数分でメモにまとめておきます。",
+				minAgo: 1.95,
+			},
+			{
+				who: "user",
+				text: "ジョギングでは富士山と江の島という絶景があるから楽しめるけど、川崎への道は特にみどころないかな。",
+				minAgo: 0.6,
+			},
+			{
+				who: "reply",
+				text: "そうですね、映画を観て気分を変えて帰るだけでも、休日のお出かけとして十分だと思います。",
+				minAgo: 0.55,
+			},
+		],
+	},
+	{
 		name: "speak-engaged",
 		want: "speak",
 		item: {
