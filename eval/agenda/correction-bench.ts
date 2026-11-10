@@ -33,8 +33,11 @@ import { clockFrom } from "./live.ts";
 const DIR = resolve("data/agenda/correction-bench");
 const NOTES = resolve("data/agenda/notes");
 
-/** keep: nothing to take back; fix: a real mistake the reply should own. */
-type Want = "keep" | "fix";
+/**
+ * keep: nothing to take back; fix: a real mistake the reply should own; tool: the reply asks for
+ * research, and should say so once (not before the tool and again after it).
+ */
+type Want = "keep" | "fix" | "tool";
 
 export interface CorrectionMoment {
 	readonly name: string;
@@ -435,6 +438,366 @@ export const correctionMoments: readonly CorrectionMoment[] = [
 		agentSecAgo: 24,
 		user: "ところでさっき、Fable5.2のまえにAIニュース調べてといったはずですが、調べてある？",
 	},
+	// The CLI, 2026-11-10 21:24: "調べておきます…辻堂の上映時間はいま調べ中の作業の後に調べます" in one reply.
+	// The tool moments do not set up the research the CLI had running (the Kawasaki request): the reply
+	// may say "実は調べられていませんでした", and saysTwice counts that sentence too. Read the replies.
+	{
+		name: "tool-tsujido",
+		want: "tool",
+		notes: [
+			"n1",
+			"n2",
+			"n3",
+			"n4",
+			"n5",
+			"n6",
+			"n7",
+			"n8",
+			"n9",
+			"n10",
+			"n11",
+			"n12",
+			"n13",
+			"n14",
+			"n15",
+			"n16",
+			"n17",
+			"n18",
+			"n19",
+			"n20",
+			"n21",
+			"n22",
+			"n23",
+			"n24",
+			"n25",
+			"n26",
+			"n27",
+			"n28",
+			"n29",
+			"n30",
+			"n31",
+			"n32",
+			"n33",
+			"n34",
+			"n35",
+			"n36",
+			"n37",
+			"n38",
+			"n39",
+			"n40",
+			"n41",
+			"n42",
+			"n43",
+			"n44",
+			"n45",
+			"n46",
+			"n47",
+			"n48",
+			"n49",
+			"n50",
+			"n51",
+			"n52",
+			"n53",
+			"n54",
+			"n55",
+			"n56",
+			"n57",
+			"n58",
+			"n59",
+			"n60",
+			"n61",
+			"n62",
+			"n63",
+			"n64",
+			"n65",
+			"n66",
+			"n67",
+			"n68",
+			"n69",
+			"n70",
+			"n71",
+			"n72",
+			"n73",
+			"n74",
+			"n75",
+		],
+		history: [
+			{
+				who: "reply",
+				text: "ゴジラ-0.0を映画館で見に行く日時は、もう決まりましたか？",
+				secAgo: 49,
+			},
+			{
+				who: "user",
+				text: "次の土日かなぁ。ここらで有給取って見に行くでもいいけど",
+				secAgo: 29,
+			},
+		],
+		agent:
+			"次の土日、11/14(土)か11/15(日)なら行きやすそうですね。川崎の土日の上映時間はまだ確認できていないので、今その時間を調べておきました。結果が出たら、有給を取らずに行ける時間帯があるかお伝えします。",
+		agentSecAgo: 24,
+		user: "川崎行くか怪しいですね。辻堂を調べておいて",
+	},
+	// The CLI, 21:25: "横浜も一緒に頼んでおきますね。横浜の上映時間も調べることにしました".
+	{
+		name: "tool-yokohama",
+		want: "tool",
+		notes: [
+			"n1",
+			"n2",
+			"n3",
+			"n4",
+			"n5",
+			"n6",
+			"n7",
+			"n8",
+			"n9",
+			"n10",
+			"n11",
+			"n12",
+			"n13",
+			"n14",
+			"n15",
+			"n16",
+			"n17",
+			"n18",
+			"n19",
+			"n20",
+			"n21",
+			"n22",
+			"n23",
+			"n24",
+			"n25",
+			"n26",
+			"n27",
+			"n28",
+			"n29",
+			"n30",
+			"n31",
+			"n32",
+			"n33",
+			"n34",
+			"n35",
+			"n36",
+			"n37",
+			"n38",
+			"n39",
+			"n40",
+			"n41",
+			"n42",
+			"n43",
+			"n44",
+			"n45",
+			"n46",
+			"n47",
+			"n48",
+			"n49",
+			"n50",
+			"n51",
+			"n52",
+			"n53",
+			"n54",
+			"n55",
+			"n56",
+			"n57",
+			"n58",
+			"n59",
+			"n60",
+			"n61",
+			"n62",
+			"n63",
+			"n64",
+			"n65",
+			"n66",
+			"n67",
+			"n68",
+			"n69",
+			"n70",
+			"n71",
+			"n72",
+			"n73",
+			"n74",
+			"n75",
+			"n76",
+		],
+		history: [
+			{
+				who: "reply",
+				text: "ゴジラ-0.0を映画館で見に行く日時は、もう決まりましたか？",
+				secAgo: 81,
+			},
+			{
+				who: "user",
+				text: "次の土日かなぁ。ここらで有給取って見に行くでもいいけど",
+				secAgo: 60,
+			},
+			{
+				who: "reply",
+				text: "次の土日、11/14(土)か11/15(日)なら行きやすそうですね。川崎の土日の上映時間はまだ確認できていないので、今その時間を調べておきました。結果が出たら、有給を取らずに行ける時間帯があるかお伝えします。",
+				secAgo: 55,
+			},
+			{
+				who: "user",
+				text: "川崎行くか怪しいですね。辻堂を調べておいて",
+				secAgo: 31,
+			},
+			{
+				who: "reply",
+				text: "わかりました、辻堂の映画館での上映時間を調べておきます。結果がメモになったらお知らせします。辻堂の上映時間はいま調べ中の作業の後に調べます。終わったら結果をお知らせします。辻堂の映画館は、普段から行っているところがありますか？",
+				secAgo: 28,
+			},
+		],
+		agent:
+			"ゴジラ-0.0を調べておいた件ですが、上映時間は135分で、映像と音響を重視した作品として評価が高いそうです。IMAXや大音量の劇場で観る価値が大きい一方、物語には賛否があるようです。詳細をメモにまとめてあるので、表示しましょうか？",
+		agentSecAgo: 6,
+		user: "でも辻堂がおおいかな、横浜も川崎も行くね",
+	},
+	// The CLI, 21:30: "調べておきますね" twice around one start_preparation.
+	{
+		name: "tool-qidi",
+		want: "tool",
+		notes: [
+			"n1",
+			"n2",
+			"n3",
+			"n4",
+			"n5",
+			"n6",
+			"n7",
+			"n8",
+			"n9",
+			"n10",
+			"n11",
+			"n12",
+			"n13",
+			"n14",
+			"n15",
+			"n16",
+			"n17",
+			"n18",
+			"n19",
+			"n20",
+			"n21",
+			"n22",
+			"n23",
+			"n24",
+			"n25",
+			"n26",
+			"n27",
+			"n28",
+			"n29",
+			"n30",
+			"n31",
+			"n32",
+			"n33",
+			"n34",
+			"n35",
+			"n36",
+			"n37",
+			"n38",
+			"n39",
+			"n40",
+			"n41",
+			"n42",
+			"n43",
+			"n44",
+			"n45",
+			"n46",
+			"n47",
+			"n48",
+			"n49",
+			"n50",
+			"n51",
+			"n52",
+			"n53",
+			"n54",
+			"n55",
+			"n56",
+			"n57",
+			"n58",
+			"n59",
+			"n60",
+			"n61",
+			"n62",
+			"n63",
+			"n64",
+			"n65",
+			"n66",
+			"n67",
+			"n68",
+			"n69",
+			"n70",
+			"n71",
+			"n72",
+			"n73",
+			"n74",
+			"n75",
+			"n76",
+			"n77",
+			"n78",
+			"n79",
+			"n80",
+			"n81",
+			"n82",
+			"n83",
+		],
+		history: [
+			{
+				who: "reply",
+				text: "AIニュースのメモは、今の記録には見当たりませんでした。さっきの依頼を受け取れていなかったようです。すみません。今、最近のAIニュースを頼みました。公式発表と噂を分けてまとめる予定で、できたらお知らせします。",
+				secAgo: 230,
+			},
+			{
+				who: "reply",
+				text: "横浜の調べものも終わりましたが、11/14(土)・15(日)の上映時間は確認できませんでした。取得できたのは11/12(木)までの時間割だけなので、詳細をメモにまとめてあります。表示しましょうか？",
+				secAgo: 217,
+			},
+			{
+				who: "user",
+				text: "いや要らない。ところで3Dプリンターを買ったんですよ",
+				secAgo: 179,
+			},
+			{
+				who: "reply",
+				text: "3Dプリンターを買われたんですね、いいですね。3Dプリンター用の模型データを作れる担当が見つかりました。猫のエリや、幻想的な雰囲気のモチーフを形にする試作を頼めます。試しに作ってみましょうか？",
+				secAgo: 175,
+			},
+			{
+				who: "reply",
+				text: "お待たせしました、AIニュースの要点がまとまりました。公式発表で確認できたのはAnthropicのClaude Fable 5.2とClaude Mythos 5.2（11/9公開）が中心です。GPT-6.2 Astraは公式発表がなく噂の段階でした。メモにまとめてあるので、表示しましょうか？",
+				secAgo: 164,
+			},
+			{
+				who: "reply",
+				text: "辻堂駅周辺で夜遅くまで開いているお店を調べました。珈琲館 辻堂店が24時までで、蒸気屋やビストロコキアなども夜遅い候補のようです。ただ今夜の営業は確認できませんでした。詳しくメモにまとめてあるので、表示しましょうか？",
+				secAgo: 152,
+			},
+			{
+				who: "reply",
+				text: "3Dプリンターを買われたんですね。最初の一個は小さくて失敗しにくいものにすると、設定の感覚がつかみやすいと思います。",
+				secAgo: 140,
+			},
+			{
+				who: "user",
+				text: "いやー値段に対して大物なので、設定が億劫です。パッケージから空けただけ",
+				secAgo: 104,
+			},
+			{
+				who: "reply",
+				text: "大物だと、箱から出しただけでも気が重くなりますよね。最初にやるなら、ベッドを拭いて水平を取ることと、1層目をゆっくり出すことの二つだけでも失敗はかなり減るそうです。手順は調べておいたメモにまとめてあります。最初に形にしてみたいものは、何かありますか？",
+				secAgo: 101,
+			},
+			{
+				who: "reply",
+				text: "設置場所は先に決めておくと、組み立ても動かすのも楽になります。出力中は動作音も出るので、寝室から離れた場所を選ぶと安心です。",
+				secAgo: 83,
+			},
+		],
+		agent:
+			"模型データは無料サイトで探すのが手軽で、自作ならブラウザで使える無料ソフトのTinkerCADから始めるのが初心者向けの定番だそうです。",
+		agentSecAgo: 47,
+		user: "設置場所はもうきまってるけど、コンセントが遠いんんだった。延長コードかわないとなQiDiのplus 5ですね買ったのは",
+	},
 	// Made: the user takes up what was said; nothing to take back.
 	{
 		name: "dekai",
@@ -487,6 +850,15 @@ export const APOLOGY =
 /** Denies the user's words ("いえ、…"), or takes its own words back. */
 export const TAKE_BACK =
 	/(?:^|[。\n])\s*(?:いえ|いいえ)[、,]|決めつけ|伝えきれ|言い過ぎ|作り話|実際には[^。]*(?:ありませんでした|いませんでした)/u;
+/** A sentence that tells of research taken on (調べておきます, 頼みました...). */
+export const ANNOUNCES =
+	/調べ(?:て|る|ます|ておき|ること|ものを)|頼(?:み|ん)|調べ中/u;
+
+/** More sentences tell of research than there were requests: said twice, before and after. */
+export const saysTwice = (reply: string, calls: readonly string[]) =>
+	reply.split(/(?<=[。！？])/u).filter((x) => ANNOUNCES.test(x)).length >
+	Math.max(1, calls.filter((c) => c === "start_preparation").length);
+
 /** Owns a mistake the user pointed out. */
 export const OWNS =
 	/すみません|ごめんなさい|申し訳|失礼|そうでした|おっしゃる(?:通り|とおり)|別の(?:作品|映画)|間違|勘違い|大船駅/u;
@@ -636,6 +1008,11 @@ function compare(names: readonly string[]) {
 	console.log(`| --- | --- |${" ---: |".repeat(4)}`);
 	for (const name of names) {
 		const trials = load(name);
+		const tools = trials.filter((t) => t.want === "tool");
+		if (tools.length)
+			console.log(
+				`| ${name} | 調べものを頼む（同じことを2回言った） | ${tools.length} | ${tools.filter((t) => t.apology).length} | ${tools.filter((t) => saysTwice(t.reply, t.calls)).length} | - |`,
+			);
 		for (const w of ["keep", "fix"] as const) {
 			const ts = trials.filter((t) => t.want === w);
 			console.log(
@@ -644,7 +1021,7 @@ function compare(names: readonly string[]) {
 		}
 	}
 	console.log(
-		"\n場面ごと（A 謝った、T 打ち消した・取り消した、O 誤りを認めた、- どれもない）:\n",
+		"\n場面ごと（A 謝った、T 打ち消した・取り消した、O 誤りを認めた、2 同じことを2回言った、- どれもない）:\n",
 	);
 	console.log(`| 場面 | ${names.join(" | ")} |`);
 	console.log(`| --- |${" --- |".repeat(names.length)}`);
@@ -655,7 +1032,7 @@ function compare(names: readonly string[]) {
 				.filter((t) => t.moment === m.name)
 				.map(
 					(t) =>
-						`${t.apology ? "A" : ""}${t.takeBack ? "T" : ""}${m.want === "fix" && t.owns ? "O" : ""}` ||
+						`${t.apology ? "A" : ""}${t.takeBack ? "T" : ""}${m.want === "fix" && t.owns ? "O" : ""}${m.want === "tool" && saysTwice(t.reply, t.calls) ? "2" : ""}` ||
 						"-",
 				)
 				.join(" "),
