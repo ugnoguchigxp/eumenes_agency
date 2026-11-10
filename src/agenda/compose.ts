@@ -150,7 +150,9 @@ export async function compose(
 		item.lastDecline = { reason: declined, at: now };
 		// The model declines only what was said or answered already, or went stale: it goes. An
 		// utterance code refused (a repeat, two questions, either-or) is written once more. Nothing
-		// else waits for it (user, 2026-11-09: "見送りばっかりしてる").
+		// else waits for it (user, 2026-11-09: "見送りばっかりしてる"). Keeping what was declined "for
+		// now" until the user's next words (ag52-decline, 2026-11-10, not adopted) brought the same
+		// kind of question back again and again: the judge's questions fell (p=0.03).
 		if (utterance === "" || item.declines >= 2) {
 			item.status = "dropped";
 			item.endedAt = now;
