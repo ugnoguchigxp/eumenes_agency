@@ -598,3 +598,33 @@ test("without the host's toolchains, the reply has neither find_toolchain/delega
 	})[0]!.content;
 	expect(offered).toContain("find_toolchain");
 });
+
+test("the Codex SDK researcher sends the researcher's rules with the request and parses its note", async () => {
+	const { codexWebNoteWriter } =
+		await import("../../standalone/agenda-research.ts");
+	const prompts: string[] = [];
+	const r = codexWebNoteWriter({
+		today: () => "2026年11月11日(水)",
+		turn: async (prompt) => {
+			prompts.push(prompt);
+			return {
+				text: "題: 富士山の標高\n要約: 3,776 m。\n---\n## 標高\n3,776 m（2026年11月11日確認）\n## 出典\n- 国土地理院",
+				searches: 2,
+				usage: { input: 18000, cachedInput: 12000, output: 120 },
+			};
+		},
+	});
+	const note = await r.writer("富士山の標高を調べて");
+	expect(note).toMatchObject({ title: "富士山の標高", summary: "3,776 m。" });
+	expect(note.markdown).toContain("国土地理院");
+	expect(prompts[0]).toContain("今日は2026年11月11日(水)です。");
+	expect(prompts[0]!.endsWith("依頼:\n富士山の標高を調べて")).toBe(true);
+	expect(r.searches()).toBe(2);
+	expect(r.tokens()).toEqual({ input: 18000, cachedInput: 12000, output: 120 });
+	// An empty answer is a failed research, not an empty note.
+	const empty = codexWebNoteWriter({
+		today: () => "x",
+		turn: async () => ({ text: "  ", searches: 0, usage: null }),
+	});
+	await expect(empty.writer("q")).rejects.toThrow("調べた結果が空だった");
+});

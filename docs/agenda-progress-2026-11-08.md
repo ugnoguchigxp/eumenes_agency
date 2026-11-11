@@ -1171,3 +1171,7 @@ lu3-cand は違和感が増えた。休みたい場面で、同じ話題とし�
 ### steer はホストのもの（0.1.7、2026-11-11）
 
 利用者: 「steerはagencyには含めず、eumenesにあるsteerとの接続を心がけてください」。配布物から steer のつなぎ（`createAgendaReplySteering`、受付箱の口）を外し、会話ループには返事の途中に足された言葉の受け口（`addedWords`）と、その印（`ADDED_WORDS_MARK`）だけを残した。CLI と examples の steer は `standalone/agenda-steer.ts` に移した（配布物の外）。Eumenes は自分の steer（vendor/steer、5ba40df6）をこの受け口につなぐ。版は 0.1.7。
+
+## 標準の検索は codex-sdk + Luna（2026-11-11）
+
+同じ実際の調べもの10件×2回で計測した（`scratchpad/search-bench`）。codex-sdk + Luna（Codex 自身のライブ Web 検索、low）は 20/20、中央値 28.6秒（90%点 46秒）、新しく読む入力は約2.5万 token（キャッシュ込み約10万）。OpenAI Responses の web_search（Luna）は 20/20、12.3秒。誰の結果か伏せた採点はほぼ互角（12対8）。Eumenes の web_search は自身の記録で中央値約46秒（直近10件: 成功4・中途5・失敗2）、web.research は約9.5分。利用者の判断: 「どうしてもcloud apiを使いたくない事情が無い限りsdk 検索をしたほうがいい」「codex-sdk lunaによる検索ツールを登録し、agencyの標準検索ツールにしましょう」。CLI の調べもの担当を codex-sdk + Luna にした（`codexWebNoteWriter`、codex が無ければ従来の担当）。Eumenes でも同じ検索を担当として登録し、agency の調べものの行き先にする。

@@ -30,7 +30,7 @@ import { agendaReplyMessages, dropRepeatedSentences } from "./agenda-reply.ts";
 import { createAgendaReplySteering } from "./agenda-steer.ts";
 import { createSteeringInbox } from "eumenes-steer";
 import { memoryModel } from "./agenda-memory.ts";
-import { webNoteWriterFor } from "./agenda-research.ts";
+import { codexWebNoteWriter, webNoteWriterFor } from "./agenda-research.ts";
 import { createChatLog, chatsDir, printAbove } from "./chat-loop.ts";
 import { createProviderLlm, createProviderReply } from "./providers.ts";
 import { loadSettings, settingsDigest } from "./settings.ts";
@@ -143,13 +143,18 @@ async function main() {
 		clock: localTime,
 	});
 	const docs = createMockDocStore({ dir: notesDir });
+	// The standard search: the Codex SDK with Luna and Codex's own web search (user, 2026-11-11);
+	// without a codex executable, the role's provider searches instead.
+	const viaCodex = !args.mockResearch && Bun.which("codex") !== null;
 	const searcher = args.mockResearch
 		? null
-		: webNoteWriterFor({
-				role: settings.llm.background,
-				meter,
-				today: () => localTime(Date.now()),
-			});
+		: viaCodex
+			? codexWebNoteWriter({ today: () => localTime(Date.now()) })
+			: webNoteWriterFor({
+					role: settings.llm.background,
+					meter,
+					today: () => localTime(Date.now()),
+				});
 	// Work delegated to a toolchain goes to its mock (Eumenes runs the real toolchain).
 	const researchWriter = searcher?.writer ?? llmWriter(llm);
 	const research = createMockWebResearch({
@@ -502,7 +507,7 @@ async function main() {
 
 	console.log(
 		dim(
-			`agenda / 調べもの: ${searcher ? "Web検索" : "mock"} / 記憶 ${memory.known().length}件・メモ ${docs.list().length}件 / 話しかけの最短間隔 ${args.interval}秒 / background ${settings.llm.background.model} (${settings.llm.background.effort}) / log ${args.log ?? "off"}\ncommands: /agenda /notes /show <id> /memory /profile /plan /stop /resume /quit`,
+			`agenda / 調べもの: ${searcher ? (viaCodex ? "Web検索（codex-sdk・Luna）" : "Web検索") : "mock"} / 記憶 ${memory.known().length}件・メモ ${docs.list().length}件 / 話しかけの最短間隔 ${args.interval}秒 / background ${settings.llm.background.model} (${settings.llm.background.effort}) / log ${args.log ?? "off"}\ncommands: /agenda /notes /show <id> /memory /profile /plan /stop /resume /quit`,
 		),
 	);
 	if (restored.length)

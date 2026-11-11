@@ -42,6 +42,7 @@
 	},
 	"devDependencies": {
 		"@anthropic-ai/sdk": "0.131.0",
+		"@openai/codex-sdk": "0.160.0",
 		"@types/bun": "1.3.14",
 		"@types/node": "25.9.3",
 		"eumenes-memory": "./examples/virtual-eumenes/vendor/eumenes-memory-0.0.4-30721f30aa19.tgz",

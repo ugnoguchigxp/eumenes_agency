@@ -184,6 +184,104 @@ export function openaiWebNoteWriter(input: {
 	return { writer, searches: () => searches };
 }
 
+/** One Codex turn, as the SDK's thread runs it (a fake in tests). */
+export type CodexTurn = (
+	prompt: string,
+	signal?: AbortSignal,
+) => Promise<{
+	readonly text: string;
+	readonly searches: number;
+	readonly usage: {
+		readonly input: number;
+		readonly cachedInput: number;
+		readonly output: number;
+	} | null;
+}>;
+
+/** A fresh Codex SDK thread per request: Luna, low effort, Codex's own live web search, read-only. */
+export const codexSdkTurn =
+	(input: { readonly model: string; readonly effort: "low" | "medium" }) =>
+	async (prompt: string, signal?: AbortSignal) => {
+		const { Codex } = await import("@openai/codex-sdk");
+		const { mkdtempSync, rmSync } = await import("node:fs");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const env: Record<string, string> = {};
+		for (const k of [
+			"PATH",
+			"HOME",
+			"CODEX_HOME",
+			"TMPDIR",
+			"LANG",
+			"LC_ALL",
+			"SSL_CERT_FILE",
+			"SSL_CERT_DIR",
+			"NODE_EXTRA_CA_CERTS",
+		])
+			if (process.env[k] !== undefined) env[k] = process.env[k]!;
+		const cwd = mkdtempSync(join(tmpdir(), "agenda-research-"));
+		try {
+			const thread = new Codex({ env }).startThread({
+				model: input.model,
+				modelReasoningEffort: input.effort,
+				webSearchMode: "live",
+				sandboxMode: "read-only",
+				approvalPolicy: "never",
+				skipGitRepoCheck: true,
+				workingDirectory: cwd,
+			});
+			const r = await thread.run(prompt, signal ? { signal } : {});
+			return {
+				text: r.finalResponse,
+				searches: r.items.filter((i) => i.type === "web_search").length,
+				usage: r.usage
+					? {
+							input: r.usage.input_tokens,
+							cachedInput: r.usage.cached_input_tokens,
+							output: r.usage.output_tokens,
+						}
+					: null,
+			};
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
+	};
+
+/**
+ * The researcher on the Codex SDK (the agency's standard search, user 2026-11-11): Luna with
+ * Codex's own live web search. On 10 real requests ×2 it answered 20/20 in 28.6 s (median), as
+ * well as the Responses API's web search and faster than Eumenes' web_search. It runs on the
+ * machine's Codex login, so it costs no API money; its tokens are counted here, not priced.
+ */
+export function codexWebNoteWriter(input: {
+	readonly today: () => string;
+	readonly turn?: CodexTurn;
+	readonly model?: string;
+}): {
+	writer: NoteWriter;
+	searches: () => number;
+	tokens: () => { input: number; cachedInput: number; output: number };
+} {
+	const turn =
+		input.turn ??
+		codexSdkTurn({ model: input.model ?? "gpt-6-luna", effort: "low" });
+	let searches = 0;
+	const tokens = { input: 0, cachedInput: 0, output: 0 };
+	const writer: NoteWriter = async (request) => {
+		const r = await turn(`${system(input.today())}\n\n依頼:\n${request}`);
+		searches += r.searches;
+		if (r.usage) {
+			tokens.input += r.usage.input;
+			tokens.cachedInput += r.usage.cachedInput;
+			tokens.output += r.usage.output;
+		}
+		const text = r.text.trim();
+		if (text === "") throw new Error("調べた結果が空だった");
+		return parseNote(text);
+	};
+	return { writer, searches: () => searches, tokens: () => ({ ...tokens }) };
+}
+
 /** The researcher on the role's provider. */
 export const webNoteWriterFor = (input: {
 	readonly role: Pick<
