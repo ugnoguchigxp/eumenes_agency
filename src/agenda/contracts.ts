@@ -30,8 +30,12 @@ export const ANSWER_WINDOW_MS = 600_000;
  * minute; user, 2026-11-11: no wait without a reason).
  */
 export const RESEARCH_RETRY_MS = 10_000;
-/** A research the host never returns stops counting as running after this. */
-export const RESEARCH_TTL_MS = 6 * 3_600_000;
+/**
+ * A research the host never returns stops counting as running after this, and the next one may
+ * start. In the CLI research came back in 14 s (median of 44, the longest 31 s, 2026-11-10); it
+ * was six hours, so one lost research stopped all research for six hours.
+ */
+export const RESEARCH_TTL_MS = 10 * 60_000;
 /** When the user asks for quiet in so many words («黙って») but names no length. */
 export const DEFAULT_QUIET_MIN = 60;
 /**

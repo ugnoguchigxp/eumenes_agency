@@ -422,7 +422,11 @@ describe("agenda agent", () => {
 		const out = await agent.step(0, idle, sig());
 		expect(out.tickets.map((t) => t.kind)).toEqual(["research"]);
 		expect(m.count("compose")).toBe(0);
-		expect(agent.nextAt(1_000)).toBe(1_800_000);
+		// A research not back in ten minutes is given up: the next one may start.
+		expect(agent.nextAt(1_000)).toBe(600_000);
+		await agent.step(600_000, idle, sig());
+		expect(agent.view().researching).toBeNull();
+		expect(agent.nextAt(600_001)).toBe(1_800_000);
 		const after = await agent.step(1_800_000, idle, sig());
 		expect(after.plan).not.toBeNull();
 		expect(after.tickets.map((t) => t.kind)).toEqual(["speak"]);
@@ -954,6 +958,49 @@ describe("agenda agent", () => {
 		expect(next.tickets.find((t) => t.kind === "research")).toMatchObject({
 			text: "パクチー抜きの注文ができる店の傾向だけ",
 		});
+	});
+
+	test("Luna 2026-11-11: a research that ended today still refuses its theme; one from yesterday does not", async () => {
+		const m = scripted({
+			plan: (d, n) => {
+				const u = (d["conversation"] as { id: string }[]).at(-1)!.id;
+				return n === 1
+					? plan(
+							add("research", "辛いラーメンの話題の新作を調べてまとめる", [u]),
+						)
+					: plan(
+							add(
+								"research",
+								"辛いラーメンの話題の新作を調べてまとめてほしい",
+								[u],
+							),
+						);
+			},
+		});
+		const agent = make({ llm: m.llm });
+		agent.observe({ id: "u1", who: "user", text: "辛いのが好き", at: 0 });
+		const first = await agent.step(0, idle, sig());
+		const ticket = first.tickets.find((t) => t.kind === "research")!;
+		// Came back with nothing to keep: no note, yet the same theme would bring the same back.
+		agent.researchReturned({
+			ticketId: ticket.id,
+			at: 20_000,
+			status: "succeeded",
+			note: null,
+		});
+		agent.observe({ id: "u2", who: "user", text: "うん", at: 30_000 });
+		const again = await agent.step(30_000, idle, sig());
+		expect(again.plan?.rejected).toEqual(["research:same_theme"]);
+		const day = 25 * 3_600_000;
+		agent.observe({
+			id: "u3",
+			who: "user",
+			text: "今日も辛いのがいい",
+			at: day,
+		});
+		const later = await agent.step(day, idle, sig());
+		expect(later.plan?.rejected).toEqual([]);
+		expect(later.plan?.added.map((i) => i.kind)).toEqual(["research"]);
 	});
 
 	test("what the user asked for is not checked against the notes", async () => {

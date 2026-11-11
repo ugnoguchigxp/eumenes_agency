@@ -245,9 +245,10 @@ export async function plan(
 			why("duplicate");
 			continue;
 		}
-		// The same theme again brings the same result back: compare with research running or
-		// waiting and with the notes of the last day. An older note may be out of date (tomorrow's
-		// weather, this week's news): the check reads whether it still answers.
+		// The same theme again brings the same result back: compare with the research of the
+		// last day (waiting, running or ended) and with the notes of the last day. Older ones
+		// may be out of date (tomorrow's weather, this week's news): the check reads whether a
+		// note still answers.
 		if (
 			a.kind === "research" &&
 			[
@@ -255,7 +256,7 @@ export async function plan(
 					.filter(
 						(i) =>
 							i.kind === "research" &&
-							(i.status === "open" || i.status === "doing"),
+							(i.endedAt === null || now - i.endedAt < NOTE_FRESH_MS),
 					)
 					.map((i) => i.checkedRequest ?? i.text),
 				...notesNow
