@@ -4,8 +4,11 @@
  * over the state; no model call.
  */
 import {
+	ANSWER_WAIT_MS,
 	ANSWER_WINDOW_MS,
 	FRESH_TALK_MS,
+	RESPONSE_WAIT_MS,
+	TOPIC_CHANGE_MS,
 	TOPIC_RECENT_MS,
 	type AgendaItem,
 } from "./contracts.ts";
@@ -33,19 +36,36 @@ export const endQuiet = (st: AgendaState, now: number) => {
 	}
 };
 
-/** The earliest time the agent may speak on its own (ignoring busy), or null when held. */
-export const speechOpenAt = (st: AgendaState, now: number): number | null => {
+/**
+ * The earliest time the agent may speak on its own (ignoring busy), or null when held; given an
+ * item that does not tie into the talk, the earliest time it may change the topic to it.
+ */
+export const speechOpenAt = (
+	st: AgendaState,
+	now: number,
+	item?: AgendaItem,
+): number | null => {
 	if (st.stopped) return null;
 	let at = now;
 	if (st.quiet.allUntil !== null && st.quiet.allUntil > at)
 		at = st.quiet.allUntil;
 	if (st.quiet.speechUntil !== null && st.quiet.speechUntil > at)
 		at = st.quiet.speechUntil;
-	// The same pace whether or not the user answers, and after a question too: only a second
-	// question waits for the answer (askBlocked). It talks about once in ten seconds (user,
-	// 2026-11-09: "やや喧しいくらい"); what it has to say is what bounds it.
+	// The set gap (user, 2026-11-09: "やや喧しいくらい"), but the user has time to respond first,
+	// to answer what the agent asked, and a new topic comes a minute after the last words.
 	if (st.lastAgentAt !== null)
-		at = Math.max(at, st.lastAgentAt + st.intervalMs);
+		at = Math.max(
+			at,
+			st.lastAgentAt +
+				Math.max(
+					st.intervalMs,
+					st.ownAskPending
+						? ANSWER_WAIT_MS
+						: item && !connected(st, item)
+							? TOPIC_CHANGE_MS
+							: RESPONSE_WAIT_MS,
+				),
+		);
 	return at;
 };
 

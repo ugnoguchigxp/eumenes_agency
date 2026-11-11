@@ -1,6 +1,6 @@
 {
 	"name": "eumenes-agency",
-	"version": "0.1.5",
+	"version": "0.1.6",
 	"private": true,
 	"license": "MIT",
 	"type": "module",
@@ -46,6 +46,7 @@
 		"@types/node": "25.9.3",
 		"eumenes-memory": "./examples/virtual-eumenes/vendor/eumenes-memory-0.0.4-30721f30aa19.tgz",
 		"eumenes-memory-host": "./examples/virtual-eumenes/vendor/eumenes-memory-host-0.1.0-3b6091d1b1ea.tgz",
+		"eumenes-steer": "./examples/virtual-eumenes/vendor/eumenes-steer-0.1.0-1ca04b8bee9b.tgz",
 		"openai": "7.51.0",
 		"oxfmt": "0.71.0",
 		"oxlint": "1.86.0",

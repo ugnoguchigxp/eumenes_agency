@@ -18,6 +18,7 @@ import { resolve } from "node:path";
 import { runRespond } from "../src/index.ts";
 import {
 	createAgendaAgent,
+	createAgendaReplySteering,
 	defaultSpeechIntervalSec,
 	speechIntervals,
 	type SpeechIntervalSec,
@@ -27,8 +28,9 @@ import {
 	type AgendaSessionEvent,
 } from "./agenda-session.ts";
 import { agendaReplyMessages, dropRepeatedSentences } from "./agenda-reply.ts";
-import { claudeMemoryModel } from "./agenda-memory.ts";
-import { webNoteWriter } from "./agenda-research.ts";
+import { createSteeringInbox } from "eumenes-steer";
+import { memoryModel } from "./agenda-memory.ts";
+import { webNoteWriterFor } from "./agenda-research.ts";
 import { createChatLog, chatsDir, printAbove } from "./chat-loop.ts";
 import { createProviderLlm, createProviderReply } from "./providers.ts";
 import { loadSettings, settingsDigest } from "./settings.ts";
@@ -118,10 +120,12 @@ const localTime = (now: number) =>
 
 async function main() {
 	const args = parseAgendaArgs(process.argv.slice(2), new Date());
+	// On gpt-6-luna while the Claude API is at its limit (until 2026-12-01); AGENCY_SETTINGS
+	// picks another (config/always-on.json: Haiku).
 	const settings = loadSettings(
 		process.env.AGENCY_SETTINGS
 			? undefined
-			: resolve(import.meta.dir, "../config/always-on.json"),
+			: resolve(import.meta.dir, "../config/agenda-luna.json"),
 	);
 	const meter = openUncappedMeter(settings, resolve(dataDir, "usage.jsonl"));
 	const llm = createProviderLlm(settings.llm.background, meter);
@@ -133,19 +137,15 @@ async function main() {
 		rmSync(statePath, { force: true });
 	}
 	const stateFile = openSnapshotFile(statePath);
-	if (settings.llm.background.provider === "openai")
-		throw new Error(
-			"the memory's model runs on the Claude API: set llm.background to a Claude model",
-		);
 	const memory = await openHostMemory({
 		dir: memoryDir,
-		complete: claudeMemoryModel({ role: settings.llm.background, meter }),
+		complete: memoryModel({ role: settings.llm.background, meter }),
 		clock: localTime,
 	});
 	const docs = createMockDocStore({ dir: notesDir });
 	const searcher = args.mockResearch
 		? null
-		: webNoteWriter({
+		: webNoteWriterFor({
 				role: settings.llm.background,
 				meter,
 				today: () => localTime(Date.now()),
@@ -402,7 +402,18 @@ async function main() {
 			show(e);
 			saveSoon();
 		},
-		reply: async (a, tools) => {
+		// Words sent while the reply is written go into its next model call (eumenes-steer). The
+		// CLI shows the reply when it is done, so words that come during its last call are taken
+		// by one more call (holdsText).
+		steering: createAgendaReplySteering({
+			inbox: createSteeringInbox({ now: Date.now }),
+			read: (id) =>
+				agent.view().said.find((x) => x.id === id && x.who === "user")?.text ??
+				null,
+			now: Date.now,
+			holdsText: true,
+		}),
+		reply: async (a, tools, steer) => {
 			const r = await runRespond({
 				messages: agendaReplyMessages({
 					agent: a,
@@ -412,7 +423,7 @@ async function main() {
 					clock: localTime(Date.now()),
 					now: Date.now(),
 				}),
-				chat,
+				chat: steer(chat),
 				tools,
 				emotion: true,
 				signal: new AbortController().signal,
@@ -514,19 +525,30 @@ async function main() {
 		},
 	);
 	let queue: Promise<unknown> = Promise.resolve();
+	const failed = (e: unknown) =>
+		out(dim(`  [エラー] ${e instanceof Error ? e.message : String(e)}`));
 	rl.on("line", (raw) => {
 		const line = raw.trim();
-		queue = queue
-			.then(async () => {
-				if (line === "") return;
-				if (line.startsWith("/")) {
-					if (!command(line)) rl.close();
-				} else await session.say(line);
-				rl.prompt(true);
-			})
-			.catch((e: unknown) =>
-				out(dim(`  [エラー] ${e instanceof Error ? e.message : String(e)}`)),
-			);
+		if (line === "") {
+			rl.prompt(true);
+			return;
+		}
+		// Words go to the session at once: while a reply is written, its next model call takes
+		// them (steer). The host waits for the replies out when it closes.
+		if (!line.startsWith("/")) {
+			queue = session
+				.say(line)
+				.then(() => rl.prompt(true))
+				.catch(failed);
+			return;
+		}
+		try {
+			// /quit waits for the reply out, so it is shown and kept.
+			if (!command(line)) void queue.finally(() => rl.close());
+			else rl.prompt(true);
+		} catch (e) {
+			failed(e);
+		}
 	});
 	rl.on("close", () => {
 		closed = true;

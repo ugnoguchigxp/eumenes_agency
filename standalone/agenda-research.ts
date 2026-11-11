@@ -1,15 +1,19 @@
 /**
- * The researcher for real, standing in for Eumenes' web_research and pursuit: a Haiku subagent
- * with the Claude API's server-side web search (read-only) that sees only the request and hands
+ * The researcher for real, standing in for Eumenes' web_research and pursuit: a subagent with
+ * the provider's server-side web search (read-only: Claude's or OpenAI's) that sees only the request and hands
  * back only its conclusion, a Markdown note. The agency itself never searches. What it returns
  * is data for the agent, never instructions.
  */
 import type Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import {
 	createClaudeClient,
 	type ClaudeRole,
 	type UsageMeter,
 } from "./claude.ts";
+import { apiKeyFromEnvironment } from "./api-keys.ts";
+import { settleOpenAI } from "./openai.ts";
+import { openaiUsage } from "./usage.ts";
 import type { NoteWriter } from "../examples/virtual-eumenes/agenda/research.ts";
 
 const system = (today: string) =>
@@ -21,6 +25,7 @@ const system = (today: string) =>
 		"3行目: ---",
 		"4行目以降: 見出しと本文（30行以内）。いつの情報か（日付）を書き、最後に「出典」の見出しで1〜3件挙げる。",
 		"確認できなかったことは「確認できなかった」と書き、推測で埋めません。",
+		"依頼にURLがあれば、まずそのページを開いて読み、それをもとにまとめます。開けなければ、開けなかったと書きます。",
 		"依頼にある名前（作品・人・店・製品・場所）は、誤記と決めつけて別のものに置き換えません。あなたの知識より新しいものかもしれないので、その名前のまま検索します。見つからなければ、題と要約に「〜は見つからなかった」と書きます。似た別のものの情報を載せるときは、題と要約で別のものだとはっきり書きます。",
 		"依頼に条件（日にち・曜日・休日・時間帯・場所・予算など）があれば、要約はその条件での答えから書きます。条件に合う情報が見つからなければ、要約の最初にそう書きます。",
 		"検索結果の英文をそのまま貼らず、日本語で書きます（数値・型番・固有名詞はそのまま）。",
@@ -115,3 +120,79 @@ export function webNoteWriter(input: {
 	};
 	return { writer, searches: () => searches };
 }
+
+/** The same researcher on the OpenAI Responses API and its web search tool. */
+export function openaiWebNoteWriter(input: {
+	readonly role: Pick<ClaudeRole, "model" | "effort" | "thinkingHeadroom">;
+	readonly meter: UsageMeter;
+	readonly today: () => string;
+	readonly client?: OpenAI;
+	readonly maxUses?: number;
+}): { writer: NoteWriter; searches: () => number } {
+	const client =
+		input.client ??
+		new OpenAI({
+			apiKey: apiKeyFromEnvironment("openai"),
+			maxRetries: 1,
+			timeout: 180_000,
+		});
+	const record = input.meter.recordProvider?.bind(input.meter);
+	if (!record) throw new Error("OpenAI requires normalized usage accounting");
+	let searches = 0;
+	const writer: NoteWriter = async (request) => {
+		const r = await client.responses.create({
+			model: input.role.model,
+			instructions: system(input.today()),
+			input: request,
+			store: false,
+			reasoning: { effort: input.role.effort },
+			max_output_tokens: noteTokens + input.role.thinkingHeadroom,
+			tools: [{ type: "web_search" }],
+			max_tool_calls: input.maxUses ?? 3,
+		});
+		searches += r.output.filter((i) => i.type === "web_search_call").length;
+		const cut =
+			r.status === "incomplete" &&
+			r.incomplete_details?.reason === "max_output_tokens";
+		// A note cut short still holds what was found: read it, where settling would throw.
+		let text: string;
+		if (cut) {
+			if (r.usage) record(openaiUsage(r.model, r.usage, r.id));
+			text = r.output
+				.flatMap((i) =>
+					i.type === "message"
+						? i.content.flatMap((c) =>
+								c.type === "output_text" ? [c.text] : [],
+							)
+						: [],
+				)
+				.join("")
+				.trim();
+		} else text = settleOpenAI(r, input.role.model, (u) => record(u)).trim();
+		if (text === "")
+			throw new Error(
+				cut ? "メモを書く前に出力の上限に達した" : "調べた結果が空だった",
+			);
+		const note = parseNote(text);
+		return cut
+			? {
+					...note,
+					markdown: `${note.markdown}\n\n（メモはここで途切れています）`,
+				}
+			: note;
+	};
+	return { writer, searches: () => searches };
+}
+
+/** The researcher on the role's provider. */
+export const webNoteWriterFor = (input: {
+	readonly role: Pick<
+		ClaudeRole,
+		"provider" | "model" | "effort" | "thinkingHeadroom"
+	>;
+	readonly meter: UsageMeter;
+	readonly today: () => string;
+}) =>
+	(input.role.provider ?? "anthropic") === "openai"
+		? openaiWebNoteWriter(input)
+		: webNoteWriter(input);

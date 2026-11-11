@@ -79,6 +79,22 @@ export const requiredAgendaExports = [
 	"declinesOffer",
 	"endsWithQuestion",
 	"asksQuestion",
+	// The host loop, the reply and steer: what the CLI runs, for Eumenes to run the same.
+	"createAgendaHost",
+	"createAgendaReplyTools",
+	"agendaReplyMessages",
+	"agendaReplySystem",
+	"dropRepeatedSentences",
+	"notesMentioned",
+	"START_PREPARATION",
+	"READ_NOTE",
+	"SHOW_NOTE",
+	"SET_QUIET",
+	"FIND_TOOLCHAIN",
+	"DELEGATE",
+	"createAgendaReplySteering",
+	"steeredLine",
+	"STEERED_MARK",
 ] as const;
 
 /** The package's entry points: the core and the agenda agent. */
@@ -231,6 +247,12 @@ export async function checkTarball(tgz: string): Promise<string[]> {
 		const host = join(dir, "host");
 		mkdirSync(join(host, "node_modules"), { recursive: true });
 		symlinkSync(pkgDir, join(host, "node_modules", "eumenes-agency"), "dir");
+		// eumenes-steer as Eumenes installs it (the vendored tarball, from the repo's install).
+		symlinkSync(
+			join(root, "node_modules", "eumenes-steer"),
+			join(host, "node_modules", "eumenes-steer"),
+			"dir",
+		);
 		writeFileSync(
 			join(host, "probe.mjs"),
 			`const core = await import("eumenes-agency");
@@ -315,6 +337,38 @@ const deps: AgendaDeps = { llm, startedAt: 1, restore: saved };
 createAgendaAgent(deps).requestResearch({ text: "q", at: 1 });
 // @ts-expect-error a snapshot is the agent's, not any object
 createAgendaAgent({ llm, startedAt: 1, restore: { items: [] } });
+
+// The host loop with the reply and steer, as Eumenes wires them: eumenes-steer's inbox is the
+// package's steer port as it is.
+import { createSteeringInbox } from "eumenes-steer";
+import { runRespond, type ReplyPort } from "eumenes-agency";
+import {
+  createAgendaHost, createAgendaReplySteering, agendaReplyMessages,
+  type AgendaHostEvent, type SteerInboxPort,
+} from "eumenes-agency/agenda";
+declare const chat: ReplyPort;
+declare const setTimer: (fn: () => void, ms: number) => unknown;
+declare const clearTimer: (handle: unknown) => void;
+const inbox: SteerInboxPort = createSteeringInbox();
+const live = createAgendaAgent({ llm, startedAt: 0 });
+const host = createAgendaHost({
+  agent: live,
+  notes: { read: () => null, list: () => [] },
+  research: { start: (t) => t.text !== "" },
+  steering: createAgendaReplySteering({ inbox, read: () => null, now: () => 0 }),
+  reply: async (a, tools, steer) => {
+    const r = await runRespond({
+      messages: agendaReplyMessages({ agent: a, known: [], notes: [], clock: null, now: 0 }),
+      chat: steer(chat), tools, emotion: true,
+      signal: new AbortController().signal, onDelta: () => undefined,
+    });
+    return { text: r.text, calls: r.calls, emotion: r.emotion ?? null };
+  },
+  now: () => 0, setTimer, clearTimer,
+  emit: (e: AgendaHostEvent) => void e,
+});
+void host.say("こんにちは").then(() => host.flush());
+host.researchReturned({ ticketId: "t1", status: "failed", note: null });
 `,
 		);
 		const agendaTypes = await run(
@@ -336,6 +390,71 @@ createAgendaAgent({ llm, startedAt: 1, restore: { items: [] } });
 		if (agendaTypes.code !== 0)
 			errors.push(
 				`agenda consumer types failed: ${agendaTypes.out || agendaTypes.err}`,
+			);
+		// The built JavaScript at work: the host loop with eumenes-steer's inbox. Words the user
+		// sends while the reply reads a note go into the reply's next model call, and get no
+		// reply of their own.
+		writeFileSync(
+			join(host, "steer-probe.mjs"),
+			`import { createSteeringInbox } from "eumenes-steer";
+import { runRespond } from "eumenes-agency";
+import {
+  createAgendaAgent, createAgendaHost, createAgendaReplySteering, steeredLine, READ_NOTE,
+} from "eumenes-agency/agenda";
+const llm = { async complete(req) {
+  const v = req.system.includes("この呼び出しは「計画」") ? { add: [], drop: [], focus: "" }
+    : { utterance: null, emotion: null, decline: "なし", questions: 0, choice: false };
+  return { value: req.schema.parse(v), model: "probe", inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, latencyMs: 1 };
+} };
+const agent = createAgendaAgent({ llm, startedAt: 0 });
+const seen = [];
+const replies = [];
+const pending = [];
+const host = createAgendaHost({
+  agent,
+  notes: { read: (id) => ({ id, title: "店", markdown: "辛味噌の店" }), list: () => [] },
+  research: { start: () => true },
+  steering: createAgendaReplySteering({
+    inbox: createSteeringInbox(),
+    read: (id) => agent.view().said.find((s) => s.id === id)?.text ?? null,
+    now: Date.now,
+  }),
+  reply: async (a, tools, steer) => {
+    const chat = { async complete(request) {
+      seen.push(request.messages);
+      if (seen.length > 1) return { text: "塩ですね。", toolCalls: [] };
+      pending.push(host.say("あと、塩で"));
+      return { text: "", toolCalls: [{ id: "c1", name: READ_NOTE, arguments: '{"id":"n1"}' }] };
+    } };
+    const r = await runRespond({
+      messages: [{ role: "system", content: "返事" }, { role: "user", content: "ラーメン" }],
+      chat: steer(chat), tools, emotion: false,
+      signal: new AbortController().signal, onDelta: () => undefined,
+    });
+    return { text: r.text, calls: r.calls };
+  },
+  now: Date.now,
+  setTimer: (fn, ms) => setTimeout(fn, ms),
+  clearTimer: (h) => clearTimeout(h),
+  emit: (e) => { if (e.type === "reply") replies.push(e.text); },
+});
+await host.say("ラーメン");
+await Promise.all(pending);
+await host.flush();
+host.close();
+const ok = seen.length === 2 && seen[1].some((m) => m.content === steeredLine("あと、塩で"))
+  && replies.length === 1 && replies[0] === "塩ですね。";
+console.log(JSON.stringify({ ok, calls: seen.length, replies }));
+process.exit(ok ? 0 : 1);
+`,
+		);
+		const steerProbe = await run(
+			[process.execPath, join(host, "steer-probe.mjs")],
+			{ cwd: host },
+		);
+		if (steerProbe.code !== 0)
+			errors.push(
+				`agenda host with steer failed: ${steerProbe.out.trim() || steerProbe.err.trim()}`,
 			);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });

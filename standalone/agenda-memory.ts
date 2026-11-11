@@ -59,7 +59,11 @@ export function claudeMemoryModel(input: {
 	};
 }
 
-/** The same port on the OpenAI Responses API; the schema is given loosely, the host checks it. */
+/**
+ * The same port on the OpenAI Responses API. The schema is enforced (strict): given loosely, Luna put
+ * `groups` and `relations` beside `proposal` instead of inside it, and the host refused every
+ * decision (CLI 2026-11-11). The host's schemas fit strict mode: every key required, none extra.
+ */
 export function openaiMemoryModel(input: {
 	readonly role: Pick<ClaudeRole, "model" | "effort" | "thinkingHeadroom">;
 	readonly meter: UsageMeter;
@@ -90,7 +94,7 @@ export function openaiMemoryModel(input: {
 					type: "json_schema",
 					name: "memory_result",
 					schema: schema as Record<string, unknown>,
-					strict: false,
+					strict: true,
 				},
 			},
 		});

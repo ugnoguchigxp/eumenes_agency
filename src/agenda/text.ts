@@ -71,6 +71,16 @@ export const withoutSaid = (text: string, said: ReadonlySet<string>) =>
 		.join("")
 		.trim();
 
+/** The web addresses in a text, each once, without the closing bracket or punctuation after them. */
+export const linksIn = (text: string) => [
+	...new Set(
+		// URL characters only: "https://github.com/x/yを確認して" ends at "y" (review 2026-11-11).
+		(text.match(/https?:\/\/[A-Za-z0-9\-._~:/?#[\]@!$&*+,;=%]+/gu) ?? []).map(
+			(u) => u.replace(/[.,!?:;]+$/u, ""),
+		),
+	),
+];
+
 /** Text inside quotes: the user's own words read back ("「有毒ガスが出るの？」という点は…") ask nothing. */
 const unquoted = (text: string) =>
 	text.replace(/「[^」]*」|『[^』]*』|https?:\/\/\S+/gu, "");

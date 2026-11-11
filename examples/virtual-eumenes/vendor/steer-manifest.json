@@ -1,0 +1,9 @@
+{
+	"package": "eumenes-steer",
+	"version": "0.1.0",
+	"artifact": "eumenes-steer-0.1.0-1ca04b8bee9b.tgz",
+	"sha256": "1ca04b8bee9b839016a14987fc903282c1b57665eca1e89457681c3990f1e705",
+	"sourceGitCommit": "1250b20",
+	"sourceTreeState": "clean committed source",
+	"verifiedWith": "the source's bun run pack:check (offline install, typecheck and tests in a separate folder); here examples/virtual-eumenes/steer.test.ts"
+}

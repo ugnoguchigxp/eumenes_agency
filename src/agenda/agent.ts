@@ -64,9 +64,24 @@ import {
 	type AgendaDeps,
 	type AgendaState,
 } from "./state.ts";
-import { asksQuestion, normalize } from "./text.ts";
+import { asksQuestion, linksIn, normalize } from "./text.ts";
 
 export type { AgendaDeps } from "./state.ts";
+
+/**
+ * The researcher sees the request alone: the addresses in the user's words it rests on go with it.
+ * Written as "リンク先の eumenes_steer を確認して", the request lost the URL the user pasted and the
+ * researcher found nothing (CLI 2026-11-11).
+ */
+const withLinks = (st: AgendaState, text: string, refs: readonly string[]) => {
+	const links = st.said
+		.filter((s) => s.who === "user" && refs.includes(s.id))
+		.flatMap((s) => linksIn(s.text))
+		.filter((u, i, all) => all.indexOf(u) === i && !text.includes(u));
+	return links.length === 0
+		? text
+		: `${text}\n相手が示したURL: ${links.join(" ")}`;
+};
 export { normalize, themeOverlap } from "./text.ts";
 
 export interface AgendaView {
@@ -258,7 +273,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 					id: nextId(st, "t"),
 					kind: "research",
 					itemId: next.id,
-					text: next.checkedRequest ?? next.text,
+					text: withLinks(st, next.checkedRequest ?? next.text, next.refs),
 					requested: next.requested,
 					promised: next.promised,
 					refs: [...next.refs],
@@ -288,16 +303,16 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 		checkedNow: Set<string>,
 	) => {
 		const epoch = st.epoch;
-		const open = speechOpenAt(st, now);
 		const none = {
 			composed: null as ComposeOutcome | null,
 			line: null as SpeakTicket | null,
 			held: false,
 			epoch,
-			open,
+			open: speechOpenAt(st, now),
 		};
 		if (st.ready) {
 			const item = st.items.find((i) => i.id === st.ready!.ticket.itemId);
+			const open = item ? speechOpenAt(st, now, item) : null;
 			if (
 				st.ready.epoch !== st.epoch ||
 				!item ||
@@ -308,19 +323,17 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			else if (open !== null && open <= now && !host().busy) {
 				const line = st.ready.ticket;
 				st.ready = null;
-				return { ...none, line, held: true };
+				return { ...none, line, held: true, open };
 			} else return none;
 		}
-		if (
-			st.stopped ||
-			host().busy ||
-			open === null ||
-			open - now > WRITE_AHEAD_MS ||
-			speechQuiet(st, now)
-		)
-			return none;
+		if (st.stopped || host().busy || speechQuiet(st, now)) return none;
+		// Written ahead of its time: the first in order that may be said within WRITE_AHEAD_MS.
+		const due = (i: AgendaItem) => {
+			const at = speechOpenAt(st, now, i);
+			return at !== null && at - now <= WRITE_AHEAD_MS;
+		};
 		for (let tries = 0; tries < 3 && !st.stopped && !signal.aborted; tries++) {
-			const item = speakable(st, now)[0];
+			const item = speakable(st, now).find(due);
 			if (!item) break;
 			if (item.kind === "ask" && !checkedNow.has(item.id)) {
 				checkedNow.add(item.id);
@@ -331,7 +344,12 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				}
 			}
 			const c = await compose(st, item, now, host, signal);
-			return { ...none, composed: c.outcome, line: c.ticket };
+			return {
+				...none,
+				composed: c.outcome,
+				line: c.ticket,
+				open: speechOpenAt(st, now, item),
+			};
 		}
 		return none;
 	};
@@ -578,14 +596,20 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 							),
 						);
 			} else times.push(st.researching.at + RESEARCH_TTL_MS);
-			const open = speechOpenAt(st, now);
-			// A line written ahead is said when speech opens; else the next is written ahead of the
-			// gap since the agent last spoke (not of a quiet: nothing is written while it lasts).
+			// A line written ahead is said when speech opens for it; else the next is written ahead
+			// of the gap since the agent last spoke (not of a quiet: nothing is written while it lasts).
 			const ahead = speechQuiet(st, now) ? 0 : WRITE_AHEAD_MS;
-			if (open !== null && st.ready) times.push(open);
-			else if (open !== null)
-				for (const i of st.items)
+			const readyItem = st.ready
+				? st.items.find((i) => i.id === st.ready!.ticket.itemId)
+				: undefined;
+			const readyAt = readyItem ? speechOpenAt(st, now, readyItem) : null;
+			if (st.ready) {
+				if (readyAt !== null) times.push(readyAt);
+			} else
+				for (const i of st.items) {
+					const open = speechOpenAt(st, now, i);
 					if (
+						open !== null &&
 						i.status === "open" &&
 						(i.kind === "talk" ||
 							(i.kind === "ask" && !askBlocked(st) && !topicGone(st, i, now)))
@@ -600,6 +624,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 									: 0,
 							),
 						);
+				}
 			return times.length ? Math.max(now, Math.min(...times)) : null;
 		},
 

@@ -5,7 +5,8 @@
 import { z } from "zod";
 import { emotionEmojis, type EmotionEmoji } from "../contracts/emotion.ts";
 
-export const AGENDA_VERSION = "agenda-1";
+/** agenda-2: the host loop, the reply and steer ship in the package (2026-11-11). */
+export const AGENDA_VERSION = "agenda-2";
 
 /**
  * The one user setting: the shortest gap between the agent's own utterances (10 s, 1 min, 5 min).
@@ -24,6 +25,21 @@ export const IDLE_PLAN_MS = 3_600_000;
 export const WRITE_AHEAD_MS = 15_000;
 /** The user's words this soon after the agent's question or offer are taken as the answer to it. */
 export const ANSWER_WINDOW_MS = 600_000;
+/**
+ * After the agent spoke (its own line or the reply), the user gets this long to respond before it
+ * speaks on its own again; a topic that does not tie into the talk waits TOPIC_CHANGE_MS. At ten
+ * seconds two or three lines came over one before the user could answer (user, 2026-11-11:
+ * "発話したら、15秒は相手のレスポンスを待って、別のトピックを振るなら1分ぐらい空けないと違和感になります").
+ */
+export const RESPONSE_WAIT_MS = 15_000;
+export const TOPIC_CHANGE_MS = 60_000;
+/**
+ * After the agent asked or offered something (its own line or the reply), the user gets this long
+ * to answer before it speaks on its own again. Fifteen seconds is time to react, not to answer:
+ * in the CLI the user answered in 30-40 s, and 7 of 11 own lines came over a question still open
+ * (user, 2026-11-11: "若干まだ喋りすぎかな").
+ */
+export const ANSWER_WAIT_MS = 60_000;
 /**
  * After a failure (a model call failed, the host refused a research or did not deliver a line)
  * the same is tried again after this: enough not to hammer a failing service, no more (it was a

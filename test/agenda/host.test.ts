@@ -565,3 +565,36 @@ test("CLI 2026-11-10: a note from an earlier session is in view when the user as
 	expect(seen).toContain("n67");
 	expect(seen.slice(0, 6)).toEqual(["n78", "n77", "n76", "n75", "n74", "n73"]);
 });
+
+test("without the host's toolchains, the reply has neither find_toolchain/delegate nor their rules", async () => {
+	const { createAgendaAgent, createAgendaReplyTools, agendaReplyMessages } =
+		await import("../../src/agenda/index.ts");
+	const agent = createAgendaAgent({
+		llm: { complete: () => Promise.reject(new Error("unused")) },
+		startedAt: 0,
+	});
+	const tools = createAgendaReplyTools({
+		agent,
+		read: () => null,
+		now: () => 0,
+	});
+	expect(tools.tools.map((t) => t.name)).not.toContain("find_toolchain");
+	expect(tools.tools.map((t) => t.name)).not.toContain("delegate");
+	const bare = agendaReplyMessages({
+		agent,
+		known: [],
+		notes: [],
+		clock: null,
+		now: 0,
+	})[0]!.content;
+	expect(bare).not.toContain("find_toolchain");
+	const offered = agendaReplyMessages({
+		agent,
+		known: [],
+		notes: [],
+		clock: null,
+		now: 0,
+		toolchains: true,
+	})[0]!.content;
+	expect(offered).toContain("find_toolchain");
+});

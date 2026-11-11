@@ -357,7 +357,7 @@ describe("agenda agent", () => {
 						id: "u2",
 						who: "user",
 						text: "ところで",
-						at: 10_000,
+						at: 15_000,
 					});
 					off.abort();
 				}
@@ -367,13 +367,13 @@ describe("agenda agent", () => {
 		agent = make({ llm: m.llm });
 		agent.observe({ id: "u1", who: "user", text: "こんにちは", at: 0 });
 		agent.observe({ id: "r1", who: "reply", text: "どうも。", at: 0 });
-		// Written at once, held until ten seconds after the reply.
+		// Written at once, held until the user had fifteen seconds to respond to the reply.
 		expect((await agent.step(0, idle, sig())).tickets).toEqual([]);
 		expect(m.count("compose")).toBe(1);
-		expect(agent.nextAt(1)).toBe(10_000);
+		expect(agent.nextAt(1)).toBe(15_000);
 		// When the gap ends, the user speaks while the step is out: the line is not said.
-		agent.infoChanged(10_000);
-		const out = await agent.step(10_000, idle, off.signal);
+		agent.infoChanged(15_000);
+		const out = await agent.step(15_000, idle, off.signal);
 		expect(out.tickets.filter((t) => t.kind === "speak")).toEqual([]);
 		expect(agent.view().items.find((i) => i.text === "Q1")?.status).toBe(
 			"open",
@@ -521,7 +521,7 @@ describe("agenda agent", () => {
 		expect(resumed.tickets.map((t) => t.kind)).toEqual(["research"]);
 	});
 
-	test("an own question: talk goes on at its pace, but no second question before the answer", async () => {
+	test("an own question: no second question before the answer; a new topic a minute after it", async () => {
 		const note: NoteRef = {
 			id: "n1",
 			title: "辛い店",
@@ -547,24 +547,24 @@ describe("agenda agent", () => {
 			at: 0,
 			status: "succeeded",
 		});
-		// Ten seconds later the talk comes, though Q1 is not answered; never Q2 before the answer.
-		// It is written at once, ahead of its time, and said when the ten seconds are over.
-		expect(agent.nextAt(1_000)).toBe(1_000);
-		expect((await agent.step(1_000, idle, sig())).tickets).toEqual([]);
-		expect(agent.nextAt(1_000)).toBe(10_000);
-		const b = await agent.step(10_000, idle, sig());
+		// Never Q2 before the answer. The talk is a new topic: a minute after Q1 (user, 2026-11-11),
+		// written ahead of its time and said when the minute is over.
+		expect(agent.nextAt(1_000)).toBe(45_000);
+		expect((await agent.step(45_000, idle, sig())).tickets).toEqual([]);
+		expect(agent.nextAt(45_000)).toBe(60_000);
+		const b = await agent.step(60_000, idle, sig());
 		expect(b.tickets).toMatchObject([{ itemKind: "talk" }]);
 		agent.recordDelivery({
 			ticketId: b.tickets[0]!.id,
-			at: 10_000,
+			at: 60_000,
 			status: "succeeded",
 		});
-		agent.observe({ id: "u1", who: "user", text: "答え", at: 30_000 });
+		agent.observe({ id: "u1", who: "user", text: "答え", at: 80_000 });
 		// Answered. Q2 does not tie into the talk: it waits until the talk is over (meanwhile
 		// the agent digs into the talk).
-		const during = await agent.step(30_000, idle, sig());
+		const during = await agent.step(80_000, idle, sig());
 		expect(during.tickets.filter((t) => t.kind === "speak")).toEqual([]);
-		const c = await agent.step(330_001, idle, sig());
+		const c = await agent.step(380_001, idle, sig());
 		expect(c.tickets).toMatchObject([{ itemKind: "ask" }]);
 		expect(
 			m.calls
@@ -727,7 +727,7 @@ describe("agenda agent", () => {
 		expect(agent.nextAt(30_000)).toBe(30_000);
 	});
 
-	test("unanswered speech keeps its pace: about once in ten seconds", async () => {
+	test("unanswered speech: topics from elsewhere come a minute apart", async () => {
 		const m = scripted({
 			plan: () =>
 				plan(
@@ -747,7 +747,7 @@ describe("agenda agent", () => {
 		let now = 0;
 		const gaps: number[] = [];
 		let last = 0;
-		for (let i = 0; i < 6; i++) {
+		for (let i = 0; i < 12; i++) {
 			const at = agent.nextAt(now);
 			if (at === null || at > 7_200_000) break;
 			now = at;
@@ -762,10 +762,46 @@ describe("agenda agent", () => {
 			agent.recordDelivery({ ticketId: t.id, at: now, status: "succeeded" });
 			agent.infoChanged(now);
 		}
-		// The question, then the topics, ten seconds apart though no one answers (the user wants
-		// it a little noisy; what it has to say is what bounds it).
-		expect(gaps.slice(0, 2)).toEqual([10, 10]);
+		// The question, then the topics: none ties into words of the user, so each is a new topic,
+		// a minute after the last line (user, 2026-11-11: "別のトピックを振るなら1分ぐらい空けないと").
+		expect(gaps.slice(0, 2)).toEqual([60, 60]);
 		expect(agent.view().unanswered).toBeGreaterThanOrEqual(3);
+	});
+
+	test("after a reply that asked something, a line on the user's words waits a minute for the answer", async () => {
+		const m = scripted({
+			plan: (_d, n) =>
+				n === 1 ? plan(add("talk", "続きの話", ["u1"], 5)) : plan(),
+		});
+		const agent = make({ llm: m.llm });
+		agent.observe({ id: "u1", who: "user", text: "猫を飼ってる", at: 0 });
+		agent.observe({
+			id: "r1",
+			who: "reply",
+			text: "いいですね。何匹いますか？",
+			at: 0,
+		});
+		expect((await agent.step(0, idle, sig())).tickets).toEqual([]);
+		expect(agent.nextAt(1)).toBe(45_000);
+		expect((await agent.step(45_000, idle, sig())).tickets).toEqual([]);
+		const out = await agent.step(60_000, idle, sig());
+		expect(out.tickets).toMatchObject([{ kind: "speak", itemKind: "talk" }]);
+	});
+
+	test("after the reply, a line on the user's words waits fifteen seconds for the user first", async () => {
+		const m = scripted({
+			plan: (_d, n) =>
+				n === 1 ? plan(add("talk", "続きの話", ["u1"], 5)) : plan(),
+		});
+		const agent = make({ llm: m.llm });
+		agent.observe({ id: "u1", who: "user", text: "猫を飼ってる", at: 0 });
+		agent.observe({ id: "r1", who: "reply", text: "いいですね。", at: 0 });
+		// Written at once, said when the user had fifteen seconds to respond (user, 2026-11-11).
+		expect((await agent.step(0, idle, sig())).tickets).toEqual([]);
+		expect(agent.nextAt(1)).toBe(15_000);
+		expect((await agent.step(14_999, idle, sig())).tickets).toEqual([]);
+		const out = await agent.step(15_000, idle, sig());
+		expect(out.tickets).toMatchObject([{ kind: "speak", itemKind: "talk" }]);
 	});
 
 	test("a result the user waits for is said without the sentence said before, not held back for it", async () => {
@@ -1001,6 +1037,31 @@ describe("agenda agent", () => {
 		const later = await agent.step(day, idle, sig());
 		expect(later.plan?.rejected).toEqual([]);
 		expect(later.plan?.added.map((i) => i.kind)).toEqual(["research"]);
+	});
+
+	test("CLI 2026-11-11: the URL the user pasted goes to the researcher with the request", async () => {
+		const m = scripted({
+			plan: (d, n) =>
+				n === 1
+					? plan(
+							add("research", "リンク先のリポジトリの構成を確認してまとめる", [
+								(d["conversation"] as { id: string }[])[0]!.id,
+							]),
+						)
+					: plan(),
+		});
+		const agent = make({ llm: m.llm });
+		agent.observe({
+			id: "u1",
+			who: "user",
+			text: "https://github.com/example/steer　これを始めました（https://example.com/a。）https://example.com/bを見て",
+			at: 0,
+		});
+		const out = await agent.step(0, idle, sig());
+		expect(out.tickets.find((t) => t.kind === "research")).toMatchObject({
+			// URL characters only: the Japanese right after a URL is not part of it.
+			text: "リンク先のリポジトリの構成を確認してまとめる\n相手が示したURL: https://github.com/example/steer https://example.com/a https://example.com/b",
+		});
 	});
 
 	test("what the user asked for is not checked against the notes", async () => {
