@@ -1,7 +1,8 @@
 /**
- * eumenes-steer under the packaged agenda (src/agenda: createAgendaHost, createAgendaReplySteering),
- * as a host would wire it: the vendored eumenes-steer (vendor/steer-manifest.json) gives the inbox,
- * the package takes it through its ports with no dependency of its own. First the reply loop alone,
+ * eumenes-steer under the packaged agenda host loop (src/agenda: createAgendaHost and its
+ * `addedWords` seam), wired as a host does it: the vendored eumenes-steer (vendor/steer-manifest.json)
+ * gives the inbox and the CLI's steer (standalone/agenda-steer.ts) fills the seam; the package has
+ * no steer of its own. First the reply loop alone,
  * then the whole host loop with the agenda agent, in the two ways a host shows a reply: streamed as
  * it is written (Eumenes) and shown when it is done (the CLI).
  */
@@ -18,13 +19,15 @@ import {
 import {
 	createAgendaAgent,
 	createAgendaHost,
-	createAgendaReplySteering,
 	READ_NOTE,
 	START_PREPARATION,
-	steeredLine,
 	type AgendaHostEvent,
-	type SteerInboxPort,
 } from "../../src/agenda/index.ts";
+import {
+	createAgendaReplySteering,
+	steeredLine,
+	type SteerInboxPort,
+} from "../../standalone/agenda-steer.ts";
 import { createMockDocStore } from "./agenda/docs.ts";
 
 // eumenes-steer's inbox is the package's port as it is (checked by the compiler).
@@ -266,7 +269,7 @@ const virtualEumenes = (
 				return true;
 			},
 		},
-		steering: createAgendaReplySteering({
+		addedWords: createAgendaReplySteering({
 			inbox: inboxPort(),
 			read: (id) =>
 				agent.view().said.find((s) => s.id === id && s.who === "user")?.text ??
@@ -490,7 +493,7 @@ test("Eumenes host: when the reply fails after taking words, they get the next r
 		agent,
 		notes: { read: (id) => docs.read(id), list: () => docs.list() },
 		research: { start: () => true },
-		steering: createAgendaReplySteering({
+		addedWords: createAgendaReplySteering({
 			inbox: counted,
 			read: (id) =>
 				agent.view().said.find((s) => s.id === id && s.who === "user")?.text ??

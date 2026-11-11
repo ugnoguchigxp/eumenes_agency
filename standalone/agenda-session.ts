@@ -8,8 +8,8 @@
 import {
 	createAgendaHost,
 	type AgendaHostEvent,
+	type AgendaAddedWords,
 	type AgendaReplyOutput,
-	type AgendaReplySteering,
 } from "../src/agenda/index.ts";
 import type { AgendaAgent } from "../src/agenda/index.ts";
 import type { ReplyPort, ToolPort } from "../src/index.ts";
@@ -43,8 +43,8 @@ export interface AgendaSessionDeps {
 	readonly emit: (event: AgendaSessionEvent) => void;
 	/** Typing counts as typing until this long after the last key. */
 	readonly typingIdleMs?: number;
-	/** Words sent while a reply is written go into its next model call (eumenes-steer). */
-	readonly steering?: AgendaReplySteering;
+	/** Words sent while a reply is written go into its next model call (the CLI's steer). */
+	readonly steering?: AgendaAddedWords;
 }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -67,7 +67,7 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 		},
 		toolchains: mockToolchains,
 		reply: deps.reply,
-		...(deps.steering ? { steering: deps.steering } : {}),
+		...(deps.steering ? { addedWords: deps.steering } : {}),
 		now,
 		setTimer,
 		clearTimer: deps.clearTimer,

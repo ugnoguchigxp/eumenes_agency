@@ -1167,3 +1167,7 @@ lu3-cand は違和感が増えた。休みたい場面で、同じ話題とし�
 - **一人の話し手**: 返事で受けた言葉に、自分から話す文がもう一度「なるほど」と相づちを打ち、別人に見えた。直前の返事を自分の言葉として続けて話す。「そういえば」はふと思い出したときだけ使う。
 - **steer**（eumenes_steer 0.1.0、`examples/virtual-eumenes/vendor/`）: 返事を書いている途中に届いた利用者の言葉を、その返事の次のモデル呼び出しに入れる。読み取りツールの往復が境界。書き終えてから見せる CLI では、最後の呼び出しの途中に届いた言葉も、まだ見せていない返事を書き直して一つの返事で答える（`holdsText`）。書きながら流す Eumenes では、直後の別の返事で答える。Luna の CLI で、「ラーメン食べに行こうと思ってる」の1秒後の「辛いのは控えめがいいな」と、東京の天気の依頼の1秒後の「大阪もお願い」が、それぞれ一つの返事にまとまった。
 - **Eumenes に載せる**: これまで配布物（`src/` から作る）には agenda の判断部分だけが入り、CLI の会話ループと返事は `standalone/` にあった。会話ループ（`createAgendaHost`）、返事（指示文・入力・ツール）、steer のつなぎ（`createAgendaReplySteering`）を `src/agenda/` に移し、CLI もそれで動かす。ホストが差し替えるのは、メモ（Eumenes では文書）、調べもの（結果は `researchReturned`）、記憶の書き手、toolchain の一覧、steer の受付箱（eumenes-steer をそのまま渡す。agency は依存しない）。`bun run pack` の検査に、新しい名前、eumenes-steer と組み合わせた型、作った JavaScript で返事の途中の言葉が入ることを足した。独立したレビューの指摘7件（複数の言葉の順、toolchain がないときの指示、失敗した返事の扱い、受付先の閉じ忘れ、URL の切れ目ほか）を直した。版は 0.1.6、`AGENDA_VERSION` は agenda-2。
+
+### steer はホストのもの（0.1.7、2026-11-11）
+
+利用者: 「steerはagencyには含めず、eumenesにあるsteerとの接続を心がけてください」。配布物から steer のつなぎ（`createAgendaReplySteering`、受付箱の口）を外し、会話ループには返事の途中に足された言葉の受け口（`addedWords`）と、その印（`ADDED_WORDS_MARK`）だけを残した。CLI と examples の steer は `standalone/agenda-steer.ts` に移した（配布物の外）。Eumenes は自分の steer（vendor/steer、5ba40df6）をこの受け口につなぐ。版は 0.1.7。

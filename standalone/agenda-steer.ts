@@ -1,11 +1,12 @@
 /**
- * Steer for the agenda reply: words the user sends while the reply is being written go into its
- * next model call, instead of waiting for a reply of their own (user, 2026-11-11: "あなたが回答を
- * 作る前に、次のコメントを入れる事ができるようにするのにSteerがいる").
+ * The CLI's steer for the agenda reply. It is not in the package: steer belongs to the host, and
+ * Eumenes connects its own (user, 2026-11-11). Words the user sends while the reply is being written
+ * go into its next model call, instead of waiting for a reply of their own (user, 2026-11-11:
+ * "あなたが回答を作る前に、次のコメントを入れる事ができるようにするのにSteerがいる").
  *
- * The inbox is eumenes-steer's (Eumenes makes one per server; the CLI one per process). This
- * module uses it through the ports below, which eumenes-steer's `SteeringInbox` satisfies as it
- * is: the agency core keeps no runtime dependency. As eumenes_steer/design.md §5 asks of Agency,
+ * It fills the host loop's `addedWords` seam (src/agenda/host.ts) with eumenes-steer's inbox (one
+ * per process here), through the ports below, which eumenes-steer's `SteeringInbox` satisfies as
+ * it is. As eumenes_steer/design.md §5 asks of Agency,
  * the boundary is each `chat.complete` of the reply loop (`runRespond` calls it again after its
  * read tools), named by the call's number. The words stay in the host's record (the agent's said
  * list); the inbox holds only their reference, and each is read again from the record when a call
@@ -18,12 +19,11 @@
  * the user as it is written (Eumenes), the first answer stands; `end` tells which words the calls
  * took, and the host answers the rest with a reply of their own right after.
  */
-import type { ReplyMessage, ReplyPort } from "../contracts/index.ts";
+import type { ReplyMessage, ReplyPort } from "../src/index.ts";
+import { addedWordsLine, type AgendaAddedWords } from "../src/agenda/index.ts";
 
-/** How the reply sees words that came while it was being written (its rules read this mark). */
-export const STEERED_MARK =
-	"（返事を書いている途中に、相手が続けて言いました）";
-export const steeredLine = (text: string) => `${STEERED_MARK}${text}`;
+/** How the reply sees words that came while it was being written (the package's mark). */
+export const steeredLine = addedWordsLine;
 
 /** One reference held by the inbox (eumenes-steer's `Required<SteeringEvent>`). */
 export interface SteerEventRef {
@@ -78,19 +78,8 @@ export interface SteerInboxPort {
 		  };
 }
 
-export interface AgendaSteeredReply {
-	/** The reply port of this reply: each model call takes the words sent before it. */
-	wrap(chat: ReplyPort): ReplyPort;
-	/** Closes the reply's target: the ids of the words its model calls took. */
-	end(): string[];
-}
-
-export interface AgendaReplySteering {
-	/** Opens the target of one reply; words sent until its `end` go to its next model call. */
-	begin(replyId: string): AgendaSteeredReply;
-	/** Words from the user while a reply runs: true when a model call of that reply may take them. */
-	send(id: string): boolean;
-}
+/** Steer as the host loop's `addedWords`. */
+export type AgendaReplySteering = AgendaAddedWords;
 
 /** Calls made again for words that came during the last one, at most (the user may keep typing). */
 const MAX_RETAKES = 2;

@@ -3,7 +3,8 @@
  * agent. Typing and the reply make it busy; each exchange goes to the memory's and the note's
  * writers behind the talk (nothing waits for them); research tickets go to the host's researcher
  * and their results come back through `researchReturned`; the agent is stepped when something is
- * due, and words the user sends while a reply is written go into that reply (steer). Clock and
+ * due, and words the user sends while a reply is written go into that reply (`addedWords`: the
+ * host's steer). Clock and
  * timers are injected, so the same loop runs in fixed tests and in the host.
  */
 import type { EmotionEmoji, ReplyPort, ToolPort } from "../contracts/index.ts";
@@ -21,7 +22,6 @@ import {
 	type AgendaNoteText,
 	type AgendaToolchains,
 } from "./reply.ts";
-import type { AgendaReplySteering } from "./steer.ts";
 
 export type AgendaHostEvent =
 	| { readonly type: "user"; readonly text: string }
@@ -97,6 +97,21 @@ export type AgendaReplyOutput =
 			readonly emotion?: EmotionEmoji | null;
 	  };
 
+/**
+ * Words the user sends while a reply is written, handed to that reply by the host (Eumenes and the
+ * CLI: their steer; the package has none of its own).
+ */
+export interface AgendaAddedWords {
+	/** Opens one reply: its chat port takes the words sent before each model call. */
+	begin(replyId: string): {
+		wrap(chat: ReplyPort): ReplyPort;
+		/** Closes the reply: the ids of the words its model calls took. */
+		end(): string[];
+	};
+	/** Words from the user while a reply runs: true when that reply may take them. */
+	send(id: string): boolean;
+}
+
 export interface AgendaHostDeps {
 	readonly agent: AgendaAgent;
 	/** The memory's writer, run after each exchange. */
@@ -122,19 +137,16 @@ export interface AgendaHostDeps {
 	readonly toolchains?: AgendaToolchains;
 	/**
 	 * The normal reply (runRespond with the host's chat port, over `agendaReplyMessages`); its tool
-	 * calls go into the agent's record so the next reply sees them. `steer` wraps its chat port so
-	 * that each model call takes the words sent meanwhile.
+	 * calls go into the agent's record so the next reply sees them. `addWords` wraps its chat port
+	 * so that each model call takes the words sent meanwhile (`addedWords`).
 	 */
 	readonly reply: (
 		agent: AgendaAgent,
 		tools: ToolPort,
-		steer: (chat: ReplyPort) => ReplyPort,
+		addWords: (chat: ReplyPort) => ReplyPort,
 	) => Promise<AgendaReplyOutput>;
-	/**
-	 * Words sent while a reply is written go into its next model call (eumenes-steer); without it
-	 * they wait for a reply of their own.
-	 */
-	readonly steering?: AgendaReplySteering;
+	/** Words sent while a reply is written go into it; without this they get a reply of their own. */
+	readonly addedWords?: AgendaAddedWords;
 	readonly now: () => number;
 	readonly setTimer: (fn: () => void, ms: number) => unknown;
 	readonly clearTimer: (handle: unknown) => void;
@@ -296,7 +308,7 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 
 	/**
 	 * The reply to the user's latest words. Words sent while it is written go into its next model
-	 * call (steer); those no call took get a reply of their own right after it. Then the plan sees
+	 * call (addedWords); those no call took get a reply of their own right after it. Then the plan sees
 	 * the exchange at once, and nothing waits for the memory (review 2026-11-10: the writing took
 	 * 5 s before anything could be planned or said); the writers run behind, one exchange after
 	 * another, and the plan reads what they wrote at its next call.
@@ -305,12 +317,12 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 		try {
 			for (;;) {
 				const replyId = `r${stamp}.${n}`;
-				let run: ReturnType<AgendaReplySteering["begin"]> | null = null;
+				let run: ReturnType<AgendaAddedWords["begin"]> | null = null;
 				try {
-					run = deps.steering?.begin(replyId) ?? null;
+					run = deps.addedWords?.begin(replyId) ?? null;
 				} catch (e) {
-					// No steer for this reply: words sent meanwhile get a reply of their own.
-					emit({ type: "error", where: "steer", message: message(e) });
+					// Nothing added to this reply: words sent meanwhile get a reply of their own.
+					emit({ type: "error", where: "addedWords", message: message(e) });
 				}
 				const started = now();
 				let answered = false;
@@ -400,7 +412,7 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 		/**
 		 * The user submitted a line: the reply, then the plan sees the exchange at once; the memory
 		 * and the note are written behind it. While a reply is being written, the line goes into it
-		 * (steer) or gets a reply of its own right after. Resolves when the replies are out.
+		 * (addedWords) or gets a reply of its own right after. Resolves when the replies are out.
 		 */
 		say(text: string): Promise<void> {
 			if (typing !== null) {
@@ -417,7 +429,7 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 			emit({ type: "user", text });
 			if (replying) {
 				sentMeanwhile.push(userId);
-				deps.steering?.send(userId);
+				deps.addedWords?.send(userId);
 				return replies;
 			}
 			replying = true;

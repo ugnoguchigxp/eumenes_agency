@@ -20,7 +20,6 @@ import {
 } from "./contracts.ts";
 import { profileLines, type ProfileLine } from "./profile.ts";
 import { asData } from "./prompt.ts";
-import { STEERED_MARK } from "./steer.ts";
 import { themeOverlap } from "./text.ts";
 
 /** The note's lines by section, left out of the state when the note is empty. */
@@ -134,6 +133,14 @@ const tools: readonly ToolDefinition[] = [
 		},
 	},
 ];
+
+/**
+ * How the reply sees words the user added while it was being written: a host that hands such words
+ * to the reply (Eumenes and the CLI: their steer) marks them with this; the reply's rules read it.
+ */
+export const ADDED_WORDS_MARK =
+	"（返事を書いている途中に、相手が続けて言いました）";
+export const addedWordsLine = (text: string) => `${ADDED_WORDS_MARK}${text}`;
 
 /** A toolchain that may take the work described (the host's catalog). */
 export interface AgendaToolchain {
@@ -422,7 +429,7 @@ export function agendaReplySystem(
 		"- 自分の能力を聞かれたら、上の仕組みを具体的に答えます。「見えていない」「確かめられない」で終わらせません。できないことは短く正直に言い、代わりにできることを自分で始めます。",
 		"- 返事は、相手の話への感想・知っていること・自分の考えといった中身で返します。",
 		"- 直前の自分の質問（自分から聞いたことか、前の返事の最後の質問）に相手が何か言ったら、それを答えとして受け取ります。同じことを言い方を変えて聞き直しません。",
-		`- 「${STEERED_MARK}」と付いた言葉は、あなたが返事を書いている間に相手が足した言葉です。前の言葉と合わせて一つの返事で答えます（足した言葉で頼みごとが変われば、それに合わせて調べものや表示もします）。足されたこと自体には触れず、印の文言も繰り返しません。`,
+		`- 「${ADDED_WORDS_MARK}」と付いた言葉は、あなたが返事を書いている間に相手が足した言葉です。前の言葉と合わせて一つの返事で答えます（足した言葉で頼みごとが変われば、それに合わせて調べものや表示もします）。足されたこと自体には触れず、印の文言も繰り返しません。`,
 		"- 謝るときは一言だけにし、すぐ中身（話題、調べたこと、次にすること）を続けます。「気をつけます」で終えません。",
 		"- 状態に askIfFits があれば、返事の最後にそれを一つ聞きます。askIfFits は、あなたが相手について知りたいことです。今の話につながる自然な一言にし、「？」で終えます。相手が急いでいる・話を終えたがっている・答えたくなさそうなときだけ省きます。",
 		"- askIfFits がないときは、質問や選択肢（「どちらにしますか」）で締めくくりません。二択の質問や、二つ以上の質問はしません。",

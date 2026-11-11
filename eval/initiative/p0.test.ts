@@ -133,13 +133,14 @@ describe.skipIf(!hasHost)("P0 baseline on the installed distribution", () => {
 		expect(d.checks.hostImportIsLoadedModule).toBe(true);
 		// R4: the installed dist is the artifact's package/dist file for file.
 		expect(d.checks.installedDistMatchesArtifact).toBe(true);
+		// File for file, whatever the vendored version holds (0.1.5 had 118 files).
 		expect(d.artifactContents).toMatchObject({
-			artifactFiles: 118,
-			installedFiles: 118,
+			installedFiles: d.artifactContents.artifactFiles,
 			missing: [],
 			extra: [],
 			changed: [],
 		});
+		expect(d.artifactContents.artifactFiles).toBeGreaterThan(0);
 		expect(d.artifactSha256).toBe(d.vendorManifest.sha256);
 		// The distribution is unchanged by the run.
 		expect(treeDigest(join(d.packageDir, "dist")).digest).toBe(d.distDigest);
@@ -929,13 +930,14 @@ describe("P0-A06 (R4): the installed dist must be the artifact's package/dist, f
 			installed,
 		);
 		expect(result).toEqual({
-			artifactFiles: 118,
-			installedFiles: 118,
+			artifactFiles: result.artifactFiles,
+			installedFiles: result.artifactFiles,
 			missing: [],
 			extra: [],
 			changed: [],
 			equal: true,
 		});
+		expect(result.artifactFiles).toBeGreaterThan(0);
 	});
 
 	test("an unchanged install passes every check", async () => {

@@ -18,7 +18,6 @@ import { resolve } from "node:path";
 import { runRespond } from "../src/index.ts";
 import {
 	createAgendaAgent,
-	createAgendaReplySteering,
 	defaultSpeechIntervalSec,
 	speechIntervals,
 	type SpeechIntervalSec,
@@ -28,6 +27,7 @@ import {
 	type AgendaSessionEvent,
 } from "./agenda-session.ts";
 import { agendaReplyMessages, dropRepeatedSentences } from "./agenda-reply.ts";
+import { createAgendaReplySteering } from "./agenda-steer.ts";
 import { createSteeringInbox } from "eumenes-steer";
 import { memoryModel } from "./agenda-memory.ts";
 import { webNoteWriterFor } from "./agenda-research.ts";

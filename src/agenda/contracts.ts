@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { emotionEmojis, type EmotionEmoji } from "../contracts/emotion.ts";
 
-/** agenda-2: the host loop, the reply and steer ship in the package (2026-11-11). */
+/** agenda-2: the host loop and the reply ship in the package; steer is the host's (2026-11-11). */
 export const AGENDA_VERSION = "agenda-2";
 
 /**

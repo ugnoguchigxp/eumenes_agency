@@ -38,6 +38,8 @@ export {
 	SET_QUIET,
 	SHOW_NOTE,
 	START_PREPARATION,
+	ADDED_WORDS_MARK,
+	addedWordsLine,
 	type AgendaNoteText,
 	type AgendaToolchain,
 	type AgendaToolchains,
@@ -45,19 +47,10 @@ export {
 } from "./reply.ts";
 export {
 	createAgendaHost,
+	type AgendaAddedWords,
 	type AgendaHost,
 	type AgendaHostDeps,
 	type AgendaHostEvent,
 	type AgendaReplyOutput,
 	type AgendaWriter,
 } from "./host.ts";
-export {
-	createAgendaReplySteering,
-	steeredLine,
-	STEERED_MARK,
-	type AgendaReplySteering,
-	type AgendaSteeredReply,
-	type SteerEventRef,
-	type SteerInboxPort,
-	type SteerTargetPort,
-} from "./steer.ts";
