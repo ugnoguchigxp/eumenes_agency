@@ -12,10 +12,10 @@ import {
 } from "./contracts.ts";
 import { checkData } from "./prompt.ts";
 import {
-	clock,
 	makeItem,
 	notes,
 	record,
+	stampOf,
 	unlimited,
 	type AgendaState,
 } from "./state.ts";
@@ -74,7 +74,7 @@ export async function check(
 			system: st.instructions.check,
 			prompt: checkData({
 				now,
-				clock: clock(st, now),
+				stamp: stampOf(st),
 				request: item.text,
 				notes: notesNow,
 				researchedBefore,

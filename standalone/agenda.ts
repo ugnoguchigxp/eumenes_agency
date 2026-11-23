@@ -8,9 +8,9 @@
  *
  *   zsh -l scripts/api-entry.zsh standalone/agenda.ts [--interval 10|60|300]
  *       [--no-plan] [--log PATH | --no-log]
- *       [--fresh] [--mock-research]
+ *       [--fresh] [--mock-research] [--data-dir PATH] [--goal-analysis-seconds N]
  *
- * Commands: /agenda /notes /show <id> /memory /profile /stop /resume /quit
+ * Commands: /agenda /goals /notes /show <id> /memory /records /stop /resume /quit
  */
 import { emitKeypressEvents, createInterface } from "node:readline";
 import { rmSync } from "node:fs";
@@ -24,35 +24,36 @@ import {
 } from "../src/agenda/index.ts";
 import {
 	createAgendaSession,
+	type AgendaSession,
 	type AgendaSessionEvent,
 } from "./agenda-session.ts";
 import { agendaReplyMessages, dropRepeatedSentences } from "./agenda-reply.ts";
 import { createAgendaReplySteering } from "./agenda-steer.ts";
 import { createSteeringInbox } from "eumenes-steer";
+import {
+	createAgendaResearch,
+	createMockDocStore,
+	hasGoalSource,
+	openAgendaGoals,
+	openHostMemory,
+	withGoalReplyInstructions,
+	withGoalReplyTools,
+} from "eumenes-agency/agenda/runtime";
 import { memoryModel } from "./agenda-memory.ts";
-import { codexWebNoteWriter, webNoteWriterFor } from "./agenda-research.ts";
+import { agendaWebNoteWriter } from "./agenda-research.ts";
+import { apiKeyFromEnvironment } from "./api-keys.ts";
 import { createChatLog, chatsDir, printAbove } from "./chat-loop.ts";
 import { createProviderLlm, createProviderReply } from "./providers.ts";
 import { loadSettings, settingsDigest } from "./settings.ts";
 import { openUncappedMeter } from "./always-on-host.ts";
-import { createMockDocStore } from "../examples/virtual-eumenes/agenda/docs.ts";
-import { openHostMemory } from "../examples/virtual-eumenes/agenda/host-memory.ts";
-import { createProfileNote } from "../examples/virtual-eumenes/agenda/profile.ts";
+import { createRecordStore } from "../examples/virtual-eumenes/agenda/records.ts";
 import {
-	createMockWebResearch,
 	llmWriter,
 	mockToolchainWork,
 } from "../examples/virtual-eumenes/agenda/research.ts";
-import { openSnapshotFile } from "../examples/virtual-eumenes/agenda/state-file.ts";
+import { openSnapshotFile } from "../runtime/agenda/state-file.ts";
 
-const dataDir = resolve(import.meta.dir, "../data/agenda");
-/** The memory's store (its own SQLite, journal and socket); data/agenda/memory.json was the mock's. */
-const memoryDir = resolve(dataDir, "memory-host");
-const notesDir = resolve(dataDir, "notes");
-/** The user's plans and interests (Markdown; the user may edit it while the CLI runs). */
-const profilePath = resolve(dataDir, "profile.md");
-/** What outlives a restart: research asked for or promised, results not told yet, the quiet. */
-const statePath = resolve(dataDir, "agenda-state.json");
+const defaultDataDir = resolve(import.meta.dir, "../data/agenda");
 
 interface Args {
 	readonly interval: SpeechIntervalSec;
@@ -60,6 +61,8 @@ interface Args {
 	readonly log: string | null;
 	readonly fresh: boolean;
 	readonly mockResearch: boolean;
+	readonly dataDir: string;
+	readonly goalAnalysisMs?: number;
 }
 
 export function parseAgendaArgs(argv: readonly string[], now: Date): Args {
@@ -67,6 +70,8 @@ export function parseAgendaArgs(argv: readonly string[], now: Date): Args {
 	let showPlan = true;
 	let fresh = false;
 	let mockResearch = false;
+	let dataDir = defaultDataDir;
+	let goalAnalysisMs: number | undefined;
 	let log: string | null =
 		`${chatsDir}/${now.toISOString().replace(/[:.]/g, "-")}-agenda.jsonl`;
 	for (let i = 0; i < argv.length; i++) {
@@ -87,7 +92,12 @@ export function parseAgendaArgs(argv: readonly string[], now: Date): Args {
 		else if (arg === "--no-log") log = null;
 		else if (arg === "--fresh") fresh = true;
 		else if (arg === "--mock-research") mockResearch = true;
-		else throw new Error(`unknown argument: ${arg}`);
+		else if (arg === "--data-dir") dataDir = resolve(value());
+		else if (arg === "--goal-analysis-seconds") {
+			goalAnalysisMs = Number(value()) * 1000;
+			if (!Number.isSafeInteger(goalAnalysisMs) || goalAnalysisMs < 1000)
+				throw new Error("usage: --goal-analysis-seconds <positive seconds>");
+		} else throw new Error(`unknown argument: ${arg}`);
 	}
 	return {
 		interval,
@@ -95,6 +105,8 @@ export function parseAgendaArgs(argv: readonly string[], now: Date): Args {
 		log,
 		fresh,
 		mockResearch,
+		dataDir,
+		...(goalAnalysisMs !== undefined ? { goalAnalysisMs } : {}),
 	};
 }
 
@@ -110,6 +122,7 @@ const clean = (s: string) =>
 		.join("");
 const localTime = (now: number) =>
 	new Date(now).toLocaleString("ja-JP", {
+		timeZone: "Asia/Tokyo",
 		weekday: "short",
 		year: "numeric",
 		month: "numeric",
@@ -120,6 +133,12 @@ const localTime = (now: number) =>
 
 async function main() {
 	const args = parseAgendaArgs(process.argv.slice(2), new Date());
+	const { dataDir } = args;
+	const memoryDir = resolve(dataDir, "memory-host");
+	const notesDir = resolve(dataDir, "notes");
+	const goalsDir = resolve(dataDir, "goals");
+	const recordsPath = resolve(dataDir, "records.json");
+	const statePath = resolve(dataDir, "agenda-state.json");
 	// On gpt-6-luna while the Claude API is at its limit (until 2026-12-01); AGENCY_SETTINGS
 	// picks another (config/always-on.json: Haiku).
 	const settings = loadSettings(
@@ -133,31 +152,28 @@ async function main() {
 	if (args.fresh) {
 		rmSync(memoryDir, { recursive: true, force: true });
 		rmSync(notesDir, { recursive: true, force: true });
-		rmSync(profilePath, { force: true });
+		rmSync(goalsDir, { recursive: true, force: true });
+		rmSync(recordsPath, { force: true });
 		rmSync(statePath, { force: true });
 	}
 	const stateFile = openSnapshotFile(statePath);
+	const completeMemory = memoryModel({ role: settings.llm.background, meter });
 	const memory = await openHostMemory({
 		dir: memoryDir,
-		complete: memoryModel({ role: settings.llm.background, meter }),
+		complete: completeMemory,
 		clock: localTime,
 	});
 	const docs = createMockDocStore({ dir: notesDir });
-	// The standard search: the Codex SDK with Luna and Codex's own web search (user, 2026-11-11);
-	// without a codex executable, the role's provider searches instead.
-	const viaCodex = !args.mockResearch && Bun.which("codex") !== null;
 	const searcher = args.mockResearch
 		? null
-		: viaCodex
-			? codexWebNoteWriter({ today: () => localTime(Date.now()) })
-			: webNoteWriterFor({
-					role: settings.llm.background,
-					meter,
-					today: () => localTime(Date.now()),
-				});
+		: agendaWebNoteWriter({
+				role: settings.llm.background,
+				meter,
+				today: () => localTime(Date.now()),
+			});
 	// Work delegated to a toolchain goes to its mock (Eumenes runs the real toolchain).
 	const researchWriter = searcher?.writer ?? llmWriter(llm);
-	const research = createMockWebResearch({
+	const research = createAgendaResearch({
 		writer: (request, delegatedTo) =>
 			delegatedTo
 				? mockToolchainWork(request, delegatedTo)
@@ -166,12 +182,11 @@ async function main() {
 		// The stand-in's note comes when it is written: no made-up wait on top.
 		delayMs: 0,
 	});
-	const steward = memory.steward;
-	const note = createProfileNote({
+	const store = createRecordStore({
 		llm,
 		known: memory.known,
 		clock: localTime,
-		path: profilePath,
+		path: recordsPath,
 	});
 	const agent = createAgendaAgent({
 		llm,
@@ -179,8 +194,8 @@ async function main() {
 		clock: localTime,
 		startedAt: Date.now(),
 		known: memory.known,
+		records: store.records,
 		notes: docs.list,
-		profile: note.get,
 		...(stateFile.loaded ? { restore: stateFile.loaded } : {}),
 	});
 	const restored = agent.view().items;
@@ -234,6 +249,116 @@ async function main() {
 				.replaceAll("\ue001", "\x1b[0m"),
 		);
 	};
+	let running: AgendaSession | undefined;
+	const goals = hasGoalSource()
+		? await openAgendaGoals({
+				dir: goalsDir,
+				codexApiKey: apiKeyFromEnvironment("openai"),
+				principal: "local:agenda",
+				scopes: () => ["personal"],
+				shared: {
+					scopeKey: "personal",
+					memory,
+					docs,
+					quiet: () => agent.view().quiet,
+				},
+				llm,
+				judge: createProviderLlm(
+					settings.llm.judge ?? settings.llm.background,
+					meter,
+				),
+				memoryModel: completeMemory,
+				now: Date.now,
+				clock: localTime,
+				opportunity: () => ({
+					active: !closed && running !== undefined,
+					busy: !running?.isIdle(),
+					scopeKey: "personal",
+				}),
+				workLimit: () =>
+					meter.spentUsd() - sessionStart < settings.spend.limitUsd
+						? Number.POSITIVE_INFINITY
+						: 0,
+				...(args.goalAnalysisMs !== undefined
+					? { analysisMs: args.goalAnalysisMs }
+					: {}),
+				tell: (report) => {
+					log.write({
+						type: "goal_report",
+						reportId: report.id,
+						goalId: report.work.request.goalId,
+						text: report.text,
+					});
+					out(`\n[目標の報告] ${report.text}`);
+				},
+				trace: (e) => {
+					if (
+						e.type === "plan_call" ||
+						e.type === "plan_rejected" ||
+						e.type === "memory_unavailable" ||
+						e.type === "work_blocked"
+					) {
+						log.write({ type: `goal_${e.type}`, outcome: e.data });
+						return;
+					}
+					const detail = e.data as {
+						goalId?: string;
+						workId?: string;
+						note?: { id: string };
+						reason?: string;
+						noteCount?: number;
+						state?: string;
+						analysis?: string;
+					};
+					if (
+						[
+							"goal_design_requested",
+							"goal_analysis",
+							"goal_design_saved",
+							"goal_design_failed",
+							"submission",
+							"work_state",
+							"goal_mock_failed",
+							"report_queued",
+						].includes(e.type)
+					)
+						log.write({
+							type: e.type === "submission" ? "goal_submitted" : e.type,
+							goalId: detail.goalId,
+							workId: detail.workId,
+							noteId: detail.note?.id,
+							state: detail.state,
+							reason: detail.reason,
+							analysis: detail.analysis,
+							noteCount: detail.noteCount,
+						});
+					if (e.type === "goal_design_saved" && detail.note) {
+						const note = docs.read(detail.note.id);
+						if (note) out(dim(`  📝 ${note.title}（/show ${note.id}）`));
+					}
+					if (e.type === "goal_design_failed")
+						out(
+							dim(
+								`  [目標の設計エラー] ${detail.reason ?? "設計書を作れませんでした"}`,
+							),
+						);
+				},
+			}).catch(async (error: unknown) => {
+				await memory.close();
+				rl.close();
+				throw error;
+			})
+		: null;
+	const steward = goals
+		? async (input: Parameters<typeof memory.steward>[0]) => {
+				const result = await goals.remember(input, "personal");
+				if (result.changed) {
+					goals.infoChanged();
+					running?.wake();
+				}
+				return result;
+			}
+		: memory.steward;
 
 	const show = (e: AgendaSessionEvent) => {
 		switch (e.type) {
@@ -355,7 +480,7 @@ async function main() {
 				});
 				return out(dim(`  📝 ${e.title ?? e.status}: ${e.summary ?? ""}`));
 			case "memory":
-			case "profile": {
+			case "records": {
 				log.write({ type: e.type, applied: e.applied, rejected: e.rejected });
 				if (!showPlan) return undefined;
 				const mark = e.type === "memory" ? "🧠" : "🗓";
@@ -393,9 +518,10 @@ async function main() {
 	const session = createAgendaSession({
 		agent,
 		steward,
-		profile: note.writer,
+		records: store.writer,
 		docs,
 		research,
+		...(goals ? { background: goals } : {}),
 		now: Date.now,
 		setTimer: (fn, ms) => {
 			const h = setTimeout(fn, ms);
@@ -404,6 +530,11 @@ async function main() {
 		},
 		clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
 		emit: (e) => {
+			if (
+				e.type === "user" ||
+				(e.type === "researched" && e.status === "succeeded")
+			)
+				goals?.infoChanged();
 			show(e);
 			saveSoon();
 		},
@@ -419,17 +550,25 @@ async function main() {
 			holdsText: true,
 		}),
 		reply: async (a, tools, steer) => {
+			const messages = agendaReplyMessages({
+				agent: a,
+				known: memory.known(),
+				plans: store.get().plans,
+				notes: docs.list(),
+				clock: localTime(Date.now()),
+				now: Date.now(),
+			});
 			const r = await runRespond({
-				messages: agendaReplyMessages({
-					agent: a,
-					known: memory.known(),
-					notes: docs.list(),
-					profile: note.get(),
-					clock: localTime(Date.now()),
-					now: Date.now(),
-				}),
+				messages: goals ? withGoalReplyInstructions(messages) : messages,
 				chat: steer(chat),
-				tools,
+				tools: goals
+					? withGoalReplyTools(tools, goals, () =>
+							a
+								.view()
+								.said.filter((s) => s.who === "user")
+								.at(-1),
+						)
+					: tools,
 				emotion: true,
 				signal: new AbortController().signal,
 				onDelta: () => undefined,
@@ -441,6 +580,7 @@ async function main() {
 			};
 		},
 	});
+	running = session;
 
 	const command = (line: string): boolean => {
 		const [cmd, ...rest] = line.split(/\s+/);
@@ -472,6 +612,25 @@ async function main() {
 						: "  メモはまだありません",
 				),
 			);
+		} else if (cmd === "/goals") {
+			const reports = new Map(
+				goals?.reports().map((report) => [report.goalId, report.text]),
+			);
+			out(
+				dim(
+					goals
+						? goals
+								.list()
+								.map(
+									({ slot, goal, progress, designNoteId, mockAuthorized }) =>
+										goal
+											? `  ${slot} ${goal.desiredState}（${goal.status}${progress?.reason ? ` / ${progress.reason}` : ""}${mockAuthorized ? " / モック許可済み" : ""}）${designNoteId ? ` /show ${designNoteId}` : ""}${reports.has(goal.goalId) ? `\n    ${reports.get(goal.goalId)}` : ""}`
+											: `  ${slot} 空き`,
+								)
+								.join("\n")
+						: "  目標を使うには EUMENES_ROOT で Eumenes のチェックアウトを指定してください",
+				),
+			);
 		} else if (cmd === "/show") {
 			const d = docs.read(rest[0] ?? "");
 			out(
@@ -488,12 +647,19 @@ async function main() {
 						: "  記憶はまだありません",
 				),
 			);
-		} else if (cmd === "/profile") {
-			const text = note.get().trim();
+		} else if (cmd === "/records") {
+			const r = store.get();
+			const lines = [
+				...r.plans.map(
+					(p) => `  予定 ${p.ref} ${p.text}${p.dueAt ? `（${p.dueAt}）` : ""}`,
+				),
+				...r.questions.map((q) => `  質問 ${q.state} ${q.attribute}`),
+				...r.conflicts.map((c) => `  食い違い ${c.ref} ${c.text}`),
+			];
 			out(
-				text
-					? `\n──── 予定と関心（${profilePath}）\n${text}\n────`
-					: dim("  予定と関心のメモはまだありません"),
+				lines.length
+					? `\n──── 記録（${recordsPath}）\n${lines.join("\n")}\n────`
+					: dim("  予定・質問の台帳・食い違いの記録はまだありません"),
 			);
 		} else if (cmd === "/stop") {
 			session.stop();
@@ -507,7 +673,7 @@ async function main() {
 
 	console.log(
 		dim(
-			`agenda / 調べもの: ${searcher ? (viaCodex ? "Web検索（codex-sdk・Luna）" : "Web検索") : "mock"} / 記憶 ${memory.known().length}件・メモ ${docs.list().length}件 / 話しかけの最短間隔 ${args.interval}秒 / background ${settings.llm.background.model} (${settings.llm.background.effort}) / log ${args.log ?? "off"}\ncommands: /agenda /notes /show <id> /memory /profile /plan /stop /resume /quit`,
+			`agenda / 調べもの: ${searcher ? (searcher.backend === "codex" ? "Web検索（Codex SDK・Luna）" : `Web検索（${searcher.backend}）`) : "mock"} / 記憶 ${memory.known().length}件・メモ ${docs.list().length}件 / 話しかけの最短間隔 ${args.interval}秒 / background ${settings.llm.background.model} (${settings.llm.background.effort}) / log ${args.log ?? "off"}\ncommands: /agenda /goals /notes /show <id> /memory /records /plan /stop /resume /quit`,
 		),
 	);
 	if (restored.length)
@@ -568,7 +734,7 @@ async function main() {
 			queue.then(() => session.flush()).catch(() => undefined),
 			new Promise((done) => setTimeout(done, 15_000).unref?.()),
 		])
-			.then(() => {
+			.then(async () => {
 				// The exchange that finished meanwhile may have asked for research.
 				saveState();
 				log.write({ type: "end", spentUsd: meter.spentUsd() - sessionStart });
@@ -577,11 +743,16 @@ async function main() {
 						`\nspend this session $${(meter.spentUsd() - sessionStart).toFixed(4)}`,
 					),
 				);
-				return memory.close();
+				try {
+					await goals?.close();
+				} finally {
+					await memory.close();
+				}
 			})
 			.finally(() => process.exit(0));
 	});
 	rl.prompt();
+	log.write({ type: "ready", goalTools: goals !== null });
 	session.start();
 }
 

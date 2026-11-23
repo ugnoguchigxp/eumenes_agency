@@ -19,10 +19,8 @@
  *               from a copy; items first asserted before the start and still active then) are
  *               shown to the agent beside it under their real aliases. The writer does not see
  *               them, so it may write one again, and the agent cannot update or forget one;
- *      profile  the plans-and-interests note rebuilt by applying the `profile` events of every
- *               earlier agenda log (add / update / remove) in order. Rebuilding all the logs
- *               gives data/agenda/profile.md line for line. Edits the user made by hand between
- *               sessions are not in it;
+ *      records  the plans, question ledger and conflicts start empty (the stand-in's writer runs
+ *               on the replayed lines; what earlier sessions left is not rebuilt);
  *      not restored: the agenda-state.json (promises and quiet time carried across a restart) and
  *               the talk before the log (the CLI does not keep it either).
  *
@@ -62,9 +60,9 @@ import {
 } from "../../standalone/agenda-reply.ts";
 import { memoryModel } from "../../standalone/agenda-memory.ts";
 import { createClaudeClient } from "../../standalone/claude.ts";
-import { createMockDocStore } from "../../examples/virtual-eumenes/agenda/docs.ts";
-import { openHostMemory } from "../../examples/virtual-eumenes/agenda/host-memory.ts";
-import { createProfileNote } from "../../examples/virtual-eumenes/agenda/profile.ts";
+import { createMockDocStore } from "../../runtime/agenda/docs.ts";
+import { openHostMemory } from "../../runtime/agenda/host-memory.ts";
+import { createRecordStore } from "../../examples/virtual-eumenes/agenda/records.ts";
 import {
 	createMockWebResearch,
 	llmWriter,
@@ -143,72 +141,6 @@ export function sessionMinutes(events: readonly ChatEvent[]): number {
 		lastWhere(events, (e) => e.type === "end")?.at ??
 		Math.max(...events.map((e) => e.at));
 	return Math.max(1, Math.ceil((end - start) / 60_000));
-}
-
-const SECTION_OF: Record<string, "plans" | "interests"> = {
-	予定: "plans",
-	関心: "interests",
-};
-
-/**
- * The plans-and-interests note after the `profile` events of these logs (every log before the
- * one replayed, oldest first), as `add 予定: …`, `update p3: …` and `remove p2: …` say. An id is
- * the line's place in the note: the plans, then the interests.
- */
-export function profileLinesFromEvents(events: readonly ChatEvent[]): {
-	plans: string[];
-	interests: string[];
-} {
-	const plans: string[] = [];
-	const interests: string[] = [];
-	const at = (n: number): [string[], number] | null =>
-		n < 0 || n >= plans.length + interests.length
-			? null
-			: n < plans.length
-				? [plans, n]
-				: [interests, n - plans.length];
-	for (const e of events) {
-		if (e.type !== "profile") continue;
-		for (const a of e.applied ?? []) {
-			const add = /^add (予定|関心): (.+)$/su.exec(a);
-			if (add) {
-				(SECTION_OF[add[1]!] === "plans" ? plans : interests).push(add[2]!);
-				continue;
-			}
-			const update = /^update p(\d+): (.+)$/su.exec(a);
-			if (update) {
-				const hit = at(Number(update[1]) - 1);
-				if (hit) hit[0][hit[1]] = update[2]!;
-				continue;
-			}
-			const remove = /^remove p(\d+)(?::|$)/u.exec(a);
-			if (remove) {
-				const hit = at(Number(remove[1]) - 1);
-				if (hit) hit[0].splice(hit[1], 1);
-			}
-		}
-	}
-	return { plans, interests };
-}
-
-/** The note as the CLI keeps it (src/agenda/profile.ts: two headings with bullet lines). */
-export function renderProfile(lines: {
-	plans: readonly string[];
-	interests: readonly string[];
-}): string {
-	const bullets = (xs: readonly string[]) => xs.map((x) => `- ${x}`);
-	return [
-		"# 利用者の予定と関心",
-		"",
-		"会話からエージェントが書き、利用者も直せるメモです。記憶に残らない予定、考え中のこと、いま気にしていることを置きます。",
-		"",
-		"## 予定",
-		...bullets(lines.plans),
-		"",
-		"## 関心",
-		...bullets(lines.interests),
-		"",
-	].join("\n");
 }
 
 /** The note files made before `startMs` (the header's `at`): their names. */
@@ -485,16 +417,6 @@ function chooseLogs(wanted: readonly string[]): string[] {
 const logName = (file: string) =>
 	basename(file).replace(/-agenda\.jsonl$/u, "");
 
-/** The agenda logs written before `startMs` (every day), oldest first. */
-function earlierProfileEvents(startMs: number): ChatEvent[] {
-	return readdirSync(CHATS)
-		.filter((f) => f.endsWith("-agenda.jsonl"))
-		.sort()
-		.flatMap((f) => parseChatLog(readFileSync(join(CHATS, f), "utf8")))
-		.filter((e) => e.type === "profile" && e.at < startMs)
-		.sort((a, b) => a.at - b.at);
-}
-
 /** The clock of the log: virtual time is epoch milliseconds. */
 const logClock = clockFrom(new Date(0).toISOString());
 
@@ -581,16 +503,8 @@ async function run(
 			const seeded = memoryAt(MEMORY_DB, startMs);
 			const known = (): KnownItem[] => [...seeded, ...memory.known()];
 
-			// The plans-and-interests note as the earlier logs left it.
-			const profilePath = join(work, "profile.md");
-			const earlier = profileLinesFromEvents(earlierProfileEvents(startMs));
-			writeFileSync(profilePath, renderProfile(earlier));
-			const note = createProfileNote({
-				llm,
-				known,
-				clock: logClock,
-				path: profilePath,
-			});
+			// The records (plans, question ledger, conflicts) start empty.
+			const store = createRecordStore({ llm, known, clock: logClock });
 
 			const research = createMockWebResearch({
 				writer: (request, delegatedTo) =>
@@ -606,13 +520,13 @@ async function run(
 				`=== ${logName(file)} ${minutes}分、利用者の発言 ${turns.length}、メモ ${docs.list().length}、記憶 ${seeded.length}`,
 			);
 			await simulateAgenda({
-				deps: { llm, clock: logClock, profile: note.get },
+				deps: { llm, clock: logClock, records: store.records },
 				minutes,
 				turns,
 				startMs,
 				memory: { known },
 				steward: memory.steward,
-				profile: note.writer,
+				records: store.writer,
 				docs,
 				research,
 				reply: async (agent, at, tools) => {
@@ -620,8 +534,8 @@ async function run(
 						messages: agendaReplyMessages({
 							agent,
 							known: known(),
+							plans: store.get().plans,
 							notes: docs.list(),
-							profile: note.get(),
 							clock: logClock(at),
 							now: at,
 						}),
@@ -687,7 +601,6 @@ async function run(
 						start: {
 							notes: docs.list().length,
 							memory: seeded.length,
-							profileLines: earlier.plans.length + earlier.interests.length,
 						},
 						end: { notes: docs.list().length, memory: memory.known().length },
 						wallSec: Math.round((performance.now() - started) / 1000),

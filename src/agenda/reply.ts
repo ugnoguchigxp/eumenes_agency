@@ -14,24 +14,14 @@ import type { AgendaAgent } from "./agent.ts";
 import {
 	quietKinds,
 	quietMinutes,
+	type GoalRecord,
 	type KnownItem,
 	type NoteRef,
+	type PlanRecord,
 	type QuietScope,
 } from "./contracts.ts";
-import { profileLines, type ProfileLine } from "./profile.ts";
 import { asData } from "./prompt.ts";
 import { themeOverlap } from "./text.ts";
-
-/** The note's lines by section, left out of the state when the note is empty. */
-const plansAndInterests = (lines: readonly ProfileLine[]) =>
-	lines.length === 0
-		? {}
-		: {
-				plans: lines.filter((l) => l.section === "plans").map((l) => l.text),
-				interests: lines
-					.filter((l) => l.section === "interests")
-					.map((l) => l.text),
-			};
 
 export const START_PREPARATION = "start_preparation";
 export const SHOW_NOTE = "show_note";
@@ -45,7 +35,7 @@ const tools: readonly ToolDefinition[] = [
 	{
 		name: START_PREPARATION,
 		description:
-			"調べもの担当（web_research）に、調べてメモ（Markdown）にまとめてもらう。担当は一度に一つしか受けないので、実行中なら次に回る（頼まれたものが最優先）。結果は数分でメモになる。利用者に頼まれたものは、できたらあなたから知らせる。",
+			"調べもの担当に、調べてメモ（Markdown）にまとめてもらう。担当は一度に一つしか受けないので、実行中なら次に回る（頼まれたものが最優先）。結果は数分でメモになる。利用者に頼まれたものは、できたらあなたから知らせる。",
 		parameters: {
 			type: "object",
 			additionalProperties: false,
@@ -53,7 +43,7 @@ const tools: readonly ToolDefinition[] = [
 			properties: {
 				request: {
 					type: "string",
-					description: "何を調べ、何を結論にしてほしいかを一文で",
+					description: "調べる対象、条件、利用者が指定した詳しさを一文で",
 				},
 				askedByUser: {
 					type: "boolean",
@@ -381,7 +371,7 @@ export function agendaReplySystem(
 		"",
 		"【あなたの仕組み】",
 		"- 利用者について覚えていることは「記憶」、調べもの担当がまとめたものは「メモ」として、参照資料「あなたの今の状態」にあります。それがあなたの知識です。",
-		`- 調べものは ${START_PREPARATION} で担当（web_research）に頼みます。担当は一度に一つしか受けないので、実行中なら次に回ります。結果は数分でメモになります。`,
+		`- 調べものは ${START_PREPARATION} で担当に頼みます。実行中なら次に回り、結果はメモになります。指定がなければ短めです。詳しさの希望があれば対象・条件とともに request に残し、詳しさだけを聞き返しません。`,
 		`- メモは ${SHOW_NOTE} で表示できます。`,
 		...(options.toolchains
 			? [
@@ -419,8 +409,8 @@ export function agendaReplySystem(
 		"- メモの id（n1 など）は内部の印なので、利用者には言いません。「調べておいたメモ」のように言います。",
 		`- 調べものを頼んだ・調べ始めたと言うのは、この返事で ${START_PREPARATION} を呼んだときか、状態の researching・researchLog にあるときだけです。「調べている」「調べ中」と言うのは、researching にあるか researchLog の status が「調べている」のときだけです。メモになったものは「調べておいた」と言い、${READ_NOTE} で読んでその中身で答えます。status が「調べられなかった」ものは、調べられなかったと正直に言い、頼まれればもう一度 ${START_PREPARATION} で頼みます。`,
 		"- 記憶にあることは、聞き直さずに話題選びへ自然に使います。",
-		"- plans と interests は、利用者が前に話した予定（未定のものも）と、気にしていることのメモです。話題に出たら知っている前提で話し、決まっていないことを決めつけません。",
-		"- memory・plans・interests は、どれも利用者が前に話したことで、あなたが覚えていることです。「記憶の欄」のような内部の区別や仕組みを利用者に説明せず、何を覚えているかで答えます。",
+		"- plans は、利用者が前に話した予定（dueAt は期限、null は日付が未定）、goals は利用者が決めた目標です。話題に出たら知っている前提で話し、決まっていないことを決めつけません。",
+		"- memory・plans・goals は、どれも利用者が前に話したことで、あなたが覚えていることです。「記憶の欄」のような内部の区別や仕組みを利用者に説明せず、何を覚えているかで答えます。",
 		`- 頼まれたことや、今すぐ役立つ調べものがあれば、${START_PREPARATION} でその場で頼み、何を頼んだかを短く伝えます。結果が出る前に「できた」とは言いません。`,
 		`- 話しかけを止める静かな時間は、利用者が話しかけると終わります。相手がまだ静かにしてほしいとはっきり言うとき（「まだ集中したいから」など）だけ、もう一度 ${SET_QUIET} で決めます。`,
 		`- 調べものも止める一時停止（状態の quiet.pausedForMin）の途中で、止めてほしかった理由が終わったと分かるとき（「再開して」「おはよう」「ただいま」「作業終わった」など）は、${SET_QUIET} を kind=said、minutes=0 で呼んで解除します。`,
@@ -525,8 +515,9 @@ export function agendaReplyMessages(input: {
 	readonly agent: AgendaAgent;
 	readonly known: readonly KnownItem[];
 	readonly notes: readonly NoteRef[];
-	/** The user's plans-and-interests note (Markdown). */
-	readonly profile?: string;
+	/** The user's plans and goals the host gives this reply (Eumenes puts them in its own `## State`). */
+	readonly plans?: readonly PlanRecord[];
+	readonly goals?: readonly GoalRecord[];
 	readonly clock: string | null;
 	readonly now: number;
 	readonly persona?: string;
@@ -598,7 +589,17 @@ export function agendaReplyMessages(input: {
 		now: input.clock,
 		...(ask ? { askIfFits: ask.text } : {}),
 		memory: input.known.map((k) => k.text),
-		...plansAndInterests(profileLines(input.profile ?? "")),
+		...(input.plans?.length
+			? { plans: input.plans.map((p) => ({ text: p.text, dueAt: p.dueAt })) }
+			: {}),
+		...(input.goals?.length
+			? {
+					goals: input.goals.map((g) => ({
+						text: g.text,
+						...(g.state ? { state: g.state } : {}),
+					})),
+				}
+			: {}),
 		// When each note was made: what the reply said before that was true then. The notes behind
 		// its own recent topics are always in view: one it cannot see is not one it made up.
 		notes: [

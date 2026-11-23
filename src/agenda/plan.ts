@@ -7,28 +7,34 @@ import {
 	OPEN_LIMITS,
 	NOTE_FRESH_MS,
 	PLAN_ADD_LIMITS,
+	goalPlanSchema,
 	planSchema,
 	RESEARCH_RETRY_MS,
 	SAME_THEME_OVERLAP,
 	type AgendaItem,
 	type AgendaKind,
+	type GoalWorkPlan,
 	type PlanOutcome,
+	type PlanOutput,
 } from "./contracts.ts";
+import { ledgerEntry } from "./ask-check.ts";
+import { heldReason, heldWhy, recordHeld, suppressedTopics } from "./marks.ts";
 import {
 	connected,
 	drawsOnMemory,
 	holdsElsewhere,
+	isRecordRef,
 	sameTopic,
 	tiesToLatest,
 } from "./pacing.ts";
-import { profileOf } from "./profile.ts";
-import { planData } from "./prompt.ts";
+import { asData, goalPlanInstructions, planData } from "./prompt.ts";
 import {
-	clock,
 	known,
 	makeItem,
 	notes,
 	record,
+	records,
+	stampOf,
 	unlimited,
 	wantPlan,
 	type AgendaState,
@@ -55,19 +61,42 @@ export async function plan(
 	// This plan digs (nothing was left to say); a new dig needs a new reason.
 	const digging = st.dig;
 	st.dig = false;
-	const knownNow = known(st);
+	// What the user asked not to bring up goes: its items are dropped, and the plan reads no record
+	// that carries a mark (the host leaves them out too; this is the second guard).
+	for (const i of st.items)
+		if (i.status === "open" && heldReason(st, i) === "suppressed") {
+			i.status = "dropped";
+			i.endedAt = now;
+		}
+	const knownNow = known(st, { purpose: "plan" }).filter(
+		(k) => recordHeld(st, `memory:${k.id}`, k.text) === null,
+	);
+	const hostNow = records(st, { purpose: "plan" });
+	const plansNow = hostNow.plans.filter(
+		(x) => recordHeld(st, `plan:${x.ref}`, x.text) === null,
+	);
+	const goalsNow = hostNow.goals.filter(
+		(x) => recordHeld(st, `goal:${x.ref}`, x.text) === null,
+	);
+	const conflictsNow = hostNow.conflicts.filter(
+		(x) => recordHeld(st, `conflict:${x.ref}`, x.text) === null,
+	);
 	const notesNow = notes(st);
-	const profileNow = profileOf(st);
 	const researching = st.researching;
+	const goalContext = st.deps.goalContext?.() ?? null;
 	// The focus the plan names is that of the user's latest words as it reads them now.
 	const latestUser = st.said.filter((s) => s.who === "user").at(-1) ?? null;
 	const prompt = planData({
 		now,
-		clock: clock(st, now),
+		stamp: stampOf(st),
 		said: st.said,
 		items: st.items,
 		known: knownNow,
-		profile: profileNow,
+		plans: plansNow,
+		goals: goalsNow,
+		conflicts: conflictsNow,
+		questions: hostNow.questions,
+		doNotRaise: suppressedTopics(st),
 		notes: notesNow,
 		researching: researching
 			? (st.items.find((i) => i.id === researching.ticket.itemId) ?? null)
@@ -77,16 +106,20 @@ export async function plan(
 		nothingToSay: digging,
 		refusedLastDig: digging ? st.refusedLastDig : [],
 	});
-	const call = await callModel(
+	const call = await callModel<PlanOutput & { goalWork?: GoalWorkPlan }>(
 		st.deps.llm,
 		unlimited,
 		{
 			purpose: "think",
 			at: now,
-			system: st.instructions.plan,
-			prompt,
-			schema: planSchema,
-			maxOutputTokens: 1500,
+			system: goalContext
+				? `${st.instructions.plan}\n\n${goalPlanInstructions}`
+				: st.instructions.plan,
+			prompt: goalContext
+				? `${prompt}\n<goal_context>${asData(goalContext)}</goal_context>`
+				: prompt,
+			schema: goalContext ? goalPlanSchema : planSchema,
+			maxOutputTokens: goalContext ? 2400 : 1500,
 		},
 		signal,
 	);
@@ -115,13 +148,45 @@ export async function plan(
 	const refsKnown = new Set([
 		...st.said.map((s) => s.id),
 		...knownNow.map((k) => `memory:${k.id}`),
-		...profileNow.map((l) => `profile:${l.id}`),
+		...plansNow.map((x) => `plan:${x.ref}`),
+		...goalsNow.map((x) => `goal:${x.ref}`),
+		...conflictsNow.map((x) => `conflict:${x.ref}`),
 		...notesNow.map((x) => `note:${x.id}`),
 	]);
 	const userSaid = new Set(
 		st.said.filter((s) => s.who === "user").map((s) => s.id),
 	);
 	const rejected: string[] = [];
+	const goalWork = st.planGen === startGen ? call.value.goalWork : undefined;
+	const delegation = goalWork?.delegation;
+	let proposal: PlanOutcome["goalWork"];
+	if (goalContext && goalWork) {
+		const goal = goalContext.goals.find(
+			(g) =>
+				g.id === delegation?.goalId && g.revision === delegation.goalRevision,
+		);
+		if (
+			delegation &&
+			(!goal ||
+				!goalContext.toolchains.some(
+					(t) => t.revisionId === delegation.toolchainRevisionId,
+				) ||
+				delegation.memoryIds.some(
+					(id) => !goalContext.memory.some((m) => m.id === id),
+				))
+		) {
+			rejected.push("goal:unknown_reference");
+		} else if (delegation && goal?.phase === "wait") {
+			rejected.push("goal:preparation_pending");
+			proposal = {
+				contextId: goalContext.id,
+				analysis: goalWork.analysis,
+				delegation: null,
+			};
+		} else {
+			proposal = { contextId: goalContext.id, ...goalWork };
+		}
+	}
 	const refused: { kind: string; text: string; why: string }[] = [];
 	const reasons: string[] = [];
 	const dropped: string[] = [];
@@ -184,17 +249,26 @@ export async function plan(
 			why("unknown_ref");
 			continue;
 		}
+		// What the user asked not to bring up is not planned; what rests on a corrected record
+		// waits until the host has reviewed it.
+		const held = heldWhy(st, refs, [text, a.topic]);
+		if (held !== null) {
+			why(held === "suppressed" ? "suppressed" : "under_review");
+			continue;
+		}
+		// The question ledger: what was asked, answered, declined or put off is not asked again.
+		if (a.kind === "ask") {
+			const entry = ledgerEntry(text, hostNow.questions);
+			if (entry) {
+				why(`ledger_${entry.state}`);
+				continue;
+			}
+		}
 		// Research rests on what the user said: their words, the memory of them, their plans and
-		// interests, or a note that came from those. The agent's own words alone never start it.
+		// goals, or a note that came from those. The agent's own words alone never start it.
 		if (
 			a.kind === "research" &&
-			!refs.some(
-				(r) =>
-					userSaid.has(r) ||
-					r.startsWith("memory:") ||
-					r.startsWith("profile:") ||
-					r.startsWith("note:"),
-			)
+			!refs.some((r) => userSaid.has(r) || isRecordRef(r))
 		) {
 			why("needs_user_reason");
 			continue;
@@ -302,11 +376,12 @@ export async function plan(
 		dropped,
 		rejected,
 		reasons,
+		...(proposal ? { goalWork: proposal } : {}),
 		call: record(
 			"plan",
 			now,
 			call.usage,
-			added.length + dropped.length > 0,
+			added.length + dropped.length > 0 || Boolean(proposal?.delegation),
 			"applied",
 		),
 	};

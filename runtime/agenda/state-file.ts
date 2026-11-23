@@ -14,7 +14,7 @@ import { dirname } from "node:path";
 import {
 	agendaSnapshotSchema,
 	type AgendaSnapshot,
-} from "../../../src/agenda/index.ts";
+} from "../../src/agenda/index.ts";
 
 export interface SnapshotFile {
 	/** What the last run saved (null: nothing, or a file set aside: `problem` says why). */

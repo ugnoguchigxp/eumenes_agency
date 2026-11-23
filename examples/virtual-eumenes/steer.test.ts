@@ -28,7 +28,7 @@ import {
 	steeredLine,
 	type SteerInboxPort,
 } from "../../standalone/agenda-steer.ts";
-import { createMockDocStore } from "./agenda/docs.ts";
+import { createMockDocStore } from "../../runtime/agenda/docs.ts";
 
 // eumenes-steer's inbox is the package's port as it is (checked by the compiler).
 const inboxPort = (): SteerInboxPort =>

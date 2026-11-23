@@ -10,10 +10,35 @@ import {
 	type AgendaItem,
 	type AskRepeat,
 	type CallRecord,
+	type QuestionRecord,
 } from "./contracts.ts";
-import { profileOf } from "./profile.ts";
 import { askCheckData } from "./prompt.ts";
-import { clock, known, record, unlimited, type AgendaState } from "./state.ts";
+import {
+	record,
+	records,
+	stampOf,
+	unlimited,
+	type AgendaState,
+} from "./state.ts";
+import { normalize } from "./text.ts";
+
+/**
+ * The ledger's entry the question is about, where its attribute stands in the question's words.
+ * Code only for what is plain: a paraphrase is for the model, which reads the ledger (a shared
+ * pair of characters is no sign of one attribute: 好きな色 and 好きな食べ物 share two of three).
+ */
+export const ledgerEntry = (
+	text: string,
+	questions: readonly QuestionRecord[],
+): QuestionRecord | null => {
+	const said = normalize(text);
+	return (
+		questions.find((q) => {
+			const attribute = normalize(q.attribute);
+			return attribute.length >= 2 && said.includes(attribute);
+		}) ?? null
+	);
+};
 
 export async function checkAsks(
 	st: AgendaState,
@@ -21,8 +46,29 @@ export async function checkAsks(
 	now: number,
 	signal: AbortSignal,
 ): Promise<{ repeats: AskRepeat[]; call: CallRecord | null }> {
-	const asks = items.filter((i) => i.kind === "ask" && i.status === "open");
-	if (asks.length === 0) return { repeats: [], call: null };
+	const open = items.filter((i) => i.kind === "ask" && i.status === "open");
+	if (open.length === 0) return { repeats: [], call: null };
+	// What the ledger holds is not asked: known (answered), asked and waiting, declined or put off.
+	const { questions } = records(st, {
+		purpose: "ask_check",
+		asks: open.map((i) => i.text),
+	});
+	const repeats: AskRepeat[] = [];
+	const asks: AgendaItem[] = [];
+	for (const item of open) {
+		const entry = ledgerEntry(item.text, questions);
+		if (!entry) {
+			asks.push(item);
+			continue;
+		}
+		const verdict = entry.state === "answered" ? "answered" : "asked";
+		const reason = `台帳: ${entry.attribute}（${entry.state}）`;
+		item.status = "dropped";
+		item.endedAt = now;
+		item.lastDecline = { reason: `${verdict}: ${reason}`, at: now };
+		repeats.push({ itemId: item.id, text: item.text, verdict, reason });
+	}
+	if (asks.length === 0) return { repeats, call: null };
 	const askedBefore = st.items
 		.filter(
 			(i) =>
@@ -40,10 +86,10 @@ export async function checkAsks(
 			at: now,
 			system: st.instructions.askCheck,
 			prompt: askCheckData({
-				clock: clock(st, now),
+				now,
+				stamp: stampOf(st),
 				said: st.said,
-				known: known(st),
-				profile: profileOf(st),
+				questions,
 				askedBefore,
 				candidates: asks.map((i) => ({ id: i.id, text: i.text })),
 			}),
@@ -54,7 +100,7 @@ export async function checkAsks(
 	);
 	if (!call.ok)
 		return {
-			repeats: [],
+			repeats,
 			call: record(
 				"ask_check",
 				now,
@@ -63,7 +109,6 @@ export async function checkAsks(
 				call.outcome.code === "aborted" ? "aborted" : "failed",
 			),
 		};
-	const repeats: AskRepeat[] = [];
 	for (const v of call.value.verdicts) {
 		if (v.verdict === "new") continue;
 		const item = asks.find((i) => i.id === v.id && i.status === "open");

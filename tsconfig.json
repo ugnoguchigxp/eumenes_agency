@@ -15,6 +15,14 @@
 		"verbatimModuleSyntax": true,
 		"isolatedModules": true
 	},
-	"include": ["src", "test", "scripts", "eval", "standalone", "examples"],
+	"include": [
+		"src",
+		"runtime",
+		"test",
+		"scripts",
+		"eval",
+		"standalone",
+		"examples"
+	],
 	"exclude": ["node_modules", "dist"]
 }

@@ -9,7 +9,7 @@ import {
 	createAgendaSession,
 	type AgendaSessionEvent,
 } from "../../standalone/agenda-session.ts";
-import { createMockDocStore } from "../../examples/virtual-eumenes/agenda/docs.ts";
+import { createMockDocStore } from "../../runtime/agenda/docs.ts";
 import {
 	createMockMemory,
 	createMockSteward,
@@ -322,4 +322,48 @@ test("CLI 2026-11-10: the reply event carries the tools it called, for the log",
 		calls,
 	});
 	session.close();
+});
+
+test("the normal host wakes for background work, holds it while typing and cancels it on a new line", async () => {
+	const clock = fakeClock();
+	const docs = createMockDocStore();
+	let due: number | null = 20;
+	let signal: AbortSignal | undefined;
+	const session = createAgendaSession({
+		...clock,
+		agent: createAgendaAgent({ llm: model, startedAt: 0, notes: docs.list }),
+		steward: null,
+		docs,
+		research: createMockWebResearch({
+			docs,
+			writer: fixedWriter,
+			delayMs: 60_000,
+		}),
+		reply: async () => "確認しました。",
+		emit: () => undefined,
+		typingIdleMs: 50,
+		background: {
+			nextAt: () => due,
+			async tick(current) {
+				signal = current;
+				due = null;
+				await new Promise<void>((resolve) =>
+					current.addEventListener("abort", () => resolve(), { once: true }),
+				);
+			},
+		},
+	});
+	try {
+		session.start();
+		await clock.advance(10);
+		session.typed();
+		await clock.advance(49);
+		expect(signal).toBeUndefined();
+		await clock.advance(1);
+		expect(signal?.aborted).toBe(false);
+		await session.say("少し待ってください");
+		expect(signal?.aborted).toBe(true);
+	} finally {
+		session.close();
+	}
 });

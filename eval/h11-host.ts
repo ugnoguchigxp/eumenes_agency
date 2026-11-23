@@ -1,5 +1,5 @@
 /**
- * P4-b / H11: a minimal host adapter standing in for Eumenes → Pursuit. It is NOT Agency code:
+ * P4-b / H11: a minimal evaluation adapter for host-side research. It is NOT Agency code:
  * it owns execution (a read-only local corpus search), the daily cap, the per-unit budget and
  * interruption. `enforce:false` is the naive host that just runs every delegate ticket.
  */

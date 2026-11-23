@@ -12,6 +12,7 @@ import {
 	TOPIC_RECENT_MS,
 	type AgendaItem,
 } from "./contracts.ts";
+import { speechHeld, workHeld } from "./marks.ts";
 import { notes, wantPlan, type AgendaState } from "./state.ts";
 import { asksQuestion, normalize } from "./text.ts";
 
@@ -146,13 +147,17 @@ export const tiesIn = (st: AgendaState, refs: readonly string[], now: number) =>
 		),
 	);
 
+/** Refs that cite what the host holds (memory, plans, goals, conflicts) or a note, not the talk. */
+const RECORD_REF = /^(?:memory|plan|goal|conflict|note):/u;
+export const isRecordRef = (ref: string) => RECORD_REF.test(ref);
+
 /**
  * A question about something said in the conversation, once that talk is over (its words are
  * older than TOPIC_RECENT_MS): asked now it would come out of nowhere ("モンハンの話に戻りますね").
  */
 export const topicGone = (st: AgendaState, i: AgendaItem, now: number) =>
 	i.kind === "ask" &&
-	i.refs.some((r) => !/^(?:memory|profile|note):/u.test(r)) &&
+	i.refs.some((r) => !isRecordRef(r)) &&
 	!i.requested &&
 	!i.promised &&
 	!tiesIn(st, [...i.refs, ...(i.noteId ? [`note:${i.noteId}`] : [])], now);
@@ -185,6 +190,7 @@ export const replyAsk = (st: AgendaState, now: number): AgendaItem | null => {
 				i.kind === "ask" &&
 				i.status === "open" &&
 				(i.deferUntil === null || i.deferUntil <= now) &&
+				!speechHeld(st, i) &&
 				!topicGone(st, i, now),
 		)
 		.sort(order);
@@ -198,9 +204,9 @@ export const replyAsk = (st: AgendaState, now: number): AgendaItem | null => {
 	return fresh ? (asks.find((i) => !drawsOnMemory(i.refs)) ?? null) : null;
 };
 
-/** Refs that draw on the memory, the user's plans and interests, or a note. */
+/** Refs that draw on what the host holds (memory, plans, goals, conflicts), or a note. */
 export const drawsOnMemory = (refs: readonly string[]) =>
-	refs.some((r) => /^(?:memory|profile|note):/u.test(r));
+	refs.some(isRecordRef);
 
 /**
  * A talk is going on (the user spoke within TOPIC_RECENT_MS): what is said ties into it. Topics
@@ -221,6 +227,7 @@ export const speakable = (st: AgendaState, now: number) =>
 				i.status === "open" &&
 				(i.kind === "ask" || i.kind === "talk") &&
 				(i.deferUntil === null || i.deferUntil <= now) &&
+				!speechHeld(st, i) &&
 				!(i.kind === "ask" && askBlocked(st)) &&
 				!topicGone(st, i, now) &&
 				(!holdsElsewhere(st, now) || connected(st, i)),
@@ -254,6 +261,7 @@ export const nextResearch = (st: AgendaState, now: number) =>
 				i.status === "open" &&
 				i.kind === "research" &&
 				(i.deferUntil === null || i.deferUntil <= now) &&
+				!workHeld(st, i) &&
 				// In a talk, only research that ties into it runs; the rest waits for the talk to end
 				// (the CLI, 2026-11-10: five of ten looked into Qwen, Bezos, Neuro-sama... while the
 				// user talked about the weather and Fable 5.2).

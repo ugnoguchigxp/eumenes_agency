@@ -1,14 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import {
+	copyFileSync,
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	renameSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { checkTarball, pack } from "../../scripts/pack.ts";
+import { eumenesRoot, hasGoalSource } from "../../runtime/agenda/goal-store.ts";
 
 describe("pack", () => {
 	test("builds a dist-only tarball that imports and exposes the host API", async () => {
@@ -27,6 +32,45 @@ describe("pack", () => {
 			rmSync(out, { recursive: true, force: true });
 		}
 	}, 60_000);
+
+	test.skipIf(!hasGoalSource())(
+		"runs goal work and recovers its report from the installed tarball",
+		async () => {
+			const out = mkdtempSync(join(tmpdir(), "agency-pack-goals-"));
+			try {
+				const built = await pack(out);
+				const peers = ["zod", "eumenes-memory", "eumenes-memory-host"];
+				const agencyModules = resolve(import.meta.dir, "../../node_modules");
+				const eumenesModules = join(eumenesRoot(), "node_modules");
+				const installs = [agencyModules];
+				if (peers.every((peer) => existsSync(join(eumenesModules, peer))))
+					installs.push(eumenesModules);
+				for (const [index, modules] of installs.entries()) {
+					const consumer = join(out, `consumer-${index}`);
+					const deps = join(consumer, "node_modules");
+					mkdirSync(deps, { recursive: true });
+					expect(
+						Bun.spawnSync(["tar", "-xzf", built.tgz, "-C", consumer]).exitCode,
+					).toBe(0);
+					renameSync(join(consumer, "package"), join(deps, "eumenes-agency"));
+					for (const peer of peers)
+						symlinkSync(join(modules, peer), join(deps, peer));
+					const probe = join(consumer, "goals.ts");
+					copyFileSync(
+						join(import.meta.dir, "packed-agenda.fixture.ts"),
+						probe,
+					);
+					const run = Bun.spawnSync([process.execPath, probe, eumenesRoot()], {
+						cwd: consumer,
+					});
+					expect(run.exitCode, run.stderr.toString()).toBe(0);
+				}
+			} finally {
+				rmSync(out, { recursive: true, force: true });
+			}
+		},
+		60_000,
+	);
 
 	test("rejects a tarball whose package has no agenda entry point", async () => {
 		const out = mkdtempSync(join(tmpdir(), "agency-pack-noagenda-"));

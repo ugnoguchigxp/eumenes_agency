@@ -1,7 +1,6 @@
 /**
  * Reading a real CLI log for the replay (eval/agenda/replay.ts): the user's lines and times, the
- * session's start and length, the plans-and-interests note rebuilt from earlier logs, the notes
- * that existed at the start, and the measures taken from a replay's events.
+ * session's start and length, the notes that existed at the start, and the measures taken from a replay's events.
  */
 import { describe, expect, test } from "bun:test";
 import {
@@ -9,15 +8,12 @@ import {
 	median,
 	notesBefore,
 	parseChatLog,
-	profileLinesFromEvents,
-	renderProfile,
 	replayMetrics,
 	sessionMinutes,
 	sessionStartMs,
 	userTurns,
 	SAYS_NOTE_ID,
 } from "../../eval/agenda/replay.ts";
-import { profileLines } from "../../src/agenda/index.ts";
 import type { AgendaSimEvent } from "../../eval/agenda/sim.ts";
 
 const T0 = 1_794_305_177_360;
@@ -67,45 +63,6 @@ describe("reading a log", () => {
 		expect(sessionMinutes(events)).toBe(3);
 		// No end event: to the last event.
 		expect(sessionMinutes(events.filter((e) => e.type !== "end"))).toBe(3);
-	});
-});
-
-describe("the plans-and-interests note rebuilt from earlier logs", () => {
-	const profile = (at: number, ...applied: string[]) =>
-		parseChatLog(line({ at, type: "profile", applied }))[0]!;
-
-	test("add, update and remove follow the ids the note gives (plans first, then interests)", () => {
-		const lines = profileLinesFromEvents([
-			profile(1, "add 予定: 映画に行く"),
-			profile(2, "add 関心: ギター", "add 関心: 料理"),
-			profile(3, "update p1: 映画に土曜に行く"),
-			profile(4, "remove p2: ギター"),
-			profile(5, "add 予定: 旅行", "update p3: 料理の腕を上げたい"),
-		]);
-		expect(lines).toEqual({
-			plans: ["映画に土曜に行く", "旅行"],
-			interests: ["料理の腕を上げたい"],
-		});
-	});
-
-	test("an id that is not in the note changes nothing", () => {
-		expect(
-			profileLinesFromEvents([
-				profile(1, "add 予定: 映画", "update p9: x", "remove p9"),
-			]),
-		).toEqual({ plans: ["映画"], interests: [] });
-	});
-
-	test("the rendered note reads back as the same lines in the agent's parser", () => {
-		const note = renderProfile({
-			plans: ["映画に行く"],
-			interests: ["ギター", "料理"],
-		});
-		expect(profileLines(note).map((l) => [l.id, l.section, l.text])).toEqual([
-			["p1", "plans", "映画に行く"],
-			["p2", "interests", "ギター"],
-			["p3", "interests", "料理"],
-		]);
 	});
 });
 

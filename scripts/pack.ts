@@ -1,6 +1,6 @@
 /**
- * Packs the host-neutral core (src/) as a versioned tarball for vendoring into a host
- * (Eumenes): dist (JS + .d.ts) only, built from src with .ts imports rewritten to .js.
+ * Packs the host-neutral core and the optional Bun Agenda runtime for vendoring into a host.
+ * The tarball contains emitted JavaScript and declarations with .js specifiers.
  *
  *   bun scripts/pack.ts                  build, write artifacts/pack/<tgz> + manifest.json, verify
  *   bun scripts/pack.ts --check [tgz]    verify an existing tarball (default: the one in manifest.json)
@@ -18,13 +18,13 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { HOST_RULES_VERSION, INSTRUCTION_VERSION } from "../src/index.ts";
 
 const root = resolve(import.meta.dir, "..");
 const defaultOut = join(root, "artifacts", "pack");
 
-/** Names a host needs from the package; the check imports dist/index.js and requires them. */
+/** Names a host needs from the core package. */
 export const requiredExports = [
 	"createAgencyRuntime",
 	"projectAgencyState",
@@ -72,10 +72,10 @@ export const requiredAgendaExports = [
 	"speechIntervals",
 	"defaultSpeechIntervalSec",
 	"defaultPersona",
-	"emptyProfile",
-	"updateProfile",
-	"profileLines",
-	"PROFILE_TITLE",
+	"extractRecords",
+	"checkExtract",
+	"extractSchema",
+	"extractJsonSchema",
 	"declinesOffer",
 	"endsWithQuestion",
 	"asksQuestion",
@@ -96,19 +96,47 @@ export const requiredAgendaExports = [
 	"addedWordsLine",
 ] as const;
 
-/** The package's entry points: the core and the agenda agent. */
+const requiredAgendaRuntimeExports = [
+	"openAgendaGoals",
+	"withGoalReplyTools",
+	"withGoalReplyInstructions",
+	"openGoalHost",
+	"createGoalStore",
+	"createGoalMemory",
+	"goalMigrations",
+	"openHostMemory",
+	"createMockDocStore",
+	"createAgendaResearch",
+	"codexGoalDesigner",
+	"createDesignGenerator",
+	"validateDesign",
+	"codexWebNoteWriter",
+	"openClaudeCodeMock",
+] as const;
+
 const entryPoints = {
-	".": { types: "./dist/index.d.ts", default: "./dist/index.js" },
+	".": { types: "./dist/src/index.d.ts", default: "./dist/src/index.js" },
 	"./agenda": {
-		types: "./dist/agenda/index.d.ts",
-		default: "./dist/agenda/index.js",
+		types: "./dist/src/agenda/index.d.ts",
+		default: "./dist/src/agenda/index.js",
+	},
+	"./agenda/runtime": {
+		types: "./dist/runtime/agenda/index.d.ts",
+		default: "./dist/runtime/agenda/index.js",
 	},
 } as const;
 
+const runtimePeers = {
+	"@openai/codex-sdk": "0.160.0",
+	"eumenes-memory": "0.0.4",
+	"eumenes-memory-host": "0.1.0 || 0.2.0",
+} as const;
+
 /** Only these may appear in the tarball. */
-const allowedPath = /^package\/(package\.json|LICENSE|dist\/.+\.(js|d\.ts))$/;
+const allowedPath =
+	/^package\/(package\.json|LICENSE|dist\/(src|runtime\/agenda)\/.+\.(js|d\.ts))$/;
 const forbiddenPath =
-	/(^|\/)(standalone|eval|data|test|tests|config|scripts|spec|labels|src|node_modules)(\/|$)|(^|\/)\.env|\.test\.|\.map$/;
+	/(^|\/)(standalone|examples|eval|data|test|tests|config|scripts|spec|labels|node_modules)(\/|$)|(^|\/)\.env|\.test\.|\.map$/;
 
 type Result = { code: number; out: string; err: string };
 
@@ -162,7 +190,7 @@ function rewriteDeclarationSpecifiers(dir: string): void {
 	}
 }
 
-/** package.json inside the tarball: dist entry points and the runtime dependencies src needs (zod). */
+/** Package metadata for the core and the separately imported Bun runtime. */
 export function tarballPackageJson(pkg: RootPackage) {
 	const zod = pkg.dependencies?.zod;
 	if (zod === undefined) throw new Error("package.json has no zod dependency");
@@ -170,7 +198,8 @@ export function tarballPackageJson(pkg: RootPackage) {
 		name: "eumenes-agency",
 		version: pkg.version,
 		license: pkg.license,
-		description: "Eumenes agency core (local distribution, unpublished).",
+		description:
+			"Eumenes Agency and Agenda runtime (local distribution, unpublished).",
 		type: "module",
 		sideEffects: false,
 		exports: {
@@ -179,6 +208,10 @@ export function tarballPackageJson(pkg: RootPackage) {
 		},
 		files: ["dist", "LICENSE"],
 		dependencies: { zod },
+		peerDependencies: runtimePeers,
+		peerDependenciesMeta: Object.fromEntries(
+			Object.keys(runtimePeers).map((name) => [name, { optional: true }]),
+		),
 	};
 }
 
@@ -194,10 +227,9 @@ export async function checkTarball(tgz: string): Promise<string[]> {
 	}
 	for (const need of [
 		"package/package.json",
-		"package/dist/index.js",
-		"package/dist/index.d.ts",
-		"package/dist/agenda/index.js",
-		"package/dist/agenda/index.d.ts",
+		...Object.values(entryPoints).flatMap((entry) =>
+			Object.values(entry).map((path) => `package/${path.slice(2)}`),
+		),
 	])
 		if (!listed.includes(need)) errors.push(`missing: ${need}`);
 	if (errors.length > 0) return errors;
@@ -218,6 +250,8 @@ export async function checkTarball(tgz: string): Promise<string[]> {
 			name?: string;
 			exports?: Record<string, unknown>;
 			dependencies?: Record<string, string>;
+			peerDependencies?: Record<string, string>;
+			peerDependenciesMeta?: Record<string, { optional?: boolean }>;
 		};
 		if (pkg.name !== "eumenes-agency") errors.push("package name");
 		for (const [entry, want] of Object.entries(entryPoints)) {
@@ -227,7 +261,14 @@ export async function checkTarball(tgz: string): Promise<string[]> {
 		}
 		if (Object.keys(pkg.dependencies ?? {}).join() !== "zod")
 			errors.push("dependencies must be exactly zod");
-		const dts = readFileSync(join(pkgDir, "dist", "index.d.ts"), "utf8");
+		for (const [name, version] of Object.entries(runtimePeers)) {
+			if (
+				pkg.peerDependencies?.[name] !== version ||
+				!pkg.peerDependenciesMeta?.[name]?.optional
+			)
+				errors.push(`optional runtime peer ${name}@${version} is missing`);
+		}
+		const dts = readFileSync(join(pkgDir, entryPoints["."].types), "utf8");
 		if (!dts.includes("./application/idle.js"))
 			errors.push("index.d.ts does not re-export the idle module");
 		for (const path of listed.filter((p) => /\.(js|d\.ts)$/.test(p))) {
@@ -235,12 +276,12 @@ export async function checkTarball(tgz: string): Promise<string[]> {
 			if (/["']\.{1,2}\/[^"']*\.ts["']/.test(text))
 				errors.push(`${path} still imports a .ts file`);
 		}
-		// Resolve zod from the repo's install, as a host's node_modules would.
-		mkdirSync(join(pkgDir, "node_modules"));
-		symlinkSync(
-			join(root, "node_modules", "zod"),
-			join(pkgDir, "node_modules", "zod"),
-		);
+		// Resolve the packaged dependencies as the consumer's separate install would.
+		for (const name of ["zod", ...Object.keys(runtimePeers)]) {
+			const link = join(pkgDir, "node_modules", name);
+			mkdirSync(dirname(link), { recursive: true });
+			symlinkSync(join(root, "node_modules", name), link);
+		}
 		// A host installs the package under its name and imports it by name (the exports map, not
 		// paths into dist): the core and the agenda subpath.
 		const host = join(dir, "host");
@@ -250,7 +291,8 @@ export async function checkTarball(tgz: string): Promise<string[]> {
 			join(host, "probe.mjs"),
 			`const core = await import("eumenes-agency");
 const agenda = await import("eumenes-agency/agenda");
-console.log(JSON.stringify({ core: Object.keys(core), agenda: Object.keys(agenda) }));
+const runtime = await import("eumenes-agency/agenda/runtime");
+console.log(JSON.stringify({ core: Object.keys(core), agenda: Object.keys(agenda), runtime: Object.keys(runtime) }));
 `,
 		);
 		const probe = await run([process.execPath, join(host, "probe.mjs")], {
@@ -261,6 +303,7 @@ console.log(JSON.stringify({ core: Object.keys(core), agenda: Object.keys(agenda
 			const got = JSON.parse(probe.out) as {
 				core: string[];
 				agenda: string[];
+				runtime: string[];
 			};
 			const core = new Set(got.core);
 			for (const name of requiredExports)
@@ -269,6 +312,10 @@ console.log(JSON.stringify({ core: Object.keys(core), agenda: Object.keys(agenda
 			for (const name of requiredAgendaExports)
 				if (!agenda.has(name))
 					errors.push(`missing export: eumenes-agency/agenda ${name}`);
+			const runtime = new Set(got.runtime);
+			for (const name of requiredAgendaRuntimeExports)
+				if (!runtime.has(name))
+					errors.push(`missing export: eumenes-agency/agenda/runtime ${name}`);
 		}
 		// Compile a host against only the emitted declarations, including the breaking changes.
 		const consumer = join(pkgDir, "consumer.ts");
@@ -278,7 +325,7 @@ console.log(JSON.stringify({ core: Object.keys(core), agenda: Object.keys(agenda
 import {
   createAgencyRuntime, runRespond, agencyOutputContract, respondSystem,
   type RuntimeDeps, type RespondInput, type BackgroundSystemContext,
-} from "./dist/index.js";
+} from "${entryPoints["."].default}";
 declare const deps: Omit<RuntimeDeps, "systemContext">;
 declare const reply: Omit<RespondInput, "messages">;
 const systemContext: BackgroundSystemContext = {
@@ -319,6 +366,18 @@ respondSystem({ opening: ["recorded utterance"] });
 			agendaConsumer,
 			`
 import type { LlmPort } from "eumenes-agency";
+import { openAgendaGoals, type GoalTarget, withGoalReplyTools, createDesignGenerator, validateDesign, type DesignInput } from "eumenes-agency/agenda/runtime";
+declare const options: Parameters<typeof openAgendaGoals>[0];
+const designInput: DesignInput = { purpose: "Fix a regression", workspace: "/workspace", analysis: "Regression confirmed", brief: { task: "Repair", prompt: "Implement the agreed fix" }, memory: [], notes: [] };
+const generateDesign = createDesignGenerator(async () => ({ status: "blocked", title: "Repair", summary: "Evidence needed", markdown: null, missing: "Reproduce the failure", sources: [] }));
+void generateDesign(designInput, new AbortController().signal).then((output) => validateDesign(designInput, output));
+const target: GoalTarget = { slot: 3, goalId: "goal-id", revision: 1 };
+async function agendaRuntime() {
+  const goals = await openAgendaGoals(options);
+  await goals.authorize(target, { id: "n1", digest: "digest" });
+  withGoalReplyTools(goals.replyTools(), goals, () => undefined);
+  return goals.reports();
+}
 import {
   createAgendaAgent, agendaSnapshotSchema,
   type AgendaAgent, type AgendaDeps, type AgendaSnapshot,
@@ -328,6 +387,25 @@ const agent: AgendaAgent = createAgendaAgent({ llm, startedAt: 0 });
 const saved: AgendaSnapshot = agendaSnapshotSchema.parse(JSON.parse(JSON.stringify(agent.snapshot(0))));
 const deps: AgendaDeps = { llm, startedAt: 1, restore: saved };
 createAgendaAgent(deps).requestResearch({ text: "q", at: 1 });
+// The host's records and marks, read at each call; its records' writer reads every line after its position.
+createAgendaAgent({
+  llm, startedAt: 1,
+  known: (call) => (call.purpose === "plan" ? [{ id: "m1", text: "猫を飼っている" }] : []),
+  records: () => ({
+    plans: [{ ref: "p1", text: "水曜に歯医者", dueAt: "2026-11-25" }],
+    goals: [{ ref: "g1", text: "毎朝ストレッチ", state: null }],
+    conflicts: [{ ref: "c1", text: "紅茶派と言っていた" }],
+    questions: [{ attribute: "好きな色", state: "answered" }],
+  }),
+  marks: () => ({ underReview: ["memory:m1"], suppressedRefs: [], suppressedTopics: ["話題"] }),
+});
+import { extractRecords, type ExtractResult } from "eumenes-agency/agenda";
+void extractRecords({
+  llm,
+  said: [{ id: "u1", who: "user", text: "来週の水曜は歯医者" }],
+  related: { plans: [{ ref: "p1", text: "水曜に歯医者", dueAt: null }] },
+  clock: null, at: 0, signal: new AbortController().signal,
+}).then((r: ExtractResult) => (r.ok ? r.records.plans : r.reason));
 // @ts-expect-error a snapshot is the agent's, not any object
 createAgendaAgent({ llm, startedAt: 1, restore: { items: [] } });
 
@@ -472,12 +550,24 @@ export interface PackResult {
 	readonly manifest: Record<string, unknown>;
 }
 
-/** Builds dist from src and writes the tarball, its .sha256 and manifest.json into `outDir`. */
+/** Builds the tarball and writes its checksum and manifest into `outDir`. */
 export async function pack(outDir = defaultOut): Promise<PackResult> {
 	const pkg = rootPackage();
 	const sha = (await must(["git", "rev-parse", "HEAD"])).trim();
 	const dirty =
-		(await must(["git", "status", "--porcelain", "--", "src"])).trim() !== "";
+		(
+			await must([
+				"git",
+				"status",
+				"--porcelain",
+				"--",
+				"src",
+				"runtime",
+				"package.json",
+				"tsconfig.build.json",
+				"scripts/pack.ts",
+			])
+		).trim() !== "";
 	const sha12 = sha.slice(0, 12);
 
 	mkdirSync(outDir, { recursive: true });

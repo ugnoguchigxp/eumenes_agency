@@ -14,7 +14,7 @@ import {
 	readFileSync,
 	writeFileSync,
 } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import {
 	canonical,
@@ -129,16 +129,17 @@ const loadDistributionManifest = async (host: string) =>
 
 export async function buildManifest(
 	cfg: RunConfig,
-	dist: { module: Record<string, any>; codeDir: string; identity: object },
+	dist: { module: Record<string, any>; identity: { entryRealpath: string } },
 	tools: unknown,
 ) {
 	const adjacent = cfg.agency === "adjacent-src";
+	const coreDir = dirname(dist.identity.entryRealpath);
 	const wake = join(
-		dist.codeDir,
+		coreDir,
 		adjacent ? "domains/agency/wake.ts" : "domains/agency/wake.js",
 	);
 	const activity = join(
-		dist.codeDir,
+		coreDir,
 		adjacent
 			? "application/activity-budget.ts"
 			: "application/activity-budget.js",
@@ -194,13 +195,13 @@ export async function buildManifest(
 			wakeConfig: {
 				value:
 					dist.module.defaultWakeConfig ?? "not exported: file digest only",
-				file: relative(dist.codeDir, wake),
+				file: relative(coreDir, wake),
 				digest: sha256(readFileSync(wake)),
 			},
 			activityLimits: {
 				value:
 					dist.module.defaultActivityLimits ?? "not exported: file digest only",
-				file: relative(dist.codeDir, activity),
+				file: relative(coreDir, activity),
 				digest: sha256(readFileSync(activity)),
 			},
 			cases: {
@@ -463,6 +464,7 @@ export async function runP0(cfg: RunConfig) {
 	const dist =
 		cfg.agency === "adjacent-src"
 			? await loadAdjacentSource(
+					cfg.host,
 					cfg.agencyRepo,
 					String((await loadDistributionManifest(cfg.host)).gitSha),
 				)

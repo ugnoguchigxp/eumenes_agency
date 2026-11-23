@@ -670,8 +670,7 @@ describe("agenda agent", () => {
 		const agent = make({ llm: m.llm, notes: () => notes });
 		const first = await agent.step(0, idle, sig());
 		expect(first.tickets).toEqual([]);
-		// The agent researches nothing itself: the host saved a report from web_research or
-		// pursuit and says something new came in.
+		// The host saved a research note and tells the agent something new came in.
 		notes.push({
 			id: "n1",
 			title: "箱根・強羅の宿の候補",

@@ -47,7 +47,6 @@ P0-E〜P4 の主会話・背景とも、Claude API の Claude Haiku 5.5（`claud
 | World Model | 外界の対象、根拠付きの主張・仮説・条件・予測と結果 |
 | Agency | 自己の解釈、関心、対象のある欲求、自己の意図、未発言候補、行動と配信の状態 |
 | Eumenes dialogue / voice / tool-runtime | 通常応答、発話の所有権、取消・割り込み、再生、権限、ツール実行 |
-| Pursuit（将来の任意接続） | 採用した目標に対する試行錯誤と検証。Agency の欲求や会話タイミングは判断しない |
 
 Agency がユーザー目標を自動採用したことにしない。既存 Goals とは、不透明な `hostGoalRef` と revision で関連付ける。自己の意図がユーザー指示と競合すれば保留または断念を提案する。現在のユーザー指示と権限は常にホストが保持する。
 
@@ -202,9 +201,9 @@ Memory と World は Eumenes ホストの公開 port を介して接続し、Age
 | P4 | P3後、P2のbaselineと評価仕様を固定。実LLMの会話と背景、OFF/ONと代替案比較 | 未見ケース・複数sessionでの意味評価と負荷実測、利用者評価、採用/縮小/保留の判断 |
 | P5 後続 | 別の統合設計合意後。Eumenes adapter、設定、context、source origin、presence、取消と配信 | Eumenesの対象domain検証、明示E2E、音声実機器受入、採用判断 |
 
-P1〜P4 の実装範囲は、P0-E〜P2-E の意味検証の結果で決める（台帳が要らなければ作らない）。2026-10-21 の利用者の判断: 研究に時間をかけてよい。実装を急がず、意味検証を先に深める。P5の製品差替えはさらに後の判断とする。Pursuit はP0-E〜P4の必須依存にせず、まず一回の許可済み操作で循環を通す。
+P1〜P4 の実装範囲は、P0-E〜P2-E の意味検証の結果で決める（台帳が要らなければ作らない）。2026-10-21 に利用者が決めた方針に沿い、研究に時間をかけて意味検証を深める。P5の製品差替えはさらに後の判断とする。まずホストへの一回の許可済み操作で循環を通す。
 
-実モデル評価の ModelPort は、Eumenes backend を経由せず、standalone から Claude API を `@anthropic-ai/sdk` で直接呼ぶ adapter とする（§1.2）。これで「backend の推論機構を別プロセスへ公開できるか」は P0-E〜P4 の前提から外れ、P5 の統合課題になる。認証は standalone の `.env` の `ANTHROPIC_API_KEY`（Pursuit と同じ key。同じ目的の別研究テーマで、同時には動かさない）。key の値はログ・結果・tgz に含めず、Git 管理を始める際は `.env` を `.gitignore` へ入れる。取消は SDK の AbortSignal、token は応答の `usage`、費用上限は実験設定で持つ。未接続なら blocked とし、固定 Provider の結果を live と呼ばない。standalone の保存設定は実験のフラグ・予算・接続 port・model route の選択だけを持つ。Eumenes と同時稼働する場合の独自 client ID は実験用DBで管理する。モデル/profile名は定数・既定値・分岐・ファイル名に固定しない。
+実モデル評価の ModelPort は、Eumenes backend を経由せず、standalone から Claude API を `@anthropic-ai/sdk` で直接呼ぶ adapter とする（§1.2）。これで「backend の推論機構を別プロセスへ公開できるか」は P0-E〜P4 の前提から外れ、P5 の統合課題になる。認証は standalone の `.env` の `ANTHROPIC_API_KEY`。key の値はログ・結果・tgz に含めず、Git 管理を始める際は `.env` を `.gitignore` へ入れる。取消は SDK の AbortSignal、token は応答の `usage`、費用上限は実験設定で持つ。未接続なら blocked とし、固定 Provider の結果を live と呼ばない。standalone の保存設定は実験のフラグ・予算・接続 port・model route の選択だけを持つ。Eumenes と同時稼働する場合の独自 client ID は実験用DBで管理する。モデル/profile名は定数・既定値・分岐・ファイル名に固定しない。
 
 ## 11. 現在の残作業
 
@@ -214,7 +213,7 @@ P1〜P4 の実装範囲は、P0-E〜P2-E の意味検証の結果で決める（
 - [x] 今回は考案までとする利用者の指定を反映。
 - [x] 一次資料12件と参考実装の位置付け、仮説・代替案・予備実験を追記。
 - [x] 候補/試行/配信の状態分離、訂正伝播、容量・処理待ち、通常応答との照合を契約化。
-- [x] 検証用 ModelPort を Claude API の Claude Haiku 5.5 に決定（standalone の `.env` に `ANTHROPIC_API_KEY` を配置済み、Pursuit と共有）。
+- [x] 検証用 ModelPort を Claude API の Claude Haiku 5.5 に決定。
 - [x] 第2回レビューの指摘（主要比較、B1 の保存範囲、P0-E の判断方法、背景予算、容量の行き詰まり、状態遷移、実行順、文書構成）を反映。
 - [x] P0-E の開始条件を決定: 費用上限 $50、利用場面は作業の未解決事項（雑談は別評価）、ケースとラベルは Claude が案を作り利用者が確定。
 - [x] P0-E を実装（コア runtime、Claude API adapter、CLI、評価ハーネス、開発ケース24件の案）。独立レビュー1回の指摘14件を修正済み。verify は 186 テストで通過。

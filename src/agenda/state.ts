@@ -9,7 +9,11 @@ import { defaultBudget } from "../contracts/runtime.ts";
 import type { Budget } from "../application/budget.ts";
 import {
 	SAID_KEPT,
+	type AgendaCall,
+	type AgendaGoalContext,
 	type AgendaItem,
+	type AgendaMarks,
+	type AgendaRecords,
 	type AgendaSnapshot,
 	type AgendaTicket,
 	type CallRecord,
@@ -22,15 +26,23 @@ import {
 
 export interface AgendaDeps {
 	readonly llm: LlmPort;
-	/** The host's memory of the user (eumenes_memory), read at each call. */
-	readonly known?: () => readonly KnownItem[];
+	/** The host has an opportunity to ask for a goal proposal in this planning call. */
+	readonly goalContext?: () => AgendaGoalContext | null;
+	/**
+	 * The host's memory of the user (eumenes_memory), read at each call: the records that bear on
+	 * that call (`call` says which), not the whole of it.
+	 */
+	readonly known?: (call: AgendaCall) => readonly KnownItem[];
+	/**
+	 * The plans, goals, conflicts and question ledger the host selects for each call (spec
+	 * 2026-11-22 §5.4). Replaces the plans-and-interests note: what the agent knows of the user
+	 * beyond the memory is the host's records, not a note the agent keeps.
+	 */
+	readonly records?: (call: AgendaCall) => AgendaRecords;
+	/** Marks on the host's records (under review, suppressed), read whenever an item is chosen. */
+	readonly marks?: () => AgendaMarks;
 	/** The researcher's notes in the host's document store, read at each call. */
 	readonly notes?: () => readonly NoteRef[];
-	/**
-	 * The user's plans-and-interests note (Markdown, profile.ts), read at each call: what the
-	 * memory leaves out (intentions, plans not settled, what the user is thinking about).
-	 */
-	readonly profile?: () => string;
 	/** A host persona replaces the built-in one; the rest of the instructions stays. */
 	readonly persona?: string;
 	readonly speechIntervalSec?: SpeechIntervalSec;
@@ -149,13 +161,28 @@ export const wantPlan = (st: AgendaState) => {
 };
 
 /** The host's memory of the user, without what was forgotten. */
-export const known = (st: AgendaState) =>
-	(st.deps.known?.() ?? []).filter(
+export const known = (st: AgendaState, call: AgendaCall) =>
+	(st.deps.known?.(call) ?? []).filter(
 		(k) =>
 			k.id !== "" &&
 			k.text.trim() !== "" &&
 			!st.forgotten.has(`memory:${k.id}`),
 	);
+
+/** The host's plans, goals, conflicts and question ledger for a call, without what was forgotten. */
+export const records = (st: AgendaState, call: AgendaCall) => {
+	const r = st.deps.records?.(call) ?? {};
+	const live = (kind: string, ref: string, text: string) =>
+		ref !== "" && text.trim() !== "" && !st.forgotten.has(`${kind}:${ref}`);
+	return {
+		plans: (r.plans ?? []).filter((x) => live("plan", x.ref, x.text)),
+		goals: (r.goals ?? []).filter((x) => live("goal", x.ref, x.text)),
+		conflicts: (r.conflicts ?? []).filter((x) =>
+			live("conflict", x.ref, x.text),
+		),
+		questions: (r.questions ?? []).filter((x) => x.attribute.trim() !== ""),
+	};
+};
 
 /** The researcher's notes, without what was forgotten or rests on it. */
 export const notes = (st: AgendaState) =>
@@ -165,8 +192,38 @@ export const notes = (st: AgendaState) =>
 			!x.refs.some((r) => st.forgotten.has(r)),
 	);
 
-export const clock = (st: AgendaState, now: number) =>
-	st.deps.clock ? st.deps.clock(now) : null;
+/** UTC to the minute ("2026-11-22T09:03Z"), by calendar arithmetic (the core has no Date). */
+const utcMinute = (at: number): string => {
+	const days = Math.floor(at / 86_400_000);
+	const z = days + 719_468;
+	const era = Math.floor(z / 146_097);
+	const doe = z - era * 146_097;
+	const yoe = Math.floor(
+		(doe -
+			Math.floor(doe / 1_460) +
+			Math.floor(doe / 36_524) -
+			Math.floor(doe / 146_096)) /
+			365,
+	);
+	const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100));
+	const mp = Math.floor((5 * doy + 2) / 153);
+	const day = doy - Math.floor((153 * mp + 2) / 5) + 1;
+	const month = mp < 10 ? mp + 3 : mp - 9;
+	const year = yoe + era * 400 + (month <= 2 ? 1 : 0);
+	const minutes = Math.floor(at / 60_000) - days * 1_440;
+	const two = (n: number) => String(n).padStart(2, "0");
+	return `${year}-${two(month)}-${two(day)}T${two(Math.floor(minutes / 60))}:${two(minutes % 60)}Z`;
+};
+
+/**
+ * A moment as the prompts show it: the host's wording of the local time, or UTC to the minute
+ * when the host gave no clock. The same moment reads the same in every call, so a line keeps its
+ * time while the conversation grows and the head of the prompt stays as it was.
+ */
+export const stampOf =
+	(st: AgendaState) =>
+	(at: number): string =>
+		st.deps.clock ? st.deps.clock(at) : utcMinute(at);
 
 export const remember = (st: AgendaState, s: Said) => {
 	st.said.push(s);

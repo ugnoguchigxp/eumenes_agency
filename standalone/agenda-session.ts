@@ -2,19 +2,20 @@
  * The agenda agent's host loop for the CLI, without terminal I/O: the packaged host loop
  * (src/agenda/host.ts, what Eumenes runs) with the CLI's stand-ins behind its ports: the mock
  * documents for notes, the stand-in researcher (one request at a time, polled here for its
- * result), the steward and the profile note's writer, and the mock toolchains. Clock and timers
+ * result), the steward and the records' writer, and the mock toolchains. Clock and timers
  * are injected so the loop runs in fixed tests.
  */
 import {
 	createAgendaHost,
 	type AgendaHostEvent,
 	type AgendaAddedWords,
+	type AgendaRecordsWriter,
 	type AgendaReplyOutput,
 } from "../src/agenda/index.ts";
 import type { AgendaAgent } from "../src/agenda/index.ts";
 import type { ReplyPort, ToolPort } from "../src/index.ts";
 import { mockToolchains } from "./agenda-reply.ts";
-import type { MockDocStore } from "../examples/virtual-eumenes/agenda/docs.ts";
+import type { MockDocStore } from "../runtime/agenda/docs.ts";
 import type { Steward } from "../examples/virtual-eumenes/agenda/memory.ts";
 import type { MockWebResearch } from "../examples/virtual-eumenes/agenda/research.ts";
 
@@ -24,8 +25,8 @@ export interface AgendaSessionDeps {
 	readonly agent: AgendaAgent;
 	/** The memory's writer, run after each exchange. */
 	readonly steward: Steward | null;
-	/** The plans-and-interests note's writer, run after the memory's (it leaves out what that holds). */
-	readonly profile?: Steward | null;
+	/** The records' writer (plans, question ledger), run after the memory's. */
+	readonly records?: AgendaRecordsWriter | null;
 	readonly docs: MockDocStore;
 	readonly research: MockWebResearch;
 	/**
@@ -45,6 +46,7 @@ export interface AgendaSessionDeps {
 	readonly typingIdleMs?: number;
 	/** Words sent while a reply is written go into its next model call (the CLI's steer). */
 	readonly steering?: AgendaAddedWords;
+	readonly background?: Parameters<typeof createAgendaHost>[0]["background"];
 }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -56,7 +58,7 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 	const host = createAgendaHost({
 		agent: deps.agent,
 		memory: deps.steward,
-		profile: deps.profile ?? null,
+		records: deps.records ?? null,
 		notes: { read: (id) => deps.docs.read(id), list: () => deps.docs.list() },
 		research: {
 			start: (t, at) => {
@@ -68,6 +70,7 @@ export function createAgendaSession(deps: AgendaSessionDeps) {
 		toolchains: mockToolchains,
 		reply: deps.reply,
 		...(deps.steering ? { addedWords: deps.steering } : {}),
+		...(deps.background ? { background: deps.background } : {}),
 		now,
 		setTimer,
 		clearTimer: deps.clearTimer,

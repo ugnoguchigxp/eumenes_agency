@@ -4,11 +4,11 @@
 		"noEmit": false,
 		"declaration": true,
 		"rewriteRelativeImportExtensions": true,
-		"rootDir": "src",
-		"types": ["node"],
+		"rootDir": ".",
+		"types": ["bun"],
 		"sourceMap": false,
 		"declarationMap": false
 	},
-	"include": ["src"],
-	"exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/test/**"]
+	"include": ["src", "runtime/agenda"],
+	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/test/**"]
 }

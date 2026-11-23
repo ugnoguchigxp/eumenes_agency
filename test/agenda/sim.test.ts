@@ -4,7 +4,7 @@
  */
 import { expect, test } from "bun:test";
 import type { LlmPort, LlmRequest } from "../../src/index.ts";
-import { createMockDocStore } from "../../examples/virtual-eumenes/agenda/docs.ts";
+import { createMockDocStore } from "../../runtime/agenda/docs.ts";
 import {
 	createMockMemory,
 	createMockSteward,

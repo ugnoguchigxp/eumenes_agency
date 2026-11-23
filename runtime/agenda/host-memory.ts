@@ -11,12 +11,15 @@
  * The host's recall answers a question from the memory; it does not pick related items, so the
  * agent does not use it.
  */
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import type { Database } from "bun:sqlite";
 import { z } from "zod";
+import type { SourceRef } from "eumenes-memory";
 import {
 	initialize,
+	methodSchemas,
 	readProfile,
 	request,
 	startStandalone,
@@ -29,20 +32,62 @@ import {
 	planningSchema,
 } from "eumenes-memory-host/meaning/planning";
 import type { Action, Complete } from "eumenes-memory-host/meaning/protocol";
-import type { KnownItem } from "../../../src/agenda/index.ts";
-import type { Steward } from "./memory.ts";
+import type { KnownItem } from "../../src/agenda/index.ts";
 
 export type { Complete } from "eumenes-memory-host/meaning/protocol";
 
+/** One pass of the memory's writer over the latest exchange. */
+export interface StewardInput {
+	readonly said: readonly { id: string; who: string; text: string }[];
+	/** Words not seen in an earlier pass: only these can be evidence. */
+	readonly fresh: readonly string[];
+	readonly at: number;
+}
+export interface StewardResult {
+	changed: boolean;
+	applied: string[];
+	rejected: string[];
+	usage: {
+		latencyMs: number;
+		inputTokens: number;
+		outputTokens: number;
+	} | null;
+}
+/** The memory's writer (Eumenes' steward): this mock, or the real memory's (host-memory.ts). */
+export type Steward = (r: StewardInput) => Promise<StewardResult>;
 const SCOPE = "personal";
+// The older vendored host has a strict source schema without provenance.
+const supportsSourceProvenance = Object.hasOwn(
+	methodSchemas.source.shape,
+	"provenance",
+);
 
 /** The store's State item as the host returns it (the fields this file reads). */
 interface StateRow {
 	readonly itemId: string;
+	readonly scopeKey: string;
+	readonly revision: number;
+	readonly evidence: readonly SourceRef[];
 	readonly kind: string;
 	readonly subject: string;
 	readonly value: { readonly text: string; readonly polarity: string };
 	readonly evidenceStatus?: string;
+}
+
+export interface GoalMemoryRef {
+	readonly id: string;
+	readonly scopeKey: string;
+	readonly revision: number;
+	readonly sources: readonly SourceRef[];
+	readonly fingerprint?: string;
+}
+
+export function coversGoalMemory(
+	shown: readonly GoalMemoryRef[],
+	current: readonly GoalMemoryRef[],
+) {
+	const byId = new Map(current.map((ref) => [ref.id, JSON.stringify(ref)]));
+	return shown.every((ref) => byId.get(ref.id) === JSON.stringify(ref));
 }
 
 /** What the host CLI tells the planner about evidence (natural.js, eumenes-memory-host 0.1.0). */
@@ -64,6 +109,183 @@ const decisionOutput = z.strictObject({
 const fail = (r: HostResult, what: string) =>
 	new Error(`${what}: ${r.status}${r.code ? ` ${r.code}` : ""}`);
 
+type GoalMemoryCall = (
+	method: "context" | "read",
+	params: unknown,
+) => Promise<HostResult>;
+
+/** Recheck a read on the shared writer, or immediately before starting the mock. */
+export type GoalMemoryGuard = (db?: Database) => boolean;
+
+interface AgendaRow {
+	readonly itemId: string;
+	readonly scopeKey: string;
+	readonly updatedAtMs: number;
+	readonly evidence: SourceRef;
+	readonly kind: string;
+	readonly text: string;
+	readonly status: string;
+	readonly sourceRole: string;
+	readonly certainty: string;
+	readonly time: unknown;
+	readonly trigger: unknown;
+}
+
+const supportsAgenda = Object.hasOwn(methodSchemas.context.shape, "agenda");
+const textOf = (item: StateRow) =>
+	item.value.polarity === "negated"
+		? `${item.value.text}（否定）`
+		: item.value.text;
+
+async function readSnapshot(
+	call: GoalMemoryCall,
+	scopeKey: string,
+	limit?: number,
+) {
+	const agenda = limit !== undefined && supportsAgenda ? { agenda: true } : {};
+	let page = await call("context", { scopeKeys: [scopeKey], limit, ...agenda });
+	if (page.status !== "context") throw fail(page, "context");
+	const id = page["snapshotId"] as string;
+	const items: StateRow[] = [];
+	const agendaItems: AgendaRow[] = [];
+	for (;;) {
+		items.push(...(page["items"] as StateRow[]));
+		agendaItems.push(...((page["agendaItems"] ?? []) as AgendaRow[]));
+		if (!page["nextCursor"]) break;
+		page = await call("context", {
+			cursor: page["nextCursor"],
+			limit,
+			...agenda,
+		});
+		if (page.status !== "context") throw fail(page, "context");
+	}
+	if (
+		(page["coverage"] as { complete?: boolean } | undefined)?.complete !== true
+	)
+		throw new Error("context: incomplete snapshot");
+	return { id, items, agendaItems };
+}
+
+function goalItem(
+	row: StateRow | AgendaRow,
+): (GoalMemoryRef & { text: string }) | null {
+	if ("value" in row) {
+		if (row.evidenceStatus !== "current" || !row.evidence.length) return null;
+		return {
+			id: row.itemId,
+			scopeKey: row.scopeKey,
+			revision: row.revision,
+			sources: row.evidence,
+			text: textOf(row),
+		};
+	}
+	if (row.status !== "pending" || !row.evidence) return null;
+	const text = JSON.stringify({
+		kind: row.kind,
+		text: row.text,
+		certainty: row.certainty,
+		time: row.time,
+		trigger: row.trigger,
+		sourceRole: row.sourceRole,
+	});
+	return {
+		id: row.itemId,
+		scopeKey: row.scopeKey,
+		revision: row.updatedAtMs,
+		sources: [row.evidence],
+		text,
+		fingerprint: createHash("sha256").update(text).digest("hex"),
+	};
+}
+
+const withoutText = ({
+	text: _text,
+	...ref
+}: GoalMemoryRef & { text: string }) => ref;
+
+/** Reads goal evidence through the public Memory connection, including standalone Memory. */
+export function createGoalMemory(
+	call: GoalMemoryCall,
+	serialize: <T>(operation: () => Promise<T>) => Promise<T> = (operation) =>
+		operation(),
+	snapshotCurrent?: (snapshotId: string, db?: Database) => boolean,
+) {
+	const inspect = async (id: string, itemId: string) => {
+		const result = await call("read", { snapshotId: id, itemId });
+		if (result.status !== "found") throw fail(result, "read goal memory");
+		const row = result["item"] as StateRow | AgendaRow;
+		if (!("value" in row)) {
+			const sources = result["sources"] as { status: string }[] | undefined;
+			if (
+				!sources?.length ||
+				sources.some(
+					({ status }) => status !== "available" && status !== "registered",
+				)
+			)
+				return null;
+		}
+		return goalItem(row);
+	};
+	const current = async (scopeKey: string) => {
+		const { id, items, agendaItems } = await readSnapshot(call, scopeKey, 20);
+		const state = items
+			.filter((row) => row.scopeKey === scopeKey)
+			.flatMap((row) => goalItem(row) ?? []);
+		const agenda = await Promise.all(
+			agendaItems
+				.filter((row) => row.scopeKey === scopeKey && row.status === "pending")
+				.map((row) => inspect(id, row.itemId)),
+		);
+		return { id, items: [...state, ...agenda.flatMap((row) => row ?? [])] };
+	};
+	const views = new Map<string, Awaited<ReturnType<typeof current>>>();
+	return {
+		goalContext: (scopeKey: string) =>
+			serialize(async () => {
+				let view = views.get(scopeKey);
+				if (
+					!view ||
+					(await call("read", { snapshotId: view.id })).status !== "found"
+				) {
+					view = await current(scopeKey);
+					views.set(scopeKey, view);
+				}
+				return view.items;
+			}),
+		withGoalMemory: <T>(
+			scopeKey: string,
+			shown: readonly GoalMemoryRef[],
+			used: readonly string[],
+			run: (valid: boolean, stillCurrent: GoalMemoryGuard) => Promise<T>,
+			allowAdditional = false,
+		) =>
+			serialize(async () => {
+				const view = await current(scopeKey);
+				if (
+					(!allowAdditional && view.items.length !== shown.length) ||
+					!coversGoalMemory(shown, view.items.map(withoutText))
+				)
+					return run(false, () => false);
+				for (const itemId of new Set(used)) {
+					const item = await inspect(view.id, itemId);
+					const prior = shown.find((ref) => ref.id === itemId);
+					if (
+						!item ||
+						!prior ||
+						!coversGoalMemory([prior], [withoutText(item)])
+					)
+						return run(false, () => false);
+				}
+				const snapshot = await call("read", { snapshotId: view.id });
+				if (snapshot.status !== "found")
+					throw fail(snapshot, "read goal snapshot");
+				return run(true, (db) => snapshotCurrent?.(view.id, db) ?? true);
+			}),
+	};
+}
+
+export type GoalMemory = ReturnType<typeof createGoalMemory>;
+
 /** The last sentence of an utterance (its question, usually), at most 120 characters. */
 const lastSentence = (text: string) => {
 	const parts = text
@@ -77,6 +299,7 @@ const lastSentence = (text: string) => {
 export async function openHostMemory(input: {
 	readonly dir: string;
 	readonly complete: Complete;
+	readonly scopeKeys?: readonly string[];
 	/** Local time as the user would say it, so the planner can place "明日" and the like. */
 	readonly clock?: (now: number) => string;
 }) {
@@ -84,39 +307,34 @@ export async function openHostMemory(input: {
 	const profilePath = join(input.dir, "profile.json");
 	const profile: Profile = existsSync(profilePath)
 		? readProfile(profilePath)
-		: initialize(input.dir);
+		: initialize(
+				input.dir,
+				input.scopeKeys?.length ? [...input.scopeKeys] : undefined,
+			);
+	const defaultScope =
+		input.scopeKeys === undefined ? SCOPE : input.scopeKeys[0];
 	const owner = await startStandalone(input.dir);
 	const call = (method: string, params: unknown) =>
 		request(profile, method, params);
 
-	/** The whole authorized snapshot, page by page (the planner needs all of it). */
-	const snapshot = async () => {
-		let page = await call("context", { scopeKeys: [SCOPE] });
-		if (page.status !== "context") throw fail(page, "context");
-		const items = [...(page["items"] as StateRow[])];
-		const id = page["snapshotId"] as string;
-		while (page["nextCursor"]) {
-			page = await call("context", { cursor: page["nextCursor"] });
-			if (page.status !== "context") throw fail(page, "context");
-			items.push(...(page["items"] as StateRow[]));
-		}
-		if (
-			(page["coverage"] as { complete?: boolean } | undefined)?.complete !==
-			true
-		)
-			throw new Error("context: incomplete snapshot");
-		return { id, items };
-	};
+	const snapshot = (scopeKey: string) => readSnapshot(call, scopeKey);
 
 	// Short handles for the agent (memory:<alias>); the store's ids are "state:<uuid>". Eight hex
 	// digits keep a clash unlikely (about 1 in a million at 100 items) and the handle stable.
 	const aliasOf = (itemId: string) =>
 		`m${itemId.replace(/^.*:/u, "").replace(/-/gu, "").slice(0, 8)}`;
-	const textOf = (i: StateRow) =>
-		i.value.polarity === "negated" ? `${i.value.text}（否定）` : i.value.text;
+	// Hold memory writes through the currentness check and the host's adoption/dispatch.
+	let pending: Promise<unknown> = Promise.resolve();
+	const serialized = <T>(operation: () => Promise<T>) => {
+		const next = pending.then(operation);
+		pending = next.catch(() => {});
+		return next;
+	};
+	const goals = createGoalMemory(call, serialized);
+
 	let rows: StateRow[] = [];
 	const refresh = async () => {
-		rows = (await snapshot()).items;
+		rows = defaultScope ? (await snapshot(defaultScope)).items : [];
 	};
 	try {
 		await refresh();
@@ -132,7 +350,7 @@ export async function openHostMemory(input: {
 				? `update ${aliasOf(a.replacesItemId)}: ${a.value.text}`
 				: `remember: ${a.value.text}`;
 
-	const steward: Steward = async (r) => {
+	const write = async (r: Parameters<Steward>[0], scopeKey: string) => {
 		const started = performance.now();
 		let inputTokens = 0;
 		let outputTokens = 0;
@@ -147,11 +365,12 @@ export async function openHostMemory(input: {
 			try {
 				const src = await call("source", {
 					submissionId: `${s.id}-${randomUUID()}`,
-					scopeKey: SCOPE,
+					scopeKey,
 					content: s.text,
+					...(supportsSourceProvenance ? { provenance: "user_message" } : {}),
 				});
 				if (src.status !== "registered") throw fail(src, "source");
-				const view = await snapshot();
+				const view = await snapshot(scopeKey);
 				const items = modelItems(view.items as never, [], { provenance: true });
 				// What the user answered: the agent's words right before (its own speech too), cut to
 				// the last sentence so a note it quoted does not reach the planner.
@@ -236,7 +455,7 @@ export async function openHostMemory(input: {
 				});
 				const plan = await call("plan", {
 					snapshotId: view.id,
-					scopeKey: SCOPE,
+					scopeKey,
 					proposal: out.proposal,
 					evidence,
 				});
@@ -274,8 +493,8 @@ export async function openHostMemory(input: {
 		}
 		// After any apply (even one that failed on the way), read the store again: what it holds
 		// is what the agent sees, whatever the reply said.
-		let changed = false;
-		if (attempted) {
+		let changed = scopeKey !== defaultScope && applied.length > 0;
+		if (attempted && scopeKey === defaultScope) {
 			const before = JSON.stringify(rows);
 			try {
 				await refresh();
@@ -309,8 +528,13 @@ export async function openHostMemory(input: {
 				kind: i.kind,
 				active: true,
 			})),
-		steward,
-		close: () => owner.close(),
+		steward: (r: Parameters<Steward>[0], scopeKey = defaultScope ?? SCOPE) =>
+			serialized(() => write(r, scopeKey)),
+		...goals,
+		close: async () => {
+			await pending;
+			await owner.close();
+		},
 	};
 }
 export type HostMemory = Awaited<ReturnType<typeof openHostMemory>>;

@@ -10,7 +10,7 @@ import {
 	openHostMemory,
 	type Complete,
 	type HostMemory,
-} from "../../examples/virtual-eumenes/agenda/host-memory.ts";
+} from "../../runtime/agenda/host-memory.ts";
 
 type Prompt = { message: string; source: string; items: { itemId: string }[] };
 

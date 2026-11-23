@@ -190,6 +190,86 @@ export interface KnownItem {
 	readonly text: string;
 }
 
+/**
+ * A plan of the user's with a date (the host's L3), cited `plan:<ref>`. `dueAt` is an ISO date
+ * (`2026-11-25`) or date and time; null when no date was named.
+ */
+export interface PlanRecord {
+	readonly ref: string;
+	readonly text: string;
+	readonly dueAt: string | null;
+}
+
+/** A goal in one of the user's slots (the host's goals), cited `goal:<ref>`. */
+export interface GoalRecord {
+	readonly ref: string;
+	readonly text: string;
+	readonly state: string | null;
+}
+
+/** A disagreement between the user's words and an earlier record, not settled yet: `conflict:<ref>`. */
+export interface ConflictRecord {
+	readonly ref: string;
+	readonly text: string;
+}
+
+/**
+ * The question ledger: what the agent asked and what became of it. `asked` waits for an answer,
+ * `answered` is known, `declined` is what the user would not say, `deferred` is "later". The agent
+ * does not ask about an attribute that has any of these.
+ */
+export const questionStates = [
+	"asked",
+	"answered",
+	"declined",
+	"deferred",
+] as const;
+export type QuestionState = (typeof questionStates)[number];
+export interface QuestionRecord {
+	readonly attribute: string;
+	readonly state: QuestionState;
+}
+
+/** Which call the host fills its records for: it picks what bears on that call (spec §5.4). */
+export type AgendaCall =
+	| { readonly purpose: "plan" }
+	| {
+			readonly purpose: "compose";
+			readonly item: {
+				readonly kind: AgendaKind;
+				readonly text: string;
+				readonly topic: string | null;
+			};
+	  }
+	| { readonly purpose: "ask_check"; readonly asks: readonly string[] };
+
+/**
+ * What the host selects for a call besides the memory (`AgendaDeps.known`): the plans near their
+ * date, the goals in their slots, unresolved conflicts, the question ledger. Each list is what bears
+ * on the call, short; records that are excluded, suppressed or under review are left out (the
+ * marks, `AgendaMarks`, are a second guard).
+ */
+export interface AgendaRecords {
+	readonly plans?: readonly PlanRecord[];
+	readonly goals?: readonly GoalRecord[];
+	readonly conflicts?: readonly ConflictRecord[];
+	readonly questions?: readonly QuestionRecord[];
+}
+
+/**
+ * Marks the host keeps on its records, read whenever the agent chooses what to do. Refs are the
+ * ones items cite (`memory:<id>`, `plan:<ref>`, `goal:<ref>`, `note:<id>`, a said id).
+ * - `underReview`: records that were corrected. What rests on them (items, and notes made from
+ *   them) is not written or said until the host clears the mark; it stays on the list.
+ * - `suppressedRefs`, `suppressedTopics`: "do not bring that up". What rests on those refs, or
+ *   speaks of those topic words, is not planned, researched, written or said, and is dropped.
+ */
+export interface AgendaMarks {
+	readonly underReview?: readonly string[];
+	readonly suppressedRefs?: readonly string[];
+	readonly suppressedTopics?: readonly string[];
+}
+
 /** A note the researcher wrote (a Markdown document in the host's store), cited `note:<id>`. */
 export interface NoteRef {
 	readonly id: string;
@@ -255,6 +335,32 @@ export interface PlanOutcome {
 	readonly rejected: readonly string[];
 	readonly reasons: readonly string[];
 	readonly call: CallRecord;
+	readonly goalWork?: { readonly contextId: string } & GoalWorkPlan;
+}
+
+/** The host supplies an authorized view of the current conversation's goals and memory. */
+export interface AgendaGoalContext {
+	readonly id: string;
+	readonly designWorkspace: string;
+	readonly goals: readonly {
+		readonly id: string;
+		readonly revision: number;
+		readonly desiredState: string;
+		readonly priority: number;
+		readonly progress: string | null;
+		readonly phase: "prepare" | "wait" | "execute";
+		readonly designNoteId: string | null;
+		readonly authorization: {
+			readonly toolchainRevisionId: string;
+			readonly workspace: string;
+			readonly impact: string;
+		} | null;
+	}[];
+	readonly memory: readonly KnownItem[];
+	readonly toolchains: readonly {
+		readonly revisionId: string;
+		readonly description: string;
+	}[];
 }
 
 export interface ComposeOutcome {
@@ -315,6 +421,27 @@ export const planSchema = z.strictObject({
 	focus: z.string(),
 });
 export type PlanOutput = z.infer<typeof planSchema>;
+
+export const goalPlanSchema = planSchema.extend({
+	add: planSchema.shape.add.max(0),
+	drop: planSchema.shape.drop.max(0),
+	goalWork: z.strictObject({
+		analysis: z.string().trim().min(1).max(800),
+		delegation: z
+			.strictObject({
+				goalId: z.string(),
+				goalRevision: z.number().int().positive(),
+				toolchainRevisionId: z.string(),
+				memoryIds: z.array(z.string()).max(20),
+				request: z.strictObject({
+					task: z.string().trim().min(1).max(40),
+					prompt: z.string().trim().min(1).max(8000),
+				}),
+			})
+			.nullable(),
+	}),
+});
+export type GoalWorkPlan = z.infer<typeof goalPlanSchema>["goalWork"];
 
 export const checkSchema = z.strictObject({
 	verdict: z.enum(["new", "partial", "covered"]),

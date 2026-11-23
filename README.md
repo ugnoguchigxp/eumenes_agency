@@ -19,15 +19,26 @@ Memory側の追加レビューを踏まえ、[ホスト入力の出典契約](sp
 2026-11-07から、このプロジェクトの標準の会話は always-on です（[設計](spec/always-on-agency-design-2026-11-07.md)、[実装と検証の記録](docs/always-on-progress-2026-11-07.md)）。利用者が黙っていても考え続け、相手を知るための質問、好みに合わせた黙っての準備（調べる・作る）、準備した結果の共有を自分から行います。「静かにして」と言われたら、その間は話しかけません。
 
 ```sh
-bun run agency                  # always-on の対話CLI（Haiku、費用は記録のみで上限なし）
-bun run agency --interval 60    # 話しかけの最短間隔: 10（既定）/ 60 / 600 秒
+bun run agency                  # Agenda の対話CLI
+bun run agency --interval 60    # 話しかけの最短間隔: 10（既定）/ 60 / 300 秒
+bun run eval:agenda:api <run-name> --web  # Agenda の実モデル評価と Web 検索
 bun run eval:always-on          # API 0件: 沈黙中に何回動けるかを旧方式と比較
 bun run eval:always-on:api <run-name> [scenario...]  # Haikuで7つのシナリオを仮想時計で再生
 ```
 
 試すときは、黙っている時間を作ってみてください。独り言（💭）が薄く表示され、`/state` で知っていること・準備中のこと・準備した材料を確認できます。気になった発話には `/feedback useful` / `/feedback intrusive` / `/feedback missed`（メモも付けられる）を付けると、ログに残ります。ログは `data/chats/<日時>-always-on.jsonl` に保存され、`bun eval/always-on/funnel.ts data/chats/*-always-on.jsonl` で、自分からの発話・準備・返事のあった割合・フィードバックを集計できます。
 
-準備の実行先は `examples/virtual-eumenes/always-on-mock.ts` のmockで、実在の検索やサービスは使いません。ライブラリとしては `createAlwaysOnAgent` を使います。既存の `createAgencyRuntime` と旧CLI（`bun run agency:legacy`）は、過去の評価を再現するために変更せず残しています。
+標準の対話CLI と Web 検索を有効にした Agenda 評価は、Codex SDK の Luna に調べものを任せます。Eumenes 本体の `web.note` と同様に、依頼の詳しさに合わせて情報時点と出典リンク付きの Markdown メモを返します。Codex CLI が見つからないときは設定中のプロバイダーで検索します。`--mock-research` を指定すると調べものは模擬応答になり、検索先は起動時の表示や評価結果で確認できます。
+
+### 会話で目標を登録する
+
+`bun run agenda` で「3番の目標に、README の実行例を更新することを登録して」のように話すと目標を登録できます。`/goals` で10枠の状態を確認できます。最初の空きで Codex が設計書を作り、通常のメモと同じく `/notes`・`/show <id>` または会話の「設計書を見せて」で開けます。初回分析から5分が経過し、ユーザーが会話で Claude Code モックの実行を許可すると、保存した設計書の本文を依頼書として送ります。模擬成果物を確認すると会話に完了を報告します。
+
+目標の保存には隣接する `eumenes` チェックアウトの Goals を使用します。別の場所にある場合は `EUMENES_ROOT` を指定してください。通し確認では `zsh -l scripts/api-entry.zsh eval/agenda/cli-goals.ts <新しい実行名>` が一時データを使って通常の CLI を操作し、会話ログ・設計書・結果を `data/agenda/runs/<実行名>` に保存します。 [目標の検証計画](spec/user-goals-verification-plan-2026-11-21.md)
+
+離席中の目標進行は実装準備の段階です。目標ごとの次の一手、作業の失敗や部分達成の扱い、実物による検証を定めています。[次の一手の判断契約](spec/goal-decision-contract-2026-11-23.md)
+
+`bun run pack` が作る tarball は `eumenes-agency/agenda/runtime` から目標ホスト、Memory 接続、ノート、Codex の設計と Web 検索、Claude Code モックを提供します。利用側は Bun で `openAgendaGoals` に Eumenes チェックアウトの `eumenesRoot`、モデルと報告の接続先を渡します。Memory の依存は `eumenes-memory@0.0.4` と `eumenes-memory-host@0.1.0` です。Codex を使う場合は `@openai/codex-sdk@0.160.0` と Codex CLI を利用します。既存のコアは `eumenes-agency` と `eumenes-agency/agenda` から利用できます。
 
 ## できること
 

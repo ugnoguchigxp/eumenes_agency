@@ -16,6 +16,7 @@ import {
 	asksQuestion,
 	type AgendaAgent,
 	type AgendaDeps,
+	type AgendaRecordsWriter,
 	type AgendaTicket,
 	type QuietScope,
 	type ReplyCall,
@@ -25,7 +26,7 @@ import {
 	createAgendaReplyTools,
 	notesMentioned,
 } from "../../standalone/agenda-reply.ts";
-import type { MockDocStore } from "../../examples/virtual-eumenes/agenda/docs.ts";
+import type { MockDocStore } from "../../runtime/agenda/docs.ts";
 import type {
 	MemoryReader,
 	Steward,
@@ -59,8 +60,8 @@ interface Usage {
 	readonly outputTokens: number;
 }
 
-/** What a writer (the memory's, or the plans-and-interests note's) did with one exchange. */
-interface WriterEvent<T extends "memory" | "profile"> {
+/** What a writer (the memory's, or the records') did with the lines it read. */
+interface WriterEvent<T extends "memory" | "records"> {
 	readonly type: T;
 	readonly atSec: number;
 	readonly applied: readonly string[];
@@ -112,7 +113,7 @@ export type AgendaSimEvent =
 			readonly queued: boolean;
 	  }
 	| WriterEvent<"memory">
-	| WriterEvent<"profile">
+	| WriterEvent<"records">
 	| {
 			readonly type: "plan";
 			readonly atSec: number;
@@ -195,8 +196,8 @@ export interface AgendaSimInput {
 	readonly startMs?: number;
 	readonly memory: MemoryReader;
 	readonly steward: Steward | null;
-	/** The plans-and-interests note's writer (absent: no note). */
-	readonly profile?: Steward | null;
+	/** The records' writer (plans, question ledger; absent: none), run after the memory's. */
+	readonly records?: AgendaRecordsWriter | null;
 	readonly docs: MockDocStore;
 	readonly research: MockWebResearch;
 	/** The normal reply (absent: no reply); its tool calls go into the agent's record. */
@@ -232,6 +233,8 @@ export async function simulateAgenda(input: AgendaSimInput) {
 	let now = start;
 	let n = 0;
 	const seen = new Set<string>();
+	/** The lines the records' writer has read. */
+	const recorded = new Set<string>();
 	const realMs = input.realMs ?? (() => performance.now());
 	/** Real time since `t0`, as the virtual clock counts it (whole seconds). */
 	const spent = (t0: number) => Math.round((realMs() - t0) / 1000) * 1000;
@@ -513,8 +516,8 @@ export async function simulateAgenda(input: AgendaSimInput) {
 				// A reply that asks something is answered (or not) like the agent's own words.
 				if (asksQuestion(text)) await react(text, "reply");
 			}
-			// The writers see the agent's own speech too: it is what the user answered. The note
-			// of plans and interests goes after the memory, so it leaves out what that holds.
+			// The memory's writer sees the agent's own speech too: it is what the user answered. The
+			// records' writer reads every line after its position (a pass that failed leaves it).
 			const said = agent
 				.view()
 				.said.slice(-8)
@@ -529,20 +532,35 @@ export async function simulateAgenda(input: AgendaSimInput) {
 			// A writer's failure is held, not left unhandled while the step runs, and fails the
 			// scenario after it (as before the writers ran behind).
 			const writing = (async () => {
-				for (const [type, writer] of [
-					["memory", input.steward],
-					["profile", input.profile ?? null],
-				] as const) {
-					if (!writer) continue;
-					const m = await writer({ said, fresh, at });
+				if (input.steward) {
+					const m = await input.steward({ said, fresh, at });
 					emit({
-						type,
+						type: "memory",
 						atSec: sec(at),
 						applied: m.applied,
 						rejected: m.rejected,
 						usage: m.usage,
 					});
 				}
+				if (!input.records) return;
+				const lines = agent
+					.view()
+					.said.filter((s) => !recorded.has(s.id))
+					.map((s) => ({
+						id: s.id,
+						who: s.who === "user" ? ("user" as const) : ("agent" as const),
+						text: s.text,
+					}));
+				if (!lines.some((s) => s.who === "user")) return;
+				const m = await input.records({ said: lines, at });
+				for (const s of lines) recorded.add(s.id);
+				emit({
+					type: "records",
+					atSec: sec(at),
+					applied: m.applied,
+					rejected: m.rejected,
+					usage: null,
+				});
 			})().then(
 				() => null,
 				(e: unknown) => ({ failed: e }),

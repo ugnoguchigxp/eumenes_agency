@@ -10,14 +10,8 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import {
-	canonical,
-	compareArtifactToInstalled,
-	digest,
-	loadDistribution,
-	treeDigest,
-} from "./baseline.ts";
+import { dirname, join, resolve } from "node:path";
+import { canonical, digest, loadDistribution, treeDigest } from "./baseline.ts";
 import {
 	createIdentityMap,
 	requestParts,
@@ -128,7 +122,9 @@ describe.skipIf(!hasHost)("P0 baseline on the installed distribution", () => {
 		>;
 		expect(d.kind).toBe("distribution");
 		expect(d.entryRealpath).toContain("eumenes-agency@vendor+agency+");
-		expect(d.entryRealpath).toEndWith("/dist/index.js");
+		expect(d.entryRealpath).toBe(
+			realpathSync(Bun.resolveSync("eumenes-agency", dirname(d.resolvedFrom))),
+		);
 		expect(Object.values(d.checks).every(Boolean)).toBe(true);
 		expect(d.checks.hostImportIsLoadedModule).toBe(true);
 		// R4: the installed dist is the artifact's package/dist file for file.
@@ -865,7 +861,10 @@ describe("P0-A06 (R4): the installed dist must be the artifact's package/dist, f
 		"package/package.json": JSON.stringify({
 			name: "eumenes-agency",
 			version: "9.9.9",
-			exports: { ".": { default: "./dist/index.js" } },
+			exports: {
+				".": { default: "./dist/index.js" },
+				"./package.json": "./package.json",
+			},
 		}),
 		"package/dist/index.js": constants,
 		"package/dist/core.js": "export const core = 1;\n",
@@ -911,24 +910,10 @@ describe("P0-A06 (R4): the installed dist must be the artifact's package/dist, f
 		return root;
 	};
 
-	test("the vendored artifact and the installed dist of this host have no difference", () => {
+	test("the vendored artifact and the installed dist of this host have no difference", async () => {
 		if (!hasHost) return;
-		const manifest = JSON.parse(
-			readFileSync(resolve(host, "vendor/agency/manifest.json"), "utf8"),
-		);
-		const installed = resolve(
-			realpathSync(
-				Bun.resolveSync(
-					"eumenes-agency",
-					resolve(host, "api/application/agency"),
-				),
-			),
-			"..",
-		);
-		const result = compareArtifactToInstalled(
-			readFileSync(resolve(host, "vendor/agency", manifest.artifact)),
-			installed,
-		);
+		const { identity } = await loadDistribution(host);
+		const result = identity.artifactContents;
 		expect(result).toEqual({
 			artifactFiles: result.artifactFiles,
 			installedFiles: result.artifactFiles,

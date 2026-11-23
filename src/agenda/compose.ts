@@ -12,15 +12,16 @@ import {
 	type ComposeOutcome,
 	type StepHost,
 } from "./contracts.ts";
+import { heldReason, recordHeld } from "./marks.ts";
 import { speechQuiet } from "./pacing.ts";
-import { profileOf } from "./profile.ts";
 import { composeData } from "./prompt.ts";
 import {
-	clock,
 	known,
 	nextId,
 	notes,
 	record,
+	records,
+	stampOf,
 	unlimited,
 	type AgendaState,
 } from "./state.ts";
@@ -58,6 +59,25 @@ export async function compose(
 			null,
 		);
 	}
+	// Marked by the host: what the user asked not to bring up goes; what rests on a corrected
+	// record waits (it stays open and is written once the host has reviewed it).
+	const heldNow = heldReason(st, item);
+	if (heldNow !== null) {
+		if (heldNow === "suppressed") {
+			item.status = "dropped";
+			item.endedAt = now;
+		}
+		return done(
+			heldNow === "suppressed" ? "suppressed" : "under_review",
+			[],
+			record("compose", now, null, false, "applied"),
+			null,
+		);
+	}
+	const forCall = {
+		purpose: "compose" as const,
+		item: { kind: item.kind, text: item.text, topic: item.topic ?? null },
+	};
 	const call = await callModel(
 		st.deps.llm,
 		unlimited,
@@ -67,12 +87,16 @@ export async function compose(
 			system: st.instructions.compose,
 			prompt: composeData({
 				now,
-				clock: clock(st, now),
+				stamp: stampOf(st),
 				item,
 				note,
 				said: st.said,
-				known: known(st),
-				profile: profileOf(st),
+				known: known(st, forCall).filter(
+					(k) => recordHeld(st, `memory:${k.id}`, k.text) === null,
+				),
+				plans: records(st, forCall).plans.filter(
+					(p) => recordHeld(st, `plan:${p.ref}`, p.text) === null,
+				),
 				quietEndedSecAgo:
 					st.lastQuietEnd === null
 						? null
@@ -107,7 +131,8 @@ export async function compose(
 		item.status !== "open" ||
 		host().busy ||
 		st.stopped ||
-		speechQuiet(st, now)
+		speechQuiet(st, now) ||
+		heldReason(st, item) !== null
 	)
 		return done(
 			null,

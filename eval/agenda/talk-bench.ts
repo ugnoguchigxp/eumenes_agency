@@ -15,7 +15,6 @@ import { z } from "zod";
 import type { LlmPort, LlmRequest } from "../../src/index.ts";
 import {
 	createAgendaAgent,
-	emptyProfile,
 	type NoteRef,
 	type PlanOutput,
 } from "../../src/agenda/index.ts";
@@ -66,17 +65,6 @@ const withPlan = (
 		},
 	};
 };
-
-const profileOf = (s: TalkSituation) =>
-	emptyProfile()
-		.replace(
-			"## 予定\n",
-			`## 予定\n${(s.plans ?? []).map((l) => `- ${l}\n`).join("")}`,
-		)
-		.replace(
-			"## 関心\n",
-			`## 関心\n${(s.interests ?? []).map((l) => `- ${l}\n`).join("")}`,
-		);
 
 const assessSchema = z.strictObject({
 	unsupported: z.array(z.string()).max(8),
@@ -187,9 +175,20 @@ async function runBench(name: string, repeat: number, only: readonly string[]) {
 				drafts,
 			),
 			startedAt: 0,
-			known: () => s.memory.map((text, i) => ({ id: `m${i + 1}`, text })),
+			// What the user said of their interests is memory now (the plans-and-interests note is gone).
+			known: () =>
+				[...s.memory, ...(s.interests ?? [])].map((text, i) => ({
+					id: `m${i + 1}`,
+					text,
+				})),
+			records: () => ({
+				plans: (s.plans ?? []).map((text, i) => ({
+					ref: `p${i + 1}`,
+					text,
+					dueAt: null,
+				})),
+			}),
 			notes: () => [note],
-			profile: () => profileOf(s),
 			clock,
 		});
 		s.history.forEach((h, i) =>

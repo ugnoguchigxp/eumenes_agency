@@ -23,7 +23,7 @@ export const delegateTools = [
 	{
 		name: "delegate",
 		description:
-			"調査・整理を作業単位として委譲する（ホストが Pursuit に渡し、単位ごとに結果が返る）",
+			"調査・整理を作業単位としてホストに委譲する（単位ごとに結果が返る）",
 		requiresApproval: false,
 	},
 ];

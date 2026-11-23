@@ -99,11 +99,11 @@ if (import.meta.main) {
 					suite: "quick",
 					windowOf: { run: job.run, minutes: summary.minutes },
 					// The notes made within the window (as a quick run would list them); the memory and
-					// the plans note are the full run's last state, not the window's.
+					// the records are the full run's last state, not the window's.
 					notes: (summary.notes ?? []).filter(
 						(n) => n.at <= startMs(name) + minutes * 60_000,
 					),
-					finalState: "memory and profile: the full run's, at its end",
+					finalState: "memory and records: the full run's, at its end",
 					usd: summary.usd * share,
 					wallSec: Math.round((summary.wallSec ?? 0) * share),
 					estimated:

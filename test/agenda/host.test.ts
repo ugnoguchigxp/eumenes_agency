@@ -1,14 +1,18 @@
 /** Review fixes in the mock Eumenes pieces: note files, the researcher, the note parser. */
 import { expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createMockDocStore } from "../../examples/virtual-eumenes/agenda/docs.ts";
+import { createMockDocStore } from "../../runtime/agenda/docs.ts";
 import {
 	createMockWebResearch,
 	fixedWriter,
 } from "../../examples/virtual-eumenes/agenda/research.ts";
-import { parseNote } from "../../standalone/agenda-research.ts";
+import {
+	codexSdkTurn,
+	codexWebNoteWriter,
+	parseNote,
+} from "../../runtime/agenda/web-research.ts";
 
 test("note files: a broken or misnamed header is skipped; an edit keeps what it does not change", () => {
 	const dir = mkdtempSync(join(tmpdir(), "agenda-notes-"));
@@ -422,7 +426,7 @@ test("review 2026-11-10 §3: soft words get a short pause whatever length the mo
 
 test("review 2026-11-10: the CLI's snapshot file is written when it changed and set aside when it does not parse", async () => {
 	const { openSnapshotFile } =
-		await import("../../examples/virtual-eumenes/agenda/state-file.ts");
+		await import("../../runtime/agenda/state-file.ts");
 	const { createAgendaAgent } = await import("../../src/agenda/index.ts");
 	const {
 		existsSync,
@@ -599,32 +603,118 @@ test("without the host's toolchains, the reply has neither find_toolchain/delega
 	expect(offered).toContain("find_toolchain");
 });
 
-test("the Codex SDK researcher sends the researcher's rules with the request and parses its note", async () => {
-	const { codexWebNoteWriter } =
-		await import("../../standalone/agenda-research.ts");
+test("the Codex researcher saves a long note and its source links through the host", async () => {
 	const prompts: string[] = [];
+	const markdown = [
+		"## 標高",
+		"3,776 m（2026年11月11日確認）",
+		"背景の説明。".repeat(1500),
+		"## 出典",
+		"- [国土地理院](https://www.gsi.go.jp/)",
+	].join("\n");
 	const r = codexWebNoteWriter({
 		today: () => "2026年11月11日(水)",
-		turn: async (prompt) => {
+		turn: async (prompt, signal) => {
+			expect(signal?.aborted).toBe(false);
 			prompts.push(prompt);
 			return {
-				text: "題: 富士山の標高\n要約: 3,776 m。\n---\n## 標高\n3,776 m（2026年11月11日確認）\n## 出典\n- 国土地理院",
+				text: `\`\`\`markdown\n題: 題：富士山の標高\n要約: 要約：3,776 m。\n---\n${markdown}\n\`\`\``,
 				searches: 2,
 				usage: { input: 18000, cachedInput: 12000, output: 120 },
 			};
 		},
 	});
-	const note = await r.writer("富士山の標高を調べて");
-	expect(note).toMatchObject({ title: "富士山の標高", summary: "3,776 m。" });
-	expect(note.markdown).toContain("国土地理院");
+	const dir = mkdtempSync(join(tmpdir(), "agenda-codex-note-"));
+	const request =
+		"富士山の標高と測定の背景を、出典を照らし合わせて詳しく調べて";
+	try {
+		const docs = createMockDocStore({ dir });
+		const research = createMockWebResearch({
+			writer: r.writer,
+			docs,
+			delayMs: 0,
+		});
+		expect(research.start({ id: "t1", text: request, refs: ["u1"] }, 100)).toBe(
+			true,
+		);
+		const result = await research.due(100);
+		expect(result).toMatchObject({
+			status: "succeeded",
+			note: { title: "富士山の標高", summary: "3,776 m。", refs: ["u1"] },
+		});
+		expect(createMockDocStore({ dir }).read(result!.note!.id)?.markdown).toBe(
+			markdown,
+		);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
 	expect(prompts[0]).toContain("今日は2026年11月11日(水)です。");
-	expect(prompts[0]!.endsWith("依頼:\n富士山の標高を調べて")).toBe(true);
+	expect(prompts[0]).toContain("短め（既定）");
+	expect(prompts[0]).toContain("一次資料を優先して複数の資料を照合");
+	expect(prompts[0]).toContain("[資料名](https://…)");
+	expect(prompts[0]!.endsWith(`依頼:\n${request}`)).toBe(true);
 	expect(r.searches()).toBe(2);
 	expect(r.tokens()).toEqual({ input: 18000, cachedInput: 12000, output: 120 });
+});
+
+test("the Codex researcher rejects empty and oversized notes and requests", async () => {
 	// An empty answer is a failed research, not an empty note.
 	const empty = codexWebNoteWriter({
 		today: () => "x",
 		turn: async () => ({ text: "  ", searches: 0, usage: null }),
 	});
 	await expect(empty.writer("q")).rejects.toThrow("調べた結果が空だった");
+	let calls = 0;
+	const long = codexWebNoteWriter({
+		today: () => "x",
+		turn: async () => {
+			calls++;
+			return { text: "あ".repeat(22_000), searches: 0, usage: null };
+		},
+	});
+	await expect(long.writer("あ".repeat(8_001))).rejects.toThrow(
+		"依頼が長すぎます",
+	);
+	expect(calls).toBe(0);
+	await expect(long.writer("q")).rejects.toThrow("出力が上限を超えました");
+	expect(calls).toBe(1);
+});
+
+test("the Codex SDK turn starts a fresh read-only search with the app tools disabled", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "agenda-codex-bin-"));
+	const command = join(dir, "codex");
+	try {
+		writeFileSync(
+			command,
+			`#!/usr/bin/env bun
+const prompt = await Bun.stdin.text();
+const send = (event) => console.log(JSON.stringify(event));
+send({ type: "item.completed", item: {
+	id: "reply", type: "agent_message", text: JSON.stringify({ args: process.argv.slice(2), prompt }),
+} });
+send({ type: "item.completed", item: { id: "s1", type: "web_search", query: "test query" } });
+send({ type: "turn.completed", usage: { input_tokens: 10, cached_input_tokens: 5, output_tokens: 2 } });
+`,
+			{ mode: 0o700 },
+		);
+		const turn = codexSdkTurn({ command, model: "gpt-6-luna", effort: "low" });
+		const r = await turn("公開の資料を調べて", AbortSignal.timeout(5000));
+		const run = JSON.parse(r.text) as { args: string[]; prompt: string };
+		expect(run.prompt).toBe("公開の資料を調べて");
+		expect(run.args).toContain('web_search="live"');
+		expect(run.args).toContain("read-only");
+		expect(run.args).toContain('approval_policy="never"');
+		expect(run.args).toContain("features.code_mode_host=true");
+		expect(run.args).toContain("features.shell_tool=false");
+		expect(run.args).toContain("features.apps=false");
+		expect(run.args).toContain("mcp_servers={}");
+		expect(run.args).toContain('history.persistence="none"');
+		expect(run.args).not.toContain("resume");
+		expect(r).toMatchObject({
+			searches: 1,
+			usage: { input: 10, cachedInput: 5, output: 2 },
+		});
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
 });

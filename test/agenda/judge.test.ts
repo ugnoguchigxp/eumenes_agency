@@ -43,7 +43,7 @@ test("the judge sees each line's local time, what was written to memory and the 
 			},
 			{ type: "show", atSec: 0, noteId: "n1", title: "辛いラーメンの店" },
 			{
-				type: "profile",
+				type: "records",
 				atSec: 0,
 				applied: [],
 				rejected: [],
@@ -63,5 +63,5 @@ test("the judge sees each line's local time, what was written to memory and the 
 	);
 	expect(transcript).toContain("（メモを利用者に表示した: 辛いラーメンの店）");
 	// Nothing written: no line.
-	expect(transcript).not.toContain("予定と関心のメモに書いた");
+	expect(transcript).not.toContain("予定・質問の台帳・食い違いに書いた");
 });

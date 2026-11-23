@@ -209,10 +209,12 @@ export async function loadDistribution(host: string) {
 	const from = resolve(host, "api/application/agency/runtime.ts");
 	const entry = Bun.resolveSync("eumenes-agency", dirname(from));
 	const entryRealpath = realpathSync(entry);
-	const packageDir = dirname(dirname(entryRealpath));
-	const pkg = JSON.parse(
-		readFileSync(join(packageDir, "package.json"), "utf8"),
+	const manifestPath = realpathSync(
+		Bun.resolveSync("eumenes-agency/package.json", dirname(from)),
 	);
+	const packageDir = dirname(manifestPath);
+	const codeDir = join(packageDir, "dist");
+	const pkg = JSON.parse(readFileSync(manifestPath, "utf8"));
 	const vendorManifestText = readFileSync(
 		resolve(host, "vendor/agency/manifest.json"),
 		"utf8",
@@ -228,15 +230,12 @@ export async function loadDistribution(host: string) {
 		resolve(host, "vendor/agency", vendor.artifact),
 	);
 	const artifactSha256 = sha256(artifactBytes);
-	const artifactContents = compareArtifactToInstalled(
-		artifactBytes,
-		join(packageDir, "dist"),
-	);
+	const artifactContents = compareArtifactToInstalled(artifactBytes, codeDir);
 	const hostDependency = JSON.parse(
 		readFileSync(resolve(host, "package.json"), "utf8"),
 	).dependencies["eumenes-agency"] as string;
 	const lock = readFileSync(resolve(host, "bun.lock"), "utf8");
-	const tree = treeDigest(join(packageDir, "dist"));
+	const tree = treeDigest(codeDir);
 	const module = await import(entryRealpath);
 	const identity: DistributionIdentity = {
 		kind: "distribution",
@@ -262,7 +261,7 @@ export async function loadDistribution(host: string) {
 		artifactContents,
 		checks: {
 			installedDistMatchesArtifact: artifactContents.equal,
-			entryInsideDist: entryRealpath.startsWith(join(packageDir, "dist") + "/"),
+			entryInsideDist: entryRealpath.startsWith(codeDir + "/"),
 			artifactChecksumMatchesManifest: artifactSha256 === vendor.sha256,
 			hostDependsOnArtifact:
 				hostDependency === `file:vendor/agency/${vendor.artifact}`,
@@ -276,7 +275,7 @@ export async function loadDistribution(host: string) {
 				module.HOST_RULES_VERSION === vendor.HOST_RULES_VERSION,
 		},
 	};
-	return { module, identity, codeDir: join(packageDir, "dist") };
+	return { module, identity, codeDir };
 }
 
 /**
@@ -285,15 +284,22 @@ export async function loadDistribution(host: string) {
  * in this process; node_modules, the product runtime and the distribution files are not changed.
  */
 export async function loadAdjacentSource(
+	host: string,
 	agencyRepo: string,
 	distributionSha: string,
 ) {
 	const entry = resolve(agencyRepo, "src/index.ts");
+	const installedEntry = realpathSync(
+		Bun.resolveSync("eumenes-agency", resolve(host, "api/application/agency")),
+	);
+	const entryFilter = new RegExp(
+		`^${installedEntry.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+	);
 	let swapped = 0;
 	Bun.plugin({
 		name: "p0-adjacent-agency-src",
 		setup(build) {
-			build.onLoad({ filter: /eumenes-agency\/dist\/index\.js$/ }, () => {
+			build.onLoad({ filter: entryFilter }, () => {
 				swapped++;
 				return {
 					contents: `export * from ${JSON.stringify(entry)};`,

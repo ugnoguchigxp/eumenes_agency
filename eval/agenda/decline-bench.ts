@@ -16,7 +16,6 @@ import { join, resolve } from "node:path";
 import type { LlmPort, LlmRequest } from "../../src/index.ts";
 import {
 	createAgendaAgent,
-	emptyProfile,
 	type NoteRef,
 	type PlanOutput,
 } from "../../src/agenda/index.ts";
@@ -902,7 +901,6 @@ async function run(name: string, repeat: number, sets: "all" | MomentSet) {
 			startedAt: 0,
 			known: () => (m.memory ?? []).map((text, i) => ({ id: `m${i}`, text })),
 			notes: () => notes,
-			profile: () => emptyProfile(),
 		});
 		const idle = () => ({ busy: false });
 		const sig = () => new AbortController().signal;

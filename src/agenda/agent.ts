@@ -33,6 +33,7 @@ import {
 } from "./contracts.ts";
 import { check } from "./check.ts";
 import { compose, type SpeakTicket } from "./compose.ts";
+import { speechHeld } from "./marks.ts";
 import {
 	askBlocked,
 	canDig,
@@ -242,11 +243,14 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 		)
 			planned = await plan(st, now, signal);
 		// New questions are checked at once: one asked or answered already, in meaning, goes
-		// before it is offered to a reply or asked on its own.
+		// before it is offered to a reply or asked on its own. A plan that added none calls
+		// nothing.
 		if (planned && !st.stopped) {
 			const fresh = planned.added.filter((i) => i.kind === "ask");
-			for (const i of fresh) checkedNow.add(i.id);
-			repeats.push(...(await checkAsks(st, fresh, now, signal)).repeats);
+			if (fresh.length > 0) {
+				for (const i of fresh) checkedNow.add(i.id);
+				repeats.push(...(await checkAsks(st, fresh, now, signal)).repeats);
+			}
 		}
 		if (st.stopped || signal.aborted) return { planned, checked, tickets };
 		// One research at a time (the researcher's limit), in order: asked for, value, oldest.
@@ -317,7 +321,8 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				st.ready.epoch !== st.epoch ||
 				!item ||
 				item.status !== "doing" ||
-				speechQuiet(st, now)
+				speechQuiet(st, now) ||
+				speechHeld(st, item)
 			)
 				dropReady();
 			else if (open !== null && open <= now && !host().busy) {
@@ -333,6 +338,10 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			return at !== null && at - now <= WRITE_AHEAD_MS;
 		};
 		for (let tries = 0; tries < 3 && !st.stopped && !signal.aborted; tries++) {
+			// The user's turn (typing, a reply being made, speech read out): nothing is written
+			// ahead, and it starts at once when the turn ends (the host steps again then). Seen
+			// again after the check below, which takes a call's time.
+			if (host().busy) break;
 			const item = speakable(st, now).find(due);
 			if (!item) break;
 			if (item.kind === "ask" && !checkedNow.has(item.id)) {
@@ -342,6 +351,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 					repeats.push(...r.repeats);
 					continue;
 				}
+				if (host().busy || st.stopped || signal.aborted) break;
 			}
 			const c = await compose(st, item, now, host, signal);
 			return {
@@ -374,7 +384,8 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			st.stopped ||
 			speechQuiet(st, now) ||
 			!item ||
-			item.status !== (s.held ? "doing" : "open");
+			item.status !== (s.held ? "doing" : "open") ||
+			speechHeld(st, item);
 		if (stale) {
 			if (s.held) {
 				st.issued.delete(line.id);

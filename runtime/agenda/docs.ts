@@ -12,7 +12,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import type { NoteRef } from "../../../src/agenda/index.ts";
+import type { NoteRef } from "../../src/agenda/index.ts";
 
 export interface NoteDoc extends NoteRef {
 	readonly markdown: string;
@@ -92,8 +92,8 @@ export function createMockDocStore(opts: { readonly dir?: string } = {}) {
 			at: number;
 		}): NoteRef {
 			const doc: NoteDoc = { id: `n${++seq}`, ...d, refs: [...d.refs] };
-			docs.set(doc.id, doc);
 			write(doc);
+			docs.set(doc.id, doc);
 			return toRef(doc);
 		},
 		list: (): NoteRef[] =>

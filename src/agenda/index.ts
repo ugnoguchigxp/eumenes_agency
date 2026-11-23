@@ -1,4 +1,10 @@
 export * from "./contracts.ts";
+export {
+	decideGoalStep,
+	goalStepSchema,
+	type GoalStep,
+	type GoalStepContext,
+} from "./goal-step.ts";
 export { asksQuestion, declinesOffer, endsWithQuestion } from "./text.ts";
 export {
 	createAgendaAgent,
@@ -17,14 +23,26 @@ export {
 	planSystem,
 } from "./prompt.ts";
 export {
-	emptyProfile,
-	PROFILE_TITLE,
-	profileLines,
-	updateProfile,
-	type ProfileLine,
-	type ProfileSection,
-	type ProfileUpdate,
-} from "./profile.ts";
+	candidateKinds,
+	checkExtract,
+	extractJsonSchema,
+	extractRecords,
+	extractSchema,
+	extractSystem,
+	memoryKinds,
+	planOps,
+	type ExtractInput,
+	type ExtractOutput,
+	type ExtractRelated,
+	type ExtractResult,
+	type ExtractSaid,
+	type ExtractedCandidate,
+	type ExtractedConflict,
+	type ExtractedMemory,
+	type ExtractedPlan,
+	type ExtractedQuestion,
+	type ExtractedRecords,
+} from "./extract.ts";
 export {
 	createAgendaReplyTools,
 	agendaReplyMessages,
@@ -52,5 +70,6 @@ export {
 	type AgendaHostDeps,
 	type AgendaHostEvent,
 	type AgendaReplyOutput,
+	type AgendaRecordsWriter,
 	type AgendaWriter,
 } from "./host.ts";

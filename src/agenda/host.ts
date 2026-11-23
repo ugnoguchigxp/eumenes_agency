@@ -1,6 +1,6 @@
 /**
  * The agenda agent's host loop, host-neutral: what a host (Eumenes, the CLI) runs around the
- * agent. Typing and the reply make it busy; each exchange goes to the memory's and the note's
+ * agent. Typing and the reply make it busy; each exchange goes to the memory's and the records'
  * writers behind the talk (nothing waits for them); research tickets go to the host's researcher
  * and their results come back through `researchReturned`; the agent is stepped when something is
  * due, and words the user sends while a reply is written go into that reply (`addedWords`: the
@@ -16,6 +16,7 @@ import type {
 	ReplyCall,
 	StepOutcome,
 } from "./contracts.ts";
+import type { ExtractSaid } from "./extract.ts";
 import {
 	createAgendaReplyTools,
 	notesMentioned,
@@ -57,7 +58,7 @@ export type AgendaHostEvent =
 			readonly summary: string | null;
 	  }
 	| {
-			readonly type: "memory" | "profile";
+			readonly type: "memory" | "records";
 			readonly applied: readonly string[];
 			readonly rejected: readonly string[];
 	  }
@@ -78,11 +79,24 @@ export type AgendaHostEvent =
 			readonly message: string;
 	  };
 
-/** One pass of a writer over the latest exchange (Eumenes: the steward; the profile note). */
+/** One pass of the memory's writer over the latest exchange (Eumenes: the steward). */
 export type AgendaWriter = (input: {
 	readonly said: readonly { id: string; who: string; text: string }[];
 	/** Words not seen in an earlier pass: only these can be evidence. */
 	readonly fresh: readonly string[];
+	readonly at: number;
+}) => Promise<{
+	readonly applied: readonly string[];
+	readonly rejected: readonly string[];
+}>;
+
+/**
+ * One pass of the records writer (`extractRecords` and the host's store) over every line after its
+ * processed position: the lines the user and the agent said since the last pass that succeeded.
+ * A pass that throws leaves the position where it was, and the next pass reads the same lines again.
+ */
+export type AgendaRecordsWriter = (input: {
+	readonly said: readonly ExtractSaid[];
 	readonly at: number;
 }) => Promise<{
 	readonly applied: readonly string[];
@@ -116,8 +130,8 @@ export interface AgendaHostDeps {
 	readonly agent: AgendaAgent;
 	/** The memory's writer, run after each exchange. */
 	readonly memory?: AgendaWriter | null;
-	/** The plans-and-interests note's writer, run after the memory's (it leaves out what that holds). */
-	readonly profile?: AgendaWriter | null;
+	/** The records' writer (plans, question ledger ...), run after the memory's. */
+	readonly records?: AgendaRecordsWriter | null;
 	/** The researcher's notes (Eumenes: its Markdown documents). */
 	readonly notes: {
 		read(id: string): AgendaNoteText | null;
@@ -147,6 +161,11 @@ export interface AgendaHostDeps {
 	) => Promise<AgendaReplyOutput>;
 	/** Words sent while a reply is written go into it; without this they get a reply of their own. */
 	readonly addedWords?: AgendaAddedWords;
+	/** A host-owned idle task with its own wake time and the conversation's cancellation signal. */
+	readonly background?: {
+		readonly nextAt: () => number | null;
+		readonly tick: (signal: AbortSignal) => Promise<unknown>;
+	};
 	readonly now: () => number;
 	readonly setTimer: (fn: () => void, ms: number) => unknown;
 	readonly clearTimer: (handle: unknown) => void;
@@ -166,6 +185,7 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 	const { agent, now, setTimer, clearTimer, emit } = deps;
 	const typingIdleMs = deps.typingIdleMs ?? 4_000;
 	let closed = false;
+	let stopped = false;
 	let typing: unknown = null;
 	let replying = false;
 	let stepping = false;
@@ -173,10 +193,13 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 	let timer: unknown = null;
 	/** The step out now: the user's words call it off (its plan and line are stale). */
 	let inFlight: AbortController | null = null;
+	let background: AbortController | null = null;
 	let backoffUntil = 0;
 	let n = 0;
 	const seen = new Set<string>();
-	/** The memory's and the note's writers, one exchange after another, behind the talk. */
+	/** The words the records' writer has read (a pass that failed does not count). */
+	const recorded = new Set<string>();
+	/** The memory's and the records' writers, one exchange after another, behind the talk. */
 	let writing: Promise<void> = Promise.resolve();
 	/** The reply out now, with the replies to words sent meanwhile that it did not take. */
 	let replies: Promise<void> = Promise.resolve();
@@ -185,6 +208,7 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 	// Ids stay unique across sessions (the memory keeps the user's words as sources).
 	const stamp = deps.idPrefix ?? now().toString(36);
 	const busy = () => typing !== null || replying;
+	const isIdle = () => !closed && !stopped && !busy();
 
 	const handle = (t: AgendaTicket) => {
 		if (t.kind === "research") {
@@ -244,6 +268,16 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 				if (closed) return;
 				emit({ type: "step", outcome: out });
 				for (const t of out.tickets) handle(t);
+				const extra = deps.background;
+				const due = isIdle() ? extra?.nextAt() : null;
+				if (extra && due != null && due <= now()) {
+					background = new AbortController();
+					try {
+						await extra.tick(background.signal);
+					} finally {
+						background = null;
+					}
+				}
 			} while (again && !closed);
 		} catch (e) {
 			// A step that keeps failing is not retried at once, over and over.
@@ -259,9 +293,12 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 	const arm = () => {
 		if (timer !== null) clearTimer(timer);
 		timer = null;
-		if (closed || busy()) return;
-		const next = agent.nextAt(now());
-		if (next === null) return;
+		if (!isIdle()) return;
+		const next = Math.min(
+			agent.nextAt(now()) ?? Number.POSITIVE_INFINITY,
+			deps.background?.nextAt() ?? Number.POSITIVE_INFINITY,
+		);
+		if (next === Number.POSITIVE_INFINITY) return;
 		const at = Math.max(next, backoffUntil);
 		timer = setTimer(
 			() => {
@@ -279,9 +316,13 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 		void kick();
 	};
 
-	/** The memory's and the note's writers see the exchange, behind the talk. */
+	/**
+	 * The memory's and the records' writers see the exchange, behind the talk. The records' writer
+	 * reads every line after its position when its turn comes: what came while the previous pass
+	 * ran is read together, at once, with no wait to gather more.
+	 */
 	const write = () => {
-		// The writers see the agent's own speech too: it is what the user answered.
+		// The memory's writer sees the agent's own speech too: it is what the user answered.
 		const said = agent
 			.view()
 			.said.slice(-8)
@@ -289,19 +330,37 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 		const fresh = said.filter((s) => !seen.has(s.id)).map((s) => s.id);
 		for (const s of said) seen.add(s.id);
 		writing = writing.then(async () => {
-			for (const [type, writer] of [
-				["memory", deps.memory ?? null],
-				["profile", deps.profile ?? null],
-			] as const) {
-				// Not skipped when the host closes: what the user said is still written (flush).
-				if (!writer) continue;
+			// Not skipped when the host closes: what the user said is still written (flush).
+			if (deps.memory) {
 				try {
-					const m = await writer({ said, fresh, at: now() });
+					const m = await deps.memory({ said, fresh, at: now() });
 					if (m.applied.length || m.rejected.length)
-						emit({ type, applied: m.applied, rejected: m.rejected });
+						emit({
+							type: "memory",
+							applied: m.applied,
+							rejected: m.rejected,
+						});
 				} catch (e) {
-					emit({ type: "error", where: type, message: message(e) });
+					emit({ type: "error", where: "memory", message: message(e) });
 				}
+			}
+			if (!deps.records) return;
+			const lines = agent
+				.view()
+				.said.filter((s) => !recorded.has(s.id))
+				.map((s) => ({
+					id: s.id,
+					who: s.who === "user" ? ("user" as const) : ("agent" as const),
+					text: s.text,
+				}));
+			if (!lines.some((s) => s.who === "user")) return;
+			try {
+				const m = await deps.records({ said: lines, at: now() });
+				for (const s of lines) recorded.add(s.id);
+				if (m.applied.length || m.rejected.length)
+					emit({ type: "records", applied: m.applied, rejected: m.rejected });
+			} catch (e) {
+				emit({ type: "error", where: "records", message: message(e) });
 			}
 		});
 	};
@@ -396,12 +455,17 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 	};
 
 	return {
+		isIdle,
+		wake: () => {
+			if (isIdle()) void kick();
+		},
 		start(): void {
 			void kick();
 		},
 		/** A key other than Enter: the user is typing, so nothing is planned or said over them. */
 		typed(): void {
 			if (closed) return;
+			background?.abort();
 			if (typing !== null) clearTimer(typing);
 			else if (timer !== null) {
 				clearTimer(timer);
@@ -411,7 +475,7 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 		},
 		/**
 		 * The user submitted a line: the reply, then the plan sees the exchange at once; the memory
-		 * and the note are written behind it. While a reply is being written, the line goes into it
+		 * and the records are written behind it. While a reply is being written, the line goes into it
 		 * (addedWords) or gets a reply of its own right after. Resolves when the replies are out.
 		 */
 		say(text: string): Promise<void> {
@@ -426,6 +490,7 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 			// The plan and the line out now are for words before these: called off, so the next
 			// step (right after the reply) does not wait for them (review 2026-11-10 evening 4.2 B).
 			inFlight?.abort();
+			background?.abort();
 			emit({ type: "user", text });
 			if (replying) {
 				sentMeanwhile.push(userId);
@@ -465,16 +530,20 @@ export function createAgendaHost(deps: AgendaHostDeps) {
 		},
 		/** The host's stop: nothing at all until resumed. */
 		stop(): void {
+			stopped = true;
+			background?.abort();
 			agent.setStopped(true);
 			if (timer !== null) clearTimer(timer);
 			timer = null;
 		},
 		resume(): void {
+			stopped = false;
 			agent.setStopped(false);
 			void kick();
 		},
 		close(): void {
 			closed = true;
+			background?.abort();
 			if (timer !== null) clearTimer(timer);
 			if (typing !== null) clearTimer(typing);
 		},

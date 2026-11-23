@@ -73,13 +73,12 @@ const J_STAY = [
 ];
 
 /**
- * Self-initiated research (social-rules-10): a mock of the request to the Pursuit research
- * subagent. The agent only sends the request; Pursuit does the research.
+ * Self-initiated research (social-rules-10): a fixed response to the host's research request.
  */
 const RESEARCH = {
-	name: "pursuit_request",
+	name: "web_note",
 	description:
-		"調査を受け持つサブエージェント（Pursuit）に調査を頼む（取り消し不要）。toolInput は「問い: … / 受入条件: …」。結果は終わったら依頼された仕事に出る。",
+		"調べもの担当に調査を頼む（読み取りのみ）。toolInput は「問い: … / 受入条件: …」。結果は終わったら依頼された仕事に出る。",
 	results: [
 		{
 			status: "succeeded" as const,

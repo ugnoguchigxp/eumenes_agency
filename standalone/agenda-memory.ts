@@ -9,7 +9,7 @@ import OpenAI from "openai";
 import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
 import { hostPlanningInstructions } from "eumenes-memory-host/meaning/planning";
 import { hostGroundingInstructions } from "eumenes-memory-host/meaning/retrieval";
-import type { Complete } from "../examples/virtual-eumenes/agenda/host-memory.ts";
+import type { Complete } from "../runtime/agenda/host-memory.ts";
 import { apiKeyFromEnvironment } from "./api-keys.ts";
 import {
 	createClaudeClient,

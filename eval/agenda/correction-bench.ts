@@ -14,11 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { runRespond, type LlmPort } from "../../src/index.ts";
-import {
-	createAgendaAgent,
-	emptyProfile,
-	type NoteRef,
-} from "../../src/agenda/index.ts";
+import { createAgendaAgent, type NoteRef } from "../../src/agenda/index.ts";
 import { clientFor } from "./verifier.ts";
 import { openUncappedMeter } from "../../standalone/always-on-host.ts";
 import { createProviderReply } from "../../standalone/providers.ts";
@@ -1286,7 +1282,6 @@ async function run(name: string, repeat: number, sets: "all" | MomentSet) {
 				agent,
 				known: [],
 				notes: refs,
-				profile: emptyProfile(),
 				clock: clockAt(t0),
 				now: t0,
 			}),

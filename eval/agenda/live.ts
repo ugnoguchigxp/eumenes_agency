@@ -27,16 +27,21 @@ import {
 	dropRepeatedSentences,
 } from "../../standalone/agenda-reply.ts";
 import { memoryModel } from "../../standalone/agenda-memory.ts";
-import { webNoteWriter } from "../../standalone/agenda-research.ts";
-import { createMockDocStore } from "../../examples/virtual-eumenes/agenda/docs.ts";
-import { openHostMemory } from "../../examples/virtual-eumenes/agenda/host-memory.ts";
-import { createProfileNote } from "../../examples/virtual-eumenes/agenda/profile.ts";
+import { agendaWebNoteWriter } from "../../standalone/agenda-research.ts";
+import { apiKeyFromEnvironment } from "../../standalone/api-keys.ts";
+import { codexGoalDesigner } from "../../runtime/agenda/codex-goal-design.ts";
+import { GOAL_DESIGNER } from "../../runtime/agenda/goal-design.ts";
+import { createMockDocStore } from "../../runtime/agenda/docs.ts";
+import { openHostMemory } from "../../runtime/agenda/host-memory.ts";
+import type { GoalHostEvent } from "../../runtime/agenda/goal-host.ts";
+import { createRecordStore } from "../../examples/virtual-eumenes/agenda/records.ts";
 import {
 	createMockWebResearch,
 	llmWriter,
 	mockToolchainWork,
 } from "../../examples/virtual-eumenes/agenda/research.ts";
 import { agendaScenarios, inWindow, quickScenarios } from "./scenarios.ts";
+import { isGoalScenario, runGoalScenario } from "./goal-scenario.ts";
 import { judgeAspects, judgeScenario } from "./judge.ts";
 import { llmUser } from "./user.ts";
 import { clientFor, verifierLlm } from "./verifier.ts";
@@ -71,7 +76,7 @@ const show = (e: AgendaSimEvent) => {
 		case "researched":
 			return `${t} 📝 ${e.status}: ${e.title ?? ""} — ${e.summary ?? ""}`;
 		case "memory":
-		case "profile":
+		case "records":
 			return e.applied.length
 				? `${t} ${e.type === "memory" ? "🧠" : "🗓"} ${e.applied.join(" / ")}`
 				: null;
@@ -121,6 +126,20 @@ if (import.meta.main) {
 		throw new Error(
 			"usage: live.ts <run-name> [--web | --mock-research] [--jobs N] [--samples N] [scenario...]",
 		);
+	const quick = argv.includes("--quick");
+	const standard = quick ? quickScenarios() : agendaScenarios;
+	const selected =
+		wanted.length === 0
+			? standard
+			: [...new Set(wanted)].map((requested) => {
+					if (isGoalScenario(requested)) return requested;
+					const scenario = standard.find(
+						(candidate) => candidate.name === requested,
+					);
+					if (!scenario) throw new Error(`未登録のシナリオ: ${requested}`);
+					return scenario;
+				});
+	if (selected.length === 0) throw new Error("実行対象のシナリオがありません");
 	const settings = loadSettings(
 		resolve(process.env.AGENCY_SETTINGS ?? "config/always-on.json"),
 	);
@@ -128,22 +147,18 @@ if (import.meta.main) {
 		resolve("data/agenda/runs", samples > 1 ? `${name}-${k + 1}` : name),
 	);
 	for (const d of runDirs) mkdirSync(d, { recursive: true });
-	// --quick: the quick suite (scenarios.ts), each scenario cut to its window.
-	const quick = argv.includes("--quick");
-	const selected = (quick ? quickScenarios() : agendaScenarios).filter(
-		(x) => wanted.length === 0 || wanted.includes(x.name),
-	);
 	const queue = runDirs.flatMap((d, k) =>
-		selected.map((s) => ({
-			s,
-			dir: d,
-			label: samples > 1 ? `${s.name}#${k + 1}` : s.name,
-		})),
+		selected.map((s) => {
+			const name = typeof s === "string" ? s : s.name;
+			return { s, dir: d, label: samples > 1 ? `${name}#${k + 1}` : name };
+		}),
 	);
 	// Side by side (12 at once by default, within the API's rate limit): a run takes about as
 	// long as its slowest scenario.
 	const jobs = count("--jobs", 12);
 	const failed: string[] = [];
+	const expected = queue.length;
+	let completed = 0;
 	const walls: { label: string; sec: number }[] = [];
 
 	const runScenario = async (job: (typeof queue)[number]) => {
@@ -154,6 +169,83 @@ if (import.meta.main) {
 			settings,
 			resolve("data/agenda/usage.jsonl"),
 		);
+		const say = (line: string) =>
+			console.log(jobs > 1 ? line.replace(/^/gmu, `[${job.label}] `) : line);
+		const spentBefore = meter.spentUsd();
+		if (typeof s === "string") {
+			let provider: LlmPort | undefined;
+			const events: GoalHostEvent[] = [];
+			const designRuns: {
+				searches: number;
+				usage: { input: number; cachedInput: number; output: number } | null;
+			}[] = [];
+			const designer = codexGoalDesigner({
+				apiKey: apiKeyFromEnvironment("openai"),
+				record: ({ searches, usage }) => designRuns.push({ searches, usage }),
+			});
+			const resultPath = join(dir, `${s}.goal.json`);
+			let summary: Awaited<ReturnType<typeof runGoalScenario>>;
+			try {
+				summary = await runGoalScenario(
+					s,
+					{
+						complete(request, signal) {
+							provider ??= createProviderLlm(
+								settings.llm.background,
+								meter,
+								clientFor(settings.llm.background),
+							);
+							return provider.complete(request, signal);
+						},
+					},
+					(event) => events.push(event),
+					designer,
+				);
+			} catch (error) {
+				const reason = error instanceof Error ? error.message : String(error);
+				writeFileSync(
+					resultPath,
+					JSON.stringify(
+						{
+							scenario: s,
+							passed: false,
+							reason,
+							events,
+							usd: meter.spentUsd() - spentBefore,
+						},
+						null,
+						"\t",
+					),
+				);
+				throw error;
+			}
+			const wallSec = (performance.now() - startedWall) / 1000;
+			const usd = meter.spentUsd() - spentBefore;
+			if (summary.design)
+				writeFileSync(join(dir, `${s}.design.md`), summary.design.markdown);
+			writeFileSync(
+				resultPath,
+				JSON.stringify(
+					{
+						...summary,
+						wallSec,
+						usd,
+						codexDesigner: { ...GOAL_DESIGNER, runs: designRuns },
+					},
+					null,
+					"\t",
+				),
+			);
+			if (summary.analysis)
+				say(
+					`  分析 ${summary.analysis}\n  依頼 ${summary.request.args.prompt}\n  報告 ${summary.reportRestart.reports[0]?.text}`,
+				);
+			say(
+				`${s} 合格（モデル ${summary.modelCalls} 回、受付 ${summary.requests} 件、完了報告 ${summary.reports} 件、$${usd.toFixed(4)}）`,
+			);
+			walls.push({ label: job.label, sec: Math.round(wallSec) });
+			return;
+		}
 		// Many scenarios at once meet the API's rate limit: a check waits and tries again
 		// (the SDK honours retry-after) instead of failing the scenario.
 		const client = clientFor(settings.llm.background);
@@ -165,9 +257,6 @@ if (import.meta.main) {
 		);
 		// The judge and the simulated user: another vendor's model than the agent's (verifier.ts).
 		const verifier = verifierLlm(settings, meter);
-		const say = (line: string) =>
-			console.log(jobs > 1 ? line.replace(/^/gmu, `[${job.label}] `) : line);
-		const spentBefore = meter.spentUsd();
 		const clockAt = clockFrom(s.clockStart ?? "2026-11-07T19:00:00+09:00");
 		// The real memory, one store per scenario (both sessions of a scenario share it).
 		const memoryDir = mkdtempSync(join(tmpdir(), "agm-"));
@@ -181,8 +270,8 @@ if (import.meta.main) {
 			clock: clockAt,
 		});
 		try {
-			// The plans-and-interests note: what the memory leaves out, kept across both sessions.
-			const note = createProfileNote({
+			// The records (plans, question ledger, conflicts), kept across both sessions.
+			const store = createRecordStore({
 				llm,
 				known: memory.known,
 				clock: clockAt,
@@ -190,12 +279,12 @@ if (import.meta.main) {
 			const docs = createMockDocStore();
 			const web = !noWeb && (allWeb || s.web === true);
 			const searcher = web
-				? webNoteWriter({
+				? agendaWebNoteWriter({
 						role: settings.llm.background,
 						meter,
 						today: () => clockAt(0),
-						// Web search runs on the Claude API only.
-						client: createClaudeClient({ maxRetries: 8, timeout: 120_000 }),
+						claudeClient: () =>
+							createClaudeClient({ maxRetries: 8, timeout: 120_000 }),
 					})
 				: null;
 			let planted = false;
@@ -235,13 +324,13 @@ if (import.meta.main) {
 				think: LlmPort,
 			) =>
 				simulateAgenda({
-					deps: { llm: think, clock: clockAt, profile: note.get },
+					deps: { llm: think, clock: clockAt, records: store.records },
 					minutes,
 					turns,
 					startMs,
 					memory,
 					steward,
-					profile: note.writer,
+					records: store.writer,
 					docs,
 					research,
 					reply: async (agent, at, tools) => {
@@ -249,8 +338,8 @@ if (import.meta.main) {
 							messages: agendaReplyMessages({
 								agent,
 								known: memory.known(),
+								plans: store.get().plans,
 								notes: docs.list(),
-								profile: note.get(),
 								clock: clockAt(at),
 								now: at,
 							}),
@@ -307,7 +396,7 @@ if (import.meta.main) {
 				minutes: s.minutes,
 				suite: quick ? "quick" : "full",
 				memory: memory.all().map((m) => m.text),
-				profile: note.get(),
+				records: store.get(),
 				notes: docs.list().map((n) => ({
 					id: n.id,
 					title: n.title,
@@ -322,6 +411,10 @@ if (import.meta.main) {
 					),
 				usd: meter.spentUsd() - spentBefore,
 				research: searcher ? `web (${searcher.searches()} searches)` : "mock",
+				researchBackend: searcher?.backend ?? "mock",
+				...(searcher?.backend === "codex"
+					? { researchTokens: searcher.tokens() }
+					: {}),
 				model: settings.llm.background.model,
 				effort: settings.llm.background.effort,
 				verifier: verifier.model,
@@ -362,17 +455,24 @@ if (import.meta.main) {
 		Array.from({ length: Math.min(jobs, queue.length) }, async () => {
 			for (let j = queue.shift(); j; j = queue.shift())
 				// One scenario that fails does not stop the others; it is reported at the end.
-				await runScenario(j).catch((e: unknown) => {
+				try {
+					await runScenario(j);
+					completed++;
+				} catch (e) {
 					failed.push(j.label);
 					console.error(
 						`[${j.label}] 失敗: ${e instanceof Error ? e.message : String(e)}`,
 					);
-				});
+				}
 		}),
 	);
 	const slow = [...walls].sort((a, b) => b.sec - a.sec).slice(0, 3);
 	if (failed.length) console.log(`\n失敗したシナリオ: ${failed.join(" ")}`);
+	if (completed !== expected) process.exitCode = 1;
+	const comparison = selected.some((s) => typeof s !== "string")
+		? `。比較: bun eval/agenda/compare.ts ${runDirs.map((d) => d.split("/").at(-1)).join(",")}`
+		: "";
 	console.log(
-		`\n実時間 ${Math.round((performance.now() - started) / 1000)}秒（遅い順: ${slow.map((w) => `${w.label} ${w.sec}秒`).join("、")}）。比較: bun eval/agenda/compare.ts ${runDirs.map((d) => d.split("/").at(-1)).join(",")}`,
+		`\n${completed}/${expected} ケース完了。実時間 ${Math.round((performance.now() - started) / 1000)}秒（遅い順: ${slow.map((w) => `${w.label} ${w.sec}秒`).join("、")}）${comparison}`,
 	);
 }
