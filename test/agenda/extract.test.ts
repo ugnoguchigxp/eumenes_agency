@@ -1,8 +1,7 @@
 /**
  * What the agent writes down from the conversation (src/agenda/extract.ts): the structured output
- * and the checks over it. A record rests on ids of the user's own words in the input; a memory
- * whose quote is not part of the words it cites is not a memory; a reference the host did not
- * show, a repeat of a record already there, goes. Scripted model; no live call.
+ * and the checks over it. A record rests on ids of the user's own words in the input; a reference
+ * the host did not show, a repeat of a record already there, goes. Scripted model; no live call.
  */
 import { describe, expect, test } from "bun:test";
 import type { LlmPort, LlmRequest } from "../../src/index.ts";
@@ -23,127 +22,12 @@ const said: ExtractSaid[] = [
 	{ id: "u3", who: "user", text: "旅行は未定だけど考えてる" },
 ];
 const related = {
-	memories: [{ ref: "m1", kind: "preference", text: "猫が好き" }],
-	candidates: [{ ref: "c1", text: "夜に散歩する" }],
 	plans: [{ ref: "p1", text: "水曜に歯医者", dueAt: "2026-11-25" }],
 	questions: [{ attribute: "好きな色", state: "answered" as const }],
 };
-const none: ExtractOutput = {
-	memories: [],
-	candidates: [],
-	plans: [],
-	questions: [],
-	conflicts: [],
-};
+const none: ExtractOutput = { plans: [], questions: [] };
 const check = (out: Partial<ExtractOutput>) =>
 	checkExtract({ ...none, ...out }, { said, related });
-const memory = (o: Partial<ExtractOutput["memories"][number]> = {}) => ({
-	kind: "preference" as const,
-	semanticKey: "drink.coffee.style",
-	subject: "self",
-	text: "コーヒーはブラックで飲む",
-	quote: "コーヒーは、ブラック派なんだよね",
-	evidence: "u1",
-	...o,
-});
-
-describe("memories: what the user said of themselves in their own words", () => {
-	test("kept when the quote is part of the cited words (space and punctuation aside)", () => {
-		const r = check({
-			memories: [
-				memory(),
-				memory({
-					text: "ブラック派",
-					quote: "コーヒーは ブラック派なんだよね",
-				}),
-			],
-		});
-		expect(r.rejected).toEqual([]);
-		expect(r.records.memories.map((m) => m.text)).toEqual([
-			"コーヒーはブラックで飲む",
-			"ブラック派",
-		]);
-	});
-
-	test("a quote that is not part of the cited words is not a memory", () => {
-		const r = check({
-			memories: [memory({ quote: "コーヒーはミルク入りが好き" })],
-		});
-		expect(r.records.memories).toEqual([]);
-		expect(r.rejected).toEqual(["memory:quote_mismatch"]);
-	});
-
-	test("a quote taken from other words than the one cited does not pass", () => {
-		const r = check({ memories: [memory({ quote: "来週の水曜は歯医者" })] });
-		expect(r.rejected).toEqual(["memory:quote_mismatch"]);
-	});
-
-	test("the agent's words, an unknown id, and an empty quote are no evidence", () => {
-		const r = check({
-			memories: [
-				memory({ evidence: "a1", quote: "コーヒーはどうやって" }),
-				memory({ evidence: "u9" }),
-				memory({ quote: "、。" }),
-			],
-		});
-		expect(r.records.memories).toEqual([]);
-		expect(r.rejected).toEqual([
-			"memory:no_user_evidence",
-			"memory:no_user_evidence",
-			"memory:quote_mismatch",
-		]);
-	});
-
-	test("what the memory already holds, or was said twice in the output, is not written again", () => {
-		const r = check({
-			memories: [
-				memory({ text: "猫が好き。", quote: "コーヒーは" }),
-				memory(),
-				memory(),
-			],
-		});
-		expect(r.records.memories).toHaveLength(1);
-		expect(r.rejected).toEqual(["memory:duplicate", "memory:duplicate"]);
-	});
-
-	test("an entry without text, key or subject is incomplete", () => {
-		const r = check({
-			memories: [
-				memory({ text: " " }),
-				memory({ semanticKey: "" }),
-				memory({ subject: "" }),
-			],
-		});
-		expect(r.rejected).toEqual([
-			"memory:incomplete",
-			"memory:incomplete",
-			"memory:incomplete",
-		]);
-	});
-});
-
-describe("candidates: inferred, on the user's words only", () => {
-	test("evidence is cut to the user's words; none left, no candidate", () => {
-		const r = check({
-			candidates: [
-				{
-					kind: "habit",
-					text: "朝にコーヒーを飲む",
-					evidence: ["a1", "u1", "u1"],
-				},
-				{ kind: "interest", text: "旅行", evidence: ["a1"] },
-				{ kind: "habit", text: "夜に散歩する", evidence: ["u3"] },
-			],
-		});
-		expect(r.records.candidates).toEqual([
-			{ kind: "habit", text: "朝にコーヒーを飲む", evidence: ["u1"] },
-		]);
-		expect(r.rejected).toEqual([
-			"candidate:no_user_evidence",
-			"candidate:duplicate",
-		]);
-	});
-});
 
 describe("plans", () => {
 	const plan = (o: Partial<ExtractOutput["plans"][number]>) => ({
@@ -229,7 +113,7 @@ describe("plans", () => {
 	});
 });
 
-describe("question ledger and conflicts", () => {
+describe("question ledger", () => {
 	test("asked may rest on the agent's own question; the rest on the user's words", () => {
 		const r = check({
 			questions: [
@@ -248,29 +132,10 @@ describe("question ledger and conflicts", () => {
 			"question:deferred:no_evidence",
 		]);
 	});
-
-	test("a conflict names a record the host showed and a word of the user's", () => {
-		const r = check({
-			conflicts: [
-				{ with: "m1", evidence: "u1", note: "前は猫が好きと言っていた" },
-				{ with: "m9", evidence: "u1", note: "x" },
-				{ with: "c1", evidence: "a1", note: "x" },
-				{ with: "p1", evidence: "u2", note: " " },
-			],
-		});
-		expect(r.records.conflicts).toEqual([
-			{ with: "m1", evidence: "u1", note: "前は猫が好きと言っていた" },
-		]);
-		expect(r.rejected).toEqual([
-			"conflict:unknown_ref",
-			"conflict:no_user_evidence",
-			"conflict:empty",
-		]);
-	});
 });
 
 describe("the output's schema", () => {
-	test("the JSON Schema names the five lists and takes nothing else", () => {
+	test("the JSON Schema names the two lists and takes nothing else", () => {
 		const schema = extractJsonSchema as {
 			type: string;
 			additionalProperties: boolean;
@@ -279,13 +144,7 @@ describe("the output's schema", () => {
 		};
 		expect(schema.type).toBe("object");
 		expect(schema.additionalProperties).toBe(false);
-		expect(schema.required).toEqual([
-			"memories",
-			"candidates",
-			"plans",
-			"questions",
-			"conflicts",
-		]);
+		expect(schema.required).toEqual(["plans", "questions"]);
 		expect(
 			Object.values(schema.properties).every((p) => p.type === "array"),
 		).toBe(true);
@@ -295,7 +154,16 @@ describe("the output's schema", () => {
 		expect(() =>
 			extractSchema.parse({
 				...none,
-				memories: [{ ...memory(), polarity: "affirmed" }],
+				plans: [
+					{
+						op: "add",
+						ref: null,
+						text: "歯医者",
+						dueAt: null,
+						evidence: ["u2"],
+						polarity: "affirmed",
+					},
+				],
 			}),
 		).toThrow();
 	});
@@ -358,8 +226,6 @@ describe("one pass", () => {
 		expect(Object.keys(data)).toEqual(["related", "conversation", "now"]);
 		expect(data["now"]).toBe("2026/11/22(日) 20:00");
 		expect(data["related"]).toEqual({
-			memories: [{ ref: "m1", kind: "preference", text: "猫が好き" }],
-			candidates: [{ ref: "c1", text: "夜に散歩する" }],
 			plans: [{ ref: "p1", text: "水曜に歯医者", dueAt: "2026-11-25" }],
 			questions: [{ attribute: "好きな色", state: "answered" }],
 		});
@@ -367,7 +233,6 @@ describe("one pass", () => {
 
 	test("what passes the checks comes back with what was dropped and why", async () => {
 		const m = scripted({
-			memories: [memory(), memory({ quote: "ない言葉" })],
 			plans: [
 				{
 					op: "add",
@@ -376,25 +241,31 @@ describe("one pass", () => {
 					dueAt: "2026-11-25",
 					evidence: ["u2"],
 				},
+				{
+					op: "add",
+					ref: null,
+					text: "散歩",
+					dueAt: "来週",
+					evidence: ["u2"],
+				},
 			],
 		});
 		const r = await run(m.llm);
 		expect(r).toMatchObject({
 			ok: true,
-			rejected: ["memory:quote_mismatch"],
+			rejected: ["plan:add:bad_due"],
 			usage: { model: "scripted" },
 		});
 		if (!r.ok) throw new Error("unreachable");
-		expect(r.records.memories).toHaveLength(1);
 		expect(r.records.plans).toHaveLength(1);
 	});
 
-	test("the instructions bar sensitive facts unless the user asked to be remembered, and give no example", async () => {
+	test("the instructions name only plans and the question ledger, and give no example", async () => {
 		const m = scripted();
 		await run(m.llm);
 		const system = m.asked[0]!.system;
-		expect(system).toContain("機微な情報");
-		expect(system).toContain("「覚えて」");
+		for (const gone of ["memories", "candidates", "conflicts", "機微な情報"])
+			expect(system).not.toContain(gone);
 		expect(system).not.toContain("例:");
 	});
 

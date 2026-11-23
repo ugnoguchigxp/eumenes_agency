@@ -503,8 +503,8 @@ async function run(
 			const seeded = memoryAt(MEMORY_DB, startMs);
 			const known = (): KnownItem[] => [...seeded, ...memory.known()];
 
-			// The records (plans, question ledger, conflicts) start empty.
-			const store = createRecordStore({ llm, known, clock: logClock });
+			// The records (plans, question ledger) start empty.
+			const store = createRecordStore({ llm, clock: logClock });
 
 			const research = createMockWebResearch({
 				writer: (request, delegatedTo) =>

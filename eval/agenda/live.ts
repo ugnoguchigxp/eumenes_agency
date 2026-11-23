@@ -270,12 +270,8 @@ if (import.meta.main) {
 			clock: clockAt,
 		});
 		try {
-			// The records (plans, question ledger, conflicts), kept across both sessions.
-			const store = createRecordStore({
-				llm,
-				known: memory.known,
-				clock: clockAt,
-			});
+			// The records (plans, question ledger), kept across both sessions.
+			const store = createRecordStore({ llm, clock: clockAt });
 			const docs = createMockDocStore();
 			const web = !noWeb && (allWeb || s.web === true);
 			const searcher = web

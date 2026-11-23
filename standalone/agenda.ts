@@ -184,7 +184,6 @@ async function main() {
 	});
 	const store = createRecordStore({
 		llm,
-		known: memory.known,
 		clock: localTime,
 		path: recordsPath,
 	});
@@ -654,7 +653,6 @@ async function main() {
 					(p) => `  予定 ${p.ref} ${p.text}${p.dueAt ? `（${p.dueAt}）` : ""}`,
 				),
 				...r.questions.map((q) => `  質問 ${q.state} ${q.attribute}`),
-				...r.conflicts.map((c) => `  食い違い ${c.ref} ${c.text}`),
 			];
 			out(
 				lines.length

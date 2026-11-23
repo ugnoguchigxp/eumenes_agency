@@ -1,9 +1,8 @@
 /**
- * The host's records (plans with a date, the question ledger, unresolved conflicts) in a stand-in
- * for Eumenes' tables: in memory, or one JSON file. Its writer runs `extractRecords` over the lines
- * after its position and keeps what passes the checks; `records` hands the agent what it holds.
- * What the user said of themselves (`memories`) and what is only inferred (`candidates`) belong
- * to the memory library in Eumenes; here they are not stored.
+ * The host's records (plans with a date, the question ledger) in a stand-in for Eumenes' tables:
+ * in memory, or one JSON file. Its writer runs `extractRecords` over the lines after its position
+ * and keeps what passes the checks; `records` hands the agent what it holds. What the user said of
+ * themselves belongs to the memory library in Eumenes; here it is not stored.
  */
 import {
 	existsSync,
@@ -18,9 +17,7 @@ import {
 	extractRecords,
 	type AgendaRecords,
 	type AgendaRecordsWriter,
-	type ConflictRecord,
 	type ExtractedRecords,
-	type KnownItem,
 	type PlanRecord,
 	type QuestionRecord,
 } from "../../../src/agenda/index.ts";
@@ -29,15 +26,12 @@ interface Stored {
 	n: number;
 	plans: PlanRecord[];
 	questions: QuestionRecord[];
-	conflicts: ConflictRecord[];
 }
 
-const empty = (): Stored => ({ n: 0, plans: [], questions: [], conflicts: [] });
+const empty = (): Stored => ({ n: 0, plans: [], questions: [] });
 
 export function createRecordStore(opts: {
 	readonly llm: LlmPort;
-	/** The memory's items: what the extraction sees as already recorded. */
-	readonly known: () => readonly KnownItem[];
 	/** Local time as the user would say it, so "来月" becomes a date. */
 	readonly clock?: (now: number) => string;
 	/** A JSON file (absent: in memory only). */
@@ -88,14 +82,6 @@ export function createRecordStore(opts: {
 			];
 			applied.push(`question ${q.op}: ${q.attribute}`);
 		}
-		for (const c of r.conflicts) {
-			const of =
-				opts.known().find((k) => k.id === c.with)?.text ??
-				state.plans.find((p) => p.ref === c.with)?.text ??
-				c.with;
-			state.conflicts.push({ ref: `c${++state.n}`, text: `${of}: ${c.note}` });
-			applied.push(`conflict ${c.with}: ${c.note}`);
-		}
 		return applied;
 	};
 	const writer: AgendaRecordsWriter = async (r) => {
@@ -103,7 +89,6 @@ export function createRecordStore(opts: {
 			llm: opts.llm,
 			said: r.said,
 			related: {
-				memories: opts.known().map((k) => ({ ref: k.id, text: k.text })),
 				plans: state.plans,
 				questions: state.questions.map((q) => ({
 					attribute: q.attribute,
@@ -124,7 +109,6 @@ export function createRecordStore(opts: {
 		records: (): AgendaRecords => ({
 			plans: state.plans,
 			questions: state.questions,
-			conflicts: state.conflicts,
 		}),
 		get: (): Readonly<Stored> => state,
 		reset: () => {
