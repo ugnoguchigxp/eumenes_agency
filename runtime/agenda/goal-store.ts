@@ -5,6 +5,12 @@ import { join, resolve } from "node:path";
 import type { NoteRef } from "../../src/agenda/index.ts";
 import type { GoalMemoryRef } from "./host-memory.ts";
 import type { GoalDesignRef, GoalPreparation } from "./goal-design.ts";
+import type { GoalMode } from "./goal-progress-contracts.ts";
+import { goalPolicyMigration } from "./goal-permits.ts";
+import {
+	createGoalProgressStore,
+	progressMigration,
+} from "./goal-progress-store.ts";
 
 export const GOAL_SLOTS = 10;
 export const CLAUDE_CODE = {
@@ -26,8 +32,12 @@ export interface GoalTarget {
 	readonly revision: number;
 }
 
-type GoalSource = { namespace: string; kind: string; id: string };
-type Transition = { expectedRevision: number; source: GoalSource };
+export type GoalSource = { namespace: string; kind: string; id: string };
+type Transition = {
+	expectedRevision: number;
+	source: GoalSource;
+	sourceMessageIds?: string[];
+};
 type Adoption = {
 	scopeKey: string;
 	desiredState: string;
@@ -45,6 +55,14 @@ export interface StoredGoal {
 	readonly desiredState: string;
 	readonly priority: number;
 	readonly status: "proposed" | "adopted" | "withdrawn" | "completed";
+}
+type GoalsRow = Omit<StoredGoal, "goalId"> & { id: string };
+
+export interface GoalRegistrationOptions {
+	readonly mode: GoalMode;
+	readonly startedAt: number;
+	readonly sourceRef: string | null;
+	readonly deliveryConversationId: string | null;
 }
 
 export interface WorkRequest {
@@ -92,25 +110,33 @@ interface GoalsModule {
 	readonly migrations: readonly Migration[];
 	createGoalsService(clock: () => string): {
 		listForStewardInTransaction(db: Database, access: GoalAccess): StoredGoal[];
+		originInTransaction?(
+			db: Database,
+			access: GoalAccess,
+			goalId: string,
+		): {
+			source: GoalSource;
+			messageIds: readonly string[];
+		} | null;
 		adoptInTransaction(
 			db: Database,
 			access: GoalAccess,
 			input: Omit<Adoption, "sourceMessageIds"> & {
 				sourceMessageIds?: string[];
 			},
-		): { id: string };
+		): GoalsRow;
 		updateInTransaction(
 			db: Database,
 			access: GoalAccess,
 			id: string,
 			input: Revision,
-		): unknown;
+		): GoalsRow;
 		withdrawInTransaction(
 			db: Database,
 			access: GoalAccess,
 			id: string,
 			input: Transition,
-		): unknown;
+		): GoalsRow;
 		completeInTransaction(
 			db: Database,
 			access: GoalAccess,
@@ -232,6 +258,8 @@ export const goalMigrations = [
 	preparationMigration,
 	designPermitMigration,
 	documentMigration,
+	progressMigration,
+	goalPolicyMigration,
 ] as const;
 
 export async function openGoalStore(
@@ -320,7 +348,7 @@ export function createGoalStore(
 	const workRows = (db: Database, principal: string) =>
 		db
 			.query<WorkRow, [string]>(
-				"SELECT payload, state, reason, acknowledged FROM goal_work WHERE principal=? ORDER BY rowid",
+				"SELECT payload, state, reason, acknowledged FROM goal_work WHERE principal=? AND mode='mock' ORDER BY rowid",
 			)
 			.all(principal)
 			.map(record);
@@ -340,7 +368,7 @@ export function createGoalStore(
 				[string, string, string, number, string, string, string]
 			>(`
 			SELECT id, design_note_id, design_digest FROM goal_permits WHERE principal=? AND scope_key=? AND goal_id=?
-			AND goal_revision=? AND toolchain=? AND workspace=? AND impact=? AND revoked=0
+			AND goal_revision=? AND toolchain=? AND workspace=? AND impact=? AND revoked=0 AND mode='mock'
 			ORDER BY rowid DESC LIMIT 1
 		`)
 			.get(
@@ -353,7 +381,9 @@ export function createGoalStore(
 				CLAUDE_CODE.impact,
 			);
 	const revokePermit = (db: Database, id: string) =>
-		db.query("UPDATE goal_permits SET revoked=1 WHERE id=?").run(id);
+		db
+			.query("UPDATE goal_permits SET revoked=1 WHERE id=? AND mode='mock'")
+			.run(id);
 	const permitMatches = (
 		permit: NonNullable<ReturnType<typeof activePermit>>,
 		design: GoalDesignRef | null,
@@ -368,11 +398,238 @@ export function createGoalStore(
 	) =>
 		db
 			.query(
-				"UPDATE goal_work SET state=?, reason=?, acknowledged=MAX(acknowledged, ?) WHERE id=?",
+				"UPDATE goal_work SET state=?, reason=?, acknowledged=MAX(acknowledged, ?) WHERE id=? AND mode='mock'",
 			)
 			.run(state, reason, Number(state === "accepted"), id);
 
+	const currentGoal = (db: Database, access: GoalAccess, goalId: string) =>
+		access.scopeKeys.length > 0
+			? goals
+					.listForStewardInTransaction(db, ledgerAccess(access))
+					.find((goal) => goal.goalId === goalId)
+			: undefined;
+	const completeGoalRevision = (
+		db: Database,
+		access: GoalAccess,
+		key: { goalId: string; goalRevision: number },
+		source: GoalSource,
+	) =>
+		goals.completeInTransaction(db, ledgerAccess(access), key.goalId, {
+			expectedRevision: key.goalRevision,
+			source,
+		});
+	const { initialize: initializeProgress, ...goalProgress } =
+		createGoalProgressStore({
+			ledgerAccess,
+			goal: currentGoal,
+			complete: completeGoalRevision,
+		});
+	const mock = (
+		db: Database,
+		principal: string,
+		id: string,
+		revision: number,
+	) =>
+		!db
+			.query(`SELECT 1 FROM goal_progress
+			WHERE principal=? AND goal_id=? AND goal_revision=? AND mode='goal'`)
+			.get(principal, id, revision);
+
+	function registerInTransaction(
+		db: Database,
+		access: GoalAccess,
+		requestedSlot: number | null,
+		input: Adoption,
+		options: GoalRegistrationOptions = {
+			mode: "mock",
+			sourceRef: null,
+			startedAt: 0,
+			deliveryConversationId: null,
+		},
+	) {
+		if (requestedSlot !== null) slotNumber(requestedSlot);
+		if (!access.scopeKeys.includes(input.scopeKey))
+			throw new Error("goal_scope_forbidden");
+		const ledgerScopeKey =
+			registrationScope?.agendaScopeKey === input.scopeKey
+				? registrationScope.ledgerScopeKey
+				: input.scopeKey;
+		// Operations written before the scope change replay against their original goal.
+		const replay = db
+			.query<
+				{ slot: number; scope_key: string },
+				[string, string, string, string]
+			>(
+				"SELECT slot, scope_key FROM goal_slot_operations WHERE principal=? AND scope_key IN (?, ?) AND operation_id=?",
+			)
+			.get(
+				access.principal,
+				input.scopeKey,
+				ledgerScopeKey,
+				input.operationKey,
+			);
+		const slot =
+			requestedSlot ??
+			replay?.slot ??
+			Array.from({ length: GOAL_SLOTS }, (_, i) => i + 1).find(
+				(i) => !occupant(db, access.principal, i),
+			);
+		if (slot === undefined) throw new Error("goal_slots_full");
+		if (replay && replay.slot !== slot) throw new Error("operation_conflict");
+		if (!replay && occupant(db, access.principal, slot))
+			throw new Error("goal_slot_occupied");
+		const { sourceMessageIds, ...adoption } = input;
+		const goal = goals.adoptInTransaction(db, ledgerAccess(access), {
+			...adoption,
+			scopeKey: replay?.scope_key ?? ledgerScopeKey,
+			...(sourceMessageIds ? { sourceMessageIds: [...sourceMessageIds] } : {}),
+		});
+		if (!replay) {
+			db.query("INSERT INTO goal_slots VALUES (?, ?, ?)").run(
+				access.principal,
+				slot,
+				goal.id,
+			);
+			db.query("INSERT INTO goal_slot_operations VALUES (?, ?, ?, ?)").run(
+				access.principal,
+				ledgerScopeKey,
+				input.operationKey,
+				slot,
+			);
+		}
+		if (!replay)
+			initializeProgress(
+				db,
+				access.principal,
+				{ ...goal, goalId: goal.id },
+				options,
+			);
+		return goal;
+	}
+	function reviseInTransaction(
+		db: Database,
+		access: GoalAccess,
+		target: GoalTarget,
+		input: Omit<Revision, "expectedRevision">,
+		options?: Omit<GoalRegistrationOptions, "mode">,
+	) {
+		const { goalId, revision: goalRevision } = atSlot(db, access, target);
+		const key = { principal: access.principal, goalId, goalRevision };
+		const goal = goals.updateInTransaction(db, ledgerAccess(access), goalId, {
+			...input,
+			expectedRevision: goalRevision,
+		});
+		const prior = goalProgress.retireProgressInTransaction(
+			db,
+			access,
+			key,
+			"superseded",
+		);
+		initializeProgress(
+			db,
+			access.principal,
+			{ ...goal, goalId },
+			{
+				mode: prior?.mode ?? "mock",
+				sourceRef: options?.sourceRef ?? null,
+				startedAt: options?.startedAt ?? 0,
+				deliveryConversationId:
+					options?.deliveryConversationId ??
+					prior?.deliveryConversationId ??
+					null,
+			},
+		);
+		return goal;
+	}
+	function withdrawInTransaction(
+		db: Database,
+		access: GoalAccess,
+		target: GoalTarget,
+		input: Omit<Transition, "expectedRevision">,
+	) {
+		const { goalId, revision: goalRevision } = atSlot(db, access, target);
+		const goal = goals.withdrawInTransaction(db, ledgerAccess(access), goalId, {
+			...input,
+			expectedRevision: goalRevision,
+		});
+		goalProgress.retireProgressInTransaction(
+			db,
+			access,
+			{ principal: access.principal, goalId, goalRevision },
+			"withdrawn",
+		);
+		return goal;
+	}
+	const legacyCandidatesInTransaction = (db: Database, access: GoalAccess) =>
+		visible(db, access).filter(
+			(goal) =>
+				goal.status === "adopted" &&
+				!!db
+					.query("SELECT 1 FROM goal_slots WHERE principal=? AND goal_id=?")
+					.get(access.principal, goal.goalId) &&
+				goalProgress.canActivateLegacyInTransaction(db, access, goal),
+		);
+	const activateLegacyGoalsInTransaction = (
+		db: Database,
+		access: GoalAccess,
+		startedAt: number,
+		currentSource?: (db: Database, id: string) => string | null,
+	) =>
+		legacyCandidatesInTransaction(db, access).flatMap((goal) => {
+			const start =
+				preparation(db, goal.goalId, goal.revision)?.startedAt ?? startedAt;
+			const origin = goals.originInTransaction?.(
+				db,
+				ledgerAccess(access),
+				goal.goalId,
+			);
+			const refs = origin
+				? [
+						...(origin.source.kind === "message" ? [origin.source.id] : []),
+						...origin.messageIds,
+					]
+				: [];
+			const sourceRef = refs.find((id) => currentSource?.(db, id)) ?? null;
+			const adopted = goalProgress.activateLegacyProgressInTransaction(
+				db,
+				access,
+				goal,
+				start,
+				sourceRef,
+			);
+			return adopted ? [adopted] : [];
+		});
+
+	function listInTransaction(
+		db: Database,
+		access: GoalAccess,
+		mode?: GoalMode,
+	) {
+		const byId = new Map(
+			visible(db, access)
+				.filter(
+					(goal) =>
+						mode === undefined ||
+						mock(db, access.principal, goal.goalId, goal.revision) ===
+							(mode === "mock"),
+				)
+				.map((goal) => [goal.goalId, goal]),
+		);
+		return Array.from({ length: GOAL_SLOTS }, (_, index) => {
+			const slot = index + 1;
+			const id = occupant(db, access.principal, slot);
+			return { slot, goal: id ? (byId.get(id) ?? null) : null };
+		});
+	}
+
 	return {
+		...goalProgress,
+		activateLegacyGoalsInTransaction,
+		hasActivatableLegacyGoalsInTransaction: (
+			db: Database,
+			access: GoalAccess,
+		) => legacyCandidatesInTransaction(db, access).length > 0,
+		currentGoalInTransaction: currentGoal,
 		rememberDocumentInTransaction(
 			db: Database,
 			principal: string,
@@ -421,6 +678,7 @@ export function createGoalStore(
 		) =>
 			store.write((db) => {
 				if (
+					!mock(db, access.principal, goal.goalId, goal.revision) ||
 					!visible(db, access).some(
 						(g) =>
 							g.goalId === goal.goalId &&
@@ -434,7 +692,7 @@ export function createGoalStore(
 				if (prepared.note && !preparation(db, goal.goalId, goal.revision)?.note)
 					db.query(`UPDATE goal_permits SET design_note_id=?, design_digest=?
 					WHERE principal=? AND scope_key=? AND goal_id=? AND goal_revision=?
-					AND design_note_id IS NULL AND revoked=0`).run(
+					AND design_note_id IS NULL AND revoked=0 AND mode='mock'`).run(
 						prepared.note.id,
 						prepared.note.digest,
 						access.principal,
@@ -452,104 +710,25 @@ export function createGoalStore(
 			}),
 		goal: (access: GoalAccess, id: string) =>
 			store.read((db) => visible(db, access).find((g) => g.goalId === id)),
-		list: (access: GoalAccess) =>
-			store.readSnapshot((db) => {
-				const byId = new Map(
-					visible(db, access).map((goal) => [goal.goalId, goal]),
-				);
-				return Array.from({ length: GOAL_SLOTS }, (_, index) => {
-					const slot = index + 1;
-					const id = occupant(db, access.principal, slot);
-					return { slot, goal: id ? (byId.get(id) ?? null) : null };
-				});
-			}),
-		register: (
-			access: GoalAccess,
-			requestedSlot: number | null,
-			input: Adoption,
-		) =>
-			store.write((db) => {
-				if (requestedSlot !== null) slotNumber(requestedSlot);
-				if (!access.scopeKeys.includes(input.scopeKey))
-					throw new Error("goal_scope_forbidden");
-				const ledgerScopeKey =
-					registrationScope?.agendaScopeKey === input.scopeKey
-						? registrationScope.ledgerScopeKey
-						: input.scopeKey;
-				// Operations written before the scope change replay against their original goal.
-				const replay = db
-					.query<
-						{ slot: number; scope_key: string },
-						[string, string, string, string]
-					>(
-						"SELECT slot, scope_key FROM goal_slot_operations WHERE principal=? AND scope_key IN (?, ?) AND operation_id=?",
-					)
-					.get(
-						access.principal,
-						input.scopeKey,
-						ledgerScopeKey,
-						input.operationKey,
-					);
-				const slot =
-					requestedSlot ??
-					replay?.slot ??
-					Array.from({ length: GOAL_SLOTS }, (_, i) => i + 1).find(
-						(i) => !occupant(db, access.principal, i),
-					);
-				if (slot === undefined) throw new Error("goal_slots_full");
-				if (replay && replay.slot !== slot)
-					throw new Error("operation_conflict");
-				if (!replay && occupant(db, access.principal, slot))
-					throw new Error("goal_slot_occupied");
-				const { sourceMessageIds, ...adoption } = input;
-				const goal = goals.adoptInTransaction(db, ledgerAccess(access), {
-					...adoption,
-					scopeKey: replay?.scope_key ?? ledgerScopeKey,
-					...(sourceMessageIds
-						? { sourceMessageIds: [...sourceMessageIds] }
-						: {}),
-				});
-				if (!replay) {
-					db.query("INSERT INTO goal_slots VALUES (?, ?, ?)").run(
-						access.principal,
-						slot,
-						goal.id,
-					);
-					db.query("INSERT INTO goal_slot_operations VALUES (?, ?, ?, ?)").run(
-						access.principal,
-						ledgerScopeKey,
-						input.operationKey,
-						slot,
-					);
-				}
-				return goal;
-			}),
+		listInTransaction,
+		goalAtSlotInTransaction: atSlot,
+		list: (access: GoalAccess, mode?: GoalMode) =>
+			store.readSnapshot((db) => listInTransaction(db, access, mode)),
+		registerInTransaction,
+		reviseInTransaction,
+		withdrawInTransaction,
+		register: (access: GoalAccess, slot: number | null, input: Adoption) =>
+			store.write((db) => registerInTransaction(db, access, slot, input)),
 		revise: (
 			access: GoalAccess,
 			target: GoalTarget,
 			input: Omit<Revision, "expectedRevision">,
-		) =>
-			store.write((db) =>
-				goals.updateInTransaction(
-					db,
-					ledgerAccess(access),
-					atSlot(db, access, target).goalId,
-					{ ...input, expectedRevision: target.revision },
-				),
-			),
+		) => store.write((db) => reviseInTransaction(db, access, target, input)),
 		withdraw: (
 			access: GoalAccess,
 			target: GoalTarget,
 			input: Omit<Transition, "expectedRevision">,
-		) =>
-			store.write((db) =>
-				goals.withdrawInTransaction(
-					db,
-					ledgerAccess(access),
-					atSlot(db, access, target).goalId,
-					{ ...input, expectedRevision: target.revision },
-				),
-			),
+		) => store.write((db) => withdrawInTransaction(db, access, target, input)),
 		release: (access: GoalAccess, target: GoalTarget) =>
 			store.write((db) => {
 				const goal = atSlot(db, access, target);
@@ -569,6 +748,8 @@ export function createGoalStore(
 			store.write((db) => {
 				const goal = atSlot(db, access, target);
 				if (goal.status !== "adopted") throw new Error("goal_state_conflict");
+				if (!mock(db, access.principal, goal.goalId, goal.revision))
+					throw new Error("goal_mode_conflict");
 				const design =
 					preparation(db, goal.goalId, goal.revision)?.note ?? null;
 				if (
@@ -606,7 +787,7 @@ export function createGoalStore(
 			store.write((db) => {
 				for (const scope of access.scopeKeys)
 					db.query(
-						"UPDATE goal_permits SET revoked=1 WHERE id=? AND principal=? AND scope_key=?",
+						"UPDATE goal_permits SET revoked=1 WHERE id=? AND principal=? AND scope_key=? AND mode='mock'",
 					).run(id, access.principal, scope);
 			}),
 		permit: (
@@ -630,6 +811,22 @@ export function createGoalStore(
 			store.write((db) => {
 				const reason = guard(db);
 				if (reason) return reason;
+				if (
+					!mock(
+						db,
+						work.principal,
+						work.request.goalId,
+						work.request.goalRevision,
+					)
+				)
+					return "goal_mode_conflict";
+				if (
+					db
+						.query(`SELECT 1 FROM goal_work WHERE principal=?
+					AND mode='goal' AND state IN ('reserved','accepted','confirmation_pending')`)
+						.get(work.principal)
+				)
+					return "goal_work_busy";
 				db.query(
 					"INSERT INTO goal_work (id, principal, goal_id, goal_revision, payload, state) VALUES (?, ?, ?, ?, ?, 'reserved')",
 				).run(
@@ -652,19 +849,20 @@ export function createGoalStore(
 			store.write((db) => {
 				const reason = guard(db);
 				if (reason) return reason;
-				const goal = goals.completeInTransaction(
-					db,
-					ledgerAccess(access),
-					work.request.goalId,
-					{
-						expectedRevision: work.request.goalRevision,
-						source: {
-							namespace: "agency",
-							kind: "artifact",
-							id: result.artifactId,
-						},
-					},
-				);
+				const key = {
+					principal: work.principal,
+					goalId: work.request.goalId,
+					goalRevision: work.request.goalRevision,
+				};
+				if (
+					!mock(db, ...([key.principal, key.goalId, key.goalRevision] as const))
+				)
+					return "goal_mode_conflict";
+				const goal = completeGoalRevision(db, access, key, {
+					namespace: "agency",
+					kind: "artifact",
+					id: result.artifactId,
+				});
 				const report: GoalReport = {
 					...result,
 					id: `${work.request.goalId}:${goal.revision}`,
@@ -675,13 +873,14 @@ export function createGoalStore(
 					"INSERT INTO goal_reports (id, principal, payload) VALUES (?, ?, ?)",
 				).run(report.id, work.principal, JSON.stringify(report));
 				setWork(db, work.request.workId, "completed", null);
+				goalProgress.retireProgressInTransaction(db, access, key, "completed");
 				return report;
 			}),
 		pendingReports: (principal: string) =>
 			store.read((db) =>
 				db
 					.query<{ payload: string }, [string]>(
-						"SELECT payload FROM goal_reports WHERE principal=? AND state='pending' ORDER BY rowid",
+						"SELECT payload FROM goal_reports WHERE principal=? AND state='pending' AND mode='mock' ORDER BY rowid",
 					)
 					.all(principal)
 					.map((row) => JSON.parse(row.payload) as GoalReport),
@@ -690,7 +889,7 @@ export function createGoalStore(
 			store.read((db) =>
 				db
 					.query<{ payload: string }, [string]>(
-						"SELECT payload FROM goal_reports WHERE principal=? AND state='delivered' ORDER BY rowid",
+						"SELECT payload FROM goal_reports WHERE principal=? AND state='delivered' AND mode='mock' ORDER BY rowid",
 					)
 					.all(access.principal)
 					.map((row) => JSON.parse(row.payload) as GoalReport)
@@ -705,7 +904,7 @@ export function createGoalStore(
 		setReport: (id: string, state: "delivered" | "invalidated") =>
 			store.write((db) => {
 				db.query(
-					"UPDATE goal_reports SET state=? WHERE id=? AND state='pending'",
+					"UPDATE goal_reports SET state=? WHERE id=? AND state='pending' AND mode='mock'",
 				).run(state, id);
 			}),
 	};

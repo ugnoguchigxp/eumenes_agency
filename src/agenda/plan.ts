@@ -29,6 +29,7 @@ import {
 } from "./pacing.ts";
 import { asData, goalPlanInstructions, planData } from "./prompt.ts";
 import {
+	isAssignment,
 	known,
 	makeItem,
 	notes,
@@ -90,7 +91,7 @@ export async function plan(
 		now,
 		stamp: stampOf(st),
 		said: st.said,
-		items: st.items,
+		items: st.items.filter((i) => !isAssignment(i)),
 		known: knownNow,
 		plans: plansNow,
 		goals: goalsNow,
@@ -221,6 +222,7 @@ export async function plan(
 		const open = st.items.filter(
 			(i) =>
 				i.kind === a.kind &&
+				!isAssignment(i) &&
 				(i.status === "open" || i.status === "doing") &&
 				!(
 					i.kind === "research" &&
@@ -330,6 +332,7 @@ export async function plan(
 					.filter(
 						(i) =>
 							i.kind === "research" &&
+							!isAssignment(i) &&
 							(i.endedAt === null || now - i.endedAt < NOTE_FRESH_MS),
 					)
 					.map((i) => i.checkedRequest ?? i.text),

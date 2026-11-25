@@ -43,14 +43,31 @@ export const goalDesignSchema = z.strictObject({
 
 export type DesignOutput = z.infer<typeof goalDesignSchema>;
 export type GoalDesignOutput = DesignOutput;
+export const registeredGoalDesignSchema = goalDesignSchema.extend({
+	criteria: z.array(
+		z.strictObject({
+			sourceQuote: z.string().trim().min(1),
+			text: z.string().trim().min(1),
+		}),
+	),
+});
+export type GoalDesignCriterion = z.infer<
+	typeof registeredGoalDesignSchema
+>["criteria"][number];
+export type RegisteredGoalDesign = z.infer<typeof registeredGoalDesignSchema>;
+export interface RegisteredGoalDesignInput extends DesignInput {
+	readonly sourceText: string;
+}
 export type DesignGenerator = (
 	input: DesignInput,
 	signal: AbortSignal,
 ) => Promise<DesignOutput>;
-export type DesignInference = (input: {
+export type DesignInference<
+	Schema extends z.ZodType = typeof goalDesignSchema,
+> = (input: {
 	readonly instructions: string;
 	readonly data: string;
-	readonly schema: typeof goalDesignSchema;
+	readonly schema: Schema;
 	readonly signal: AbortSignal;
 }) => Promise<unknown>;
 export type GoalDesigner = (
@@ -114,22 +131,65 @@ const designInstructions = [
 ].join("\n");
 
 export function createDesignGenerator(infer: DesignInference): DesignGenerator {
-	return async (input, signal) => {
-		const data = asData(input);
-		if (Buffer.byteLength(data) > 128 * 1024)
-			throw new Error("goal_design_context_too_large");
-		const runSignal = AbortSignal.any([
-			signal,
-			AbortSignal.timeout(4 * 60_000),
-		]);
-		runSignal.throwIfAborted();
-		const output = await infer({
-			instructions: designInstructions,
-			data,
-			schema: goalDesignSchema,
-			signal: runSignal,
-		});
-		runSignal.throwIfAborted();
-		return validateDesign(input, output);
-	};
+	return async (input, signal) =>
+		validateDesign(
+			input,
+			await inferDesign(
+				infer,
+				input,
+				goalDesignSchema,
+				designInstructions,
+				signal,
+			),
+		);
+}
+
+async function inferDesign<Schema extends z.ZodType>(
+	infer: DesignInference<Schema>,
+	input: DesignInput,
+	schema: Schema,
+	instructions: string,
+	signal: AbortSignal,
+) {
+	const data = asData(input);
+	if (Buffer.byteLength(data) > 128 * 1024)
+		throw new Error("goal_design_context_too_large");
+	const runSignal = AbortSignal.any([signal, AbortSignal.timeout(4 * 60_000)]);
+	runSignal.throwIfAborted();
+	const output = await infer({ instructions, data, schema, signal: runSignal });
+	runSignal.throwIfAborted();
+	return output;
+}
+
+export function validateRegisteredGoalDesign(
+	input: RegisteredGoalDesignInput,
+	output: unknown,
+): RegisteredGoalDesign {
+	const { criteria, ...document } = registeredGoalDesignSchema.parse(output);
+	const design = validateDesign(input, document);
+	if (
+		criteria.some(({ sourceQuote }) => !input.sourceText.includes(sourceQuote))
+	)
+		throw new Error("goal_criterion_source_invalid");
+	return { ...design, criteria };
+}
+
+export function createRegisteredGoalDesignGenerator(
+	infer: DesignInference<typeof registeredGoalDesignSchema>,
+) {
+	const instructions =
+		designInstructions +
+		"\n" +
+		"criteria に、利用者の原文 sourceText に根拠のある個別の達成条件を、実物と照合できる形で記録します。sourceQuote は原文からの正確な引用です。手段の候補や独自に加えた期待値を達成条件にしません。元の目標全体は維持されます。";
+	return async (input: RegisteredGoalDesignInput, signal: AbortSignal) =>
+		validateRegisteredGoalDesign(
+			input,
+			await inferDesign(
+				infer,
+				input,
+				registeredGoalDesignSchema,
+				instructions,
+				signal,
+			),
+		);
 }

@@ -781,7 +781,7 @@ export async function openGoalHost(options: GoalHostOptions) {
 			return;
 		}
 		const candidates = store
-			.list(scopeAccess(scopeKey))
+			.list(scopeAccess(scopeKey), "mock")
 			.flatMap(({ goal }) => (goal?.status === "adopted" ? [goal] : []));
 		const goals = candidates.filter(
 			(g) =>
@@ -998,7 +998,7 @@ export async function openGoalHost(options: GoalHostOptions) {
 				Math.max(at, lastTickAt + 1000, q.speechUntil ?? at, q.allUntil ?? at),
 			);
 		const goals = store
-			.list(scopeAccess(scopeKey))
+			.list(scopeAccess(scopeKey), "mock")
 			.flatMap(({ goal }) => (goal?.status === "adopted" ? [goal] : []));
 		if (goals.length) {
 			due.push(wakeRequested ? at : lastTickAt + IDLE_PLAN_MS);

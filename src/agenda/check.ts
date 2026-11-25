@@ -32,6 +32,8 @@ export async function check(
 			// A research that failed brought nothing back: asking it again is not a repeat.
 			(i) =>
 				i.kind === "research" &&
+				// Work handed to a toolchain is no research: it covers no theme.
+				i.delegatedTo === undefined &&
 				i.id !== item.id &&
 				i.status !== "open" &&
 				i.status !== "failed",

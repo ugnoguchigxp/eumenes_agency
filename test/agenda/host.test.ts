@@ -251,7 +251,7 @@ test("the reply always sees the note behind a topic the agent brought up itself"
 	expect(m[1]!.content).toContain('"id":"n1"');
 });
 
-test("Eumenes' way of handing work over: find a toolchain that fits, delegate to it, a TODO comes back", async () => {
+test("Eumenes' way of handing work over: find a toolchain that fits, delegate to it, an assignment is kept", async () => {
 	const { createAgendaAgent } = await import("../../src/agenda/index.ts");
 	const { createAgendaReplyTools } =
 		await import("../../standalone/agenda-reply.ts");
@@ -289,34 +289,28 @@ test("Eumenes' way of handing work over: find a toolchain that fits, delegate to
 	);
 	// A toolchain it has not found is not one to hand work to.
 	expect(
-		await call("delegate", {
-			mode: "execute",
-			toolchain: "video.generate",
-			request: "x",
-			impact: "y",
-		}),
+		await call("delegate", { toolchain: "video.generate", request: "x" }),
 	).toMatchObject({ status: "error", error: "unknown_toolchain" });
-	// What the user has not said yes to waits for their word.
-	expect(
-		await call("delegate", {
-			mode: "confirm",
-			toolchain: toolchain!.toolchain,
-			request: "ジョギングの距離を記録するアプリ",
-			impact: "アプリが届く",
-		}),
-	).toMatchObject({ status: "error", error: "needs_user_confirmation" });
 	const done = await call("delegate", {
-		mode: "execute",
 		toolchain: toolchain!.toolchain,
 		request: "ジョギングの距離を記録するアプリ",
-		impact: "アプリが届く",
 	});
-	expect(done).toMatchObject({ status: "accepted", revision: 1 });
-	expect(agent.view().items.find((i) => i.id === done["todo"])).toMatchObject({
+	expect(done).toMatchObject({ status: "accepted" });
+	expect(done).not.toHaveProperty("todo");
+	expect(
+		agent.view().items.find((i) => i.id === done["assignment"]),
+	).toMatchObject({
 		kind: "research",
 		delegatedTo: toolchain!.toolchain,
 		requested: true,
 	});
+	// The same work, handed over again while it is going on, is refused.
+	expect(
+		await call("delegate", {
+			toolchain: toolchain!.toolchain,
+			request: "ジョギングの距離を記録するアプリ",
+		}),
+	).toMatchObject({ status: "error", error: "duplicate" });
 	// The work is mocked: a note that says what was done.
 	expect(
 		(await mockToolchainWork("ジョギングの距離を記録するアプリ", "mock.x"))

@@ -1,8 +1,8 @@
 # 登録目標の次の一手を選ぶ Agency 契約
 
-2026年11月23日。離席中も目標を進める方針は利用者と合意済み。本書は次回実装するパッケージ契約と行動試験を定める。永続キュー、許可、移行、実行先、製品としての完了条件は本家の設計を正本とする。[本家の設計と実装計画](../../eumenes/spec/registered-goal-autonomy-2026-11-23.md)
+2026年11月23日。離席中も目標を進める方針は利用者と合意済み。本書は 0.1.12 に実装したパッケージ契約と行動試験を定める。永続キュー、許可、移行、実行先、製品としての完了条件は本家の設計を正本とする。固定試験・実モデル試験の結果と未確認の範囲は本家の検証記録に分ける。[本家の設計と実装計画](../../eumenes/spec/registered-goal-autonomy-2026-11-23.md)・[実装・検証記録](../../eumenes/spec/verification/goal-autonomy-2026-11-23/README.md)
 
-第2稿では、以下の型名を新しく公開する契約として固定する。最初の変更は `decideGoalStep` とその部分試験。次の変更で判断の採用結果を GoalStore に保存する。配布物と本家に渡す順序は共通の実装手順を参照する。[実装担当の着手手順](../../eumenes/spec/registered-goal-autonomy-implementation-2026-11-23.md)
+第2稿で固定した型名を公開し、`decideGoalStep` の採用結果を GoalStore に保存する。配布物と本家への取込順序、各段の合格条件は共通の実装手順を参照する。[実装担当の手順書](../../eumenes/spec/registered-goal-autonomy-implementation-2026-11-23.md)
 
 ## 1. 判断を呼ぶ単位
 
@@ -38,18 +38,25 @@
 
 次は新設する `src/agenda/goal-step.ts` の公開型。実装は Zod の strict object と判別可能な union から型を導出する。参照はその呼出しでホストが発行した不透明な文字列。モデル入力に含める参照と、裏側で対応付ける許可ID・証拠の原版・受付の再送キーを分ける。
 
+推論に渡す応答スキーマは strict object の `{step: GoalStep}` とする。`step` 内の選択肢には `anyOf` を使い、Agency が各 `kind` の strict schema と提示参照を検査してから公開関数の `step` を返す。2026年11月23日の保存済み通常接続による確認で、この形式を使った実モデルが、終了2の観測から資料を読む行動を選んだ。公開する `GoalStep` は下記の形を使う。[Structured Outputs の対応スキーマ](https://developers.openai.com/api/docs/guides/structured-outputs#supported-schemas)
+
 ```ts
 type GoalStepContext = {
   version: 1
   contextId: string
   goal: { id: string; revision: number; desiredState: string; sourceRef: string | null }
   progressVersion: number
+  editAvailability?: {
+    workspaceRef: string; permittedPaths: string[]; nowMs: number; notBeforeMs: number; reason: string
+  }
+  verificationRequired?: { attemptRef: string; criterionIds: string[] }
   criteria: Array<{ id: string; text: string; status: "open" | "passed"; evidenceRefs: string[] }>
   evidence: Array<{ ref: string; version: string; summary: string }>
   attempts: Array<{
     ref: string; criterionIds: string[]; capabilityRef: string; request: string; expectedObservation: string
     outcome: "reserved" | "running" | "succeeded" | "partial" | "failed" | "rejected" | "cancelled"
     observed: string | null; evidenceRefs: string[]
+    savedReceipt?: { ownerWorkId: string; ownerRevision: number; resultRef: string | null }
   }>
   capabilities: Array<{ ref: string; description: string; allowedScope: string }>
   watches: Array<{ ref: string; condition: string; dueAtMs: number | null }>
@@ -70,6 +77,12 @@ type GoalStep = {
   | { kind: "verify"; checks: Array<{ criterionId: string; checkRef: string; evidenceRefs: string[] }> }
 )
 ```
+
+`editAvailability` は、保存済みの変更許可を初回分析の時刻条件で待っている間に付ける。許可済みパス、判断時刻、開始可能時刻を示し、同じ期限を `watches` に提示する。実行に使える能力は `capabilities` で示す。ホストは未回答の質問を保存したまま期限到達時に再判断し、時刻による保留の解除に本人の再許可を要求しない。
+
+`savedReceipt` は、ホストが台帳へ保存した実行先の受付ID・版・結果参照。返却済みの観測と、新しい `act` による実行を区別する判断材料にする。既存の受付の照会・復旧はホストが元のIDで行う。登録済み検査の能力には実際の `command/args/cwd` を提示し、その能力を選ぶと許可された固定の検査が実行されることを示す。成果物に求める条件は引き続き原文と独立検証で判定する。
+
+`verificationRequired` は、成果を返す能力の成功後に、対応する独立検査がある条件をホストが示す。該当する判断では `verify` を選び、指定された全条件と提示検査・根拠を対応付ける。新たな作業の能力は提示しない。同じ受付の成果版に対する検証を一度行い、不一致なら未達条件と実測を持って通常の次の一手へ戻す。文書の意味検証にも同じ状態制約を使う。
 
 - 登録時に必ず `root` を作る。本文は Goals の `desiredState` と同一。新規の明示登録は `goal.sourceRef` で今回の利用者の原文を参照し、条件の引用を証拠入力に含める。参照を復元できない旧行は `null` として登録済みの本文を使う。最初に設計書を作る推論で、目標用の出力スキーマに `criteria: Array<{sourceQuote: string; text: string}>` を加える。既存の設計指示と `validateDesign` による本文・出典検査を再利用し、旧入口は既存スキーマで読む。目標用入口は原文中の引用と空でない検査条件を確認する。最初の有効な設計を採用する writer で内訳に `root.1` 以降のIDを付け、設計の再送には保存済みの割当を返す。内訳が空でも `root` を検証する。手段の変更で条件を削除したり、件数・期待値を変更したりしない。小目標は試行に記録し、完了には原文と全条件を照合する。[既存の設計生成・検査](../runtime/agenda/goal-design.ts)
 - `attempts` は直近の各試行と対象条件に関わる過去の失敗を載せる。何を依頼し、何を期待し、実際に何が返ったかを同じ試行で読める形にする。`observed` と証拠の `summary` は受付先・検査器の観測から作り、`evidence` は有効な参照だけを載せる。`reason` は今回の選択を根拠づける観測の短い説明。検査提案に証拠がまだない場合は、提示された `checkRef` で実行して取得できる。恒久拒否で使えない能力は理由を直近の結果に残す。

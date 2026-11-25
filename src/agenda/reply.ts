@@ -14,6 +14,7 @@ import type { AgendaAgent } from "./agent.ts";
 import {
 	quietKinds,
 	quietMinutes,
+	type AgendaItem,
 	type GoalRecord,
 	type KnownItem,
 	type NoteRef,
@@ -21,9 +22,19 @@ import {
 	type QuietScope,
 } from "./contracts.ts";
 import { asData } from "./prompt.ts";
+import { isAssignment } from "./state.ts";
 import { themeOverlap } from "./text.ts";
 
 export const START_PREPARATION = "start_preparation";
+
+/** How much of an assignment the reply's state carries: the rest is in its report note. */
+const ASSIGNMENT_REQUEST_CHARS = 80;
+const ASSIGNMENT_PROGRESS_CHARS = 120;
+const ASSIGNMENT_QUESTION_CHARS = 300;
+/** The ended assignments still shown (the newest): what was told lately, not the whole history. */
+const ENDED_ASSIGNMENTS = 3;
+const clip = (text: string, max: number) =>
+	text.length > max ? `${text.slice(0, max - 1)}…` : text;
 export const SHOW_NOTE = "show_note";
 export const READ_NOTE = "read_note";
 export const SET_QUIET = "set_quiet";
@@ -67,17 +78,14 @@ const tools: readonly ToolDefinition[] = [
 	{
 		name: DELEGATE,
 		description:
-			"見つけた担当に仕事を依頼する。依頼するとTODOができ、結果は後で届く（できたらあなたから知らせる）。mode: execute=すぐ実行（利用者が頼んだ・乗ったとき）、confirm=実行前に利用者の確認が要る、approve=利用者の承認が要る。",
+			"見つけた担当に仕事を依頼する（利用者が頼んだ・乗ったとき）。依頼すると担当の作業ができ、状態の assignments に出る。結果は後でメモになって届き、終わったことも担当からの質問も、あなたから利用者に知らせる。",
 		parameters: {
 			type: "object",
 			additionalProperties: false,
-			required: ["mode", "toolchain", "request", "impact"],
+			required: ["toolchain", "request"],
 			properties: {
-				mode: { type: "string", enum: ["execute", "confirm", "approve"] },
 				toolchain: { type: "string" },
 				request: { type: "string", description: "何を作るかを具体的に" },
-				announcement: { type: "string" },
-				impact: { type: "string", description: "利用者に何が届くか" },
 			},
 		},
 	},
@@ -141,7 +149,7 @@ export interface AgendaToolchain {
 /**
  * The host's catalog of toolchains for find_toolchain and delegate (absent: neither tool is
  * offered). Delegated work comes back to the host as a research ticket with `delegatedTo`; the
- * host runs it there and asks the user first where its toolchains act for real.
+ * host runs it there, reports its progress and questions, and returns the result as a note.
  */
 export interface AgendaToolchains {
 	find(
@@ -166,6 +174,24 @@ export interface ReplyToolEvents {
 	readonly onQuiet?: (r: { scope: QuietScope; minutes: number }) => void;
 	readonly onRead?: (note: { id: string; title: string }) => void;
 }
+
+/** How an assignment stands, in the words the reply says it with. */
+const assignmentStatus = (i: AgendaItem): string => {
+	switch (i.status) {
+		case "open":
+			return "待っている";
+		case "doing":
+			return i.question ? "質問がある" : "進めている";
+		case "done":
+			return i.resultNoteId
+				? `終わった（メモ ${i.resultNoteId} になった）`
+				: "終わった";
+		case "failed":
+			return "やり遂げられなかった";
+		case "dropped":
+			return "やめた";
+	}
+};
 
 /** The reply's tools. Refusals come back as tool results, not errors. */
 export function createAgendaReplyTools(input: {
@@ -236,16 +262,12 @@ export function createAgendaReplyTools(input: {
 						: null;
 				const request =
 					typeof args["request"] === "string" ? args["request"].trim() : "";
-				if (
-					!["execute", "confirm", "approve"].includes(String(args["mode"])) ||
-					request === "" ||
-					typeof args["impact"] !== "string"
-				)
+				if (request === "")
 					return {
 						content: JSON.stringify({
 							status: "error",
 							error: "invalid_arguments",
-							detail: "mode, toolchain, request, impact",
+							detail: "toolchain, request",
 						}),
 					};
 				if (!toolchain)
@@ -254,18 +276,6 @@ export function createAgendaReplyTools(input: {
 							status: "error",
 							error: "unknown_toolchain",
 							detail: String(args["toolchain"]),
-						}),
-					};
-				// Only what the user said yes to runs here: anything else waits for their word. The
-				// model's mode=execute is taken as that yes for the ticket; a host whose toolchains act
-				// for real asks the user itself before it runs the ticket, and keeps the record of what
-				// ran (spec 2026-11-08 §12, review 2026-11-10).
-				if (args["mode"] !== "execute")
-					return {
-						content: JSON.stringify({
-							status: "error",
-							error: "needs_user_confirmation",
-							detail: "利用者が乗ったら mode=execute で頼み直す",
 						}),
 					};
 				const r = input.agent.requestResearch({
@@ -282,9 +292,7 @@ export function createAgendaReplyTools(input: {
 				return {
 					content: JSON.stringify({
 						status: "accepted",
-						todo: r.item.id,
-						revision: 1,
-						...(r.queued ? { queued: true } : {}),
+						assignment: r.item.id,
 					}),
 				};
 			}
@@ -385,12 +393,12 @@ export function agendaReplySystem(
 			: []),
 		...(options.toolchains
 			? [
-					`- 作ったものを相手が気に入ったら（「いいね」「好き」など）、同じテーマで続けて作ることを持ちかけます（例:「毎日1曲このテーマで作ろうと思いますが、スケジュールしますか？」）。乗ってもらえたら、${FIND_TOOLCHAIN} で定期的に作れる担当を探し、${DELEGATE}（mode は execute、request にいつ・何を・どのテーマで作るか）で頼みます。`,
+					`- 作ったものを相手が気に入ったら（「いいね」「好き」など）、同じテーマで続けて作ることを持ちかけます（例:「毎日1曲このテーマで作ろうと思いますが、スケジュールしますか？」）。乗ってもらえたら、${FIND_TOOLCHAIN} で定期的に作れる担当を探し、${DELEGATE}（request にいつ・何を・どのテーマで作るか）で頼みます。`,
 				]
 			: []),
 		...(options.toolchains
 			? [
-					`- 相手がはっきり頼んだとき、または持ちかけに乗ったときは、見つかった担当に ${DELEGATE}（mode は execute、request に何をしてほしいか、impact に相手に何が届くか）で頼み、頼んだことを伝えます。まだ探していなければ、先に ${FIND_TOOLCHAIN} で探します。できる前に「できた」とは言いません。`,
+					`- 相手がはっきり頼んだとき、または持ちかけに乗ったときは、見つかった担当に ${DELEGATE}（request に何をしてほしいか）で頼み、頼んだことを伝えます。まだ探していなければ、先に ${FIND_TOOLCHAIN} で探します。できる前に「できた」とは言いません。`,
 				]
 			: []),
 		`- 利用者が静かにしてほしいと言ったら ${SET_QUIET} で期間を決めます（話しかけだけ止めるか、調べものも含めてすべて止めるか）。控えてほしい気持ちをやわらかく言ったとき（「ちょっと待って」「今はのんびりしたい」「そっとしておいて」「今はいい」「話しかけが続いてる」など）も、短い一時停止の頼みです（kind=soft）。`,
@@ -408,6 +416,7 @@ export function agendaReplySystem(
 		`- notes にあるテーマは、${READ_NOTE} で読んで答えます。ただし天気・ニュース・上映や営業の時間・価格のように時期で変わる情報で、メモがその時期のものでない（madeMinutesAgo が大きく、相手が聞いている日や今の話でない）ときは、メモで答えず調べ直します。`,
 		"- メモの id（n1 など）は内部の印なので、利用者には言いません。「調べておいたメモ」のように言います。",
 		`- 調べものを頼んだ・調べ始めたと言うのは、この返事で ${START_PREPARATION} を呼んだときか、状態の researching・researchLog にあるときだけです。「調べている」「調べ中」と言うのは、researching にあるか researchLog の status が「調べている」のときだけです。メモになったものは「調べておいた」と言い、${READ_NOTE} で読んでその中身で答えます。status が「調べられなかった」ものは、調べられなかったと正直に言い、頼まれればもう一度 ${START_PREPARATION} で頼みます。`,
+		`- 担当に仕事を渡した・進めていると言うのは、状態の assignments にあるときだけです。status が「質問がある」のものは、question を利用者にたずね、返ってきた答えは担当への回答の道具で渡します。「終わった」ものは、${READ_NOTE} でメモを読んでその中身で答えます。「やり遂げられなかった」ものは、できなかったと正直に言います。`,
 		"- 記憶にあることは、聞き直さずに話題選びへ自然に使います。",
 		"- plans は、利用者が前に話した予定（dueAt は期限、null は日付が未定）、goals は利用者が決めた目標です。話題に出たら知っている前提で話し、決まっていないことを決めつけません。",
 		"- memory・plans・goals は、どれも利用者が前に話したことで、あなたが覚えていることです。「記憶の欄」のような内部の区別や仕組みを利用者に説明せず、何を覚えているかで答えます。",
@@ -584,6 +593,32 @@ export function agendaReplyMessages(input: {
 	// In a conversation the agent asks only here: code picks the question and when (one in two
 	// replies); the reply words it, or leaves it out.
 	const ask = input.agent.askForReply(input.now);
+	// Work handed to a toolchain: the ones going on and the last 8 that ended. Its own place, so a
+	// request is never lost from view (the researcher's lists above are for research only).
+	const assignmentItems = view.items.filter(isAssignment);
+	// The full request and the result are in the report note: the state carries the head of each, so long requests to
+	// a developer toolchain do not grow every reply's input.
+	const assignments = [
+		...assignmentItems.filter(
+			(i) => i.status === "open" || i.status === "doing",
+		),
+		...assignmentItems
+			.filter((i) => i.status !== "open" && i.status !== "doing")
+			.slice(-ENDED_ASSIGNMENTS),
+	].map((i) => ({
+		id: i.id,
+		assignee: i.delegatedTo!,
+		request: clip(i.text, ASSIGNMENT_REQUEST_CHARS),
+		status: assignmentStatus(i),
+		...(i.progress
+			? { progress: clip(i.progress, ASSIGNMENT_PROGRESS_CHARS) }
+			: {}),
+		...(i.question
+			? { question: clip(i.question, ASSIGNMENT_QUESTION_CHARS) }
+			: {}),
+		minutesAgo: Math.round((input.now - i.createdAt) / 60_000),
+		...(i.requested ? { askedByUser: true } : {}),
+	}));
 	const state = {
 		...(away ? { whileAway: away } : {}),
 		now: input.clock,
@@ -625,13 +660,19 @@ export function agendaReplyMessages(input: {
 			: null,
 		waitingResearch: view.items
 			.filter(
-				(i) => i.kind === "research" && i.status === "open" && i.requested,
+				(i) =>
+					i.kind === "research" &&
+					!isAssignment(i) &&
+					i.status === "open" &&
+					i.requested,
 			)
 			.map((i) => i.text),
 		// What was asked of the researcher in this session and what came of it: the reply's own
 		// earlier tool calls are not in the conversation, so this is how it knows what it did.
 		researchLog: view.items
-			.filter((i) => i.kind === "research" && i.status !== "open")
+			.filter(
+				(i) => i.kind === "research" && !isAssignment(i) && i.status !== "open",
+			)
 			.slice(-8)
 			.map((i) => ({
 				request: i.checkedRequest ?? i.text,
@@ -648,6 +689,7 @@ export function agendaReplyMessages(input: {
 				minutesAgo: Math.round((input.now - i.createdAt) / 60_000),
 				...(i.requested ? { askedByUser: true } : {}),
 			})),
+		...(assignments.length ? { assignments } : {}),
 		quiet: {
 			speechForMin: minutesLeft(view.quiet.speechUntil, input.now),
 			pausedForMin: minutesLeft(view.quiet.allUntil, input.now),

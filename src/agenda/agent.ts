@@ -58,6 +58,7 @@ import {
 } from "./prompt.ts";
 import {
 	createState,
+	isAssignment,
 	makeItem,
 	nextId,
 	remember,
@@ -121,13 +122,28 @@ export interface AgendaAgent {
 	nextAt(now: number): number | null;
 	/** The host's answer to a research ticket: accepted, or refused (busy researcher). */
 	researchStarted(ticketId: string, accepted: boolean, at: number): void;
-	/** A research came back; the host saved its note (null when it failed). */
+	/**
+	 * A research or an assignment came back; the host saved its note (null when it failed).
+	 */
 	researchReturned(r: {
 		ticketId: string;
 		at: number;
 		status: "succeeded" | "failed";
 		note: NoteRef | null;
 	}): void;
+	/**
+	 * The host reports how an issued assignment (a ticket with `delegatedTo`) stands: the assignee's
+	 * latest one-line progress and its open question to the user (null: none). A new question is
+	 * asked of the user by the agent itself, once. Unknown tickets are ignored.
+	 */
+	assignmentObserved(r: {
+		ticketId: string;
+		at: number;
+		progress: string | null;
+		question: string | null;
+	}): void;
+	/** The user called an assignment off: it is dropped, no failure is told. */
+	assignmentEnded(r: { itemId: string; at: number; status: "dropped" }): void;
 	/** The host delivered (or failed to deliver) a speak ticket. */
 	recordDelivery(r: {
 		ticketId: string;
@@ -145,8 +161,16 @@ export interface AgendaAgent {
 		at: number;
 		/** The user asked for it (absent: yes). */
 		requested?: boolean;
-		/** Work for a toolchain found through find_toolchain instead of research (the user said yes). */
+		/**
+		 * Work for a toolchain found through find_toolchain instead of research (the user said
+		 * yes). It does not wait for the researcher: `queued` is false for it.
+		 */
 		delegatedTo?: string;
+		/**
+		 * An assignment the user asked for on a screen (a form they sent), not in words the agent
+		 * heard: the request rests on that message. Only with `delegatedTo`.
+		 */
+		userRef?: { readonly id: string };
 	}):
 		| { readonly item: AgendaItem; readonly queued: boolean }
 		| { readonly rejected: string };
@@ -179,6 +203,24 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 		st.researching
 			? (st.items.find((i) => i.id === st.researching!.ticket.itemId) ?? null)
 			: null;
+	/** The assignee's question and progress end with the assignment; so does the line asking it. */
+	const closeAssignment = (item: AgendaItem) => {
+		if (item.question) dropQuestionLine(item, item.question);
+		delete item.question;
+		delete item.progress;
+	};
+	/** The line that would ask the assignee's question is not said once the question is gone. */
+	const dropQuestionLine = (item: AgendaItem, question: string) => {
+		const line = questionLine(item, question);
+		for (const i of st.items)
+			if (i.kind === "talk" && i.status === "open" && i.text === line) {
+				i.status = "dropped";
+				i.endedAt = item.endedAt ?? i.createdAt;
+			}
+	};
+	const questionLine = (item: AgendaItem, question: string) =>
+		`担当（${item.delegatedTo}）から質問:「${question}」`;
+
 	/**
 	 * The researcher failed, or never came back. What the user asked for, or what the reply said
 	 * it would look into, was promised: the user hears it did not work out, not silence.
@@ -191,6 +233,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 		if (!item) return;
 		item.status = "failed";
 		item.endedAt = at;
+		closeAssignment(item);
 		if (!(t.requested || t.promised) || t.refs.some((x) => st.forgotten.has(x)))
 			return;
 		st.items.push(
@@ -209,6 +252,39 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				createdAt: at,
 			}),
 		);
+	};
+
+	/**
+	 * Assignments (work for a toolchain) are issued at once, one ticket per open item, beside the
+	 * researcher's one slot: the user asked for them, so a quiet does not hold them (only the host's
+	 * stop does, in `step`). No time limit here: the host owns the deadline and reports a failure.
+	 */
+	const issueAssignments = (now: number): AgendaTicket[] => {
+		const tickets: AgendaTicket[] = [];
+		for (const item of st.items) {
+			if (
+				!isAssignment(item) ||
+				item.status !== "open" ||
+				(item.deferUntil !== null && item.deferUntil > now)
+			)
+				continue;
+			const ticket: AgendaTicket = {
+				id: nextId(st, "t"),
+				kind: "research",
+				itemId: item.id,
+				text: withLinks(st, item.text, item.refs),
+				requested: item.requested,
+				promised: item.promised,
+				refs: [...item.refs],
+				at: now,
+				delegatedTo: item.delegatedTo!,
+			};
+			item.status = "doing";
+			item.deferUntil = null;
+			st.issued.set(ticket.id, ticket);
+			tickets.push(ticket);
+		}
+		return tickets;
 	};
 
 	/** The line written ahead is not said: its item goes back to wait. */
@@ -492,6 +568,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			};
 			if (st.stopped) return { ...base, skipped: "stopped" };
 			endQuiet(st, now);
+			// The researcher's time limit only: an assignment's deadline is the host's.
 			if (st.researching && st.researching.at + RESEARCH_TTL_MS <= now) {
 				const t = st.researching.ticket;
 				st.issued.delete(t.id);
@@ -506,9 +583,10 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 					now
 			)
 				wantPlan(st);
+			const assigned = issueAssignments(now);
 			if (paused(st, now)) {
 				dropReady();
-				return { ...base, skipped: null };
+				return { ...base, tickets: assigned, skipped: null };
 			}
 			// Nothing that may be said now: this very step digs (not the next one).
 			if (canDig(st, now)) {
@@ -534,6 +612,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			]);
 			if (pr.status === "rejected" || fr.status === "rejected") {
 				if (pr.status === "fulfilled") takeBack(pr.value.tickets);
+				takeBack(assigned);
 				if (fr.status === "fulfilled")
 					settleLine(fr.value, now, host, AbortSignal.abort());
 				throw pr.status === "rejected"
@@ -556,6 +635,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			// Stopped while they were out: nothing is started or said.
 			if (st.stopped) {
 				takeBack(p.tickets);
+				takeBack(assigned);
 				dropReady();
 				return {
 					...base,
@@ -577,14 +657,18 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				check: p.checked,
 				repeats,
 				compose: s.composed,
-				tickets: [...p.tickets, ...(line ? [line] : [])],
+				tickets: [...assigned, ...p.tickets, ...(line ? [line] : [])],
 			};
 		},
 
 		nextAt(now) {
 			if (st.stopped) return null;
-			if (paused(st, now)) return st.quiet.allUntil;
-			const times: number[] = [];
+			// An assignment waits for nothing but its retry time (not for a quiet, not for the researcher).
+			const assignedAt = st.items
+				.filter((i) => isAssignment(i) && i.status === "open")
+				.map((i) => Math.max(now, i.deferUntil ?? now));
+			if (paused(st, now)) return Math.min(st.quiet.allUntil!, ...assignedAt);
+			const times: number[] = [...assignedAt];
 			if (st.quiet.speechUntil !== null && st.quiet.speechUntil > now)
 				times.push(st.quiet.speechUntil);
 			if (st.planDue) times.push(Math.max(now, st.planRetryAt ?? now));
@@ -595,7 +679,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			);
 			if (st.researching === null) {
 				for (const i of st.items)
-					if (i.status === "open" && i.kind === "research")
+					if (i.status === "open" && i.kind === "research" && !isAssignment(i))
 						times.push(
 							Math.max(
 								now,
@@ -667,6 +751,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				item.status = "done";
 				item.endedAt = r.at;
 				item.resultNoteId = r.note?.id ?? null;
+				closeAssignment(item);
 			}
 			const usable =
 				r.status === "succeeded" &&
@@ -711,21 +796,78 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 					makeItem(st, {
 						kind: "talk",
 						text: t.delegatedTo
-							? `頼まれた「${r.note!.title}」ができた`
+							? `頼まれた「${item!.text}」を担当（${t.delegatedTo}）が終えた（メモ ${r.note!.title}）`
 							: t.requested
 								? `頼まれた調べもの「${r.note!.title}」ができた`
 								: `調べておくと言った「${r.note!.title}」がまとまった`,
 						refs: [`note:${r.note!.id}`, ...t.refs],
 						value: 5,
-						reason: t.requested
-							? "利用者に頼まれた調べものの結果"
-							: "返事で調べておくと言ったことの結果",
+						reason: t.delegatedTo
+							? "利用者に頼まれた担当の作業の結果"
+							: t.requested
+								? "利用者に頼まれた調べものの結果"
+								: "返事で調べておくと言ったことの結果",
 						requested: t.requested,
 						promised: true,
 						noteId: r.note!.id,
 						createdAt: r.at,
 					}),
 				);
+		},
+
+		assignmentObserved(r) {
+			const t = st.issued.get(r.ticketId);
+			if (!t || t.kind !== "research" || t.delegatedTo === undefined) return;
+			const item = st.items.find((i) => i.id === t.itemId);
+			if (!item || !isAssignment(item)) return;
+			item.progress = r.progress;
+			const before = item.question ?? null;
+			item.question = r.question;
+			if (before !== null && before !== r.question)
+				dropQuestionLine(item, before);
+			// A new question is asked of the user by the agent itself (not only if a reply happens
+			// to mention it); the same question is not queued twice.
+			const line = r.question === null ? null : questionLine(item, r.question);
+			if (
+				line === null ||
+				before === r.question ||
+				t.refs.some((x) => st.forgotten.has(x)) ||
+				st.items.some(
+					(i) => i.kind === "talk" && i.status === "open" && i.text === line,
+				)
+			)
+				return;
+			st.items.push(
+				makeItem(st, {
+					kind: "talk",
+					text: line,
+					refs: [...t.refs],
+					value: 5,
+					reason: "担当が利用者に聞きたいことがある",
+					requested: t.requested,
+					promised: true,
+					createdAt: r.at,
+				}),
+			);
+			wantPlan(st);
+			st.lastInfoAt = Math.max(st.lastInfoAt, r.at);
+		},
+
+		assignmentEnded(r) {
+			const item = st.items.find((i) => i.id === r.itemId);
+			if (
+				!item ||
+				!isAssignment(item) ||
+				(item.status !== "open" && item.status !== "doing")
+			)
+				return;
+			item.status = r.status;
+			item.endedAt = r.at;
+			closeAssignment(item);
+			for (const [id, t] of st.issued)
+				if (t.kind === "research" && t.itemId === item.id) st.issued.delete(id);
+			wantPlan(st);
+			st.lastInfoAt = Math.max(st.lastInfoAt, r.at);
 		},
 
 		recordDelivery(r) {
@@ -771,14 +913,20 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			const requested = r.requested ?? true;
 			const text = r.text.trim();
 			if (text === "") return { rejected: "empty" };
-			const asked = [...st.said].reverse().find((s) => s.who === "user");
+			const asked =
+				r.delegatedTo !== undefined && r.userRef
+					? r.userRef
+					: [...st.said].reverse().find((s) => s.who === "user");
 			if (!asked) return { rejected: "needs_user_request" };
 			const same = normalize(text);
+			// An assignment is the same one only for the same assignee; research and assignments
+			// are not each other's duplicates.
 			if (
 				st.items.some(
 					(i) =>
 						i.kind === "research" &&
 						(i.status === "open" || i.status === "doing") &&
+						i.delegatedTo === r.delegatedTo &&
 						normalize(i.text) === same,
 				)
 			)
@@ -800,7 +948,10 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 					: {}),
 			});
 			st.items.push(item);
-			return { item, queued: st.researching !== null };
+			return {
+				item,
+				queued: r.delegatedTo === undefined && st.researching !== null,
+			};
 		},
 
 		noteUsed(noteId, at) {
@@ -916,6 +1067,8 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 					...(i.delegatedTo !== undefined
 						? { delegatedTo: i.delegatedTo }
 						: {}),
+					...(i.question !== undefined ? { question: i.question } : {}),
+					...(i.progress !== undefined ? { progress: i.progress } : {}),
 				})),
 		}),
 	};
@@ -952,6 +1105,8 @@ function restore(st: AgendaState, given: AgendaSnapshot): void {
 				? { checkedRequest: x.checkedRequest }
 				: {}),
 			...(x.delegatedTo !== undefined ? { delegatedTo: x.delegatedTo } : {}),
+			...(x.question !== undefined ? { question: x.question } : {}),
+			...(x.progress !== undefined ? { progress: x.progress } : {}),
 		});
 	}
 	const highest = Math.max(

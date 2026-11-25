@@ -36,7 +36,7 @@ bun run eval:always-on:api <run-name> [scenario...]  # Haikuで7つのシナリ�
 
 目標の保存には隣接する `eumenes` チェックアウトの Goals を使用します。別の場所にある場合は `EUMENES_ROOT` を指定してください。通し確認では `zsh -l scripts/api-entry.zsh eval/agenda/cli-goals.ts <新しい実行名>` が一時データを使って通常の CLI を操作し、会話ログ・設計書・結果を `data/agenda/runs/<実行名>` に保存します。 [目標の検証計画](spec/user-goals-verification-plan-2026-11-21.md)
 
-離席中の目標進行は実装準備の段階です。目標ごとの次の一手、作業の失敗や部分達成の扱い、実物による検証を定めています。[次の一手の判断契約](spec/goal-decision-contract-2026-11-23.md)
+0.1.12 は、離席中の目標進行に使う `decideGoalStep` と、許可・試行・観測・完了を保存する進行台帳を提供します。Eumenes 本家では会話と独立した背景キューから呼び、開発監督・Claude Code・Web メモの実行先に接続します。上記の standalone CLI は引き続きモック用の経路です。実物による検証と本家での受入状況は、[次の一手の判断契約](spec/goal-decision-contract-2026-11-23.md)と[本家の実装・検証記録](../eumenes/spec/verification/goal-autonomy-2026-11-23/README.md)を参照してください。
 
 `bun run pack` が作る tarball は `eumenes-agency/agenda/runtime` から目標ホスト、Memory 接続、ノート、Codex の設計と Web 検索、Claude Code モックを提供します。利用側は Bun で `openAgendaGoals` に Eumenes チェックアウトの `eumenesRoot`、モデルと報告の接続先を渡します。Memory の依存は `eumenes-memory@0.0.4` と `eumenes-memory-host@0.1.0` です。Codex を使う場合は `@openai/codex-sdk@0.160.0` と Codex CLI を利用します。既存のコアは `eumenes-agency` と `eumenes-agency/agenda` から利用できます。
 

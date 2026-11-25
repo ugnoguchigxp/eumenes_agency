@@ -230,6 +230,13 @@ export const remember = (st: AgendaState, s: Said) => {
 	if (st.said.length > SAID_KEPT) st.said = st.said.slice(-SAID_KEPT);
 };
 
+/**
+ * Work handed to a toolchain (a research item with `delegatedTo`): it does not use the researcher's
+ * one slot, is not checked against the notes and is not the plan's business.
+ */
+export const isAssignment = (i: AgendaItem) =>
+	i.kind === "research" && i.delegatedTo !== undefined;
+
 /** A new item with the usual defaults: open, not deferred, never declined. */
 export const makeItem = (
 	st: AgendaState,
@@ -246,6 +253,8 @@ export const makeItem = (
 				| "status"
 				| "endedAt"
 				| "delegatedTo"
+				| "question"
+				| "progress"
 				| "checkedRequest"
 				| "topic"
 			>

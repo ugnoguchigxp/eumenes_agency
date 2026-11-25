@@ -76,6 +76,8 @@ export const requiredAgendaExports = [
 	"checkExtract",
 	"extractSchema",
 	"extractJsonSchema",
+	"decideGoalStep",
+	"goalStepSchema",
 	"declinesOffer",
 	"endsWithQuestion",
 	"asksQuestion",
@@ -99,6 +101,7 @@ export const requiredAgendaExports = [
 const requiredAgendaRuntimeExports = [
 	"openAgendaGoals",
 	"withGoalReplyTools",
+	"goalWorkPermissionSchema",
 	"withGoalReplyInstructions",
 	"openGoalHost",
 	"createGoalStore",
@@ -110,6 +113,9 @@ const requiredAgendaRuntimeExports = [
 	"codexGoalDesigner",
 	"createDesignGenerator",
 	"validateDesign",
+	"createRegisteredGoalDesignGenerator",
+	"registeredGoalDesignSchema",
+	"validateRegisteredGoalDesign",
 	"codexWebNoteWriter",
 	"openClaudeCodeMock",
 ] as const;

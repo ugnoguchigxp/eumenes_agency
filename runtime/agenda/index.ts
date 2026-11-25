@@ -1,6 +1,9 @@
 export {
 	openAgendaGoals,
 	goalReplyToolNames,
+	goalWorkPermissionSchema,
+	type GoalReplyWorkPort,
+	type GoalWorkPermission,
 	withGoalReplyInstructions,
 	withGoalReplyTools,
 } from "./agenda-goals.ts";
@@ -20,12 +23,28 @@ export {
 	type GoalDocument,
 	type GoalReport,
 	type GoalTarget,
+	type GoalAccess,
+	type GoalRegistrationOptions,
+	type GoalSource,
+	type StoredGoal,
 	type WorkRequest,
 } from "./goal-store.ts";
+export type { GoalDecisionAdmission } from "./goal-progress-store.ts";
+export type * from "./goal-progress-contracts.ts";
+export {
+	canResolveGoalQuestion,
+	goalOwnerQuestionCriteria,
+} from "./goal-progress-contracts.ts";
 export {
 	GOAL_ANALYSIS_MS,
 	GOAL_DESIGNER,
 	createDesignGenerator,
+	createRegisteredGoalDesignGenerator,
+	validateRegisteredGoalDesign,
+	registeredGoalDesignSchema,
+	type GoalDesignCriterion,
+	type RegisteredGoalDesign,
+	type RegisteredGoalDesignInput,
 	validateDesign,
 	type DesignInput,
 	type DesignOutput,

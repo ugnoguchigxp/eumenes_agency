@@ -120,6 +120,10 @@ export interface AgendaItem {
 	checkedRequest?: string | null;
 	/** Work handed to a toolchain found through find_toolchain (the user said yes): its name. */
 	delegatedTo?: string;
+	/** `delegatedTo`: the assignee's open question to the user (null: none). */
+	question?: string | null;
+	/** `delegatedTo`: the assignee's latest one-line progress (null: none). */
+	progress?: string | null;
 	/** `research`: the note it became. */
 	resultNoteId?: string | null;
 	/** Why the utterance was last declined, and when (the plan learns from it). */
@@ -160,6 +164,8 @@ export const agendaSnapshotSchema = z.strictObject({
 				declines: z.number().int().min(0),
 				checkedRequest: z.string().nullable().optional(),
 				delegatedTo: z.string().optional(),
+				question: z.string().nullable().optional(),
+				progress: z.string().nullable().optional(),
 			}),
 		)
 		.max(200),

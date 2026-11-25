@@ -13,7 +13,7 @@ import {
 	type AgendaItem,
 } from "./contracts.ts";
 import { speechHeld, workHeld } from "./marks.ts";
-import { notes, wantPlan, type AgendaState } from "./state.ts";
+import { isAssignment, notes, wantPlan, type AgendaState } from "./state.ts";
 import { asksQuestion, normalize } from "./text.ts";
 
 export const paused = (st: AgendaState, now: number) =>
@@ -260,6 +260,7 @@ export const nextResearch = (st: AgendaState, now: number) =>
 			(i) =>
 				i.status === "open" &&
 				i.kind === "research" &&
+				!isAssignment(i) &&
 				(i.deferUntil === null || i.deferUntil <= now) &&
 				!workHeld(st, i) &&
 				// In a talk, only research that ties into it runs; the rest waits for the talk to end

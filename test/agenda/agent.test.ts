@@ -1230,7 +1230,9 @@ describe("agenda agent", () => {
 		expect(
 			agent.view().items.find((i) => i.kind === "talk" && i.noteId === "n2")
 				?.text,
-		).toBe("頼まれた「七里ヶ浜の朝（北斎風）」ができた");
+		).toBe(
+			"頼まれた「七里ヶ浜の朝を北斎風の絵にする」を担当（mock.paint）が終えた（メモ 七里ヶ浜の朝（北斎風））",
+		);
 	});
 
 	test("the plan knows a toolchain only once the reply found one: it sees what was found, for what", async () => {

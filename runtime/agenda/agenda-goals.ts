@@ -203,6 +203,18 @@ const register = z.strictObject({
 	priority,
 	quote,
 });
+export const goalWorkPermissionSchema = z.strictObject({
+	quote,
+	workspaceRef: z.string().min(1).describe("提示済みの作業先の参照"),
+	mode: z.enum(["read", "verify", "edit"]),
+	readablePaths: z.array(z.string().min(1)).min(1).max(32),
+	writablePaths: z.array(z.string().min(1)).max(32),
+	checkRefs: z.array(z.string().min(1)).max(12),
+});
+export type GoalWorkPermission = z.infer<typeof goalWorkPermissionSchema>;
+const realRegister = register.extend({
+	workPermission: goalWorkPermissionSchema.nullable().optional(),
+});
 const update = z.strictObject({
 	action: z.enum([
 		"authorize_mock",
@@ -227,6 +239,38 @@ const update = z.strictObject({
 	priority,
 	quote,
 });
+const realUpdate = update.extend({
+	action: z.enum([
+		"authorize_mock",
+		"revoke_mock",
+		"revise",
+		"withdraw",
+		"release",
+		"authorize_work",
+		"revoke_work",
+		"answer_question",
+	]),
+	workPermission: goalWorkPermissionSchema.nullable().optional(),
+	permit: z
+		.strictObject({ id: z.string().min(1), revision: z.number().int().min(1) })
+		.nullable()
+		.optional(),
+	questionRef: z.string().min(1).nullable().optional(),
+});
+type UserWords = { id: string; text: string };
+export interface GoalReplyWorkPort {
+	list(): unknown;
+	register(
+		input: z.infer<typeof realRegister>,
+		user: UserWords,
+		signal: AbortSignal,
+	): Promise<unknown>;
+	update(
+		input: z.infer<typeof realUpdate>,
+		user: UserWords,
+		signal: AbortSignal,
+	): Promise<unknown>;
+}
 const goalTools = [
 	{
 		name: "list_goals",
@@ -275,12 +319,30 @@ export function withGoalReplyTools(
 	host: GoalHost,
 	latestUser: () => { id: string; text: string } | undefined,
 	scopeKey = "personal",
+	work?: GoalReplyWorkPort,
 ): ToolPort {
 	const result = (value: unknown) => ({ content: JSON.stringify(value) });
 	return {
-		tools: [...base.tools, ...goalTools],
+		tools: [
+			...base.tools,
+			...goalTools.map((tool) =>
+				!work || tool.name === "list_goals"
+					? tool
+					: {
+							...tool,
+							description:
+								tool.name === "register_goal"
+									? "目標を保存します。同じ発言で範囲付き実作業が許可されていれば workPermission を指定します。"
+									: "現行の枠・目標ID・版を指定し、実作業の許可・取消、質問への回答、改訂、取下げなどを適用します。",
+							parameters: z.toJSONSchema(
+								tool.name === "register_goal" ? realRegister : realUpdate,
+							),
+						},
+			),
+		],
 		async call(call, signal) {
-			if (call.name === "list_goals") return result({ slots: host.list() });
+			if (call.name === "list_goals")
+				return result(work ? work.list() : { slots: host.list() });
 			if (call.name !== "register_goal" && call.name !== "update_goal")
 				return base.call(call, signal);
 			try {
@@ -289,12 +351,35 @@ export function withGoalReplyTools(
 				const user = latestUser();
 				const input =
 					call.name === "register_goal"
-						? register.parse(raw)
-						: update.parse(raw);
+						? realRegister.parse(raw)
+						: realUpdate.parse(raw);
 				if (!user?.text.includes(input.quote))
 					return result({
 						status: "refused",
 						reason: "user_request_not_found",
+					});
+				if (
+					input.workPermission &&
+					!user.text.includes(input.workPermission.quote)
+				)
+					return result({
+						status: "refused",
+						reason: "permission_quote_not_found",
+					});
+				if (work && !("action" in input))
+					return result(await work.register(input, user, signal));
+				if (
+					work &&
+					"action" in input &&
+					input.action !== "authorize_mock" &&
+					input.action !== "revoke_mock" &&
+					input.action !== "release"
+				)
+					return result(await work.update(input, user, signal));
+				if (!work && input.workPermission)
+					return result({
+						status: "refused",
+						reason: "goal_worker_unavailable",
 					});
 				const source = {
 					namespace: "conversation",
@@ -305,6 +390,13 @@ export function withGoalReplyTools(
 					const { slot, goalId, revision } = input;
 					const target = { slot, goalId, revision };
 					switch (input.action) {
+						case "authorize_work":
+						case "revoke_work":
+						case "answer_question":
+							return result({
+								status: "refused",
+								reason: "goal_worker_unavailable",
+							});
 						case "authorize_mock":
 							await host.authorize(target, input.design);
 							break;

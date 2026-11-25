@@ -5,10 +5,14 @@ import type { LlmRequest } from "eumenes-agency";
 import {
 	READ_NOTE,
 	SHOW_NOTE,
+	decideGoalStep,
+	goalStepSchema,
+	type GoalStepContext,
 	type AgendaGoalContext,
 } from "eumenes-agency/agenda";
 import {
 	CLAUDE_CODE,
+	goalMigrations,
 	codexGoalDesigner,
 	codexWebNoteWriter,
 	openAgendaGoals,
@@ -38,6 +42,56 @@ const respond = <T>(request: LlmRequest<T>, value: unknown) => ({
 	cacheReadTokens: 0,
 	latencyMs: 0,
 });
+const snapshot: GoalStepContext = {
+	version: 1,
+	contextId: "packed:1",
+	goal: {
+		id: "packed",
+		revision: 1,
+		desiredState: "Verify a saved artifact",
+		sourceRef: null,
+	},
+	progressVersion: 1,
+	criteria: [
+		{
+			id: "root",
+			status: "open",
+			text: "Verify a saved artifact",
+			evidenceRefs: [],
+		},
+	],
+	evidence: [],
+	attempts: [],
+	capabilities: [],
+	watches: [],
+	checks: [],
+	openQuestions: [],
+	reviewRequired: false,
+};
+const proposed = goalStepSchema.parse({
+	contextId: snapshot.contextId,
+	progressVersion: 1,
+	criterionIds: ["root"],
+	kind: "ask",
+	missing: "artifact",
+	question: "Where is the artifact?",
+	reason: "The artifact location is unavailable.",
+	review: null,
+});
+assert.deepEqual(
+	await decideGoalStep(
+		{
+			async complete(request) {
+				return respond(request, { step: proposed });
+			},
+		},
+		snapshot,
+		{ sources: [], complete: true },
+		new AbortController().signal,
+	),
+	{ status: "chosen", step: proposed },
+);
+assert.equal(goalMigrations.at(-1)?.id, "agency-goals/0006-read-policies");
 const memoryModel: Complete = async () => ({
 	raw: JSON.stringify({
 		proposal: {
