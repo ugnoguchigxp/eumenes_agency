@@ -321,6 +321,11 @@ export type AgendaTicket =
 export interface StepHost {
 	/** Typing, a reply being made or speech being read out: nothing is planned or said. */
 	readonly busy: boolean;
+	/**
+	 * The conversation is not the one on screen: nothing is planned, and only what was promised
+	 * (a report of work the user asked for, an assignee's question) is said there.
+	 */
+	readonly promisedOnly?: boolean;
 }
 
 export interface CallRecord {

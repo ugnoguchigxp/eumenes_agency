@@ -188,6 +188,9 @@ export interface AgendaAgent {
 	snapshot(now: number): AgendaSnapshot;
 }
 
+/** A line owed to the user: a report of what they asked for, or an assignee's question. */
+const promisedLine = (i: AgendaItem) => i.kind === "talk" && i.promised;
+
 export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 	const intervalSec = deps.speechIntervalSec ?? defaultSpeechIntervalSec;
 	if (!speechIntervals.includes(intervalSec))
@@ -315,6 +318,7 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 		if (
 			st.planDue &&
 			!host().busy &&
+			!host().promisedOnly &&
 			(st.planRetryAt === null || st.planRetryAt <= now)
 		)
 			planned = await plan(st, now, signal);
@@ -401,7 +405,12 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 				speechHeld(st, item)
 			)
 				dropReady();
-			else if (open !== null && open <= now && !host().busy) {
+			else if (
+				open !== null &&
+				open <= now &&
+				!host().busy &&
+				(!host().promisedOnly || promisedLine(item))
+			) {
 				const line = st.ready.ticket;
 				st.ready = null;
 				return { ...none, line, held: true, open };
@@ -418,7 +427,9 @@ export function createAgendaAgent(deps: AgendaDeps): AgendaAgent {
 			// ahead, and it starts at once when the turn ends (the host steps again then). Seen
 			// again after the check below, which takes a call's time.
 			if (host().busy) break;
-			const item = speakable(st, now).find(due);
+			const item = speakable(st, now).find(
+				(i) => due(i) && (!host().promisedOnly || promisedLine(i)),
+			);
 			if (!item) break;
 			if (item.kind === "ask" && !checkedNow.has(item.id)) {
 				checkedNow.add(item.id);

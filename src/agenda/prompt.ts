@@ -62,6 +62,7 @@ export function planSystem(persona: string = defaultPersona): string {
 		"【先回りする】",
 		"- user.plans は、相手が話した予定です（dueAt は期限、null は日付が未定）。user.goals は、相手が枠に入れた目標です。記憶（user.memory）は確かな事実と好みで、予定や目標は持ちません。",
 		"- 相手がこれから考えそうなこと、聞きそうなことを先回りして research にします（user.plans の予定の下調べ、user.goals の目標に役立つ情報、user.memory の好きなものの新しい動き、困っていることの解決の手がかり）。予定で決まっていないこと（宿、同行者など）は、ask で聞くか、決めるのに役立つ下調べにします。dueAt を過ぎた予定は、済んだものとして扱い、先回りの材料にしません。",
+		"- inProgress は、利用者が担当に頼んでまだ終わっていない仕事です。終わったもの・できたものとして話す talk や ask は足しません（結果はできたときに知らせます）。",
 		"- notes・researchedBefore・researching と同じテーマの調べものは、言い方を変えても足しません（同じ結果を何度も受け取ることになります。ホストも似たテーマを断ります）。次に調べるなら、まだ扱っていない別の話題や観点にします。ただし天気・ニュース・上映や営業の時間・価格のように時期で変わる情報で、メモが古い（at が now より大きく前で、今の時期のものでない）ときは、今の情報を調べ直す research を足してかまいません。",
 		"- 相手が話した話題で、まだメモにない観点があれば research を足します。調べものは一度に一つずつ順に進むので、続けて調べたいことは待ちの列に入れておいてかまいません。",
 		"- 調べた結果を全部伝えようとはしません。メモは記録に残り、後の会話で使えます。talk にするのは、雑談のネタになりそうなもの、相手が喜びそう・驚きそうなものだけです。",
@@ -308,6 +309,8 @@ export interface PlanInput {
 	readonly doNotRaise?: readonly string[];
 	readonly notes: readonly NoteRef[];
 	readonly researching: AgendaItem | null;
+	/** Work the user asked a toolchain for that has not ended: it is not done, so nothing is said of its result. */
+	readonly assignments?: readonly AgendaItem[];
 	readonly quiet: Quiet;
 	/** The name the last plan gave the topic of the user's words (null: none yet). */
 	readonly lastFocus?: string | null;
@@ -417,6 +420,15 @@ export function planData(input: PlanInput): string {
 					secAgo: secAgo(now, input.researching.createdAt),
 				}
 			: null,
+		...(input.assignments?.length
+			? {
+					inProgress: input.assignments.map((i) => ({
+						assignee: i.delegatedTo,
+						request: i.text.slice(0, 80),
+						...(i.question ? { question: i.question.slice(0, 300) } : {}),
+					})),
+				}
+			: {}),
 		notes: [...input.notes]
 			.sort((a, b) => b.at - a.at)
 			.slice(0, PLAN_NOTES)

@@ -92,6 +92,9 @@ export async function plan(
 		stamp: stampOf(st),
 		said: st.said,
 		items: st.items.filter((i) => !isAssignment(i)),
+		assignments: st.items.filter(
+			(i) => isAssignment(i) && (i.status === "open" || i.status === "doing"),
+		),
 		known: knownNow,
 		plans: plansNow,
 		goals: goalsNow,

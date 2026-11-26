@@ -590,3 +590,66 @@ test("an assignment the user sent from a screen rests on that message, with no w
 	// The item rests on the screen's message, not on the last words heard (u1).
 	expect("item" in r && r.item.refs).toEqual(["form-1"]);
 });
+
+test("in a conversation not on screen only a promised report is said, and nothing is planned", async () => {
+	const { agent, m } = setup();
+	assign(agent, "夕焼けの海の絵を描く");
+	const offScreen = () => ({ busy: false, promisedOnly: true });
+	const t = research((await agent.step(0, offScreen, sig())).tickets)[0]!;
+	const note: NoteRef = {
+		id: "n9",
+		title: "夕焼けの海",
+		summary: "描いた",
+		at: 60_000,
+		refs: [],
+	};
+	noteStore.push(note);
+	agent.researchReturned({
+		ticketId: t.id,
+		at: 60_000,
+		status: "succeeded",
+		note,
+	});
+	const spoken: AgendaTicket[] = [];
+	for (const now of [70_000, 200_000, 400_000])
+		spoken.push(...(await agent.step(now, offScreen, sig())).tickets);
+	expect(spoken).toMatchObject([
+		{ kind: "speak", itemKind: "talk", noteId: "n9" },
+	]);
+	expect(m.kinds).not.toContain("plan");
+});
+
+test("the planner sees the assignments still running, so it does not talk of them as done", async () => {
+	const prompts: string[] = [];
+	const llm: LlmPort = {
+		complete<T>(req: LlmRequest<T>) {
+			prompts.push(req.prompt);
+			const plan = req.system.includes("この呼び出しは「計画」");
+			return Promise.resolve({
+				value: (plan ? { add: [], drop: [], focus: "" } : {}) as T,
+				call: {
+					purpose: plan ? "plan" : "compose",
+					at: 0,
+					model: "m",
+					latencyMs: 0,
+					inputTokens: 0,
+					outputTokens: 0,
+					code: "ok",
+				},
+			} as never);
+		},
+	} as unknown as LlmPort;
+	const agent = createAgendaAgent({ llm, startedAt: 0, notes: () => [] });
+	agent.observe({
+		id: "u1",
+		who: "user",
+		text: "夕焼けの海の絵を描いて",
+		at: 0,
+	});
+	assign(agent, "夕焼けの海の絵を描く", "画像生成");
+	agent.infoChanged(1);
+	await agent.step(1, idle, sig());
+	const planPrompt = prompts.find((p) => p.includes("inProgress"));
+	expect(planPrompt).toBeDefined();
+	expect(planPrompt).toContain("夕焼けの海の絵を描く");
+});
